@@ -1,4 +1,15 @@
 
+import RecentProjects from "@/app/components/recentProject";
+
+export default function Home() {
+  return (
+    <>
+    
+    <RecentProjects />
+
+    </>
+
+
 
 
 import ProgressCard from "@/components/ProgressCard";
@@ -78,6 +89,7 @@ export default function Home() {
       <main className="min-h-screen pl-64" />
 
     </div>
+
 
   );
 }
