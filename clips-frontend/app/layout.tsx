@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import TopNav from "@/component/TopNav";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,7 +28,16 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+
+        <>
+          <TopNav
+            user={{
+              name: "Jane Doe",
+              avatarUrl: "https://randomuser.me/api/portraits/women/2.jpg",
+            }}
+          />
+          <main>{children}</main>
+        </>
       </body>
     </html>
   );
