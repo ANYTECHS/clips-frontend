@@ -57,7 +57,7 @@ function PlatformsIcon() {
 
 export default function StatCardGroup() {
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <>
        <StatCard
         index={0}
         label="Total Earnings"
@@ -66,6 +66,7 @@ export default function StatCardGroup() {
         trendLabel=""
         icon={<EarningsIcon />}
         iconColor="#00C27C"
+        className="bento-stat-card"
       />
       <StatCard
         index={1}
@@ -75,6 +76,7 @@ export default function StatCardGroup() {
         trendLabel=""
         icon={<ClipsIcon />}
         iconColor="#00C27C"
+        className="bento-stat-card"
       />
       <StatCard
         index={2}
@@ -84,7 +86,8 @@ export default function StatCardGroup() {
         trendLabel="Steady" 
         icon={<PlatformsIcon />}
         iconColor="#00C27C"
+        className="bento-stat-card"
       />
-    </div>
+    </>
   );
 }
