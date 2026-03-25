@@ -4,6 +4,7 @@ import Image from "next/image";
 
 
 import Image from "next/image";
+import OnboardingStep1 from "@/app/components/OnboardingStep1";
 
 export default function Home() {
   return (
@@ -142,6 +143,11 @@ export default function Home() {
         <div className="w-full flex justify-center">
           <AiInsightCard />
         </div>
+
+        <OnboardingStep1 onContinue={(values) => {
+  // values.fullName, values.niche
+  router.push("/onboard/step-2");
+}} />
 
         {/* Other metrics below */}
         <div className="w-full max-w-5xl">
