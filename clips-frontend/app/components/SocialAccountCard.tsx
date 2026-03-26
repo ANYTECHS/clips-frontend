@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import { Check } from "lucide-react";
 
 interface SocialAccountCardProps {
   platform: "tiktok" | "instagram" | "youtube";
@@ -8,6 +9,7 @@ interface SocialAccountCardProps {
   subtext: string;
   icon?: React.ReactNode;
   onConnect: (platform: string) => void;
+  isSelected?: boolean;
 }
 
 export default function SocialAccountCard({
@@ -16,6 +18,7 @@ export default function SocialAccountCard({
   subtext,
   icon,
   onConnect,
+  isSelected = false,
 }: SocialAccountCardProps) {
   const handleClick = () => {
     onConnect(platform);
@@ -32,11 +35,20 @@ export default function SocialAccountCard({
     <div
       role="button"
       tabIndex={0}
-      aria-label={`Connect ${label} account`}
+      aria-label={`${isSelected ? "Deselect" : "Select"} ${label} account`}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
-      className="rounded-2xl bg-white/90 dark:bg-zinc-900/90 backdrop-blur-xl p-4 sm:p-6 flex flex-col items-center gap-4 cursor-pointer select-none border border-zinc-200 dark:border-zinc-800 transition-all duration-200 ease-in-out hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+      className={`relative rounded-2xl backdrop-blur-xl p-4 sm:p-6 flex flex-col items-center gap-4 cursor-pointer select-none border transition-all duration-200 ease-in-out ${
+        isSelected
+          ? "bg-white/10 border-white/30 dark:bg-zinc-800/70 dark:border-zinc-600"
+          : "bg-white/90 dark:bg-zinc-900/90 border-zinc-200 dark:border-zinc-800 hover:border-zinc-400 dark:hover:border-zinc-500 hover:bg-zinc-50 dark:hover:bg-zinc-800/50"
+      }`}
     >
+      {isSelected && (
+        <div className="absolute top-3 right-3 bg-green-500 rounded-full p-1">
+          <Check className="h-4 w-4 text-white" />
+        </div>
+      )}
       <div className="flex items-center justify-center">
         {icon ?? <span className="text-lg font-semibold">{label}</span>}
       </div>

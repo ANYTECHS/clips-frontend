@@ -1,4 +1,5 @@
 import Image from "next/image";
+import PlanUsage from "./PlanUsage";
 
 type NavItem = {
   label: string;
@@ -56,7 +57,9 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-white/5 pt-5">
+      <PlanUsage usage={80} />
+
+      <div className="border-t border-white/5 pt-5">
         <div className="flex items-center gap-3">
           <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#1F2937]">
             <Image

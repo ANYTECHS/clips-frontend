@@ -39,10 +39,12 @@ const PLATFORMS: PlatformConfig[] = [
 
 interface SocialAccountCardGridProps {
   onConnect: (platform: string) => void;
+  selectedPlatforms?: Set<string>;
 }
 
 export default function SocialAccountCardGrid({
   onConnect,
+  selectedPlatforms = new Set(),
 }: SocialAccountCardGridProps) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -54,6 +56,7 @@ export default function SocialAccountCardGrid({
           subtext={config.subtext}
           icon={config.icon}
           onConnect={onConnect}
+          isSelected={selectedPlatforms.has(config.platform)}
         />
       ))}
     </div>

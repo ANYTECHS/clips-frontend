@@ -1,0 +1,24 @@
+## Footer & Security Disclaimer (Fixes #17)
+
+### Changes
+- **Updated Footer copyright/security text**: Now shows exact "© 2024 ClipCash AI. Secure OAuth2 connection for all socials. We never share your private data."
+  - Centered layout via flexbox
+  - Muted grey styling (`text-white/30 text-xs`) to avoid distracting main CTA
+- **Enhanced legal links**: Added `hover:underline` on Privacy Policy/Terms/Cookie Settings (plus existing color transition)
+
+### Files Changed
+| File | Changes |
+|------|---------|
+| `component/Footer.tsx` | Text update + hover underline |
+| `TODO.md` | Implementation tracking (docs) |
+
+### Testing
+- View main page (`/`) → Scroll to footer: Text correct, centered, muted
+- Hover legal links: Underline appears
+- Dashboard (`/dashboard`) skips footer as designed
+- "Skip for now"-style CTAs positioned clearly above (main "Get Started" button)
+
+### Screenshots
+*(Attach before/after footer)*
+
+Closes #17 ✅

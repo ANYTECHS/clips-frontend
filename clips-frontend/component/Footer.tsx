@@ -39,7 +39,6 @@ export default function Footer() {
       ].join(" ")}
     >
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-
         <div className="flex items-center gap-2 shrink-0">
           <Image
             src="/images/logo.png"
@@ -49,14 +48,12 @@ export default function Footer() {
             className="object-cover w-28 h-auto"
           />
           <span className="text-white/30 text-xs">
-            © 2024 ClipCash AI. All rights reserved.
+            © 2024 ClipCash AI. Secure OAuth2 connection for all socials. We
+            never share your private data.
           </span>
         </div>
 
-        <nav
-          aria-label="Partner platforms"
-          className="flex items-center gap-6"
-        >
+        <nav aria-label="Partner platforms" className="flex items-center gap-6">
           {PLATFORM_ITEMS.map((item) => (
             <Link
               key={item.label}
@@ -76,7 +73,7 @@ export default function Footer() {
               href={item.href}
               className={[
                 "text-xs text-white/30",
-                "hover:text-white/70",
+                "hover:text-white/70 hover:underline",
                 "transition-colors duration-150",
               ].join(" ")}
             >
@@ -84,7 +81,6 @@ export default function Footer() {
             </Link>
           ))}
         </div>
-
       </div>
     </footer>
   );

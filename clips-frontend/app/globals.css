@@ -2,19 +2,42 @@
 @import "tailwindcss";
 @import "./styles/bento-grid.css";
 
+
 :root {
+
+/* ============================================
+   ClipCash Design System
+   ============================================ */
+
+:root {
+  /* Brand Colors */
+  --brand-primary: #00FF9D;
+  --brand-primary-hover: #00E68D;
+  --brand-primary-light: #88FFD9;
+  
+  /* Dark Mode Background Palette */
+
   --background: #050505;
-  --foreground: #f5f7fb;
   --page-background: #050505;
   --card-background: #121212;
+  --card-background-elevated: #1A1A1A;
+  --border-color: #2A2A2A;
+  
+  /* Text Colors */
+  --foreground: #f5f7fb;
   --heading-color: #f6f4f0;
   --muted-text: #8d97ac;
-  --link-color: #17f9bf;
+  
+  /* Link Colors */
+  --link-color: #00FF9D;
   --link-hover: #88ffd9;
-  --status-processing-bg: rgba(2, 119, 88, 0.22);
-  --status-processing-text: #14f1b1;
+  
+  /* Status Colors */
+  --status-processing-bg: rgba(0, 255, 157, 0.15);
+  --status-processing-text: #00FF9D;
   --status-completed-bg: #23252b;
   --status-completed-text: #98a0af;
+
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -25,6 +48,36 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-inter: var(--font-inter);
+
+  --status-error-bg: rgba(239, 68, 68, 0.15);
+  --status-error-text: #EF4444;
+  
+  /* Border Radius - ClipCash Standard */
+  --radius-card: 1rem; /* rounded-2xl for cards */
+  --radius-button: 0.5rem; /* rounded-lg for buttons */
+  --radius-input: 0.5rem; /* rounded-lg for inputs */
+  --radius-badge: 0.375rem; /* rounded-md for badges */
+}
+
+@theme inline {
+  /* Color System */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--brand-primary);
+  --color-primary-hover: var(--brand-primary-hover);
+  --color-card: var(--card-background);
+  --color-border: var(--border-color);
+  --color-muted: var(--muted-text);
+  
+  /* Typography - Sans-serif Font Stack */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol";
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  
+  /* Border Radius Tokens */
+  --radius-2xl: var(--radius-card);
+  --radius-lg: var(--radius-button);
+  --radius-md: var(--radius-badge);
+
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,11 +85,13 @@
     --background: #050505;
     --foreground: #f5f7fb;
   }
+ feat/ui-ai-pulsing-status
 
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
   }
+
 }
 
 @keyframes stat-in {
