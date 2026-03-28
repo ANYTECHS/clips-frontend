@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import PlatformManageModal from "./components/PlatformManageModal";
+import { Badge } from "@/components/ui/Badge";
 
 type Platform = {
   name: string;
@@ -83,9 +84,14 @@ export default function ConnectAccountsSection() {
               </span>
 
               {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white/80">{p.name}</p>
-                <p className="text-xs text-white/30 truncate">{p.handle}</p>
+              <div className="flex-1 min-w-0 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-white/80">{p.name}</p>
+                  <p className="text-xs text-white/30 truncate">{p.handle}</p>
+                </div>
+                <Badge variant={p.connected ? "active" : "not-linked"}>
+                  {p.connected ? "Active" : "Not Linked"}
+                </Badge>
               </div>
 
               {/* Manage button for connected, Connect for disconnected */}
