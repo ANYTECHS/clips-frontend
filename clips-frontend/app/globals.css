@@ -2,9 +2,6 @@
 @import "tailwindcss";
 @import "./styles/bento-grid.css";
 
-
-:root {
-
 /* ============================================
    ClipCash Design System
    ============================================ */
@@ -85,7 +82,7 @@
     --background: #050505;
     --foreground: #f5f7fb;
   }
- feat/ui-ai-pulsing-status
+
 
   :root {
     --background: #0a0a0a;

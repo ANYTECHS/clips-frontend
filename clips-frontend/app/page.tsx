@@ -1,3 +1,5 @@
+import CreatorBadge from "./components/CreatorsBadge";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-[#050505] px-4 py-20 text-white md:px-8">
@@ -6,7 +8,16 @@ export default function Home() {
         <p className="mt-4 text-zinc-300">
           ClipCash helps creators generate, curate, and publish short clips in minutes.
         </p>
+
+          {/* Onbaording proof section for issue #14 */}
+         <CreatorBadge count="2,500+" label="creators joined this week." />
       </section>
+
+
+     
+
+    
+
       <section id="features" className="mx-auto mt-24 max-w-5xl">
         <h2 className="text-2xl font-semibold">Features</h2>
       </section>
