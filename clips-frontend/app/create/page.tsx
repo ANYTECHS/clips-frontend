@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import { Sparkles, Upload, Link as LinkIcon, Loader2 } from "lucide-react";
+import { Sparkles, Link as LinkIcon, Loader2, Info } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useProcessStore } from "../hooks/useProcessStore";
 import FileUploadZone from "../components/FileUploadZone";
@@ -211,15 +211,19 @@ export default function CreateClipsPage() {
             }}
           >
             <label className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-semibold text-white">Auto-Publish</h3>
-                <p className="mt-1 text-sm text-zinc-400">
-                  Automatically publish clips to selected platforms
+              <div id="auto-generate-label">
+                <h3 className="text-base font-semibold text-white">Auto-generate clips</h3>
+                <p id="auto-generate-description" className="mt-1 text-sm text-zinc-400">
+                  Let Clips automatically extract highlight-ready moments for the selected platforms
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setAutoPublish(!autoPublish)}
+                role="switch"
+                aria-checked={autoPublish}
+                aria-labelledby="auto-generate-label"
+                aria-describedby="auto-generate-description"
                 disabled={isSubmitting}
                 className={`relative h-7 w-12 rounded-full transition ${
                   autoPublish ? "bg-[#00E68A]" : "bg-zinc-700"
@@ -232,6 +236,13 @@ export default function CreateClipsPage() {
                 />
               </button>
             </label>
+
+            <div className="mt-5 flex items-start gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/45 px-4 py-3 text-sm text-zinc-400">
+              <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-500" aria-hidden="true" />
+              <p>
+                Estimated processing time: 1 to 3 minutes depending on video length and clip count.
+              </p>
+            </div>
           </div>
 
           {/* Error Message */}

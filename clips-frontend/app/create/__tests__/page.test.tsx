@@ -28,7 +28,8 @@ describe("CreateClipsPage", () => {
     expect(screen.getByText("Create Clips")).toBeInTheDocument();
     expect(screen.getByLabelText("Video URL")).toBeInTheDocument();
     expect(screen.getByText("Target Platforms")).toBeInTheDocument();
-    expect(screen.getByText("Auto-Publish")).toBeInTheDocument();
+    expect(screen.getByText("Auto-generate clips")).toBeInTheDocument();
+    expect(screen.getByText(/estimated processing time/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /generate clips/i })).toBeInTheDocument();
   });
 
@@ -53,21 +54,20 @@ describe("CreateClipsPage", () => {
     expect(submitButton).toBeEnabled();
   });
 
-  it("clears file when URL is entered", async () => {
+  it("disables the URL input when a file is selected", async () => {
     const user = userEvent.setup();
     render(<CreateClipsPage />);
     
-    // Upload file first
     const file = new File(["video"], "test.mp4", { type: "video/mp4" });
-    const fileInput = screen.getByLabelText(/upload video file/i);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+    if (!fileInput) {
+      throw new Error("Expected hidden file input to exist");
+    }
     await user.upload(fileInput, file);
     
-    // Then enter URL
     const urlInput = screen.getByLabelText("Video URL");
-    await user.type(urlInput, "https://youtube.com/watch?v=test");
-    
-    // File should be cleared (URL input should be enabled)
-    expect(urlInput).not.toBeDisabled();
+    expect(urlInput).toBeDisabled();
   });
 
   it("toggles platform selection", async () => {
@@ -88,18 +88,20 @@ describe("CreateClipsPage", () => {
     expect(tiktokButton).not.toHaveClass("ring-[#00E68A]");
   });
 
-  it("toggles auto-publish switch", async () => {
+  it("toggles auto-generate switch with keyboard support", async () => {
     const user = userEvent.setup();
     render(<CreateClipsPage />);
     
-    const autoPublishToggle = screen.getByRole("button", { name: "" }).closest("button");
-    
-    // Click to enable
-    if (autoPublishToggle) {
-      await user.click(autoPublishToggle);
-      // Verify toggle state changed (check for class changes)
-      expect(autoPublishToggle).toHaveClass("bg-[#00E68A]");
-    }
+    const autoGenerateToggle = screen.getByRole("switch", { name: /auto-generate clips/i });
+    expect(autoGenerateToggle).toHaveAttribute("aria-checked", "false");
+
+    await user.click(autoGenerateToggle);
+    expect(autoGenerateToggle).toHaveClass("bg-[#00E68A]");
+    expect(autoGenerateToggle).toHaveAttribute("aria-checked", "true");
+
+    autoGenerateToggle.focus();
+    await user.keyboard("[Space]");
+    expect(autoGenerateToggle).toHaveAttribute("aria-checked", "false");
   });
 
   it("shows loading state during submission", async () => {
