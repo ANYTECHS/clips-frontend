@@ -26,16 +26,16 @@ describe("CreateClipsPage", () => {
     render(<CreateClipsPage />);
     
     expect(screen.getByText("Create Clips")).toBeInTheDocument();
-    expect(screen.getByLabelText("Video URL")).toBeInTheDocument();
+    expect(screen.getByLabelText("Paste YouTube or Vimeo URL")).toBeInTheDocument();
     expect(screen.getByText("Target Platforms")).toBeInTheDocument();
     expect(screen.getByText("Auto-Publish")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /generate clips/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /clip now/i })).toBeInTheDocument();
   });
 
   it("disables submit button when no video input is provided", () => {
     render(<CreateClipsPage />);
     
-    const submitButton = screen.getByRole("button", { name: /generate clips/i });
+    const submitButton = screen.getByRole("button", { name: /clip now/i });
     expect(submitButton).toBeDisabled();
   });
 
@@ -43,31 +43,46 @@ describe("CreateClipsPage", () => {
     const user = userEvent.setup();
     render(<CreateClipsPage />);
     
-    const urlInput = screen.getByLabelText("Video URL");
+    const urlInput = screen.getByLabelText("Paste YouTube or Vimeo URL");
     await user.type(urlInput, "https://youtube.com/watch?v=test");
     
     const tiktokButton = screen.getByRole("button", { name: "TikTok" });
     await user.click(tiktokButton);
     
-    const submitButton = screen.getByRole("button", { name: /generate clips/i });
+    const submitButton = screen.getByRole("button", { name: /clip now/i });
     expect(submitButton).toBeEnabled();
   });
 
-  it("clears file when URL is entered", async () => {
+  it("disables the URL input when a file is selected", async () => {
     const user = userEvent.setup();
     render(<CreateClipsPage />);
     
-    // Upload file first
     const file = new File(["video"], "test.mp4", { type: "video/mp4" });
-    const fileInput = screen.getByLabelText(/upload video file/i);
+    const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement | null;
+    expect(fileInput).not.toBeNull();
+    if (!fileInput) {
+      throw new Error("Expected hidden file input to exist");
+    }
     await user.upload(fileInput, file);
     
-    // Then enter URL
-    const urlInput = screen.getByLabelText("Video URL");
-    await user.type(urlInput, "https://youtube.com/watch?v=test");
-    
-    // File should be cleared (URL input should be enabled)
-    expect(urlInput).not.toBeDisabled();
+    const urlInput = screen.getByLabelText("Paste YouTube or Vimeo URL");
+    expect(urlInput).toBeDisabled();
+  });
+
+  it("shows validation feedback for unsupported video URLs", async () => {
+    const user = userEvent.setup();
+    render(<CreateClipsPage />);
+
+    const urlInput = screen.getByLabelText("Paste YouTube or Vimeo URL");
+    await user.type(urlInput, "https://example.com/video");
+
+    expect(screen.getByText(/please enter a valid youtube or vimeo url/i)).toBeInTheDocument();
+
+    const tiktokButton = screen.getByRole("button", { name: "TikTok" });
+    await user.click(tiktokButton);
+
+    const submitButton = screen.getByRole("button", { name: /clip now/i });
+    expect(submitButton).toBeDisabled();
   });
 
   it("toggles platform selection", async () => {
@@ -116,14 +131,14 @@ describe("CreateClipsPage", () => {
     render(<CreateClipsPage />);
     
     // Fill form
-    const urlInput = screen.getByLabelText("Video URL");
+    const urlInput = screen.getByLabelText("Paste YouTube or Vimeo URL");
     await user.type(urlInput, "https://youtube.com/watch?v=test");
     
     const tiktokButton = screen.getByRole("button", { name: "TikTok" });
     await user.click(tiktokButton);
     
     // Submit
-    const submitButton = screen.getByRole("button", { name: /generate clips/i });
+    const submitButton = screen.getByRole("button", { name: /clip now/i });
     await user.click(submitButton);
     
     // Should show loading state
@@ -132,35 +147,20 @@ describe("CreateClipsPage", () => {
     });
   });
 
-  it("displays error message on submission failure", async () => {
+  it("displays validation feedback for invalid video URLs before submission", async () => {
     const user = userEvent.setup();
-    
-    // Mock fetch to fail
-    global.fetch = vi.fn(() =>
-      Promise.resolve({
-        ok: false,
-        status: 400,
-        json: () => Promise.resolve({ message: "Invalid video URL" }),
-      } as Response)
-    );
-    
+
     render(<CreateClipsPage />);
-    
-    // Fill form
-    const urlInput = screen.getByLabelText("Video URL");
+
+    const urlInput = screen.getByLabelText("Paste YouTube or Vimeo URL");
     await user.type(urlInput, "https://invalid-url");
-    
+
     const tiktokButton = screen.getByRole("button", { name: "TikTok" });
     await user.click(tiktokButton);
-    
-    // Submit
-    const submitButton = screen.getByRole("button", { name: /generate clips/i });
-    await user.click(submitButton);
-    
-    // Should show error
-    await waitFor(() => {
-      expect(screen.getByText("Invalid video URL")).toBeInTheDocument();
-    });
+
+    const submitButton = screen.getByRole("button", { name: /clip now/i });
+    expect(submitButton).toBeDisabled();
+    expect(screen.getByText(/please enter a valid youtube or vimeo url/i)).toBeInTheDocument();
   });
 
   it("shows validation hints", () => {

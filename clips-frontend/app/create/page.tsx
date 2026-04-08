@@ -14,6 +14,9 @@ interface PlatformState {
   enabled: boolean;
 }
 
+const SUPPORTED_VIDEO_URL_PATTERN =
+  /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|vimeo\.com\/)/i;
+
 const INITIAL_PLATFORMS: PlatformState[] = [
   { id: "tiktok", name: "TikTok", enabled: false },
   { id: "instagram", name: "Instagram", enabled: false },
@@ -32,8 +35,18 @@ export default function CreateClipsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const trimmedVideoUrl = videoUrl.trim();
+  const hasTypedVideoUrl = trimmedVideoUrl !== "";
+  const hasSupportedVideoUrl =
+    !hasTypedVideoUrl || SUPPORTED_VIDEO_URL_PATTERN.test(trimmedVideoUrl);
+  const urlValidationMessage =
+    hasTypedVideoUrl && !hasSupportedVideoUrl
+      ? "Please enter a valid YouTube or Vimeo URL."
+      : null;
+
   // Validation
-  const hasVideoInput = videoUrl.trim() !== "" || uploadedFile !== null;
+  const hasVideoInput =
+    uploadedFile !== null || (hasTypedVideoUrl && hasSupportedVideoUrl);
   const hasSelectedPlatform = platforms.some((p) => p.enabled);
   const isFormValid = hasVideoInput && hasSelectedPlatform && !isSubmitting;
 
@@ -63,6 +76,11 @@ export default function CreateClipsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!uploadedFile && hasTypedVideoUrl && !hasSupportedVideoUrl) {
+      setError("Please enter a valid YouTube or Vimeo URL.");
+      return;
+    }
     
     if (!isFormValid) return;
 
@@ -135,7 +153,7 @@ export default function CreateClipsPage() {
             {/* URL Input */}
             <div className="mb-4">
               <label htmlFor="video-url" className="mb-2 block text-sm text-zinc-400">
-                Video URL
+                Paste YouTube or Vimeo URL
               </label>
               <div className="relative">
                 <LinkIcon className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-zinc-500" />
@@ -144,11 +162,22 @@ export default function CreateClipsPage() {
                   type="url"
                   value={videoUrl}
                   onChange={handleUrlChange}
-                  placeholder="https://youtube.com/watch?v=..."
+                  placeholder="https://youtube.com/watch?v=... or https://vimeo.com/..."
                   disabled={uploadedFile !== null || isSubmitting}
-                  className="w-full rounded-xl bg-zinc-900/50 py-3 pl-11 pr-4 text-white placeholder-zinc-500 outline-none ring-1 ring-zinc-800 transition focus:ring-2 focus:ring-[#00E68A] disabled:opacity-50"
+                  aria-invalid={Boolean(urlValidationMessage)}
+                  aria-describedby="video-url-help"
+                  className="w-full rounded-xl bg-zinc-900/50 py-3 pl-11 pr-4 text-white placeholder-zinc-500 outline-none ring-1 ring-zinc-800 transition hover:ring-zinc-700 focus:ring-2 focus:ring-[#00E68A] disabled:opacity-50"
                 />
               </div>
+              <p
+                id="video-url-help"
+                className={`mt-2 text-sm ${
+                  urlValidationMessage ? "text-red-400" : "text-zinc-500"
+                }`}
+              >
+                {urlValidationMessage ??
+                  "Supported links: public YouTube watch/share URLs and Vimeo video URLs."}
+              </p>
             </div>
 
             {/* Divider */}
@@ -255,7 +284,7 @@ export default function CreateClipsPage() {
             ) : (
               <>
                 <Sparkles className="h-5 w-5" aria-hidden="true" />
-                Generate Clips
+                Clip Now
               </>
             )}
           </button>
