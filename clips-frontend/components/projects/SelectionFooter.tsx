@@ -7,8 +7,10 @@ import {
   Download, 
   Zap, 
   MoveRight,
-  Hexagon
+  Hexagon,
+  Info
 } from "lucide-react";
+import { calculateMintCost, formatSol } from "@/app/lib/mintUtils";
 
 interface SelectionFooterProps {
   count: number;
@@ -18,6 +20,8 @@ interface SelectionFooterProps {
 
 export default function SelectionFooter({ count, onMint, isMinting = false }: SelectionFooterProps) {
   if (count === 0) return null;
+
+  const { gasFee, storageCost, totalCost } = calculateMintCost(count);
 
   return (
     <div className="w-full py-6 animate-in slide-in-from-bottom-5 fade-in duration-500 border-t border-white/5 bg-[#050505]/40 backdrop-blur-md">
@@ -45,31 +49,51 @@ export default function SelectionFooter({ count, onMint, isMinting = false }: Se
           </button>
         </div>
 
-        {/* Right: Primary Platform Actions */}
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          <button className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-[#111815] border border-[#1A2621] text-brand font-black text-[12px] group hover:border-brand/40 transition-all">
-            <Zap className="w-4 h-4 fill-brand" />
-            <span>AUTO-SCHEDULE ON</span>
-          </button>
-          
-          <button 
-            onClick={onMint}
-            disabled={isMinting || count === 0}
-            className={`flex items-center gap-3 px-10 py-4 rounded-3xl text-black font-black text-[15px] transition-all ${
-              isMinting 
-                ? "bg-[#00E58F]/50 cursor-not-allowed" 
-                : "bg-[#00E58F] hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_30px_rgba(0,229,143,0.2)]"
-            }`}
-          >
-            {isMinting ? (
-              <span>Minting...</span>
-            ) : (
-              <>
-                <span>Mint Selected Clips</span>
-                <Hexagon className="w-5 h-5 ml-1 fill-black/20" />
-              </>
-            )}
-          </button>
+        {/* Right: Cost & Primary Actions */}
+        <div className="flex flex-col items-end gap-3">
+          {/* Cost breakdown */}
+          <div className="flex items-center gap-3 md:gap-4 text-[12px] text-[#5A6F65] bg-black/40 border border-white/5 rounded-xl px-4 py-2">
+            <div className="flex items-center gap-1.5" title="Estimated gas and rent fee">
+              <span>Gas:</span>
+              <span className="text-white/90 font-medium">{formatSol(gasFee)}</span>
+            </div>
+            <div className="w-[1px] h-3 bg-white/10" />
+            <div className="flex items-center gap-1.5" title="Arweave storage fee">
+              <span>Storage:</span>
+              <span className="text-white/90 font-medium">{formatSol(storageCost)}</span>
+            </div>
+            <div className="w-[1px] h-3 bg-white/10" />
+            <div className="flex items-center gap-1.5">
+              <span className="text-brand font-bold">Total:</span>
+              <span className="text-[#00E58F] font-black">{formatSol(totalCost)}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <button className="flex items-center gap-2.5 px-6 py-3 rounded-2xl bg-[#111815] border border-[#1A2621] text-brand font-black text-[12px] group hover:border-brand/40 transition-all">
+              <Zap className="w-4 h-4 fill-brand" />
+              <span>AUTO-SCHEDULE ON</span>
+            </button>
+            
+            <button 
+              onClick={onMint}
+              disabled={isMinting || count === 0}
+              className={`flex items-center gap-3 px-10 py-4 rounded-3xl text-black font-black text-[15px] transition-all ${
+                isMinting 
+                  ? "bg-[#00E58F]/50 cursor-not-allowed" 
+                  : "bg-[#00E58F] hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_30px_rgba(0,229,143,0.2)]"
+              }`}
+            >
+              {isMinting ? (
+                <span>Minting...</span>
+              ) : (
+                <>
+                  <span>Mint Selected Clips</span>
+                  <Hexagon className="w-5 h-5 ml-1 fill-black/20" />
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
