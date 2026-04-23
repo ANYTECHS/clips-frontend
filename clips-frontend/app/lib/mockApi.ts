@@ -1,5 +1,12 @@
 // This file replaces the backend server by mocking the needed endpoints client-side with simulated latency.
 
+export type OnboardingData = {
+  username?: string;
+  niche?: string;
+  socialsConnected?: boolean;
+  [key: string]: unknown;
+};
+
 export type User = {
   id: string;
   email: string;
@@ -7,7 +14,7 @@ export type User = {
   username?: string;
   password?: string;
   onboardingStep: number;
-  profile?: Record<string, any>;
+  profile?: OnboardingData;
 };
 
 // In-memory fake database
@@ -113,7 +120,7 @@ export const MockApi = {
     return { success: true, posted: clipIds.length };
   },
 
-  saveOnboarding: async (userId: string, step: number, data: any) => {
+  saveOnboarding: async (userId: string, step: number, data: OnboardingData) => {
     await delay(500); // Usually faster for background auto-save
     
     let user: User | undefined = users.find(u => u.id === userId);
