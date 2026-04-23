@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { 
   Send, 
   Trash2, 
@@ -25,28 +25,49 @@ export default function SelectionFooter({ count, onMint, isMinting = false }: Se
 
   return (
     <div className="w-full py-6 animate-in slide-in-from-bottom-5 fade-in duration-500 border-t border-white/5 bg-[#050505]/40 backdrop-blur-md">
-      <div className="relative bg-[#0B100E] border border-white/10 rounded-[32px] px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-6 w-full shadow-2xl">
-        {/* Left: Selection Count */}
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-[#00E58F] flex items-center justify-center text-black font-black text-[16px]">
-            {count}
-          </div>
-          <div className="space-y-0.5">
-            <p className="text-[16px] font-extrabold text-white">Clips selected</p>
-            <p className="text-[12px] font-medium text-[#5A6F65]">Ready for batch export or posting</p>
-          </div>
+      {/* Error Banner */}
+      {postError && (
+        <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-2xl px-5 py-3 mb-4 mx-1">
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
+          <p className="text-[13px] text-red-300 flex-1">{postError}</p>
+          {retryCount >= 3 && (
+            <span className="text-[11px] text-red-400/60 shrink-0">Try reconnecting your platform account.</span>
+          )}
+          <button
+            onClick={() => setPostError(null)}
+            className="text-red-400/60 hover:text-red-300 transition-colors shrink-0"
+            aria-label="Dismiss error"
+          >
+            <X className="w-4 h-4" />
+          </button>
         </div>
+      )}
 
-        {/* Middle: Actions */}
-        <div className="flex flex-wrap items-center justify-center gap-4 text-[#5A6F65]">
-          <button className="flex items-center gap-2.5 px-6 py-3 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all">
-            <Download className="w-4 h-4" />
-            <span>Export Clips</span>
-          </button>
-          <button className="flex items-center gap-2.5 px-6 py-3 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all">
-            <Trash2 className="w-4 h-4" />
-            <span>Delete Permanently</span>
-          </button>
+      <div className="relative bg-[#0B100E] border border-white/10 rounded-[24px] sm:rounded-[32px] px-4 sm:px-8 py-4 flex flex-col items-stretch gap-4 w-full shadow-2xl overflow-hidden">
+        {/* Top row: count + middle actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Left: Selection Count */}
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-[#00E58F] flex items-center justify-center text-black font-black text-[16px] shrink-0">
+              {count}
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[16px] font-extrabold text-white">Clips selected</p>
+              <p className="text-[12px] font-medium text-[#5A6F65]">Ready for batch export or posting</p>
+            </div>
+          </div>
+
+          {/* Middle: Actions */}
+          <div className="flex flex-wrap items-center gap-3 text-[#5A6F65]">
+            <button className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all touch-manipulation">
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Export</span>
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all touch-manipulation">
+              <Trash2 className="w-4 h-4 shrink-0" />
+              <span>Delete</span>
+            </button>
+          </div>
         </div>
 
         {/* Right: Cost & Primary Actions */}

@@ -20,6 +20,7 @@ interface ProjectFiltersProps {
   onViralityLevelToggle: (level: string) => void;
   activeFilterCount: number;
   onResetFilters: () => void;
+  mobile?: boolean;
 }
 
 export default function ProjectFilters({
@@ -28,7 +29,8 @@ export default function ProjectFilters({
   viralityLevels,
   onViralityLevelToggle,
   activeFilterCount,
-  onResetFilters
+  onResetFilters,
+  mobile = false,
 }: ProjectFiltersProps) {
   const captionsStyles = ["All Styles", "Bold & Dynamic", "Minimalist", "Emoji-Rich", "Subtitles Only"];
   const levels = [
@@ -38,7 +40,7 @@ export default function ProjectFilters({
   ];
 
   return (
-    <div className="w-[300px] pr-6 border-r border-white/5 h-full hidden xl:flex flex-col animate-in fade-in slide-in-from-left duration-700">
+    <div className={`w-[300px] pr-6 border-r border-white/5 h-full flex-col animate-in fade-in slide-in-from-left duration-700 ${mobile ? "flex" : "hidden xl:flex"}`}>
       <div className="flex-1 overflow-y-auto pr-4 space-y-10 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20 transition-all custom-sidebar-scroll pb-10">
         {/* Branding Section */}
         <div className="space-y-6 pt-2">

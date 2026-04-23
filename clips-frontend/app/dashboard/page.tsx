@@ -8,6 +8,7 @@ import RevenueChart from "@/components/dashboard/RevenueChart";
 import PlatformDistribution from "@/components/dashboard/PlatformDistribution";
 import AIInsightCard from "@/components/dashboard/AIInsightCard";
 import ProjectCard from "@/components/dashboard/ProjectCard";
+import EarningsSummaryCards from "@/components/dashboard/EarningsSummaryCards";
 import { DollarSign, Video, Globe } from "lucide-react";
 
 export default function DashboardPage() {
@@ -57,19 +58,27 @@ export default function DashboardPage() {
             />
           </div>
 
-          {/* Middle Section: Chart + Right Panel Distribution */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-            {/* Left Column: Chart */}
-            {/* <div className="lg:col-span-2 h-full">
-              <RevenueChart />
-            </div> */}
+          {/* Earnings Summary Cards */}
+          <div className="space-y-4">
+            <h3 className="text-[18px] font-extrabold text-white tracking-tight">Earnings Summary</h3>
+            <EarningsSummaryCards />
+          </div>
 
-            {/* Right Column: Platform Breakdown */}
-            <div className="chart-container flex lg:col-span-2 gap-4 sm:gap-8 flex-col w-full ">
+          {/* Middle Section: Chart + Platform Distribution */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            {/* Revenue Chart — spans 2 cols */}
+            <div className="lg:col-span-2">
+              <RevenueChart />
+            </div>
+
+            {/* Platform Distribution — 1 col */}
+            <div>
               <PlatformDistribution />
-              <AIInsightCard />
             </div>
           </div>
+
+          {/* AI Insight */}
+          <AIInsightCard />
 
           {/* Bottom Section: Recent Projects */}
           <div className="space-y-6">

@@ -39,7 +39,7 @@ export default function ClipCard({
 
   return (
     <div 
-      className={`group relative bg-[#0B100E] border rounded-[32px] overflow-hidden transition-all duration-500 ${
+      className={`group relative bg-[#0B100E] border rounded-[24px] sm:rounded-[32px] overflow-hidden transition-all duration-500 ${
         isSelected 
           ? "border-brand ring-1 ring-brand/20 shadow-[0_0_50px_rgba(0,229,143,0.15)]" 
           : "border-white/5 hover:border-white/20"
@@ -55,19 +55,19 @@ export default function ClipCard({
           className="w-full h-full object-cover"
         />
         
-        {/* Selection Indicator (Top Left) */}
+        {/* Selection Indicator (Top Left) — always visible on touch, hover on desktop */}
         <div 
           onClick={(e) => {
             e.stopPropagation();
             onSelect(id);
           }}
-          className={`absolute top-4 left-4 w-6 h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer z-20 ${
+          className={`absolute top-3 left-3 sm:top-4 sm:left-4 w-8 h-8 sm:w-6 sm:h-6 rounded-lg border flex items-center justify-center transition-all cursor-pointer z-20 touch-manipulation ${
             isSelected 
               ? "bg-brand border-brand shadow-[0_0_15px_rgba(0,229,143,0.4)]" 
               : "bg-black/40 border-white/20 hover:border-white/40 backdrop-blur-md"
           }`}
         >
-          {isSelected && <Check className="w-3.5 h-3.5 text-black stroke-[4px]" />}
+          {isSelected && <Check className="w-4 h-4 sm:w-3.5 sm:h-3.5 text-black stroke-[4px]" />}
         </div>
 
         {/* Score Badge (Top Right) */}
@@ -75,23 +75,23 @@ export default function ClipCard({
           <span className="text-[10px] font-black tracking-widest leading-none">AI SCORE {score}%</span>
         </div>
 
-        {/* Play Overlay (Hover) */}
+        {/* Play Overlay — visible on hover (desktop) or always on touch */}
         <div className={`absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center transition-all duration-300 z-10 ${
-          isHovered ? "opacity-100" : "opacity-0"
+          isHovered ? "opacity-100" : "opacity-0 [@media(hover:none)]:opacity-100"
         }`}>
-          <div className="w-12 h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-xl">
-             <Play className="w-5 h-5 text-white fill-white ml-1" />
+          <div className="w-14 h-14 sm:w-12 sm:h-12 rounded-full bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-xl">
+             <Play className="w-6 h-6 sm:w-5 sm:h-5 text-white fill-white ml-1" />
           </div>
         </div>
 
         {/* Duration (Bottom Right) */}
-        <div className="absolute bottom-3 right-4 px-1.5 py-0.5 rounded-md bg-black/80 text-[10px] font-black text-white z-20">
+        <div className="absolute bottom-3 right-3 sm:right-4 px-1.5 py-0.5 rounded-md bg-black/80 text-[10px] font-black text-white z-20">
           {duration}
         </div>
       </div>
 
       {/* Content Area */}
-      <div className="p-6 space-y-4">
+      <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
         <div className="space-y-1.5">
           <h4 className="text-[14px] font-bold text-white tracking-tight leading-tight">
             {title}
@@ -102,15 +102,15 @@ export default function ClipCard({
         </div>
 
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button className="text-[#5A6F65] hover:text-white transition-colors" title="Edit">
-              <Edit className="w-3.5 h-3.5" />
+          <div className="flex items-center gap-3">
+            <button className="p-1.5 text-[#5A6F65] hover:text-white transition-colors touch-manipulation" title="Edit">
+              <Edit className="w-4 h-4" />
             </button>
-            <button className="text-[#5A6F65] hover:text-white transition-colors" title="Download">
-              <Download className="w-3.5 h-3.5" />
+            <button className="p-1.5 text-[#5A6F65] hover:text-white transition-colors touch-manipulation" title="Download">
+              <Download className="w-4 h-4" />
             </button>
           </div>
-          <button className="text-[11px] font-black text-brand uppercase tracking-widest flex items-center gap-1.5 hover:underline">
+          <button className="text-[11px] font-black text-brand uppercase tracking-widest flex items-center gap-1.5 hover:underline py-1.5 touch-manipulation">
             PREVIEW <span className="text-[14px] leading-none mb-0.5">›</span>
           </button>
         </div>

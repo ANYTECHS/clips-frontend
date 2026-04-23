@@ -85,6 +85,34 @@ export const MockApi = {
     return { token, user: newUser };
   },
 
+  /**
+   * Simulate minting an NFT collection — randomly fails to test error handling
+   */
+  mintCollection: async (data: { collectionName: string; description: string; creatorRoyalty: string; listingPrice: string }) => {
+    await delay(1800);
+
+    // Simulate random failure scenarios
+    const roll = Math.random();
+    if (roll < 0.25) throw new Error("WALLET_REJECTED");
+    if (roll < 0.4) throw new Error("NETWORK_ERROR");
+    if (roll < 0.5) throw new Error("UPLOAD_FAILED");
+
+    return { success: true, txHash: `0x${Math.random().toString(16).slice(2, 18)}`, collection: data.collectionName };
+  },
+
+  /**
+   * Simulate posting clips to platforms
+   */
+  postClips: async (clipIds: string[]) => {
+    await delay(1400);
+
+    const roll = Math.random();
+    if (roll < 0.2) throw new Error("NETWORK_ERROR");
+    if (roll < 0.3) throw new Error("PLATFORM_AUTH_EXPIRED");
+
+    return { success: true, posted: clipIds.length };
+  },
+
   saveOnboarding: async (userId: string, step: number, data: any) => {
     await delay(500); // Usually faster for background auto-save
     
