@@ -1,6 +1,9 @@
+"use client";
+
 import React from "react";
 import { Upload, Bell, Menu } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import WalletConnectButton from "@/components/WalletConnectButton";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -30,6 +33,10 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
       </div>
 
       <div className="flex items-center gap-4">
+        <div className="hidden sm:block">
+          <WalletConnectButton compact />
+        </div>
+
         <button className="w-11 h-11 rounded-xl bg-[#111111] border border-white/5 flex items-center justify-center text-[#8e9895] hover:text-white transition-colors relative">
           <Bell className="w-5 h-5" />
           <div className="absolute top-3 right-3 w-2 h-2 bg-brand rounded-full border-2 border-[#111111]" />

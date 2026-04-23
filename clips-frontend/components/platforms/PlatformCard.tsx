@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { LucideIcon, CheckCircle2, MoreHorizontal, Settings } from "lucide-react";
+import { LucideIcon, CheckCircle2, MoreHorizontal, Settings, Loader2 } from "lucide-react";
 
 interface PlatformCardProps {
   name: string;
@@ -11,9 +11,12 @@ interface PlatformCardProps {
   ctaText: string;
   username? : string;
   variant?: "vertical" | "horizontal";
+  onConnect?: () => void;
+  onDisconnect?: () => void;
+  isLoading?: boolean;
 }
 
-export default function PlatformCard({ name, description, icon: Icon, status, ctaText, username, variant = "vertical" }: PlatformCardProps) {
+export default function PlatformCard({ name, description, icon: Icon, status, ctaText, username, variant = "vertical", onConnect, onDisconnect, isLoading }: PlatformCardProps) {
   const isActive = status === "ACTIVE" || status === "LINKED";
 
   if (variant === "horizontal") {
@@ -39,10 +42,23 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
               <div className="text-[13px] font-mono text-[#3A4A43] bg-white/[0.02] px-2 py-0.5 rounded-lg border border-white/[0.03]">
                 {username}
               </div>
+              {onDisconnect && (
+                <button
+                  onClick={onDisconnect}
+                  className="text-[11px] text-[#5A6F65] hover:text-red-400 transition-colors mt-0.5 font-medium"
+                >
+                  Disconnect
+                </button>
+              )}
             </div>
           ) : (
-            <button className="px-6 py-2.5 rounded-xl border border-white/10 text-white font-bold text-[13px] hover:bg-white/[0.05] transition-all active:scale-[0.98]">
-              {ctaText}
+            <button
+              onClick={onConnect}
+              disabled={isLoading}
+              className="px-6 py-2.5 rounded-xl border border-white/10 text-white font-bold text-[13px] hover:bg-white/[0.05] transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
+            >
+              {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+              {isLoading ? "Connecting..." : ctaText}
             </button>
           )}
         </div>
@@ -71,14 +87,20 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
       </div>
 
       <button 
+        onClick={status === "NOT LINKED" ? onConnect : onDisconnect}
+        disabled={isLoading}
         className={`w-full py-4 rounded-xl font-bold text-[14px] transition-all flex items-center justify-center gap-2.5 ${
           status === "NOT LINKED" 
             ? "bg-brand hover:bg-brand-hover text-black shadow-[0_0_20px_rgba(0,229,143,0.2)] hover:shadow-[0_0_35px_rgba(0,229,143,0.35)]" 
             : "bg-transparent border border-white/10 text-white hover:bg-white/[0.05]"
-        } active:scale-[0.98] group/btn`}
+        } active:scale-[0.98] group/btn disabled:opacity-60 disabled:cursor-not-allowed`}
       >
-        {status === "ACTIVE" && <Settings className="w-4 h-4 text-[#5A6F65] group-hover/btn:text-white transition-colors" />}
-        {ctaText}
+        {isLoading ? (
+          <Loader2 className="w-4 h-4 animate-spin" />
+        ) : (
+          status === "ACTIVE" && <Settings className="w-4 h-4 text-[#5A6F65] group-hover/btn:text-white transition-colors" />
+        )}
+        {isLoading ? "Connecting..." : ctaText}
       </button>
     </div>
   );

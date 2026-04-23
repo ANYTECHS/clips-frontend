@@ -13,9 +13,12 @@ import {
   Share2, 
   Wallet,
   Menu,
-  Settings
+  Settings,
+  AlertCircle,
+  X
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { useWallet, truncateAddress } from "@/components/WalletProvider";
 
 // Custom Figma Icons
 const InstagramIcon = ({ className }: { className?: string }) => (
@@ -71,6 +74,15 @@ const MetaMaskIcon = ({ className }: { className?: string }) => (
 export default function PlatformsPage() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const {
+    isConnected: walletConnected,
+    isConnecting: walletConnecting,
+    address: walletAddress,
+    error: walletError,
+    connectMetaMask,
+    disconnect: disconnectWallet,
+    clearError: clearWalletError,
+  } = useWallet();
 
   return (
     <div className="flex min-h-screen bg-[#050505] text-white font-sans overflow-hidden">
@@ -194,9 +206,24 @@ export default function PlatformsPage() {
             <SectionHeader 
               title="Web3 Wallets" 
               icon={Wallet} 
-              label="REWARDS DESTINATION" 
+              label={walletConnected ? "1 CONNECTED" : "REWARDS DESTINATION"} 
             />
-            <div className="grid grid-cols-2 gap-6">
+
+            {/* Wallet error banner */}
+            {walletError && (
+              <div className="flex items-start gap-3 bg-red-950/60 border border-red-500/25 rounded-2xl px-5 py-4 mb-6">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <p className="text-[14px] text-red-300 leading-snug flex-1">{walletError}</p>
+                <button
+                  onClick={clearWalletError}
+                  className="text-red-400 hover:text-red-200 transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <PlatformCard 
                 name="Phantom Wallet" 
                 description="Solana Network"
@@ -207,12 +234,15 @@ export default function PlatformsPage() {
               />
               <PlatformCard 
                 name="MetaMask" 
-                username="0x71C...4921" 
+                username={walletConnected && walletAddress ? truncateAddress(walletAddress) : undefined}
                 description="Ethereum / L2s"
                 icon={MetaMaskIcon} 
-                status="LINKED" 
-                ctaText="Linked"
+                status={walletConnected ? "LINKED" : "NOT LINKED"}
+                ctaText={walletConnecting ? "Connecting..." : "Connect MetaMask"}
                 variant="horizontal"
+                onConnect={connectMetaMask}
+                onDisconnect={disconnectWallet}
+                isLoading={walletConnecting}
               />
             </div>
           </section>
