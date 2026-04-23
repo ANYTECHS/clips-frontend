@@ -43,28 +43,31 @@ export default function SelectionFooter({ count, onMint, isMinting = false }: Se
         </div>
       )}
 
-      <div className="relative bg-[#0B100E] border border-white/10 rounded-[32px] px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-6 w-full shadow-2xl">
-        {/* Left: Selection Count */}
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-full bg-[#00E58F] flex items-center justify-center text-black font-black text-[16px]">
-            {count}
+      <div className="relative bg-[#0B100E] border border-white/10 rounded-[24px] sm:rounded-[32px] px-4 sm:px-8 py-4 flex flex-col items-stretch gap-4 w-full shadow-2xl overflow-hidden">
+        {/* Top row: count + middle actions */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          {/* Left: Selection Count */}
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-[#00E58F] flex items-center justify-center text-black font-black text-[16px] shrink-0">
+              {count}
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[16px] font-extrabold text-white">Clips selected</p>
+              <p className="text-[12px] font-medium text-[#5A6F65]">Ready for batch export or posting</p>
+            </div>
           </div>
-          <div className="space-y-0.5">
-            <p className="text-[16px] font-extrabold text-white">Clips selected</p>
-            <p className="text-[12px] font-medium text-[#5A6F65]">Ready for batch export or posting</p>
-          </div>
-        </div>
 
-        {/* Middle: Actions */}
-        <div className="flex flex-wrap items-center justify-center gap-4 text-[#5A6F65]">
-          <button className="flex items-center gap-2.5 px-6 py-3 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all">
-            <Download className="w-4 h-4" />
-            <span>Export Clips</span>
-          </button>
-          <button className="flex items-center gap-2.5 px-6 py-3 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all">
-            <Trash2 className="w-4 h-4" />
-            <span>Delete Permanently</span>
-          </button>
+          {/* Middle: Actions */}
+          <div className="flex flex-wrap items-center gap-3 text-[#5A6F65]">
+            <button className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all touch-manipulation">
+              <Download className="w-4 h-4 shrink-0" />
+              <span>Export</span>
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all touch-manipulation">
+              <Trash2 className="w-4 h-4 shrink-0" />
+              <span>Delete</span>
+            </button>
+          </div>
         </div>
 
         {/* Right: Cost & Primary Actions */}
