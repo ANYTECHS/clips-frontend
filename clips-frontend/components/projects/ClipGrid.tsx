@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { memo } from "react";
 import ClipCard from "./ClipCard";
-import { ListFilter, ChevronDown, CheckSquare, Square } from "lucide-react";
+import { ListFilter, ChevronDown } from "lucide-react";
 
 interface Clip {
   id: string;
@@ -19,14 +19,12 @@ interface ClipGridProps {
   onSelectAll: () => void;
 }
 
-export default function ClipGrid({ 
+const ClipGrid = memo(function ClipGrid({ 
   clips, 
   selectedIds, 
   onSelect, 
   onSelectAll 
 }: ClipGridProps) {
-  const allSelected = selectedIds.length === clips.length && clips.length > 0;
-
   return (
     <div className="flex-1 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
       {/* Grid Header */}
@@ -70,4 +68,6 @@ export default function ClipGrid({
       </div>
     </div>
   );
-}
+});
+
+export default ClipGrid;

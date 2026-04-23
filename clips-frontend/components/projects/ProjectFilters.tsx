@@ -10,7 +10,10 @@ import {
   Check, 
   Clock, 
   ChevronDown,
-  ArrowLeft
+  ArrowLeft,
+  Layout,
+  CheckCircle2,
+  History
 } from "lucide-react";
 
 interface ProjectFiltersProps {
@@ -20,6 +23,8 @@ interface ProjectFiltersProps {
   onViralityLevelToggle: (level: string) => void;
   activeFilterCount: number;
   onResetFilters: () => void;
+  vaultFilter?: string;
+  onVaultFilterChange?: (filter: string) => void;
   mobile?: boolean;
 }
 
@@ -30,6 +35,8 @@ export default function ProjectFilters({
   onViralityLevelToggle,
   activeFilterCount,
   onResetFilters,
+  vaultFilter = "pending",
+  onVaultFilterChange,
   mobile = false,
 }: ProjectFiltersProps) {
   const captionsStyles = ["All Styles", "Bold & Dynamic", "Minimalist", "Emoji-Rich", "Subtitles Only"];
@@ -57,6 +64,38 @@ export default function ProjectFilters({
             </div>
             Back to Dashboard
           </Link>
+        </div>
+
+        {/* Vault Filters Section */}
+        <div className="space-y-6">
+          <h3 className="text-[11px] font-black text-[#5A6F65] uppercase tracking-[0.2em] mb-4">Vault Filters</h3>
+          
+          <div className="space-y-2">
+            {[
+              { id: 'pending', label: 'Pending', icon: Clock },
+              { id: 'listed', label: 'Listed', icon: CheckCircle2 },
+              { id: 'history', label: 'History', icon: History }
+            ].map((filter) => {
+              const isActive = vaultFilter === filter.id;
+              return (
+                <button 
+                  key={filter.id}
+                  onClick={() => onVaultFilterChange?.(filter.id)}
+                  className={`w-full group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
+                    isActive 
+                      ? "bg-brand/10 border border-brand/40 text-brand shadow-[0_0_20px_rgba(0,229,143,0.05)]" 
+                      : "bg-[#111815] border border-white/5 text-[#5A6F65] hover:text-white hover:bg-white/[0.03]"
+                  }`}
+                >
+                  <filter.icon className={`w-4 h-4 ${isActive ? "text-brand" : "text-[#5A6F65] group-hover:text-white"}`} />
+                  <span className="text-[13px] font-bold">{filter.label}</span>
+                  {isActive && (
+                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_8px_rgba(0,229,143,0.8)]" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Curation Tools Section */}

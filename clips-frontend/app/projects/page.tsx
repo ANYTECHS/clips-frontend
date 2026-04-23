@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ProjectFilters from "@/components/projects/ProjectFilters";
 import ClipGrid from "@/components/projects/ClipGrid";
@@ -8,12 +8,12 @@ import SelectionFooter from "@/components/projects/SelectionFooter";
 import { X } from "lucide-react";
 
 const mockClips = [
-  { id: "1", title: "Clip #01 - The Big Reveal Hook", thumbnail: "/projects/thumb1.png", score: 94, scoreKey: "high", duration: "00:45", style: "Bold & Dynamic" },
-  { id: "2", title: "Clip #02 - Technical Deep Dive", thumbnail: "/projects/thumb2.png", score: 68, scoreKey: "medium", duration: "00:58", style: "Minimalist" },
-  { id: "3", title: "Clip #03 - Audience Reaction", thumbnail: "/projects/thumb3.png", score: 82, scoreKey: "high", duration: "00:32", style: "Emoji-Rich" },
-  { id: "4", title: "Clip #04 - Feature Walkthrough", thumbnail: "/projects/thumb1.png", score: 91, scoreKey: "high", duration: "00:52", style: "Subtitles Only" },
-  { id: "5", title: "Clip #05 - Closing Remarks", thumbnail: "/projects/thumb2.png", score: 42, scoreKey: "low", duration: "01:12", style: "Minimalist" },
-  { id: "6", title: "Clip #06 - Product Detail B-Roll", thumbnail: "/projects/thumb3.png", score: 89, scoreKey: "high", duration: "00:44", style: "Bold & Dynamic" },
+  { id: "1", title: "Clip #01 - The Big Reveal Hook", thumbnail: "/projects/thumb1.png", score: 94, scoreKey: "high", duration: "00:45", style: "Bold & Dynamic", status: "pending" },
+  { id: "2", title: "Clip #02 - Technical Deep Dive", thumbnail: "/projects/thumb2.png", score: 68, scoreKey: "medium", duration: "00:58", style: "Minimalist", status: "listed" },
+  { id: "3", title: "Clip #03 - Audience Reaction", thumbnail: "/projects/thumb3.png", score: 82, scoreKey: "high", duration: "00:32", style: "Emoji-Rich", status: "pending" },
+  { id: "4", title: "Clip #04 - Feature Walkthrough", thumbnail: "/projects/thumb1.png", score: 91, scoreKey: "high", duration: "00:52", style: "Subtitles Only", status: "history" },
+  { id: "5", title: "Clip #05 - Closing Remarks", thumbnail: "/projects/thumb2.png", score: 42, scoreKey: "low", duration: "01:12", style: "Minimalist", status: "pending" },
+  { id: "6", title: "Clip #06 - Product Detail B-Roll", thumbnail: "/projects/thumb3.png", score: 89, scoreKey: "high", duration: "00:44", style: "Bold & Dynamic", status: "listed" },
 ];
 
 export default function ProjectsPage() {
@@ -21,41 +21,53 @@ export default function ProjectsPage() {
   const [isMinting, setIsMinting] = useState(false);
   const [captionsStyle, setCaptionsStyle] = useState("All Styles");
   const [viralityLevels, setViralityLevels] = useState<string[]>(["high", "medium", "low"]);
+  const [vaultFilter, setVaultFilter] = useState("pending");
+  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
-  const filteredClips = mockClips.filter(clip => {
-    const matchesStyle = captionsStyle === "All Styles" || clip.style === captionsStyle;
-    const matchesLevel = viralityLevels.includes(clip.scoreKey);
-    return matchesStyle && matchesLevel;
-  });
+  const filteredClips = useMemo(() => {
+    return mockClips.filter(clip => {
+      const matchesStyle = captionsStyle === "All Styles" || clip.style === captionsStyle;
+      const matchesLevel = viralityLevels.includes(clip.scoreKey);
+      const matchesVault = clip.status === vaultFilter;
+      return matchesStyle && matchesLevel && matchesVault;
+    });
+  }, [captionsStyle, viralityLevels, vaultFilter]);
 
-  const activeFilterCount = (captionsStyle !== "All Styles" ? 1 : 0) + (viralityLevels.length < 3 ? 1 : 0);
+  const activeFilterCount = useMemo(() => {
+    return (captionsStyle !== "All Styles" ? 1 : 0) + 
+           (viralityLevels.length < 3 ? 1 : 0) + 
+           (vaultFilter !== "pending" ? 1 : 0);
+  }, [captionsStyle, viralityLevels, vaultFilter]);
 
-  const handleViralityToggle = (level: string) => {
+  const handleViralityToggle = useCallback((level: string) => {
     setViralityLevels(prev =>
       prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]
     );
-  };
+  }, []);
 
-  const handleResetFilters = () => {
+  const handleResetFilters = useCallback(() => {
     setCaptionsStyle("All Styles");
     setViralityLevels(["high", "medium", "low"]);
-  };
+    setVaultFilter("pending");
+  }, []);
 
-  const handleSelect = (id: string) => {
+  const handleSelect = useCallback((id: string) => {
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
-  };
+  }, []);
 
-  const handleSelectAll = () => {
-    if (selectedIds.length === filteredClips.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredClips.map(c => c.id));
-    }
-  };
+  const handleSelectAll = useCallback(() => {
+    setSelectedIds(prev => {
+      if (prev.length === filteredClips.length) {
+        return [];
+      } else {
+        return filteredClips.map(c => c.id);
+      }
+    });
+  }, [filteredClips]);
 
-  const handleMint = async () => {
+  const handleMint = useCallback(async () => {
     if (selectedIds.length === 0) return;
     
     setIsMinting(true);
@@ -71,7 +83,7 @@ export default function ProjectsPage() {
     } finally {
       setIsMinting(false);
     }
-  };
+  }, [selectedIds]);
 
   return (
     <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden">
@@ -105,6 +117,8 @@ export default function ProjectsPage() {
           onViralityLevelToggle={handleViralityToggle}
           activeFilterCount={activeFilterCount}
           onResetFilters={handleResetFilters}
+          vaultFilter={vaultFilter}
+          onVaultFilterChange={setVaultFilter}
           mobile
         />
       </div>
@@ -118,6 +132,8 @@ export default function ProjectsPage() {
           onViralityLevelToggle={handleViralityToggle}
           activeFilterCount={activeFilterCount}
           onResetFilters={handleResetFilters}
+          vaultFilter={vaultFilter}
+          onVaultFilterChange={setVaultFilter}
         />
       </div>
 
@@ -126,7 +142,7 @@ export default function ProjectsPage() {
         <DashboardHeader onMenuClick={() => setMobileFiltersOpen(true)} />
 
         <div className="flex-1 flex flex-col overflow-hidden w-full max-w-[1400px] mx-auto pt-6">
-          <div className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4">
+          <div key={vaultFilter} className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500">
             <ClipGrid
               clips={filteredClips}
               selectedIds={selectedIds}
@@ -137,7 +153,6 @@ export default function ProjectsPage() {
           
           {/* Docked Actions Footer (now truly always visible and grounded) */}
 
-          <SelectionFooter count={selectedIds.length} selectedIds={selectedIds} />
           <SelectionFooter 
             count={selectedIds.length} 
             onMint={handleMint}

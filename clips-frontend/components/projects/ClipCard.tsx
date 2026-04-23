@@ -1,13 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, memo } from "react";
 import { 
   Play, 
   Download, 
   Edit, 
-  Share2, 
-  Check, 
-  ExternalLink 
+  Check 
 } from "lucide-react";
 
 interface ClipCardProps {
@@ -20,7 +18,7 @@ interface ClipCardProps {
   onSelect: (id: string) => void;
 }
 
-export default function ClipCard({ 
+const ClipCard = memo(function ClipCard({ 
   id, 
   title, 
   thumbnail, 
@@ -52,7 +50,9 @@ export default function ClipCard({
         <img 
           src={thumbnail} 
           alt={title} 
-          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+          className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
         />
         
         {/* Selection Indicator (Top Left) — always visible on touch, hover on desktop */}
@@ -117,4 +117,6 @@ export default function ClipCard({
       </div>
     </div>
   );
-}
+});
+
+export default ClipCard;
