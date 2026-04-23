@@ -12,13 +12,15 @@ import {
   Settings, 
   Zap,
   ArrowUpRight,
-  X
+  X,
+  Gem
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
   { id: "projects", label: "Projects", icon: Video, href: "/projects" },
+  { id: "vault", label: "NFT Vault", icon: Gem, href: "/vault" },
   { id: "platforms", label: "Platforms", icon: Share2, href: "/platforms" },
   // { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
