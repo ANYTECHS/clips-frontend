@@ -111,7 +111,7 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
           <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-zinc-800">
             <img 
               src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || user?.email || 'Guest'}`} 
-              alt="avatar" 
+              alt={`${user?.username || user?.name || 'Guest'} avatar`} 
               className="w-full h-full object-cover" 
             />
           </div>
