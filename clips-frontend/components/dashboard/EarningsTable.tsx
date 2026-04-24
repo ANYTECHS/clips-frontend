@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
-import { Download, Search } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Download, Search, X } from 'lucide-react';
 import { Transaction, MockApi, Summary } from '@/app/lib/mockApi';
 import { useAuth } from '@/components/AuthProvider';
 import TransactionTable from '@/components/ui/TransactionTable';
+import { useEarningsSearch } from '@/app/lib/EarningsSearchContext';
+import { useDebounce } from '@/app/lib/useDebounce';
 
 interface EarningsTableProps {
   onExport?: (format: 'csv') => void;
@@ -14,7 +16,13 @@ export default function EarningsTable({ onExport }: EarningsTableProps) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [summary, setSummary] = useState<Summary>({ total: '0.00', completed: '0.00', pending: '0.00' });
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
+
+  // Local search bar (within the table panel) — kept for table-scoped filtering
+  const [localSearch, setLocalSearch] = useState('');
+
+  // Global search from the EarningsLayout header
+  const { searchQuery } = useEarningsSearch();
+
   const { user } = useAuth();
 
   useEffect(() => {
@@ -34,12 +42,30 @@ export default function EarningsTable({ onExport }: EarningsTableProps) {
     fetchData();
   }, [user?.id]);
 
-  const filtered = transactions.filter(tx =>
-    tx.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.platform.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    tx.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Debounce both search inputs at 300ms so filtering only runs
+  // after the user pauses typing — prevents jank on every keystroke
+  const debouncedLocalSearch = useDebounce(localSearch, 300);
+  const debouncedGlobalSearch = useDebounce(searchQuery, 300);
+
+  // Combine: global header search takes priority; local search refines further
+  const activeTerm = (debouncedGlobalSearch || debouncedLocalSearch).toLowerCase().trim();
+
+  const filtered = useMemo(() => {
+    if (!activeTerm) return transactions;
+
+    return transactions.filter(tx => {
+      return (
+        tx.id.toLowerCase().includes(activeTerm) ||
+        tx.description.toLowerCase().includes(activeTerm) ||
+        tx.platform.toLowerCase().includes(activeTerm) ||
+        tx.status.toLowerCase().includes(activeTerm) ||
+        tx.type.toLowerCase().includes(activeTerm) ||
+        tx.date.toLowerCase().includes(activeTerm) ||
+        tx.taxId.toLowerCase().includes(activeTerm) ||
+        tx.amount.toString().includes(activeTerm)
+      );
+    });
+  }, [transactions, activeTerm]);
 
   return (
     <div className="space-y-6">
@@ -65,15 +91,30 @@ export default function EarningsTable({ onExport }: EarningsTableProps) {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4A5D54] pointer-events-none" />
             <input
+              id="table-search"
               type="text"
               placeholder="Search by ID, platform, status..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-72 bg-[#111111] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-[14px] text-white placeholder:text-[#4A5D54] focus:border-brand focus:outline-none transition-colors"
+              value={localSearch}
+              onChange={(e) => setLocalSearch(e.target.value)}
+              className="w-full sm:w-72 bg-[#111111] border border-white/5 rounded-xl pl-10 pr-8 py-2.5 text-[14px] text-white placeholder:text-[#4A5D54] focus:border-brand focus:outline-none transition-colors"
             />
+            {localSearch && (
+              <button
+                onClick={() => setLocalSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4A5D54] hover:text-white transition-colors"
+                aria-label="Clear table search"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
           <div className="text-[#8e9895] text-[13px]">
             {filtered.length} of {transactions.length} transactions
+            {activeTerm && (
+              <span className="ml-2 text-brand font-medium">
+                for &quot;{activeTerm}&quot;
+              </span>
+            )}
           </div>
         </div>
         <button

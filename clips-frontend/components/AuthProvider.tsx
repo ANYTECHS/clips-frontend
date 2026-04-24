@@ -7,12 +7,14 @@ import { useRouter, usePathname } from "next/navigation";
 interface AuthContextType {
   user: User | null;
   setUser: (user: User | null) => void;
+  logout: () => void;
   isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   setUser: () => {},
+  logout: () => {},
   isLoading: true,
 });
 
@@ -28,7 +30,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Load from local storage on mount
     const storedUser = localStorage.getItem("clipcash_user");
     if (storedUser) {
-      setUserState(JSON.parse(storedUser));
+      try {
+        setUserState(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse stored user", e);
+        localStorage.removeItem("clipcash_user");
+      }
     }
     setIsLoading(false);
   }, []);
@@ -42,12 +49,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const logout = () => {
+    setUser(null);
+    router.push("/login");
+  };
+
   // Basic routing logic based on auth state
   useEffect(() => {
     if (isLoading) return;
 
+    const protectedRoutes = ["/dashboard", "/onboarding", "/earnings", "/projects", "/vault", "/platforms", "/clips"];
+    const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+    const isAuthRoute = pathname === "/login" || pathname === "/signup";
+
     if (user) {
-      if (pathname === "/login" || pathname === "/signup" || pathname === "/") {
+      if (isAuthRoute || pathname === "/") {
         if (user.onboardingStep === 1 || user.onboardingStep === 2) {
           router.push("/onboarding");
         } else {
@@ -59,14 +75,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
     } else {
-      if (pathname === "/dashboard" || pathname === "/onboarding" || pathname === "/earnings") {
+      if (isProtectedRoute) {
         router.push("/login");
       }
     }
   }, [user, isLoading, pathname, router]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser, isLoading }}>
+    <AuthContext.Provider value={{ user, setUser, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

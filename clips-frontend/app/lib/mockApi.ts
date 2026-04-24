@@ -147,15 +147,6 @@ export const MockApi = {
   getEarningsReport: async (userId: string) => {
     await delay(1000 + Math.random() * 500); // Variable latency for realism
     
-    // Mock 50+ transactions totaling ~$12,450 matching dashboard
-    const baseTransactions: Omit<Transaction, 'id'>[] = [
-      { date: '2024-10-15', description: 'YouTube Shorts payout #47', amount: 245.80, platform: 'YouTube', status: 'completed', taxId: 'TX-001' },
-      { date: '2024-10-12', description: 'TikTok viral clips batch', amount: 189.50, platform: 'TikTok', status: 'completed', taxId: 'TX-002' },
-      { date: '2024-10-10', description: 'Instagram Reels monetization', amount: 156.20, platform: 'Instagram', status: 'completed', taxId: 'TX-003' },
-      { date: '2024-10-08', description: 'Twitch highlights payout', amount: 98.75, platform: 'Twitch', status: 'pending', taxId: 'TX-004' },
-      // ... more data to sum ~$12k
-    ];
-    
     // Generate 50+ varied transactions
     const transactions: Transaction[] = [];
     const platforms = ['YouTube', 'TikTok', 'Instagram', 'Twitch'] as const;

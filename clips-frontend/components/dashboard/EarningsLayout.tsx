@@ -17,6 +17,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import { EarningsSearchProvider, useEarningsSearch } from "@/app/lib/EarningsSearchContext";
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -151,7 +152,7 @@ function EarningsSidebar({
 // ─── Header ─────────────────────────────────────────────────────────────────
 
 function EarningsHeader({ onMenuClick }: { onMenuClick: () => void }) {
-  const [searchValue, setSearchValue] = useState("");
+  const { searchQuery, setSearchQuery } = useEarningsSearch();
 
   return (
     <header className="flex items-center justify-between py-5 px-4 sm:px-6 lg:px-10 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-30">
@@ -168,12 +169,22 @@ function EarningsHeader({ onMenuClick }: { onMenuClick: () => void }) {
         <div className="relative w-full">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4A5D54] pointer-events-none" />
           <input
+            id="earnings-search"
             type="text"
             placeholder="Search transactions, payouts..."
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            className="w-full bg-[#111111] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-[14px] text-white placeholder:text-[#4A5D54] focus:outline-none focus:border-brand/30 focus:bg-[#111111] transition-colors"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full bg-[#111111] border border-white/5 rounded-xl pl-10 pr-10 py-2.5 text-[14px] text-white placeholder:text-[#4A5D54] focus:outline-none focus:border-brand/30 focus:bg-[#111111] transition-colors"
           />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4A5D54] hover:text-white transition-colors"
+              aria-label="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
       </div>
 
@@ -209,31 +220,33 @@ export default function EarningsLayout({ children }: EarningsLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#050505] text-white font-sans overflow-hidden">
-      {/* Ambient glows */}
-      <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
+    <EarningsSearchProvider>
+      <div className="flex min-h-screen bg-[#050505] text-white font-sans overflow-hidden">
+        {/* Ambient glows */}
+        <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
+        <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
 
-      {/* Mobile sidebar backdrop */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+        {/* Mobile sidebar backdrop */}
+        {sidebarOpen && (
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
+        <EarningsSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
         />
-      )}
 
-      <EarningsSidebar
-        isOpen={sidebarOpen}
-        onClose={() => setSidebarOpen(false)}
-      />
+        <main className="flex-1 flex flex-col h-screen overflow-y-auto relative z-10">
+          <EarningsHeader onMenuClick={() => setSidebarOpen(true)} />
 
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto relative z-10">
-        <EarningsHeader onMenuClick={() => setSidebarOpen(true)} />
-
-        <div className="px-4 sm:px-6 lg:px-10 py-8 max-w-[1400px] mx-auto w-full">
-          {children}
-        </div>
-      </main>
-    </div>
+          <div className="px-4 sm:px-6 lg:px-10 py-8 max-w-[1400px] mx-auto w-full">
+            {children}
+          </div>
+        </main>
+      </div>
+    </EarningsSearchProvider>
   );
 }
