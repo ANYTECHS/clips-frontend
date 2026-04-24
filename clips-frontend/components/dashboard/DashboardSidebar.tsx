@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { 
@@ -33,6 +33,12 @@ interface SidebarProps {
 export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
   const { user } = useAuth();
+  const [showToast, setShowToast] = useState(false);
+
+  const handleUpgradeClick = () => {
+    setShowToast(true);
+    setTimeout(() => setShowToast(false), 3000);
+  };
 
   return (
     <aside className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-[300px] lg:w-[280px] bg-[#050505] border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
@@ -98,7 +104,10 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
             />
           </div>
 
-          <button className="w-full bg-brand hover:bg-brand-hover text-black py-2.5 rounded-xl font-bold text-[13px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.98]">
+          <button 
+            onClick={handleUpgradeClick}
+            className="w-full bg-brand hover:bg-brand-hover text-black py-2.5 rounded-xl font-bold text-[13px] flex items-center justify-center gap-1.5 transition-all active:scale-[0.95] active:brightness-90 hover:shadow-[0_0_20px_rgba(0,229,143,0.3)]"
+          >
             Upgrade Now
             <ArrowUpRight className="w-4 h-4" />
           </button>
@@ -125,6 +134,27 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {showToast && (
+        <div className="fixed bottom-6 right-6 z-[100] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="bg-[#0C120F] border border-brand/30 rounded-xl px-5 py-4 shadow-[0_0_30px_rgba(0,229,143,0.2)] backdrop-blur-md flex items-center gap-3 max-w-sm">
+            <div className="w-8 h-8 rounded-full bg-brand/10 flex items-center justify-center shrink-0">
+              <Zap className="w-4 h-4 text-brand fill-brand" />
+            </div>
+            <div className="flex-1">
+              <p className="text-[13px] font-bold text-white">Upgrade flow coming soon</p>
+              <p className="text-[11px] text-[#5A6F65] mt-0.5">We're working on something awesome!</p>
+            </div>
+            <button 
+              onClick={() => setShowToast(false)}
+              className="text-[#5A6F65] hover:text-white transition-colors shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
