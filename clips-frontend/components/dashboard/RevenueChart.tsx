@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { ChevronDown } from "lucide-react";
 
 type Range = "6M" | "7D" | "30D" | "90D";
@@ -264,6 +264,17 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
 export default function RevenueChart() {
   const [range, setRange] = useState<Range>("6M");
   const [open, setOpen]   = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const is6M      = range === "6M";
   const totalAds  = DATA_6M.reduce((s, d) => s + d.ads, 0);
@@ -297,7 +308,7 @@ export default function RevenueChart() {
         </div>
 
         {/* Range Picker */}
-        <div className="relative">
+        <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setOpen((o) => !o)}
             className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] border border-white/5 rounded-xl text-[13px] text-[#8e9895] hover:text-white transition-colors"
