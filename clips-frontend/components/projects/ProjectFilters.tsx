@@ -11,7 +11,6 @@ import {
   Clock, 
   ChevronDown,
   ArrowLeft,
-  Layout,
   CheckCircle2,
   History
 } from "lucide-react";

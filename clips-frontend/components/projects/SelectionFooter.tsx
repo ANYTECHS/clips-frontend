@@ -8,7 +8,9 @@ import {
   Zap, 
   MoveRight,
   Hexagon,
-  Info
+  Info,
+  AlertCircle,
+  X
 } from "lucide-react";
 import { calculateMintCost, formatSol } from "@/app/lib/mintUtils";
 
@@ -19,6 +21,9 @@ interface SelectionFooterProps {
 }
 
 export default function SelectionFooter({ count, onMint, isMinting = false }: SelectionFooterProps) {
+  const [postError, setPostError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+
   if (count === 0) return null;
 
   const { gasFee, storageCost, totalCost } = calculateMintCost(count);
