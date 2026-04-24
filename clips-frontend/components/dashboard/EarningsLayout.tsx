@@ -39,7 +39,7 @@ function EarningsSidebar({
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-[#050505] border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 shrink-0 h-screen sticky top-0 ${
+      className={`fixed inset-y-0 left-0 z-50 w-[280px] bg-background border-r border-border flex flex-col transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 shrink-0 h-screen sticky top-0 ${
         isOpen ? "translate-x-0" : "-translate-x-full"
       }`}
     >
@@ -59,7 +59,7 @@ function EarningsSidebar({
         </Link>
         <button
           onClick={onClose}
-          className="lg:hidden p-2 text-[#5A6F65] hover:text-white transition-colors"
+          className="lg:hidden p-2 text-muted-foreground hover:text-white transition-colors"
         >
           <X className="w-5 h-5" />
         </button>
@@ -77,14 +77,14 @@ function EarningsSidebar({
               className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
                 isActive
                   ? "bg-brand/10 text-brand font-bold"
-                  : "text-[#8e9895] hover:text-white hover:bg-white/[0.03]"
+                  : "text-muted hover:text-white hover:bg-white/[0.03]"
               }`}
             >
               <item.icon
                 className={`w-5 h-5 ${
                   isActive
                     ? "text-brand"
-                    : "text-[#4A5D54] group-hover:text-white"
+                    : "text-subtle group-hover:text-white"
                 }`}
               />
               <span className="text-[14px]">{item.label}</span>
@@ -98,7 +98,7 @@ function EarningsSidebar({
 
       {/* Pro Plan Card */}
       <div className="px-6 mb-6">
-        <div className="bg-[#0C120F] border border-[#1A2621] rounded-[20px] p-5 relative overflow-hidden">
+        <div className="bg-surface border border-border rounded-[20px] p-5 relative overflow-hidden">
           <div className="absolute -top-12 -right-12 w-24 h-24 bg-brand/10 blur-[40px] rounded-full pointer-events-none" />
           <div className="flex justify-between items-start mb-4">
             <div>
@@ -109,7 +109,7 @@ function EarningsSidebar({
             </div>
             <Zap className="w-4 h-4 text-brand fill-brand" />
           </div>
-          <div className="w-full h-1.5 bg-[#17201C] rounded-full mb-5 overflow-hidden">
+          <div className="w-full h-1.5 bg-surface-hover rounded-full mb-5 overflow-hidden">
             <div
               className="h-full bg-brand rounded-full shadow-[0_0_10px_rgba(0,229,143,0.5)]"
               style={{ width: "80%" }}
@@ -123,9 +123,9 @@ function EarningsSidebar({
       </div>
 
       {/* User Info */}
-      <div className="p-6 border-t border-white/5 bg-[#080C0B]/50">
+      <div className="p-6 border-t border-border bg-background/50">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-zinc-800">
+          <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-surface">
             <img
               src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${
                 user?.name || user?.email || "Guest"
@@ -138,7 +138,7 @@ function EarningsSidebar({
             <div className="text-[14px] font-bold text-white truncate">
               {user?.profile?.username || user?.name || "Alex Rivera"}
             </div>
-            <div className="text-[11px] text-[#5A6F65] truncate">
+            <div className="text-[11px] text-muted-foreground truncate">
               {user?.email || "alex@clipcash.ai"}
             </div>
           </div>
@@ -154,25 +154,25 @@ function EarningsHeader({ onMenuClick }: { onMenuClick: () => void }) {
   const [searchValue, setSearchValue] = useState("");
 
   return (
-    <header className="flex items-center justify-between py-5 px-4 sm:px-6 lg:px-10 border-b border-white/5 bg-[#050505]/80 backdrop-blur-md sticky top-0 z-30">
+    <header className="flex items-center justify-between py-5 px-4 sm:px-6 lg:px-10 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30">
       {/* Left: hamburger + search */}
       <div className="flex items-center gap-3 flex-1 max-w-md">
         <button
           onClick={onMenuClick}
-          className="lg:hidden p-2 -ml-2 text-[#8e9895] hover:text-white transition-colors shrink-0"
+          className="lg:hidden p-2 -ml-2 text-muted hover:text-white transition-colors shrink-0"
           aria-label="Open menu"
         >
           <Menu className="w-6 h-6" />
         </button>
 
         <div className="relative w-full">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4A5D54] pointer-events-none" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-subtle pointer-events-none" />
           <input
             type="text"
             placeholder="Search transactions, payouts..."
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
-            className="w-full bg-[#111111] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-[14px] text-white placeholder:text-[#4A5D54] focus:outline-none focus:border-brand/30 focus:bg-[#111111] transition-colors"
+            className="w-full bg-surface border border-border rounded-xl pl-10 pr-4 py-2.5 text-[14px] text-white placeholder:text-subtle focus:outline-none focus:border-brand/30 focus:bg-surface transition-colors"
           />
         </div>
       </div>
@@ -181,11 +181,11 @@ function EarningsHeader({ onMenuClick }: { onMenuClick: () => void }) {
       <div className="flex items-center gap-3 ml-4">
         {/* Notifications */}
         <button
-          className="w-10 h-10 rounded-xl bg-[#111111] border border-white/5 flex items-center justify-center text-[#8e9895] hover:text-white transition-colors relative shrink-0"
+          className="w-10 h-10 rounded-xl bg-surface border border-border flex items-center justify-center text-muted hover:text-white transition-colors relative shrink-0"
           aria-label="Notifications"
         >
           <Bell className="w-5 h-5" />
-          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-[#111111]" />
+          <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-brand rounded-full border-2 border-surface" />
         </button>
 
         {/* Wallet Connect */}
@@ -209,7 +209,7 @@ export default function EarningsLayout({ children }: EarningsLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#050505] text-white font-sans overflow-hidden">
+    <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
       {/* Ambient glows */}
       <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
       <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />

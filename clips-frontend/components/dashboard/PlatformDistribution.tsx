@@ -50,33 +50,33 @@ const platforms: Platform[] = [
     name: "TikTok Shorts",
     icon: TikTokIcon,
     percentage: 38,
-    color: "#EE1D52",
-    iconColor: "text-[#EE1D52]",
-    bgColor: "#EE1D5215",
+    color: "var(--color-tiktok)",
+    iconColor: "text-tiktok",
+    bgColor: "rgba(238, 29, 82, 0.15)",
   },
   {
     name: "YouTube Shorts",
     icon: YoutubeIcon,
     percentage: 31,
-    color: "#FF0000",
-    iconColor: "text-red-500",
-    bgColor: "#FF000015",
+    color: "var(--color-youtube)",
+    iconColor: "text-youtube",
+    bgColor: "rgba(255, 0, 0, 0.15)",
   },
   {
     name: "Instagram Reels",
     icon: InstagramIcon,
     percentage: 22,
-    color: "#E1306C",
-    iconColor: "text-pink-500",
-    bgColor: "#E1306C15",
+    color: "var(--color-instagram)",
+    iconColor: "text-instagram",
+    bgColor: "rgba(225, 48, 108, 0.15)",
   },
   {
     name: "Other",
     icon: OtherIcon,
     percentage: 9,
-    color: "#8e9895",
-    iconColor: "text-[#8e9895]",
-    bgColor: "#8e989515",
+    color: "var(--color-muted)",
+    iconColor: "text-muted",
+    bgColor: "rgba(142, 152, 149, 0.1)",
   },
 ];
 
@@ -95,12 +95,12 @@ export default function PlatformDistribution() {
   return (
     <section
       aria-label="Platform contribution distribution"
-      className="bg-[#111111] border border-white/5 rounded-[24px] p-8 flex flex-col gap-7"
+      className="bg-surface border border-border rounded-[24px] p-8 flex flex-col gap-7"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
         <h3 className="text-[18px] font-bold text-white tracking-tight">Distribution</h3>
-        <span className="text-[12px] text-[#8e9895] font-medium">{total}% total</span>
+        <span className="text-[12px] text-muted font-medium">{total}% total</span>
       </div>
 
       {/* Stacked overview bar */}
@@ -161,7 +161,7 @@ export default function PlatformDistribution() {
 
       {/* Footer */}
       <button
-        className="w-full py-3 rounded-xl border border-white/5 text-[13px] font-bold text-[#8e9895] hover:text-white hover:bg-white/[0.03] transition-all flex items-center justify-center gap-2 mt-1"
+        className="w-full py-3 rounded-xl border border-white/5 text-[13px] font-bold text-muted hover:text-white hover:bg-white/[0.03] transition-all flex items-center justify-center gap-2 mt-1"
         aria-label="Connect a new platform"
       >
         <Plus className="w-4 h-4" aria-hidden="true" />

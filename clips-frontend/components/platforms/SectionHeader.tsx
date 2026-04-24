@@ -14,7 +14,7 @@ export default function SectionHeader({ title, icon: Icon, label, labelColor = "
   return (
     <div className="flex items-center justify-between mb-8">
       <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center text-[#5A6F65]">
+        <div className="w-8 h-8 rounded-lg bg-white/[0.03] border border-white/5 flex items-center justify-center text-muted-foreground">
           <Icon className="w-4.5 h-4.5" />
         </div>
         <h3 className="text-[18px] font-bold text-white tracking-tight">{title}</h3>

@@ -27,7 +27,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
             <button
               onClick={disconnect}
               title="Disconnect wallet"
-              className="p-2 rounded-xl bg-white/[0.03] border border-white/5 text-[#5A6F65] hover:text-red-400 hover:border-red-400/20 transition-all"
+              className="p-2 rounded-xl bg-white/[0.03] border border-white/5 text-muted-foreground hover:text-red-400 hover:border-red-400/20 transition-all"
             >
               <LogOut className="w-4 h-4" />
             </button>

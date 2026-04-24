@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
-.root {
-  background-color: #080C0B;
+:root {
+  background-color: var(--color-background);
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -16,12 +16,32 @@
   --color-surface-hover: #161D1A;
   --color-border: #1E2923;
   --color-input: #0B100E;
+  --color-muted: #8e9895;
+  --color-muted-foreground: #5A6F65;
+  --color-subtle: #4A5D54;
+  --color-warning: #FACC15;
+  --color-error: #EF4444;
+  --color-tips: #3B82F6;
+  --color-legendary-from: #FFD700;
+  --color-legendary-to: #FFA500;
+  --color-epic-from: #9D4EDD;
+  --color-epic-to: #7209B7;
+  --color-uncommon: #3A86FF;
+  --color-tiktok: #EE1D52;
+  --color-tiktok-accent: #69C9D0;
+  --color-youtube: #FF0000;
+  --color-instagram: #E1306C;
+  --color-instagram-start: #f09433;
+  --color-instagram-mid: #dc2743;
+  --color-instagram-end: #bc1888;
+  --color-phantom: #AB9FF2;
+  --color-metamask: #E2761B;
 }
 
 @layer base {
   body {
     background-color: var(--color-background);
-    color: #ffffff;
+    color: white;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }

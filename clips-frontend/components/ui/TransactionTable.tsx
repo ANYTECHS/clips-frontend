@@ -51,13 +51,13 @@ function CopyId({ id }: { id: string }) {
       className="flex items-center gap-1.5 group"
       title="Copy transaction ID"
     >
-      <span className="font-mono text-[12px] text-[#8e9895] group-hover:text-white transition-colors">
+      <span className="font-mono text-[12px] text-muted group-hover:text-white transition-colors">
         {id}
       </span>
       {copied ? (
         <Check className="w-3 h-3 text-brand shrink-0" />
       ) : (
-        <Copy className="w-3 h-3 text-[#4A5D54] group-hover:text-[#8e9895] shrink-0 transition-colors" />
+        <Copy className="w-3 h-3 text-subtle group-hover:text-muted shrink-0 transition-colors" />
       )}
     </button>
   );
@@ -85,17 +85,17 @@ function SortTh({
   const active = current === sortKey;
   return (
     <th
-      className={`py-4 px-4 text-left font-bold text-[12px] text-[#8e9895] uppercase tracking-wider cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap ${className}`}
+      className={`py-4 px-4 text-left font-bold text-[12px] text-muted uppercase tracking-wider cursor-pointer select-none hover:text-white transition-colors whitespace-nowrap ${className}`}
       onClick={() => onSort(sortKey)}
     >
       <span className="inline-flex items-center gap-1">
         {label}
         <span className="flex flex-col -space-y-0.5">
           <ChevronUp
-            className={`w-2.5 h-2.5 ${active && dir === "asc" ? "text-brand" : "text-[#4A5D54]"}`}
+            className={`w-2.5 h-2.5 ${active && dir === "asc" ? "text-brand" : "text-subtle"}`}
           />
           <ChevronDown
-            className={`w-2.5 h-2.5 ${active && dir === "desc" ? "text-brand" : "text-[#4A5D54]"}`}
+            className={`w-2.5 h-2.5 ${active && dir === "desc" ? "text-brand" : "text-subtle"}`}
           />
         </span>
       </span>
@@ -166,7 +166,7 @@ export default function TransactionTable({
 
   if (loading) {
     return (
-      <div className="bg-[#111111] border border-white/5 rounded-[24px] p-12 flex items-center justify-center">
+      <div className="bg-surface border border-border rounded-[24px] p-12 flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-brand/20 border-t-brand animate-spin-slow" />
       </div>
     );
@@ -174,20 +174,20 @@ export default function TransactionTable({
 
   if (transactions.length === 0) {
     return (
-      <div className="bg-[#111111] border border-white/5 rounded-[24px] p-12 text-center">
-        <p className="text-[#4A5D54] text-[15px]">No transactions found</p>
+      <div className="bg-surface border border-border rounded-[24px] p-12 text-center">
+        <p className="text-subtle text-[15px]">No transactions found</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-[24px] overflow-hidden">
+    <div className="bg-surface border border-border rounded-[24px] overflow-hidden">
       {/* Desktop table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="w-full min-w-[700px]">
           <thead>
-            <tr className="border-b border-white/5">
-              <th className="py-4 pl-6 pr-4 text-left font-bold text-[12px] text-[#8e9895] uppercase tracking-wider whitespace-nowrap">
+            <tr className="border-b border-border">
+              <th className="py-4 pl-6 pr-4 text-left font-bold text-[12px] text-muted uppercase tracking-wider whitespace-nowrap">
                 Transaction ID
               </th>
               <SortTh label="Date" sortKey="date" current={sortKey} dir={sortDir} onSort={handleSort} />
@@ -200,7 +200,7 @@ export default function TransactionTable({
             {paginated.map((tx) => (
               <tr
                 key={tx.id}
-                className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+                className="border-b border-border hover:bg-surface-hover transition-colors"
               >
                 {/* Transaction ID */}
                 <td className="py-4 pl-6 pr-4">
@@ -236,7 +236,7 @@ export default function TransactionTable({
                       {formatUSD(tx.amount)}
                     </span>
                     {tx.cryptoAmount && tx.cryptoCurrency && (
-                      <span className="text-[11px] text-[#8e9895] font-mono">
+                      <span className="text-[11px] text-muted font-mono">
                         {formatCrypto(tx.cryptoAmount, tx.cryptoCurrency)}
                       </span>
                     )}
@@ -249,9 +249,9 @@ export default function TransactionTable({
       </div>
 
       {/* Mobile stacked cards */}
-      <div className="md:hidden divide-y divide-white/[0.04]">
+      <div className="md:hidden divide-y divide-border">
         {paginated.map((tx) => (
-          <div key={tx.id} className="p-4 hover:bg-white/[0.02] transition-colors">
+          <div key={tx.id} className="p-4 hover:bg-surface-hover transition-colors">
             <div className="flex items-start justify-between gap-3 mb-2">
               <CopyId id={tx.id} />
               <StatusBadge status={tx.status} size="sm" />
@@ -265,16 +265,16 @@ export default function TransactionTable({
                   {tx.type}
                 </span>
               </div>
-              <span className="text-[12px] text-[#8e9895]">{formatDate(tx.date)}</span>
+              <span className="text-[12px] text-muted">{formatDate(tx.date)}</span>
             </div>
             <div className="flex items-end justify-between mt-2">
-              <span className="text-[13px] text-[#8e9895] truncate max-w-[180px]">
+              <span className="text-[13px] text-muted truncate max-w-[180px]">
                 {tx.description}
               </span>
               <div className="text-right shrink-0 ml-2">
                 <div className="text-[15px] font-bold text-white">{formatUSD(tx.amount)}</div>
                 {tx.cryptoAmount && tx.cryptoCurrency && (
-                  <div className="text-[11px] text-[#8e9895] font-mono">
+                  <div className="text-[11px] text-muted font-mono">
                     {formatCrypto(tx.cryptoAmount, tx.cryptoCurrency)}
                   </div>
                 )}
@@ -286,8 +286,8 @@ export default function TransactionTable({
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="px-6 py-4 border-t border-white/5 flex items-center justify-between">
-          <span className="text-[12px] text-[#8e9895]">
+        <div className="px-6 py-4 border-t border-border flex items-center justify-between">
+          <span className="text-[12px] text-muted">
             {(page - 1) * itemsPerPage + 1}–{Math.min(page * itemsPerPage, sorted.length)} of{" "}
             {sorted.length}
           </span>
@@ -295,7 +295,7 @@ export default function TransactionTable({
             <button
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
-              className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-[#8e9895] hover:text-white hover:bg-white/10 transition-colors text-sm"
+              className="w-8 h-8 rounded-lg bg-surface-hover border border-border disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-muted hover:text-white hover:bg-white/10 transition-colors text-sm"
             >
               ‹
             </button>
@@ -309,7 +309,7 @@ export default function TransactionTable({
                   className={`w-8 h-8 rounded-lg border text-[12px] font-bold transition-colors ${
                     p === page
                       ? "bg-brand/10 border-brand/30 text-brand"
-                      : "bg-white/5 border-white/10 text-[#8e9895] hover:text-white hover:bg-white/10"
+                      : "bg-surface-hover border-border text-muted hover:text-white hover:bg-white/10"
                   }`}
                 >
                   {p}
@@ -319,7 +319,7 @@ export default function TransactionTable({
             <button
               disabled={page === totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-[#8e9895] hover:text-white hover:bg-white/10 transition-colors text-sm"
+              className="w-8 h-8 rounded-lg bg-surface-hover border border-border disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-muted hover:text-white hover:bg-white/10 transition-colors text-sm"
             >
               ›
             </button>

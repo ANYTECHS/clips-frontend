@@ -58,7 +58,7 @@ export default function ProjectFilters({
             <span>ClipCash <span className="text-brand">AI</span></span>
           </Link>
 
-          <Link href="/dashboard" className="inline-flex items-center gap-2 text-[13px] font-bold text-[#5A6F65] hover:text-white transition-colors group">
+          <Link href="/dashboard" className="inline-flex items-center gap-2 text-[13px] font-bold text-muted-foreground hover:text-white transition-colors group">
             <div className="w-8 h-8 rounded-full bg-white/[0.03] border border-white/5 flex items-center justify-center group-hover:bg-brand/10 group-hover:border-brand/20 transition-all">
               <ArrowLeft className="w-4 h-4" />
             </div>
@@ -68,7 +68,7 @@ export default function ProjectFilters({
 
         {/* Vault Filters Section */}
         <div className="space-y-6">
-          <h3 className="text-[11px] font-black text-[#5A6F65] uppercase tracking-[0.2em] mb-4">Vault Filters</h3>
+          <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Vault Filters</h3>
           
           <div className="space-y-2">
             {[
@@ -84,10 +84,10 @@ export default function ProjectFilters({
                   className={`w-full group flex items-center gap-3 px-4 py-3 rounded-2xl transition-all ${
                     isActive 
                       ? "bg-brand/10 border border-brand/40 text-brand shadow-[0_0_20px_rgba(0,229,143,0.05)]" 
-                      : "bg-[#111815] border border-white/5 text-[#5A6F65] hover:text-white hover:bg-white/[0.03]"
+                      : "bg-surface border border-white/5 text-muted-foreground hover:text-white hover:bg-white/[0.03]"
                   }`}
                 >
-                  <filter.icon className={`w-4 h-4 ${isActive ? "text-brand" : "text-[#5A6F65] group-hover:text-white"}`} />
+                  <filter.icon className={`w-4 h-4 ${isActive ? "text-brand" : "text-muted-foreground group-hover:text-white"}`} />
                   <span className="text-[13px] font-bold">{filter.label}</span>
                   {isActive && (
                     <div className="ml-auto w-1.5 h-1.5 rounded-full bg-brand shadow-[0_0_8px_rgba(0,229,143,0.8)]" />
@@ -100,7 +100,7 @@ export default function ProjectFilters({
 
         {/* Curation Tools Section */}
         <div className="space-y-6">
-          <h3 className="text-[11px] font-black text-[#5A6F65] uppercase tracking-[0.2em] mb-4">Curation Tools</h3>
+          <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Curation Tools</h3>
           
           <div className="space-y-2">
             <button 
@@ -108,7 +108,7 @@ export default function ProjectFilters({
               className={`w-full group flex items-center justify-between px-4 py-3 rounded-2xl transition-all ${
                 activeFilterCount > 0 
                   ? "bg-brand/10 border border-brand/40 text-brand" 
-                  : "bg-[#111815] border border-white/5 text-[#5A6F65] hover:text-white"
+                  : "bg-surface border border-white/5 text-muted-foreground hover:text-white"
               }`}
             >
               <div className="flex items-center gap-3 font-bold text-[13px]">
@@ -116,19 +116,19 @@ export default function ProjectFilters({
                 <span>{activeFilterCount > 0 ? "Clear Filters" : "Active Filters"}</span>
               </div>
               <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[11px] font-black ${
-                activeFilterCount > 0 ? "bg-brand text-black" : "bg-white/5 text-[#5A6F65]"
+                activeFilterCount > 0 ? "bg-brand text-black" : "bg-white/5 text-muted-foreground"
               }`}>
                 {activeFilterCount}
               </div>
             </button>
 
-            <button className="w-full group flex items-center gap-3 px-4 py-3 text-[#5A6F65] hover:text-white transition-all rounded-2xl hover:bg-white/[0.03]">
+            <button className="w-full group flex items-center gap-3 px-4 py-3 text-muted-foreground hover:text-white transition-all rounded-2xl hover:bg-white/[0.03]">
               <Sparkles className="w-4 h-4" />
               <span className="text-[13px] font-bold">AI Suggestions</span>
             </button>
 
             <div className="space-y-3 pt-2">
-              <label className="text-[11px] font-bold text-[#3A4A43] flex items-center gap-2 uppercase tracking-widest pl-4">
+              <label className="text-[11px] font-bold text-subtle flex items-center gap-2 uppercase tracking-widest pl-4">
                 <Type className="w-3 h-3" />
                 Captions Style
               </label>
@@ -137,13 +137,13 @@ export default function ProjectFilters({
                   <select 
                     value={captionsStyle}
                     onChange={(e) => onCaptionsStyleChange(e.target.value)}
-                    className="w-full bg-[#0B100E] border border-white/5 rounded-xl px-4 py-3 text-[12px] font-bold text-gray-300 outline-none appearance-none cursor-pointer focus:border-brand/40 transition-all"
+                    className="w-full bg-input border border-white/5 rounded-xl px-4 py-3 text-[12px] font-bold text-gray-300 outline-none appearance-none cursor-pointer focus:border-brand/40 transition-all"
                   >
                     {captionsStyles.map(style => (
                       <option key={style} value={style}>{style}</option>
                     ))}
                   </select>
-                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#5A6F65] pointer-events-none" />
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" />
                 </div>
               </div>
             </div>
@@ -152,7 +152,7 @@ export default function ProjectFilters({
 
         {/* Virality Score Section */}
         <div className="space-y-6">
-          <h3 className="text-[11px] font-black text-[#5A6F65] uppercase tracking-[0.2em] mb-4">Virality Score</h3>
+          <h3 className="text-[11px] font-black text-muted-foreground uppercase tracking-[0.2em] mb-4">Virality Score</h3>
           
           <div className="space-y-4 px-1">
             {levels.map((level) => {
@@ -172,13 +172,13 @@ export default function ProjectFilters({
                       {isActive && <Check className="w-3.5 h-3.5 text-black stroke-[3px]" />}
                     </div>
                     <span className={`text-[13px] font-bold transition-colors ${
-                      isActive ? "text-white" : "text-[#5A6F65]"
+                      isActive ? "text-white" : "text-muted-foreground"
                     }`}>
                       {level.label}
                     </span>
                   </div>
                   <span className={`text-[11px] font-black ${
-                    isActive ? "text-brand" : "text-[#3A4A43]"
+                    isActive ? "text-brand" : "text-subtle"
                   }`}>{level.count}</span>
                 </div>
               );
@@ -187,11 +187,11 @@ export default function ProjectFilters({
         </div>
 
         {/* Mini Pro Plan Card */}
-        <div className="bg-[#0B100E] border border-white/5 rounded-[32px] p-6 space-y-4 relative overflow-hidden group">
+        <div className="bg-input border border-white/5 rounded-[32px] p-6 space-y-4 relative overflow-hidden group">
           <div className="absolute inset-0 bg-brand/5 blur-3xl rounded-full -bottom-1/2 -right-1/2 opacity-0 group-hover:opacity-100 transition-opacity" />
           <div className="space-y-2 relative z-10">
             <p className="text-[11px] font-black text-brand uppercase tracking-[0.2em]">PRO PLAN</p>
-            <p className="text-[13px] font-medium text-[#5A6F65]">You have <span className="text-white">12.4GB</span> storage left.</p>
+            <p className="text-[13px] font-medium text-muted-foreground">You have <span className="text-white">12.4GB</span> storage left.</p>
           </div>
           <button className="w-full py-3 bg-brand text-black font-black text-[13px] rounded-2xl tracking-tight transition-all active:scale-[0.98] relative z-10 hover:shadow-[0_0_20px_rgba(0,229,143,0.3)]">
             Upgrade Now

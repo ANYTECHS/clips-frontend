@@ -69,18 +69,18 @@ export default function CreateClipsForm() {
   };
 
   return (
-    <div className="w-full bg-[#080C0B]/80 backdrop-blur-3xl border border-brand/20 rounded-[32px] p-6 sm:p-10 shadow-[0_0_100px_rgba(0,229,143,0.03),inset_0_0_20px_rgba(0,229,143,0.05)] relative overflow-hidden group">
+    <div className="w-full bg-background/80 backdrop-blur-3xl border border-brand/20 rounded-[32px] p-6 sm:p-10 shadow-[0_0_100px_rgba(0,229,143,0.03),inset_0_0_20px_rgba(0,229,143,0.05)] relative overflow-hidden group">
       {/* Glow Effect Corner */}
       <div className="absolute -top-24 -right-24 w-48 h-48 bg-brand/5 blur-[80px] rounded-full pointer-events-none group-hover:bg-brand/10 transition-all duration-700" />
       
       <div className="space-y-8">
         {/* Import from URL Section */}
         <div className="space-y-3">
-          <label className="text-[13px] font-bold text-[#5A6F65] uppercase tracking-wider block ml-1">
+          <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider block ml-1">
             Paste YouTube or Vimeo URL
           </label>
           <div className="relative flex items-center group/input">
-            <div className="absolute left-6 text-[#3A4A43] group-focus-within/input:text-brand transition-colors">
+            <div className="absolute left-6 text-subtle group-focus-within/input:text-brand transition-colors">
               <LinkIcon className="w-5 h-5" />
             </div>
             <input 
@@ -88,26 +88,26 @@ export default function CreateClipsForm() {
               value={videoUrl}
               onChange={handleUrlChange}
               placeholder="https://www.youtube.com/watch?v=... or https://vimeo.com/..." 
-              className={`w-full h-14 bg-[#0B100E] border rounded-2xl pl-16 pr-36 text-[14px] font-medium placeholder-[#3A4A43] text-white transition-all outline-none ${
-                urlError ? "border-[#FF6B6B] ring-0" : "border-white/[0.03] focus:border-[#00E58F]/60"
-              } focus:ring-4 ${urlError ? "focus:ring-[#FF6B6B]/20" : "focus:ring-[#00E58F]/15"}`}
+              className={`w-full h-14 bg-input border rounded-2xl pl-16 pr-36 text-[14px] font-medium placeholder-subtle text-white transition-all outline-none ${
+                urlError ? "border-rose-500 ring-0" : "border-white/[0.03] focus:border-brand/60"
+              } focus:ring-4 ${urlError ? "focus:ring-rose-500/20" : "focus:ring-brand/15"}`}
             />
             <button 
               onClick={handleClipNow}
-              className="absolute right-2 px-5 py-3 bg-[#00E58F] hover:bg-[#00f69f] text-black font-bold rounded-xl text-[14px] transition-all active:scale-[0.98] shadow-[0_6px_30px_rgba(0,229,143,0.25)]"
+              className="absolute right-2 px-5 py-3 bg-brand hover:bg-brand-hover text-black font-bold rounded-xl text-[14px] transition-all active:scale-[0.98] shadow-[0_6px_30px_rgba(0,229,143,0.25)]"
             >
               Clip Now
             </button>
           </div>
           {urlError && (
-            <p className="text-[12px] text-[#FF6B6B] ml-1">{urlError}</p>
+            <p className="text-[12px] text-rose-500 ml-1">{urlError}</p>
           )}
         </div>
 
         {/* Divider */}
         <div className="relative flex items-center justify-center py-2">
           <div className="absolute left-0 right-0 h-px bg-white/[0.03]" />
-          <span className="relative z-10 px-6 bg-[#080C0B] text-[12px] font-black text-[#2A3B34] uppercase tracking-[0.2em]">OR</span>
+          <span className="relative z-10 px-6 bg-background text-[12px] font-black text-subtle uppercase tracking-[0.2em]">OR</span>
         </div>
 
         {/* Upload Area */}
@@ -120,19 +120,19 @@ export default function CreateClipsForm() {
             accept="video/*"
           />
           <div className="w-full aspect-[21/9] sm:aspect-[4.5/1] border-2 border-dashed border-white/5 group-hover/upload:border-brand/20 rounded-[24px] bg-white/[0.01] group-hover/upload:bg-brand/[0.01] flex flex-col items-center justify-center gap-4 transition-all duration-500 cursor-pointer overflow-hidden">
-            <div className="w-14 h-14 rounded-2xl bg-[#0B100E] border border-white/5 flex items-center justify-center group-hover/upload:scale-110 group-hover/upload:border-brand/20 transition-all duration-500 relative">
+            <div className="w-14 h-14 rounded-2xl bg-input border border-white/5 flex items-center justify-center group-hover/upload:scale-110 group-hover/upload:border-brand/20 transition-all duration-500 relative">
               <div className="absolute inset-0 bg-brand/5 blur-xl group-hover/upload:bg-brand/10 transition-colors rounded-full" />
               {selectedFile ? (
                 <Check className="w-6 h-6 text-brand relative z-10" />
               ) : (
-                <Upload className="w-6 h-6 text-[#5A6F65] group-hover/upload:text-brand relative z-10" />
+                <Upload className="w-6 h-6 text-muted-foreground group-hover/upload:text-brand relative z-10" />
               )}
             </div>
             <div className="text-center space-y-1 relative z-10">
               <p className="text-[16px] font-bold text-white group-hover/upload:text-brand transition-colors">
                 {selectedFile ? selectedFile.name : "Click to upload or drag and drop"}
               </p>
-              <p className="text-[12px] font-medium text-[#3A4A43]">
+              <p className="text-[12px] font-medium text-subtle">
                 {selectedFile ? `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB` : "MP4, MOV, WEBM up to 2GB"}
               </p>
             </div>
@@ -143,7 +143,7 @@ export default function CreateClipsForm() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-10">
           {/* Target Platforms */}
           <div className="space-y-4 flex-1">
-            <label className="text-[13px] font-bold text-[#5A6F65] uppercase tracking-wider block ml-1">
+            <label className="text-[13px] font-bold text-muted-foreground uppercase tracking-wider block ml-1">
               Target Platforms
             </label>
             <div className="flex flex-wrap gap-3">
@@ -154,7 +154,7 @@ export default function CreateClipsForm() {
                   className={`px-5 py-2.5 rounded-full border text-[13px] font-bold flex items-center gap-2 transition-all duration-300 ${
                     activePlatform === platform.name 
                       ? "bg-brand/10 border-brand text-brand shadow-[0_0_15px_rgba(0,229,143,0.15)]" 
-                      : "bg-[#0B100E] border-white/5 text-[#5A6F65] hover:text-white hover:border-white/10"
+                      : "bg-input border-white/5 text-muted-foreground hover:text-white hover:border-white/10"
                   }`}
                 >
                   <span className={activePlatform === platform.name ? "opacity-100" : "opacity-40 grayscale group-hover:grayscale-0 transition-all"}>
@@ -168,10 +168,10 @@ export default function CreateClipsForm() {
           </div>
 
           {/* Auto Generate Toggle */}
-          <div className="bg-[#0B100E]/50 border border-white/5 rounded-[24px] p-6 lg:min-w-[320px] flex items-center justify-between group/toggle hover:border-brand/20 transition-all">
+          <div className="bg-input/50 border border-white/5 rounded-[24px] p-6 lg:min-w-[320px] flex items-center justify-between group/toggle hover:border-brand/20 transition-all">
             <div className="space-y-1">
               <p className="text-[14px] font-bold text-white group-hover/toggle:text-brand transition-colors">Auto-generate clips</p>
-              <p className="text-[11px] font-medium text-[#5A6F65]">Extract 50–200 viral moments</p>
+              <p className="text-[11px] font-medium text-muted-foreground">Extract 50–200 viral moments</p>
             </div>
             <Switch checked={autoGenerate} onChange={(v) => setAutoGenerate(v)} ariaLabel="Auto-generate clips" />
           </div>
@@ -179,8 +179,8 @@ export default function CreateClipsForm() {
 
         {/* Footer Action Row */}
         <div className="pt-6 border-t border-white/[0.03] flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-2.5 text-[#5A6F65]">
-            <Info className="w-4 h-4 text-[#5A6F65]" />
+          <div className="flex items-center gap-2.5 text-muted-foreground">
+            <Info className="w-4 h-4 text-muted-foreground" />
             <span className="text-[13px] font-medium tracking-tight">Estimated processing time: <span className="text-white">4–6 minutes</span></span>
           </div>
           <button 

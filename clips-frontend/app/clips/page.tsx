@@ -13,7 +13,7 @@ import ClipsStats from "../../components/clips/ClipsStats";
 
 export default function ClipsPage() {
   return (
-    <div className="min-h-screen bg-[#050505] text-white font-sans selection:bg-brand/30 selection:text-brand relative overflow-x-hidden">
+    <div className="min-h-screen bg-background text-white font-sans selection:bg-brand/30 selection:text-brand relative overflow-x-hidden">
       {/* Background Glow Elements */}
       <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[1400px] h-screen pointer-events-none z-0">
         <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-brand/5 blur-[120px]" />

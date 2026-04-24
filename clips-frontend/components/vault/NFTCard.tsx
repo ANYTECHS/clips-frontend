@@ -36,26 +36,26 @@ const NFTCard = memo(function NFTCard({
   const getRarityStyle = (r: string) => {
     switch (r) {
       case "legendary":
-        return "bg-gradient-to-r from-[#FFD700] to-[#FFA500] text-black";
+        return "bg-gradient-to-r from-legendary-from to-legendary-to text-black";
       case "epic":
-        return "bg-gradient-to-r from-[#9D4EDD] to-[#7209B7] text-white";
+        return "bg-gradient-to-r from-epic-from to-epic-to text-white";
       case "rare":
-        return "bg-gradient-to-r from-[#00E58F] to-[#00C46E] text-black";
+        return "bg-gradient-to-r from-brand to-brand/80 text-black";
       case "uncommon":
-        return "bg-[#3A86FF] text-white";
+        return "bg-uncommon text-white";
       default:
-        return "bg-[#6B7D72] text-white";
+        return "bg-muted-foreground text-white";
     }
   };
 
   const getStatusBadge = () => {
     switch (status) {
       case "pending":
-        return { color: "bg-[#FACC15]/20 text-[#FACC15] border-[#FACC15]/30", label: "Pending Mint", icon: Clock };
+        return { color: "bg-warning/20 text-warning border-warning/30", label: "Pending Mint", icon: Clock };
       case "listed":
-        return { color: "bg-[#00E58F]/20 text-[#00E58F] border-[#00E58F]/30", label: "Listed", icon: TrendingUp };
+        return { color: "bg-brand/20 text-brand border-brand/30", label: "Listed", icon: TrendingUp };
       case "minted":
-        return { color: "bg-[#3A86FF]/20 text-[#3A86FF] border-[#3A86FF]/30", label: "Minted", icon: Zap };
+        return { color: "bg-uncommon/20 text-uncommon border-uncommon/30", label: "Minted", icon: Zap };
     }
   };
 
@@ -65,12 +65,12 @@ const NFTCard = memo(function NFTCard({
 
   return (
     <div 
-      className="group relative bg-[#0B100E] border border-white/5 hover:border-white/20 rounded-[20px] overflow-hidden transition-all duration-300 cursor-pointer"
+      className="group relative bg-surface border border-border hover:border-border rounded-[20px] overflow-hidden transition-all duration-300 cursor-pointer"
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
       {/* Thumbnail Area */}
-      <div className="relative aspect-square overflow-hidden bg-[#050505]">
+      <div className="relative aspect-square overflow-hidden bg-background">
         <img 
           src={thumbnail} 
           alt={title}
@@ -111,21 +111,21 @@ const NFTCard = memo(function NFTCard({
         {/* Price Info */}
         <div className="space-y-2">
           <div className="flex items-baseline justify-between">
-            <span className="text-[11px] text-[#8e9895] uppercase tracking-wider font-bold">Current Value</span>
-            <span className={`text-[12px] font-bold ${priceChange >= 0 ? "text-[#00E58F]" : "text-[#EF4444]"}`}>
+            <span className="text-[11px] text-muted uppercase tracking-wider font-bold">Current Value</span>
+            <span className={`text-[12px] font-bold ${priceChange >= 0 ? "text-brand" : "text-error"}`}>
               {priceChange >= 0 ? "+" : ""}{priceChange.toFixed(1)}%
             </span>
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-[18px] font-black text-white">{currentValue.toFixed(2)}</span>
-            <span className="text-[12px] text-[#8e9895]">ETH</span>
+            <span className="text-[12px] text-muted">ETH</span>
           </div>
         </div>
 
         {/* Floor Price Comparison */}
-        <div className="pt-2 border-t border-white/5 flex items-center justify-between">
-          <span className="text-[11px] text-[#5A6F65]">Floor: {floorPrice.toFixed(2)} ETH</span>
-          <span className="text-[11px] text-[#5A6F65]">{mintedDate || listedDate || "N/A"}</span>
+        <div className="pt-2 border-t border-border flex items-center justify-between">
+          <span className="text-[11px] text-muted-foreground">Floor: {floorPrice.toFixed(2)} ETH</span>
+          <span className="text-[11px] text-muted-foreground">{mintedDate || listedDate || "N/A"}</span>
         </div>
       </div>
     </div>

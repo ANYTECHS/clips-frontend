@@ -21,7 +21,7 @@ export default function Navbar() {
   }, []);
 
   return (
-    <div className="w-full border-b border-[#1A2620]">
+    <div className="w-full border-b border-border">
       <header className="w-full max-w-7xl mx-auto px-6 py-[22px] flex justify-between items-center z-10 transition-opacity duration-500 relative">
         <Link href="/" className="flex items-center gap-3 text-[19px] font-extrabold tracking-tight text-white hover:opacity-80 transition-opacity">
           <div className="w-[30px] h-[30px] bg-brand rounded-[8px] flex items-center justify-center text-black text-[16px]">
@@ -31,7 +31,7 @@ export default function Navbar() {
         </Link>
         
         {!user && (
-          <nav className="hidden lg:flex gap-10 text-[13px] font-semibold text-[#8e9895]">
+          <nav className="hidden lg:flex gap-10 text-[13px] font-semibold text-muted">
             <Link href="#" className="hover:text-white transition-colors">Features</Link>
             <Link href="#" className="hover:text-white transition-colors">Pricing</Link>
             <Link href="#" className="hover:text-white transition-colors">Showcase</Link>
@@ -59,21 +59,21 @@ export default function Navbar() {
             <div className="relative" ref={dropdownRef}>
               <button 
                 onClick={() => setDropdownOpen(!dropdownOpen)}
-                className="text-[14px] text-white font-medium px-4 py-2 bg-[#1A221E] border border-[#2A3B34] rounded-full shadow-sm hover:bg-[#212c26] transition-colors"
+                className="text-[14px] text-white font-medium px-4 py-2 bg-input border border-subtle rounded-full shadow-sm hover:bg-surface-hover transition-colors"
               >
                 {user.profile?.username || user.name || user.email}
               </button>
               
               {dropdownOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-[#131A17] border border-[#1E2A24] rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                <div className="absolute right-0 mt-2 w-48 bg-surface border border-border rounded-xl shadow-lg overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
                   <button 
                     onClick={() => {
                       setUser(null);
                       setDropdownOpen(false);
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-3 text-[14px] text-white hover:bg-[#1A221E] transition-colors"
+                    className="w-full flex items-center gap-2 px-4 py-3 text-[14px] text-white hover:bg-surface-hover transition-colors"
                   >
-                    <LogOut className="w-4 h-4 text-[#8e9895]" />
+                    <LogOut className="w-4 h-4 text-muted" />
                     <span>Log out</span>
                   </button>
                 </div>

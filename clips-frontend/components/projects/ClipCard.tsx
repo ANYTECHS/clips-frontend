@@ -33,14 +33,14 @@ const ClipCard = memo(function ClipCard({
   const [isHovered, setIsHovered] = useState(false);
 
   const getScoreStyle = (s: number) => {
-    if (s >= 90) return "bg-[#00E58F] border-[#00E58F] text-black shadow-[0_0_20px_rgba(0,229,143,0.4)]";
-    if (s >= 70) return "bg-[#FACC15] border-[#FACC15] text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]";
-    return "bg-[#EF4444] border-[#EF4444] text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]";
+    if (s >= 90) return "bg-brand border-brand text-black shadow-[0_0_20px_rgba(0,229,143,0.4)]";
+    if (s >= 70) return "bg-warning border-warning text-black shadow-[0_0_20px_rgba(250,204,21,0.4)]";
+    return "bg-error border-error text-white shadow-[0_0_20px_rgba(239,68,68,0.4)]";
   };
 
   return (
     <div 
-      className={`group relative bg-[#0B100E] border rounded-[24px] sm:rounded-[32px] overflow-hidden transition-all duration-500 ${
+      className={`group relative bg-input border rounded-[24px] sm:rounded-[32px] overflow-hidden transition-all duration-500 ${
         isSelected 
           ? "border-brand ring-1 ring-brand/20 shadow-[0_0_50px_rgba(0,229,143,0.15)]"
           : isRecommended
@@ -108,17 +108,17 @@ const ClipCard = memo(function ClipCard({
           <h4 className="text-[14px] font-bold text-white tracking-tight leading-tight">
             {title}
           </h4>
-          <p className="text-[11px] font-medium text-[#5A6F65]">
+          <p className="text-[11px] font-medium text-muted-foreground">
             Perfect for TikTok & Reels
           </p>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button className="p-1.5 text-[#5A6F65] hover:text-white transition-colors touch-manipulation" title="Edit">
+            <button className="p-1.5 text-muted-foreground hover:text-white transition-colors touch-manipulation" title="Edit">
               <Edit className="w-4 h-4" />
             </button>
-            <button className="p-1.5 text-[#5A6F65] hover:text-white transition-colors touch-manipulation" title="Download">
+            <button className="p-1.5 text-muted-foreground hover:text-white transition-colors touch-manipulation" title="Download">
               <Download className="w-4 h-4" />
             </button>
           </div>

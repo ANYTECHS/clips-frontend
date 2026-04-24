@@ -21,14 +21,14 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
 
   if (variant === "horizontal") {
     return (
-      <div className="bg-[#111111]/40 backdrop-blur-md border border-white/[0.03] rounded-[24px] p-6 flex items-center justify-between group hover:border-brand/20 transition-all duration-300 relative overflow-hidden">
+      <div className="bg-surface/40 backdrop-blur-md border border-white/[0.03] rounded-[24px] p-6 flex items-center justify-between group hover:border-brand/20 transition-all duration-300 relative overflow-hidden">
         <div className="flex items-center gap-5">
-          <div className="w-14 h-14 rounded-full bg-[#1A1A1A] border border-white/5 flex items-center justify-center text-[#5A6F65] group-hover:text-brand transition-colors">
+          <div className="w-14 h-14 rounded-full bg-surface-hover border border-white/5 flex items-center justify-center text-muted-foreground group-hover:text-brand transition-colors">
             <Icon className="w-7 h-7" />
           </div>
           <div className="flex flex-col gap-0.5">
             <h4 className="text-[17px] font-bold text-white tracking-tight">{name}</h4>
-            <p className="text-[13px] text-[#5A6F65] font-medium">{description}</p>
+            <p className="text-[13px] text-muted-foreground font-medium">{description}</p>
           </div>
         </div>
         
@@ -39,13 +39,13 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Linked
               </div>
-              <div className="text-[13px] font-mono text-[#3A4A43] bg-white/[0.02] px-2 py-0.5 rounded-lg border border-white/[0.03]">
+              <div className="text-[13px] font-mono text-subtle bg-white/[0.02] px-2 py-0.5 rounded-lg border border-white/[0.03]">
                 {username}
               </div>
               {onDisconnect && (
                 <button
                   onClick={onDisconnect}
-                  className="text-[11px] text-[#5A6F65] hover:text-red-400 transition-colors mt-0.5 font-medium"
+                  className="text-[11px] text-muted-foreground hover:text-red-400 transition-colors mt-0.5 font-medium"
                 >
                   Disconnect
                 </button>
@@ -67,15 +67,15 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
   }
 
   return (
-    <div className="bg-[#111111]/40 backdrop-blur-md border border-white/[0.03] rounded-[24px] p-8 flex flex-col gap-8 group hover:border-brand/20 transition-all duration-300 relative overflow-hidden">
+    <div className="bg-surface/40 backdrop-blur-md border border-white/[0.03] rounded-[24px] p-8 flex flex-col gap-8 group hover:border-brand/20 transition-all duration-300 relative overflow-hidden">
       <div className="flex items-start justify-between">
-        <div className="w-16 h-16 rounded-[22px] bg-[#1A1A1A] border border-white/5 flex items-center justify-center text-[#5A6F65] group-hover:text-brand transition-all duration-500 shadow-inner">
+        <div className="w-16 h-16 rounded-[22px] bg-surface-hover border border-white/5 flex items-center justify-center text-muted-foreground group-hover:text-brand transition-all duration-500 shadow-inner">
           <Icon className="w-8 h-8" />
         </div>
         <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-[0.12em] ${
           isActive 
             ? "bg-brand/10 text-brand border border-brand/20 shadow-[0_0_10px_rgba(0,229,143,0.15)]" 
-            : "bg-white/[0.03] text-[#5A6F65] border border-white/5"
+            : "bg-white/[0.03] text-muted-foreground border border-white/5"
         }`}>
           {status}
         </div>
@@ -83,7 +83,7 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
 
       <div className="space-y-1">
         <h4 className="text-[20px] font-bold text-white tracking-tight">{name}</h4>
-        <p className="text-[14px] text-[#5A6F65] font-medium leading-relaxed">{username || description}</p>
+        <p className="text-[14px] text-muted-foreground font-medium leading-relaxed">{username || description}</p>
       </div>
 
       <button 
@@ -98,7 +98,7 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
         {isLoading ? (
           <Loader2 className="w-4 h-4 animate-spin" />
         ) : (
-          status === "ACTIVE" && <Settings className="w-4 h-4 text-[#5A6F65] group-hover/btn:text-white transition-colors" />
+          status === "ACTIVE" && <Settings className="w-4 h-4 text-muted-foreground group-hover/btn:text-white transition-colors" />
         )}
         {isLoading ? "Connecting..." : ctaText}
       </button>

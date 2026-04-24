@@ -103,7 +103,7 @@ export default function ProjectsPage() {
   }, [selectedIds]);
 
   return (
-    <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-background text-white font-sans overflow-hidden">
       {/* Background Effects */}
       <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
       <div className="fixed bottom-0 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3 translate-y-1/3" />
@@ -117,12 +117,12 @@ export default function ProjectsPage() {
       )}
 
       {/* Mobile Filter Drawer */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-[#050505] border-r border-white/5 py-10 pl-8 transition-transform duration-300 lg:hidden ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-background border-r border-white/5 py-10 pl-8 transition-transform duration-300 lg:hidden ${
         mobileFiltersOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
         <button
           onClick={() => setMobileFiltersOpen(false)}
-          className="absolute top-4 right-4 p-2 text-[#5A6F65] hover:text-white transition-colors"
+          className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-white transition-colors"
           aria-label="Close filters"
         >
           <X className="w-5 h-5" />

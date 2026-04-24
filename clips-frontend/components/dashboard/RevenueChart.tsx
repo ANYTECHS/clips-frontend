@@ -50,8 +50,8 @@ const RANGE_LABELS: Record<Range, string> = {
   "90D": "Last 90 Days",
 };
 
-const COLOR_ADS  = "#00E58F";
-const COLOR_TIPS = "#3B82F6";
+const COLOR_ADS  = "var(--color-brand)";
+const COLOR_TIPS = "var(--color-tips)";
 
 const fmt = (v: number) =>
   v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`;
@@ -93,16 +93,16 @@ function BarChart({ data }: { data: MonthPoint[] }) {
       >
         <defs>
           <linearGradient id="gradAds" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={COLOR_ADS} stopOpacity="1" />
-            <stop offset="100%" stopColor={COLOR_ADS} stopOpacity="0.55" />
+            <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0.55" />
           </linearGradient>
           <linearGradient id="gradTips" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={COLOR_TIPS} stopOpacity="1" />
             <stop offset="100%" stopColor={COLOR_TIPS} stopOpacity="0.55" />
           </linearGradient>
           <linearGradient id="gradHover" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.04" />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            <stop offset="0%" stopColor="white" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -110,9 +110,9 @@ function BarChart({ data }: { data: MonthPoint[] }) {
         {ticks.map((t) => (
           <g key={t.y}>
             <line x1={PAD_L} y1={t.y} x2={SVG_W - PAD_R} y2={t.y}
-              stroke="#ffffff" strokeOpacity="0.05" strokeWidth="1" />
+              stroke="white" strokeOpacity="0.05" strokeWidth="1" />
             <text x={PAD_L - 6} y={t.y + 4} textAnchor="end"
-              fontSize="10" fill="#4A5D54" fontFamily="inherit">
+              fontSize="10" fill="var(--color-subtle)" fontFamily="inherit">
               {t.label}
             </text>
           </g>
@@ -152,10 +152,10 @@ function BarChart({ data }: { data: MonthPoint[] }) {
               {isHov && (
                 <g>
                   <rect x={groupX - 52} y={ttY} width={104} height={46}
-                    rx="8" fill="#1A1A1A"
-                    stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
+                    rx="8" fill="var(--color-surface-hover)"
+                    stroke="var(--color-border)" strokeWidth="1" />
                   <text x={groupX} y={ttY + 16} textAnchor="middle"
-                    fontSize="10" fill={COLOR_ADS} fontFamily="inherit" fontWeight="600">
+                    fontSize="10" fill="var(--color-brand)" fontFamily="inherit" fontWeight="600">
                     Ads {fmt(d.ads)}
                   </text>
                   <text x={groupX} y={ttY + 32} textAnchor="middle"
@@ -167,7 +167,7 @@ function BarChart({ data }: { data: MonthPoint[] }) {
 
               <text x={groupX} y={baseY + 18} textAnchor="middle"
                 fontSize="11" fontWeight="700"
-                fill={isHov ? "#ffffff" : "#4A5D54"}
+                fill={isHov ? "white" : "var(--color-subtle)"}
                 fontFamily="inherit">
                 {d.label}
               </text>
@@ -177,7 +177,7 @@ function BarChart({ data }: { data: MonthPoint[] }) {
 
         {/* Baseline */}
         <line x1={PAD_L} y1={PAD_T + chartH} x2={SVG_W - PAD_R} y2={PAD_T + chartH}
-          stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
+          stroke="white" strokeOpacity="0.08" strokeWidth="1" />
       </svg>
     </div>
   );
@@ -232,7 +232,7 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
           <g key={i}>
             <circle cx={x} cy={ys[i]}
               r={i === peakIdx ? 5 : 3}
-              fill={i === peakIdx ? COLOR_ADS : "#1A1A1A"}
+              fill={i === peakIdx ? COLOR_ADS : "var(--color-surface-hover)"}
               stroke={COLOR_ADS}
               strokeWidth={i === peakIdx ? 0 : 1.5}
               opacity={i === peakIdx ? 1 : 0.5} />
@@ -249,7 +249,7 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
         {data.map((d, i) => (
           <span key={d.label}
             className={`text-[11px] font-bold tracking-wider ${
-              i === peakIdx ? "text-brand" : "text-[#4A5D54]"
+              i === peakIdx ? "text-brand" : "text-subtle"
             }`}>
             {d.label}
           </span>
@@ -284,7 +284,7 @@ export default function RevenueChart() {
     : 0;
 
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-[24px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-brand/10 transition-all duration-300">
+    <div className="bg-surface border border-border rounded-[24px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-brand/10 transition-all duration-300">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -293,15 +293,15 @@ export default function RevenueChart() {
             Revenue Trend
           </h3>
           {is6M ? (
-            <p className="text-[#5A6F65] text-[12px] font-medium">
+            <p className="text-muted-foreground text-[12px] font-medium">
               Ads{" "}
               <span className="text-brand">{fmt(totalAds)}</span>
               {"  ·  "}
               Tips{" "}
-              <span className="text-[#3B82F6]">{fmt(totalTips)}</span>
+              <span className="text-tips">{fmt(totalTips)}</span>
             </p>
           ) : (
-            <p className="text-[#5A6F65] text-[12px] font-medium">
+            <p className="text-muted-foreground text-[12px] font-medium">
               Peak: <span className="text-brand">{fmt(legacyPeak)}</span>
             </p>
           )}
@@ -311,7 +311,7 @@ export default function RevenueChart() {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] border border-white/5 rounded-xl text-[13px] text-[#8e9895] hover:text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-hover border border-border rounded-xl text-[13px] text-muted hover:text-white transition-colors"
           >
             {RANGE_LABELS[range]}
             <ChevronDown
@@ -320,7 +320,7 @@ export default function RevenueChart() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-full mt-2 bg-[#1A1A1A] border border-white/10 rounded-xl overflow-hidden z-20 min-w-[150px] shadow-xl">
+            <div className="absolute right-0 top-full mt-2 bg-surface-hover border border-border rounded-xl overflow-hidden z-20 min-w-[150px] shadow-xl">
               {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
                 <button
                   key={r}
@@ -328,7 +328,7 @@ export default function RevenueChart() {
                   className={`w-full text-left px-4 py-2.5 text-[13px] font-medium transition-colors ${
                     r === range
                       ? "text-brand bg-brand/5"
-                      : "text-[#8e9895] hover:text-white hover:bg-white/5"
+                      : "text-muted hover:text-white hover:bg-surface-hover"
                   }`}
                 >
                   {RANGE_LABELS[r]}
@@ -342,11 +342,11 @@ export default function RevenueChart() {
       {/* Legend (6M only) */}
       {is6M && (
         <div className="flex items-center gap-5">
-          <span className="flex items-center gap-2 text-[12px] font-semibold text-[#8e9895]">
+          <span className="flex items-center gap-2 text-[12px] font-semibold text-muted">
             <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_ADS }} />
             Platform Ads
           </span>
-          <span className="flex items-center gap-2 text-[12px] font-semibold text-[#8e9895]">
+          <span className="flex items-center gap-2 text-[12px] font-semibold text-muted">
             <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_TIPS }} />
             Direct Tips
           </span>

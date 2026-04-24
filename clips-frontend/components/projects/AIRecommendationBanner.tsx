@@ -43,7 +43,7 @@ export default function AIRecommendationBanner({
           >
             <Sparkles
               className={`w-4.5 h-4.5 transition-colors ${
-                isActive ? "text-brand" : "text-[#5A6F65]"
+                isActive ? "text-brand" : "text-muted-foreground"
               }`}
               aria-hidden="true"
             />
@@ -53,7 +53,7 @@ export default function AIRecommendationBanner({
             <p className="text-[13px] font-bold text-white leading-tight">
               AI Smart Recommendations
             </p>
-            <p className="text-[12px] text-[#8e9895] mt-0.5">
+            <p className="text-[12px] text-muted mt-0.5">
               {isActive ? (
                 <>
                   <span className="text-brand font-bold">{recommendedCount} clips</span>
@@ -96,7 +96,7 @@ export default function AIRecommendationBanner({
               className={`absolute top-0.5 w-5 h-5 rounded-full transition-all duration-300 shadow-sm ${
                 isActive
                   ? "left-[22px] bg-brand shadow-[0_0_8px_rgba(0,229,143,0.6)]"
-                  : "left-0.5 bg-[#5A6F65]"
+                  : "left-0.5 bg-muted-foreground"
               }`}
             />
           </button>

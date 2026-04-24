@@ -62,14 +62,14 @@ export default function EarningsSummaryCards({
         value={data.cryptoRevenue.value}
         change={data.cryptoRevenue.change}
         icon={EthLucideCompat as any}
-        accentColor="#627EEA" // Ethereum brand blue
+        accentColor="var(--color-brand)"
       />
       <EarningsSummaryCard
         title="Pending Payouts"
         value={data.pendingPayouts.value}
         change={data.pendingPayouts.change}
         icon={Clock}
-        accentColor="#F59E0B" // Amber for pending/warning state
+        accentColor="var(--color-muted)"
       />
     </div>
   );

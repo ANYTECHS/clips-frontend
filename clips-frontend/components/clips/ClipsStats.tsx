@@ -14,7 +14,7 @@ export default function ClipsStats() {
       {stats.map((stat) => (
         <div 
           key={stat.label}
-          className="bg-[#080C0B]/40 backdrop-blur-md border border-white/[0.03] hover:border-brand/20 rounded-[24px] p-6 text-center transition-all duration-500 group relative overflow-hidden"
+          className="bg-background/40 backdrop-blur-md border border-white/[0.03] hover:border-brand/20 rounded-[24px] p-6 text-center transition-all duration-500 group relative overflow-hidden"
         >
           {/* Subtle Glow Background */}
           <div className="absolute inset-0 bg-brand/[0.01] group-hover:bg-brand/[0.03] transition-all duration-500" />
@@ -23,11 +23,11 @@ export default function ClipsStats() {
             <p className="text-[28px] sm:text-[32px] font-black text-white group-hover:text-brand transition-colors tracking-tight">
               {stat.value}
             </p>
-            <p className="text-[12px] font-bold text-[#5A6F65] uppercase tracking-wider group-hover:text-white transition-colors">
+            <p className="text-[12px] font-bold text-muted-foreground uppercase tracking-wider group-hover:text-white transition-colors">
               {stat.label}
             </p>
             <div className="pt-3 border-t border-white/[0.03] mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-               <p className="text-[10px] font-medium text-[#3A4A43] uppercase tracking-widest">{stat.detail}</p>
+               <p className="text-[10px] font-medium text-subtle uppercase tracking-widest">{stat.detail}</p>
             </div>
           </div>
         </div>

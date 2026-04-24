@@ -86,7 +86,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
   const [retryCount, setRetryCount] = useState(0);
 
   const inputClass = (field: keyof MintFormErrors) =>
-    `w-full bg-[var(--color-input)] border rounded-xl px-4 py-3 text-[14px] text-white placeholder:text-[#4A5D54] focus:outline-none transition-colors ${
+    `w-full bg-[var(--color-input)] border rounded-xl px-4 py-3 text-[14px] text-white placeholder:text-subtle focus:outline-none transition-colors ${
       touched[field] && errors[field]
         ? "border-red-500/60 focus:border-red-500"
         : "border-[var(--color-border)] focus:border-brand/50"
@@ -141,7 +141,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
         </div>
         <div>
           <p className="text-[16px] font-bold text-white">Ready to Mint</p>
-          <p className="text-[13px] text-[#5A6F65] mt-1">
+          <p className="text-[13px] text-muted-foreground mt-1">
             Your configuration has been saved and is ready for submission.
           </p>
         </div>
@@ -163,14 +163,14 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
     >
       <div>
         <h2 className="text-[18px] font-bold text-white">Mint Configuration</h2>
-        <p className="text-[13px] text-[#5A6F65] mt-1">
+        <p className="text-[13px] text-muted-foreground mt-1">
           Set up your NFT collection details before minting.
         </p>
       </div>
 
       {/* Collection Name */}
       <div>
-        <label className="block text-[13px] font-semibold text-[#8e9895] mb-2">
+        <label className="block text-[13px] font-semibold text-muted mb-2">
           Collection Name
         </label>
         <input
@@ -187,7 +187,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
 
       {/* Metadata Description */}
       <div>
-        <label className="block text-[13px] font-semibold text-[#8e9895] mb-2">
+        <label className="block text-[13px] font-semibold text-muted mb-2">
           Metadata Description
         </label>
         <textarea
@@ -201,7 +201,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
         />
         <div className="flex items-start justify-between mt-1.5">
           <FieldError message={touched.description ? errors.description : undefined} />
-          <span className={`text-[11px] ml-auto shrink-0 ${form.description.length > 500 ? "text-red-400" : "text-[#4A5D54]"}`}>
+          <span className={`text-[11px] ml-auto shrink-0 ${form.description.length > 500 ? "text-red-400" : "text-subtle"}`}>
             {form.description.length}/500
           </span>
         </div>
@@ -210,7 +210,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
       {/* Creator Royalty & Listing Price — side by side */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
-          <label className="block text-[13px] font-semibold text-[#8e9895] mb-2">
+          <label className="block text-[13px] font-semibold text-muted mb-2">
             Creator Royalty (%)
           </label>
           <div className="relative">
@@ -226,7 +226,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
               step={0.1}
               className={`${inputClass("creatorRoyalty")} pr-10`}
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] text-[#4A5D54] pointer-events-none">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] text-subtle pointer-events-none">
               %
             </span>
           </div>
@@ -234,7 +234,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
         </div>
 
         <div>
-          <label className="block text-[13px] font-semibold text-[#8e9895] mb-2">
+          <label className="block text-[13px] font-semibold text-muted mb-2">
             Listing Price
           </label>
           <div className="relative">
@@ -249,7 +249,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
               step={0.001}
               className={`${inputClass("listingPrice")} pr-16`}
             />
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] text-[#4A5D54] pointer-events-none">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[13px] text-subtle pointer-events-none">
               ETH
             </span>
           </div>

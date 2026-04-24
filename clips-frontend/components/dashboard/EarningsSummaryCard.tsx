@@ -23,7 +23,7 @@ export default function EarningsSummaryCard({
   const isNeutral = change === 0;
 
   const trendColor = isNeutral
-    ? "text-[#8e9895]"
+    ? "text-muted"
     : isPositive
     ? "text-emerald-400"
     : "text-rose-500";
@@ -35,17 +35,17 @@ export default function EarningsSummaryCard({
     : `${isPositive ? "+" : ""}${change.toFixed(1)}%`;
 
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-[24px] p-6 sm:p-8 flex flex-col gap-5 relative overflow-hidden group hover:border-brand/20 transition-all duration-300">
+    <div className="bg-surface border border-border rounded-[24px] p-6 sm:p-8 flex flex-col gap-5 relative overflow-hidden group hover:border-brand/20 transition-all duration-300">
       {/* Top row: label + icon */}
       <div className="flex items-center justify-between">
-        <span className="text-[#8e9895] text-[12px] sm:text-[13px] font-bold uppercase tracking-wider">
+        <span className="text-muted text-[12px] sm:text-[13px] font-bold uppercase tracking-wider">
           {title}
         </span>
         <div
           className={
             accentColor
-              ? "w-10 h-10 rounded-xl border border-white/5 flex items-center justify-center transition-colors"
-              : "w-10 h-10 rounded-xl bg-[#1A1A1A] border border-white/5 flex items-center justify-center text-[#5A6F65] group-hover:text-brand group-hover:bg-brand/5 transition-colors"
+              ? "w-10 h-10 rounded-xl border border-border flex items-center justify-center transition-colors"
+              : "w-10 h-10 rounded-xl bg-surface-hover border border-border flex items-center justify-center text-muted-foreground group-hover:text-brand group-hover:bg-brand/5 transition-colors"
           }
           style={
             accentColor
@@ -71,7 +71,7 @@ export default function EarningsSummaryCard({
       </div>
 
       {/* Trend label */}
-      <p className="text-[#8e9895] text-[12px]">vs. last 30 days</p>
+      <p className="text-muted text-[12px]">vs. last 30 days</p>
 
       {/* Hover bottom glow bar */}
       <div className="absolute bottom-0 left-0 w-full h-[2px] bg-gradient-to-r from-transparent via-brand/20 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />

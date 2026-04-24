@@ -236,14 +236,14 @@ export default function NFTGrid({ filter }: NFTGridProps) {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h2 className="text-[24px] font-extrabold text-white tracking-tight">{filterInfo.title}</h2>
-          <p className="text-[14px] text-[#8e9895] mt-1">{filterInfo.description}</p>
+          <p className="text-[14px] text-muted mt-1">{filterInfo.description}</p>
         </div>
-        <div className="flex items-center gap-3 px-4 py-2.5 bg-[#0B100E] border border-white/10 rounded-xl">
-          <Search className="w-4 h-4 text-[#5A6F65]" />
+        <div className="flex items-center gap-3 px-4 py-2.5 bg-input border border-border rounded-xl">
+          <Search className="w-4 h-4 text-muted-foreground" />
           <input
             type="text"
             placeholder="Search NFTs..."
-            className="bg-transparent text-white text-[13px] placeholder-[#5A6F65] outline-none w-40"
+            className="bg-transparent text-white text-[13px] placeholder-muted-foreground outline-none w-40"
           />
         </div>
       </div>
@@ -269,11 +269,11 @@ export default function NFTGrid({ filter }: NFTGridProps) {
       ) : (
         <div className="flex flex-col items-center justify-center py-16 px-4">
           <div className="text-center">
-            <div className="w-16 h-16 bg-[#0C120F] border border-white/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Search className="w-8 h-8 text-[#5A6F65]" />
+            <div className="w-16 h-16 bg-surface border border-border rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-muted-foreground" />
             </div>
             <h3 className="text-[16px] font-bold text-white mb-2">No NFTs Found</h3>
-            <p className="text-[14px] text-[#8e9895] max-w-xs">
+            <p className="text-[14px] text-muted max-w-xs">
               {filter === "pending" && "Create and configure new NFTs to get started."}
               {filter === "listed" && "No NFTs are currently listed for sale."}
               {filter === "history" && "No minting history yet."}
@@ -284,8 +284,8 @@ export default function NFTGrid({ filter }: NFTGridProps) {
 
       {/* Results Count */}
       {nfts.length > 0 && (
-        <div className="text-center pt-4 border-t border-white/5">
-          <p className="text-[13px] text-[#5A6F65]">
+        <div className="text-center pt-4 border-t border-border">
+          <p className="text-[13px] text-muted-foreground">
             Showing <span className="font-bold text-white">{nfts.length}</span> NFTs
           </p>
         </div>

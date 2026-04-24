@@ -45,17 +45,17 @@ export default function EarningsTable({ onExport }: EarningsTableProps) {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-[#111111] border border-white/5 rounded-[24px] p-8">
-          <div className="text-[#8e9895] text-[13px] font-bold uppercase tracking-wider mb-2">Total Earnings</div>
+        <div className="bg-surface border border-border rounded-[24px] p-8">
+          <div className="text-muted text-[13px] font-bold uppercase tracking-wider mb-2">Total Earnings</div>
           <div className="text-[28px] font-extrabold text-white">${summary.total}</div>
         </div>
-        <div className="bg-[#111111] border border-white/5 rounded-[24px] p-8">
-          <div className="text-[#8e9895] text-[13px] font-bold uppercase tracking-wider mb-2">Completed</div>
+        <div className="bg-surface border border-border rounded-[24px] p-8">
+          <div className="text-muted text-[13px] font-bold uppercase tracking-wider mb-2">Completed</div>
           <div className="text-[28px] font-extrabold text-brand">${summary.completed}</div>
         </div>
-        <div className="bg-[#111111] border border-white/5 rounded-[24px] p-8">
-          <div className="text-[#8e9895] text-[13px] font-bold uppercase tracking-wider mb-2">Pending</div>
-          <div className="text-[28px] font-extrabold text-yellow-400">${summary.pending}</div>
+        <div className="bg-surface border border-border rounded-[24px] p-8">
+          <div className="text-muted text-[13px] font-bold uppercase tracking-wider mb-2">Pending</div>
+          <div className="text-[28px] font-extrabold text-warning">${summary.pending}</div>
         </div>
       </div>
 
@@ -63,16 +63,16 @@ export default function EarningsTable({ onExport }: EarningsTableProps) {
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
         <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center flex-1">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#4A5D54] pointer-events-none" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
             <input
               type="text"
               placeholder="Search by ID, platform, status..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full sm:w-72 bg-[#111111] border border-white/5 rounded-xl pl-10 pr-4 py-2.5 text-[14px] text-white placeholder:text-[#4A5D54] focus:border-brand focus:outline-none transition-colors"
+              className="w-full sm:w-72 bg-input border border-border rounded-xl pl-10 pr-4 py-2.5 text-[14px] text-white placeholder:text-muted-foreground focus:border-brand focus:outline-none transition-colors"
             />
           </div>
-          <div className="text-[#8e9895] text-[13px]">
+          <div className="text-muted text-[13px]">
             {filtered.length} of {transactions.length} transactions
           </div>
         </div>

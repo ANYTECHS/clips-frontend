@@ -5,7 +5,7 @@ import { Sparkles, ArrowRight } from "lucide-react";
 
 export default function AIInsightCard() {
   return (
-    <div className="bg-[#111111] border border-brand/20 rounded-[28px] p-8 flex flex-col gap-6 relative overflow-hidden group shadow-[0_0_40px_rgba(0,229,143,0.05)]">
+    <div className="bg-surface border border-brand/20 rounded-[28px] p-8 flex flex-col gap-6 relative overflow-hidden group shadow-[0_0_40px_rgba(0,229,143,0.05)]">
       {/* Background Glow */}
       <div className="absolute top-0 right-0 w-40 h-40 bg-brand/10 blur-[60px] rounded-full pointer-events-none -translate-y-1/2 translate-x-1/2" />
       <div className="absolute bottom-0 left-0 w-32 h-32 bg-brand/5 blur-[50px] rounded-full pointer-events-none translate-y-1/2 -translate-x-1/2" />
@@ -18,7 +18,7 @@ export default function AIInsightCard() {
       </div>
 
       <div className="space-y-4 relative z-10">
-        <p className="text-[#8e9895] text-[15px] leading-[1.6]">
+        <p className="text-muted text-[15px] leading-[1.6]">
           "Your gaming clips get <span className="text-brand font-bold">40% more engagement</span> when posted between 6PM and 9PM EST. Try scheduling your next batch for tonight."
         </p>
         

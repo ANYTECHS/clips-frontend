@@ -86,7 +86,7 @@ export default function EarningsPage() {
             <h1 className="text-[28px] sm:text-[32px] font-extrabold tracking-tight text-white leading-tight">
               Earnings & Tax Report
             </h1>
-            <p className="text-[#8e9895] text-[14px] mt-1">
+            <p className="text-muted text-[14px] mt-1">
               Complete transaction history for tax reporting. 
               <span className="font-medium text-white">Total: ${summary.total}</span>
             </p>
