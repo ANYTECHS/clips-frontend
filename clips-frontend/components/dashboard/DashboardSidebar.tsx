@@ -35,12 +35,12 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
   const { user } = useAuth();
 
   return (
-    <aside className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-[300px] lg:w-[280px] bg-[#050505] border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
+    <aside role="navigation" className={`fixed inset-y-0 left-0 z-50 w-72 sm:w-[300px] lg:w-[280px] bg-[#050505] border-r border-white/5 flex flex-col transition-transform duration-300 ease-in-out lg:relative lg:translate-x-0 ${
       isOpen ? "translate-x-0" : "-translate-x-full"
     } shrink-0 h-screen sticky top-0`}>
       {/* Logo & Close */}
       <div className="p-8 flex items-center justify-between">
-        <Link href="/dashboard" className="flex items-center gap-3 text-[20px] font-extrabold tracking-tight text-white group" onClick={onClose}>
+        <Link href="/dashboard" aria-label="ClipCash AI Dashboard - Navigate to home" className="flex items-center gap-3 text-[20px] font-extrabold tracking-tight text-white group" onClick={onClose}>
           <div className="w-[32px] h-[32px] bg-brand rounded-[10px] flex items-center justify-center text-black text-[18px] group-hover:scale-110 transition-transform">
             ⚡
           </div>
@@ -48,6 +48,7 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
         </Link>
         <button 
           onClick={onClose}
+          aria-label="Close navigation menu"
           className="lg:hidden p-2 text-[#5A6F65] hover:text-white transition-colors"
         >
           <X className="w-5 h-5" />
