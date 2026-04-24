@@ -65,7 +65,7 @@ const PAD_R = 16;
 const PAD_T = 16;
 const PAD_B = 32;
 
-function BarChart({ data }: { data: MonthPoint[] }) {
+function BarChart({ data, rangeLabel }: { data: MonthPoint[], rangeLabel: string }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const chartW = SVG_W - PAD_L - PAD_R;
@@ -83,6 +83,8 @@ function BarChart({ data }: { data: MonthPoint[] }) {
     label: fmt(yMax * t),
   }));
 
+  const ariaLabel = `Bar chart showing revenue trend for ${rangeLabel}`;
+
   return (
     <div className="relative w-full" style={{ minHeight: SVG_H + 8 }}>
       <svg
@@ -90,7 +92,10 @@ function BarChart({ data }: { data: MonthPoint[] }) {
         className="w-full"
         style={{ height: SVG_H }}
         preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={ariaLabel}
       >
+        <title>{ariaLabel}</title>
         <defs>
           <linearGradient id="gradAds" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={COLOR_ADS} stopOpacity="1" />
@@ -207,13 +212,16 @@ function buildLinePaths(points: { label: string; value: number }[]) {
   return { line, fill, xs, ys };
 }
 
-function LineChart({ data }: { data: { label: string; value: number }[] }) {
+function LineChart({ data, rangeLabel }: { data: { label: string; value: number }[], rangeLabel: string }) {
   const { line, fill, xs, ys } = buildLinePaths(data);
   const peakIdx = ys.indexOf(Math.min(...ys));
+  const ariaLabel = `Line chart showing revenue trend for ${rangeLabel}`;
   return (
     <div className="relative w-full" style={{ minHeight: 200 }}>
       <svg viewBox={`0 0 ${LC_W} ${LC_H}`} className="w-full"
-        style={{ height: 160 }} preserveAspectRatio="none">
+        style={{ height: 160 }} preserveAspectRatio="none"
+        role="img" aria-label={ariaLabel}>
+        <title>{ariaLabel}</title>
         <defs>
           <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={COLOR_ADS} stopOpacity="0.18" />
@@ -355,8 +363,8 @@ export default function RevenueChart() {
 
       {/* Chart */}
       {is6M
-        ? <BarChart data={DATA_6M} />
-        : <LineChart data={DATA_LEGACY[range as Exclude<Range, "6M">]} />
+        ? <BarChart data={DATA_6M} rangeLabel={RANGE_LABELS[range]} />
+        : <LineChart data={DATA_LEGACY[range as Exclude<Range, "6M">]} rangeLabel={RANGE_LABELS[range]} />
       }
 
       {/* Bottom glow on hover */}

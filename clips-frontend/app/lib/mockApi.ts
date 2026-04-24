@@ -149,10 +149,10 @@ export const MockApi = {
     
     // Mock 50+ transactions totaling ~$12,450 matching dashboard
     const baseTransactions: Omit<Transaction, 'id'>[] = [
-      { date: '2024-10-15', description: 'YouTube Shorts payout #47', amount: 245.80, platform: 'YouTube', status: 'completed', taxId: 'TX-001' },
-      { date: '2024-10-12', description: 'TikTok viral clips batch', amount: 189.50, platform: 'TikTok', status: 'completed', taxId: 'TX-002' },
-      { date: '2024-10-10', description: 'Instagram Reels monetization', amount: 156.20, platform: 'Instagram', status: 'completed', taxId: 'TX-003' },
-      { date: '2024-10-08', description: 'Twitch highlights payout', amount: 98.75, platform: 'Twitch', status: 'pending', taxId: 'TX-004' },
+      { date: '2024-10-15', description: 'YouTube Shorts payout #47', amount: 245.80, platform: 'YouTube', type: 'payout', status: 'completed', taxId: 'TX-001' },
+      { date: '2024-10-12', description: 'TikTok viral clips batch', amount: 189.50, platform: 'TikTok', type: 'payout', status: 'completed', taxId: 'TX-002' },
+      { date: '2024-10-10', description: 'Instagram Reels monetization', amount: 156.20, platform: 'Instagram', type: 'payout', status: 'completed', taxId: 'TX-003' },
+      { date: '2024-10-08', description: 'Twitch highlights payout', amount: 98.75, platform: 'Twitch', type: 'payout', status: 'pending', taxId: 'TX-004' },
       // ... more data to sum ~$12k
     ];
     
