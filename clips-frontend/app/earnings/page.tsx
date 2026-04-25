@@ -106,8 +106,8 @@ export default function EarningsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatCard label="Total Earned" value={`$${summary.total}`} trend="+12.5%" icon={DollarSign} />
           <StatCard label="Completed" value={`$${summary.completed}`} trend="+8.2%" icon={TrendingUp} />
-          <StatCard label="Pending Payout" value={`$${summary.pending}`} trend="Processing" icon={Wallet} />
-          <StatCard label="Tax Ready" value="✅ Yes" trend="Exportable" icon={FileText} />
+          <StatCard label="Pending Payout" value={`$${summary.pending}`} trend="Processing" icon={Wallet} hideTrendIcon={true} />
+          <StatCard label="Tax Ready" value="✅ Yes" trend="Exportable" icon={FileText} hideTrendIcon={true} />
         </div>
 
         {/* Table */}

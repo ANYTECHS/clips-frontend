@@ -9,9 +9,10 @@ interface StatCardProps {
   trend: string;
   isPositive?: boolean;
   icon: LucideIcon;
+  hideTrendIcon?: boolean;
 }
 
-export default function StatCard({ label, value, trend, isPositive = true, icon: Icon }: StatCardProps) {
+export default function StatCard({ label, value, trend, isPositive = true, icon: Icon, hideTrendIcon = false }: StatCardProps) {
   return (
     <div className="bg-surface border border-border rounded-[24px] p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-brand/20 transition-all duration-300">
       <div className="flex items-center justify-between">
@@ -24,7 +25,7 @@ export default function StatCard({ label, value, trend, isPositive = true, icon:
       <div className="flex items-end gap-3">
         <h3 className="text-[32px] font-extrabold text-white leading-none font-mono">{value}</h3>
         <div className={`flex items-center gap-1 text-[13px] font-bold pb-1 ${isPositive ? "text-brand" : "text-error"}`}>
-          {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+          {!hideTrendIcon && (isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />)}
           <span>{trend}</span>
         </div>
       </div>
