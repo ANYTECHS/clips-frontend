@@ -74,6 +74,7 @@ const MetaMaskIcon = ({ className }: { className?: string }) => (
 export default function PlatformsPage() {
   const { user } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [phantomError, setPhantomError] = useState<string | null>(null);
   const {
     isConnected: walletConnected,
     isConnecting: walletConnecting,
@@ -223,6 +224,20 @@ export default function PlatformsPage() {
               </div>
             )}
 
+            {/* Phantom info banner */}
+            {phantomError && (
+              <div className="flex items-start gap-3 bg-brand/10 border border-brand/20 rounded-2xl px-5 py-4 mb-6">
+                <AlertCircle className="w-5 h-5 text-brand shrink-0 mt-0.5" />
+                <p className="text-[14px] text-brand/90 leading-snug flex-1">{phantomError}</p>
+                <button
+                  onClick={() => setPhantomError(null)}
+                  className="text-brand/70 hover:text-brand transition-colors shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <PlatformCard 
                 name="Phantom Wallet" 
@@ -231,6 +246,10 @@ export default function PlatformsPage() {
                 status="NOT LINKED" 
                 ctaText="Connect Phantom"
                 variant="horizontal"
+                onConnect={() => {
+                  setPhantomError("Phantom wallet support coming soon");
+                  setTimeout(() => setPhantomError(null), 4000);
+                }}
               />
               <PlatformCard 
                 name="MetaMask" 

@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState, memo } from "react";
+import React, { useState, memo, useCallback } from "react";
 import { 
   Play, 
   Download, 
   Edit, 
   Check,
   Sparkles,
+  X,
+  Zap,
 } from "lucide-react";
 
 interface ClipCardProps {
@@ -20,6 +22,15 @@ interface ClipCardProps {
   onSelect: (id: string) => void;
 }
 
+function useToast() {
+  const [toast, setToast] = useState<{ message: string; type: "info" | "success" } | null>(null);
+  const show = useCallback((message: string, type: "info" | "success" = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+  return { toast, show };
+}
+
 const ClipCard = memo(function ClipCard({ 
   id, 
   title, 
@@ -31,6 +42,31 @@ const ClipCard = memo(function ClipCard({
   onSelect 
 }: ClipCardProps) {
   const [isHovered, setIsHovered] = useState(false);
+  const { toast, show: showToast } = useToast();
+
+  const handleEdit = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    showToast("Clip editor coming soon", "info");
+  };
+
+  const handleDownload = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Trigger a mock download using the thumbnail URL as a stand-in
+    const a = document.createElement("a");
+    a.href = thumbnail;
+    a.download = `${title.replace(/\s+/g, "_")}.mp4`;
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    showToast("Download started", "success");
+  };
+
+  const handlePreview = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    showToast("Preview coming soon", "info");
+  };
 
   const getScoreStyle = (s: number) => {
     if (s >= 90) return "bg-brand border-brand text-black shadow-[0_0_20px_rgba(0,229,143,0.4)]";
@@ -125,18 +161,49 @@ const ClipCard = memo(function ClipCard({
 
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <button className="p-1.5 text-muted-foreground hover:text-white transition-colors touch-manipulation" title="Edit">
+            <button
+              aria-label="Edit clip"
+              onClick={handleEdit}
+              className="p-1.5 text-muted-foreground hover:text-white transition-colors touch-manipulation"
+              title="Edit"
+            >
               <Edit className="w-4 h-4" />
             </button>
-            <button className="p-1.5 text-muted-foreground hover:text-white transition-colors touch-manipulation" title="Download">
+            <button
+              aria-label="Download clip"
+              onClick={handleDownload}
+              className="p-1.5 text-muted-foreground hover:text-white transition-colors touch-manipulation"
+              title="Download"
+            >
               <Download className="w-4 h-4" />
             </button>
           </div>
-          <button className="text-[11px] font-black text-brand uppercase tracking-widest flex items-center gap-1.5 hover:underline py-1.5 touch-manipulation">
+          <button
+            aria-label="Preview clip"
+            onClick={handlePreview}
+            className="text-[11px] font-black text-brand uppercase tracking-widest flex items-center gap-1.5 hover:underline py-1.5 touch-manipulation"
+          >
             PREVIEW <span className="text-[14px] leading-none mb-0.5">›</span>
           </button>
         </div>
       </div>
+
+      {/* In-card toast */}
+      {toast && (
+        <div className="absolute bottom-4 left-4 right-4 z-30 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl border shadow-lg backdrop-blur-md ${
+            toast.type === "success"
+              ? "bg-brand/10 border-brand/30 text-brand"
+              : "bg-[#0C120F]/90 border-white/10 text-white"
+          }`}>
+            {toast.type === "success"
+              ? <Check className="w-3.5 h-3.5 shrink-0" />
+              : <Zap className="w-3.5 h-3.5 shrink-0 text-brand" />
+            }
+            <p className="text-[12px] font-semibold">{toast.message}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 });

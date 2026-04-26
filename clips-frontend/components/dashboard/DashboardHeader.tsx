@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Upload, Bell, Menu } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import WalletConnectButton from "@/components/WalletConnectButton";
@@ -12,7 +12,25 @@ interface HeaderProps {
 export default function DashboardHeader({ onMenuClick }: HeaderProps) {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifRead, setNotifRead] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
   const firstName = user?.name?.split(' ')[0] || user?.profile?.username || "Guest";
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const handleBellClick = () => {
+    setNotifOpen((prev) => !prev);
+    setNotifRead(true);
+  };
 
   const handleQuickUpload = async () => {
     if (isUploading) return;
@@ -118,10 +136,46 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
           <WalletConnectButton compact />
         </div>
 
-        <button className="w-11 h-11 rounded-xl bg-surface border border-border flex items-center justify-center text-muted hover:text-white transition-colors relative">
-          <Bell className="w-5 h-5" />
-          <div className="absolute top-3 right-3 w-2 h-2 bg-brand rounded-full border-2 border-surface" />
-        </button>
+        <div className="relative" ref={notifRef}>
+          <button className="w-11 h-11 rounded-xl bg-surface border border-border flex items-center justify-center text-muted hover:text-white transition-colors relative"
+            onClick={handleBellClick}
+            aria-label="Notifications"
+          >
+            <Bell className="w-5 h-5" />
+            {!notifRead && (
+              <div className="absolute top-3 right-3 w-2 h-2 bg-brand rounded-full border-2 border-surface" />
+            )}
+          </button>
+
+          {notifOpen && (
+            <div className="absolute right-0 mt-2 w-80 bg-[#0C120F] border border-white/10 rounded-2xl shadow-[0_8px_40px_rgba(0,0,0,0.5)] z-50 animate-in fade-in slide-in-from-top-2 duration-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-white/[0.06]">
+                <p className="text-[14px] font-bold text-white">Notifications</p>
+              </div>
+              <div className="divide-y divide-white/[0.04]">
+                <div className="px-5 py-4 flex items-start gap-3 hover:bg-white/[0.02] transition-colors">
+                  <div className="w-2 h-2 rounded-full bg-brand mt-1.5 shrink-0" />
+                  <div>
+                    <p className="text-[13px] font-semibold text-white leading-snug">3 new clips are ready</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Your AI finished processing your last stream.</p>
+                    <p className="text-[10px] text-subtle mt-1">2 minutes ago</p>
+                  </div>
+                </div>
+                <div className="px-5 py-4 flex items-start gap-3 hover:bg-white/[0.02] transition-colors">
+                  <div className="w-2 h-2 rounded-full bg-muted mt-1.5 shrink-0" />
+                  <div>
+                    <p className="text-[13px] font-semibold text-white leading-snug">TikTok earnings updated</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Your latest payout has been recorded.</p>
+                    <p className="text-[10px] text-subtle mt-1">1 hour ago</p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-3 border-t border-white/[0.06]">
+                <p className="text-[11px] text-muted-foreground text-center">No more notifications</p>
+              </div>
+            </div>
+          )}
+        </div>
         
         <button 
           onClick={handleQuickUpload}
