@@ -14,7 +14,7 @@ import Switch from "../Switch";
 export default function CreateClipsForm() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [activePlatform, setActivePlatform] = useState("TikTok");
+  const [activePlatforms, setActivePlatforms] = useState<string[]>(["TikTok"]);
   const [autoGenerate, setAutoGenerate] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
@@ -36,8 +36,8 @@ export default function CreateClipsForm() {
   };
 
   const handleGenerate = () => {
-    // Navigate to the processing page
-    router.push("/dashboard/processing");
+    // Navigate to the processing page with selected platforms
+    router.push(`/dashboard/processing?platforms=${encodeURIComponent(activePlatforms.join(","))}`);
   };
 
   const [videoUrl, setVideoUrl] = useState("");
@@ -147,23 +147,33 @@ export default function CreateClipsForm() {
               Target Platforms
             </label>
             <div className="flex flex-wrap gap-3">
-              {platforms.map((platform) => (
-                <button 
-                  key={platform.name}
-                  onClick={() => setActivePlatform(platform.name)}
-                  className={`px-5 py-2.5 rounded-full border text-[13px] font-bold flex items-center gap-2 transition-all duration-300 ${
-                    activePlatform === platform.name 
-                      ? "bg-brand/10 border-brand text-brand shadow-[0_0_15px_rgba(0,229,143,0.15)]" 
-                      : "bg-input border-white/5 text-muted-foreground hover:text-white hover:border-white/10"
-                  }`}
-                >
-                  <span className={activePlatform === platform.name ? "opacity-100" : "opacity-40 grayscale group-hover:grayscale-0 transition-all"}>
-                    {platform.icon}
-                  </span>
-                  {platform.name}
-                  {activePlatform === platform.name && <Check className="w-3.5 h-3.5 ml-1" />}
-                </button>
-              ))}
+              {platforms.map((platform) => {
+                const isActive = activePlatforms.includes(platform.name);
+                return (
+                  <button 
+                    key={platform.name}
+                    onClick={() =>
+                      setActivePlatforms((prev) =>
+                        prev.includes(platform.name)
+                          ? prev.length > 1 ? prev.filter((p) => p !== platform.name) : prev
+                          : [...prev, platform.name]
+                      )
+                    }
+                    aria-pressed={isActive}
+                    className={`px-5 py-2.5 rounded-full border text-[13px] font-bold flex items-center gap-2 transition-all duration-300 ${
+                      isActive
+                        ? "bg-brand/10 border-brand text-brand shadow-[0_0_15px_rgba(0,229,143,0.15)]" 
+                        : "bg-input border-white/5 text-muted-foreground hover:text-white hover:border-white/10"
+                    }`}
+                  >
+                    <span className={isActive ? "opacity-100" : "opacity-40 grayscale group-hover:grayscale-0 transition-all"}>
+                      {platform.icon}
+                    </span>
+                    {platform.name}
+                    {isActive && <Check className="w-3.5 h-3.5 ml-1" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -185,7 +195,8 @@ export default function CreateClipsForm() {
           </div>
           <button 
             onClick={handleGenerate}
-            className="w-full sm:w-auto px-10 py-4.5 bg-brand hover:shadow-[0_0_40px_rgba(0,229,143,0.4)] text-black font-black rounded-2xl text-[16px] flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
+            disabled={activePlatforms.length === 0}
+            className="w-full sm:w-auto px-10 py-4.5 bg-brand hover:shadow-[0_0_40px_rgba(0,229,143,0.4)] text-black font-black rounded-2xl text-[16px] flex items-center justify-center gap-2.5 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none"
           >
             <span>Generate Clips</span>
             <Sparkles className="w-5 h-5 fill-black" />
