@@ -6,6 +6,7 @@ import ProjectFilters from "@/components/projects/ProjectFilters";
 import ClipGrid from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
 import { X } from "lucide-react";
+import { useToast } from "@/hooks/useToast";
 
 const RECOMMENDATION_THRESHOLD = 90;
 
@@ -19,6 +20,7 @@ const mockClips = [
 ];
 
 export default function ProjectsPage() {
+  const { showToast, ToastEl } = useToast();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [isMinting, setIsMinting] = useState(false);
   const [captionsStyle, setCaptionsStyle] = useState("All Styles");
@@ -92,11 +94,12 @@ export default function ProjectsPage() {
       console.log(`Minting NFTs with IDs: ${selectedIds.join(", ")}`);
       // Simulate an API call for minting
       await new Promise(resolve => setTimeout(resolve, 2000));
-      alert(`Successfully minted ${selectedIds.length} clip(s)!`);
+      showToast(`Successfully minted ${selectedIds.length} clip(s)!`, "success");
       setSelectedIds([]); // Clear selection after successful mint
     } catch (error) {
       console.error("Minting failed", error);
-      alert("Failed to mint clips");
+      const errorMessage = error instanceof Error ? error.message : "Failed to mint clips";
+      showToast(errorMessage, "error");
     } finally {
       setIsMinting(false);
     }
@@ -183,6 +186,7 @@ export default function ProjectsPage() {
 
         </div>
       </main>
+      {ToastEl}
     </div>
   );
 }
