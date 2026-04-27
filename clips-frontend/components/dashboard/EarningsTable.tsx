@@ -1,6 +1,5 @@
 "use client";
 
-<<<<<<< Updated upstream
 import React, { useState, useMemo } from "react";
 import { Download, Search, X } from "lucide-react";
 import { Transaction, Summary } from "@/app/lib/mockApi";
@@ -9,7 +8,6 @@ import { useEarningsSearch } from "@/app/lib/EarningsSearchContext";
 import { useDebounce } from "@/app/lib/useDebounce";
 
 interface EarningsTableProps {
-  // NEW: Accept the data as props instead of fetching it
   transactions: Transaction[];
   summary: Summary;
   loading: boolean;
@@ -22,28 +20,11 @@ export default function EarningsTable({
   loading,
   onExport,
 }: EarningsTableProps) {
-  // Local search bar logic remains the same
   const [localSearch, setLocalSearch] = useState("");
   const { searchQuery } = useEarningsSearch();
 
   const debouncedLocalSearch = useDebounce(localSearch, 300);
   const debouncedGlobalSearch = useDebounce(searchQuery, 300);
-=======
-import React, { useState } from 'react';
-import { Download, Search } from 'lucide-react';
-import { Transaction, Summary } from '@/app/lib/mockApi';
-import TransactionTable from '@/components/ui/TransactionTable';
-
-interface EarningsTableProps {
-  transactions: Transaction[];
-  summary: Summary;
-  loading: boolean;
-  onExport?: () => void;
-}
-
-export default function EarningsTable({ transactions, summary, loading, onExport }: EarningsTableProps) {
-  const [searchTerm, setSearchTerm] = useState('');
->>>>>>> Stashed changes
 
   const activeTerm = (debouncedGlobalSearch || debouncedLocalSearch)
     .toLowerCase()
@@ -123,13 +104,8 @@ export default function EarningsTable({ transactions, summary, loading, onExport
           </div>
         </div>
         <button
-<<<<<<< Updated upstream
           onClick={() => onExport?.("csv")}
           className="bg-brand hover:bg-brand-hover text-black px-6 py-2.5 rounded-xl font-bold text-[14px] flex items-center gap-2 transition-all"
-=======
-          onClick={() => onExport?.()}
-          className="bg-brand hover:bg-brand-hover text-black px-6 py-2.5 rounded-xl font-bold text-[14px] flex items-center gap-2 transition-all shadow-lg hover:shadow-xl active:scale-[0.98]"
->>>>>>> Stashed changes
         >
           <Download className="w-4 h-4" />
           Export CSV

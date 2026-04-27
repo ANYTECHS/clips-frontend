@@ -1,16 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
 import { CloudUpload } from "lucide-react";
-import { useUserStore, selectUserName, type UserState, type UserActions } from "@/app/store";
+import { useUserStore, selectUserName } from "@/app/store";
 
 export default function DashboardHeader() {
-  const fetchUser = useUserStore((s: UserState & UserActions) => s.fetchUser);
   const userName = useUserStore(selectUserName);
-
-  useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
 
   return (
     <header className="flex items-start justify-between gap-4 rounded-2xl px-6 py-5">

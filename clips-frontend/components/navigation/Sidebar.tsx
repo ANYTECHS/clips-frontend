@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import React, { useEffect } from "react";
+import React from "react";
 import PlanUsage from "./PlanUsage";
 import {
   useUserStore,
@@ -11,8 +11,6 @@ import {
   selectUserEmail,
   selectUserAvatar,
   selectPlanUsage,
-  type UserState,
-  type UserActions,
 } from "@/app/store";
 
 type NavItem = {
@@ -33,15 +31,10 @@ const navItems: NavItem[] = [
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
-  const fetchUser = useUserStore((s: UserState & UserActions) => s.fetchUser);
   const name = useUserStore(selectUserName);
   const email = useUserStore(selectUserEmail);
   const avatarUrl = useUserStore(selectUserAvatar);
   const planUsage = useUserStore(selectPlanUsage);
-
-  useEffect(() => {
-    fetchUser();
-  }, [fetchUser]);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLAnchorElement>, href: string) => {
     if (e.key === " " || e.key === "Spacebar") {
