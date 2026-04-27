@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { Bell, Zap, Menu } from "lucide-react";
@@ -9,6 +10,13 @@ import { Bell, Zap, Menu } from "lucide-react";
 export default function ClipsNavbar() {
   const { user } = useAuth();
   const pathname = usePathname();
+
+  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || user?.email || 'Guest'}`;
+  const [imgSrc, setImgSrc] = useState(defaultAvatar);
+
+  useEffect(() => {
+    setImgSrc(defaultAvatar);
+  }, [user?.name, user?.email, defaultAvatar]);
 
   const navLinks = [
     { label: "Dashboard", href: "/dashboard" },
@@ -62,11 +70,13 @@ export default function ClipsNavbar() {
 
           <div className="flex items-center gap-4">
             <div className="hidden md:block w-px h-8 bg-white/[0.05]" />
-            <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-surface hover:border-brand/40 transition-colors cursor-pointer group">
-              <img 
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || user?.email || 'Guest'}`} 
-                alt={`${user?.name || "User"} avatar`} 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+            <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-surface hover:border-brand/40 transition-colors cursor-pointer group relative">
+              <Image 
+                src={imgSrc} 
+                alt={`${user?.name || user?.email || "User"} avatar`} 
+                fill
+                className="object-cover group-hover:scale-110 transition-transform duration-500" 
+                onError={() => setImgSrc('/avatar.png')}
               />
             </div>
           </div>
