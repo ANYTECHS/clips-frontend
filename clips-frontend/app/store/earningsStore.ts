@@ -41,6 +41,9 @@ async function fetchEarningsFromAPI(): Promise<{
   totalEarnings: string;
   totalTrend: number;
   trendLabel: string;
+  totalFiat: { value: string; change: number };
+  cryptoRevenue: { value: string; change: number };
+  pendingPayouts: { value: string; change: number };
   breakdown: EarningsBreakdownItem[];
 }> {
   // TODO: replace with `fetch('/api/earnings')` when the endpoint is ready
@@ -49,6 +52,9 @@ async function fetchEarningsFromAPI(): Promise<{
     totalEarnings: "$12,450.80",
     totalTrend: 12.5,
     trendLabel: "+12.5% from last month",
+    totalFiat: { value: "$12,450.80", change: 12.5 },
+    cryptoRevenue: { value: "1.25 ETH", change: 8.2 },
+    pendingPayouts: { value: "$1,850.25", change: 0 },
     breakdown: MOCK_BREAKDOWN,
   };
 }
@@ -59,6 +65,9 @@ const initialState: EarningsState = {
   totalEarnings: "$0.00",
   totalTrend: 0,
   trendLabel: "",
+  totalFiat: { value: "$0.00", change: 0 },
+  cryptoRevenue: { value: "0.00 ETH", change: 0 },
+  pendingPayouts: { value: "$0.00", change: 0 },
   breakdown: [],
   lastFetchedAt: null,
   loading: false,
@@ -90,6 +99,9 @@ export const useEarningsStore = create<EarningsState & EarningsActions>(
           totalEarnings: data.totalEarnings,
           totalTrend: data.totalTrend,
           trendLabel: data.trendLabel,
+          totalFiat: data.totalFiat,
+          cryptoRevenue: data.cryptoRevenue,
+          pendingPayouts: data.pendingPayouts,
           breakdown: data.breakdown,
           lastFetchedAt: Date.now(),
           loading: false,
@@ -115,6 +127,9 @@ export const selectEarningsTotals = (s: EarningsState & EarningsActions) => ({
   totalEarnings: s.totalEarnings,
   totalTrend: s.totalTrend,
   trendLabel: s.trendLabel,
+  totalFiat: s.totalFiat,
+  cryptoRevenue: s.cryptoRevenue,
+  pendingPayouts: s.pendingPayouts,
 });
 
 /** Full breakdown list */

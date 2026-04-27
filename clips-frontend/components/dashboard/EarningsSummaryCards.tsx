@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { DollarSign, Clock } from "lucide-react";
 import EarningsSummaryCard from "./EarningsSummaryCard";
+import { useEarningsStore, selectEarningsTotals, selectEarningsMeta } from "@/app/store";
 
 // Ethereum icon as a simple inline SVG component (not in lucide-react)
 function EthIcon({ className }: { className?: string }) {
@@ -39,16 +40,31 @@ interface EarningsSummaryCardsProps {
   data?: EarningsSummaryData;
 }
 
-// Default mock data — replace with real API data when available
-const defaultData: EarningsSummaryData = {
-  totalFiat: { value: "$24,830.00", change: 14.2 },
-  cryptoRevenue: { value: "3.84 ETH", change: -5.7 },
-  pendingPayouts: { value: "$3,120.50", change: 0 },
-};
-
 export default function EarningsSummaryCards({
-  data = defaultData,
+  data: propData,
 }: EarningsSummaryCardsProps) {
+  const { fetchEarnings } = useEarningsStore();
+  const storeTotals = useEarningsStore(selectEarningsTotals);
+  const { loading } = useEarningsStore(selectEarningsMeta);
+
+  useEffect(() => {
+    fetchEarnings();
+  }, [fetchEarnings]);
+
+  const data = propData || storeTotals;
+
+  if (loading && !propData && data.totalFiat.value === "$0.00") {
+    return (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[1, 2, 3].map((i) => (
+          <div 
+            key={i} 
+            className="bg-surface/50 border border-border/50 rounded-[24px] h-[160px] animate-pulse" 
+          />
+        ))}
+      </div>
+    );
+  }
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
       <EarningsSummaryCard

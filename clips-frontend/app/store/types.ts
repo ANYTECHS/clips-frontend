@@ -102,6 +102,12 @@ export interface EarningsState {
   totalEarnings: string;
   totalTrend: number;
   trendLabel: string;
+  
+  /** Granular summary cards data */
+  totalFiat: { value: string; change: number };
+  cryptoRevenue: { value: string; change: number };
+  pendingPayouts: { value: string; change: number };
+
   breakdown: EarningsBreakdownItem[];
   /** ISO timestamp of the last successful fetch */
   lastFetchedAt: number | null;
