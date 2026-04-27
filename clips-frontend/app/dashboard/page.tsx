@@ -93,19 +93,19 @@ export default function DashboardPage() {
                 title="Apex Legends Clutch Moments" 
                 clipsCount={2} 
                 status="processing"
-                thumbnail="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=400&h=400"
+                thumbnail="/projects/thumb1.png"
               />
               <ProjectCard 
                 title="React Native Tutorial 2024" 
                 clipsCount={12} 
                 status="completed"
-                thumbnail="https://images.unsplash.com/photo-1633356122544-f134324a6cee?auto=format&fit=crop&q=80&w=400&h=400"
+                thumbnail="/projects/thumb2.png"
               />
               <ProjectCard 
                 title="Weekly Podcast Highlight #42" 
                 clipsCount={5} 
                 status="completed"
-                thumbnail="https://images.unsplash.com/photo-1590602847861-f357a9332bbc?auto=format&fit=crop&q=80&w=400&h=400"
+                thumbnail="/projects/thumb3.png"
               />
             </div>
           </div>

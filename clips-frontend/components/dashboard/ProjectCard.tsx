@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Play } from "lucide-react";
 
 interface ProjectCardProps {
@@ -11,10 +12,22 @@ interface ProjectCardProps {
 }
 
 export default function ProjectCard({ title, clipsCount, status, thumbnail }: ProjectCardProps) {
+  const [imgSrc, setImgSrc] = useState(thumbnail);
+
+  useEffect(() => {
+    setImgSrc(thumbnail);
+  }, [thumbnail]);
+
   return (
     <div className="bg-surface border border-border rounded-[24px] p-5 flex items-center gap-5 group hover:border-white/10 transition-all duration-300">
       <div className="w-24 h-24 rounded-[18px] overflow-hidden relative shrink-0">
-        <img src={thumbnail} alt={title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+        <Image 
+          src={imgSrc} 
+          alt={title} 
+          fill
+          className="object-cover group-hover:scale-110 transition-transform duration-500" 
+          onError={() => setImgSrc('/projects/thumb1.png')}
+        />
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="w-8 h-8 rounded-full bg-brand/90 flex items-center justify-center text-black">
             <Play className="w-4 h-4 fill-current ml-0.5" />
