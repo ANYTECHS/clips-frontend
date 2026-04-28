@@ -20,6 +20,10 @@ interface ClipCardProps {
   isSelected: boolean;
   isRecommended?: boolean;
   onSelect: (id: string) => void;
+  /** Optional callback invoked when the user clicks Edit. */
+  onEdit?: (id: string) => void;
+  /** Optional callback invoked when the user clicks Download. */
+  onDownload?: (id: string) => void;
 }
 
 function useToast() {
@@ -39,27 +43,37 @@ const ClipCard = memo(function ClipCard({
   duration, 
   isSelected,
   isRecommended = false,
-  onSelect 
+  onSelect,
+  onEdit,
+  onDownload,
 }: ClipCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const { toast, show: showToast } = useToast();
 
   const handleEdit = (e: React.MouseEvent) => {
     e.stopPropagation();
-    showToast("Clip editor coming soon", "info");
+    if (onEdit) {
+      onEdit(id);
+    } else {
+      showToast("Clip editor coming soon", "info");
+    }
   };
 
   const handleDownload = (e: React.MouseEvent) => {
     e.stopPropagation();
-    // Trigger a mock download using the thumbnail URL as a stand-in
-    const a = document.createElement("a");
-    a.href = thumbnail;
-    a.download = `${title.replace(/\s+/g, "_")}.mp4`;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+    if (onDownload) {
+      onDownload(id);
+    } else {
+      // Fallback: open thumbnail in new tab as stand-in until real clip URL is available
+      const a = document.createElement("a");
+      a.href = thumbnail;
+      a.download = `${title.replace(/\s+/g, "_")}.mp4`;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
     showToast("Download started", "success");
   };
 
