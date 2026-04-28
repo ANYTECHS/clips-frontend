@@ -6,19 +6,31 @@ import { Search } from "lucide-react";
 import { useDebounce } from "@/app/lib/useDebounce";
 
 interface NFTGridProps {
-  filter: "pending" | "listed" | "history";
+  filter: "queue" | "minted" | "history";
+}
+
+interface NFTItem {
+  id: string;
+  title: string;
+  thumbnail: string;
+  floorPrice: number;
+  currentValue: number;
+  status: "ready_to_mint" | "queue" | "minted";
+  rarity: "common" | "uncommon" | "rare" | "epic" | "legendary";
+  mintedDate?: string;
+  listedDate?: string;
 }
 
 // Mock data for different filters
 const mockNFTData = {
-  pending: [
+  queue: [
     {
       id: "nft-1",
       title: "Legendary Gaming Moment #1",
       thumbnail: "https://images.unsplash.com/photo-1538481527238-41cbcecf2c4d?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 2.5,
       currentValue: 3.8,
-      status: "pending" as const,
+      status: "ready_to_mint" as const,
       rarity: "legendary" as const,
     },
     {
@@ -27,7 +39,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1552820728-8ac41f1ce891?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 1.2,
       currentValue: 1.5,
-      status: "pending" as const,
+      status: "queue" as const,
       rarity: "epic" as const,
     },
     {
@@ -36,7 +48,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1560070165-7474185a6ca0?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 0.8,
       currentValue: 1.1,
-      status: "pending" as const,
+      status: "queue" as const,
       rarity: "rare" as const,
     },
     {
@@ -45,8 +57,8 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1552395784-5dd1b0e28326?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 0.5,
       currentValue: 0.6,
-      status: "pending" as const,
-      rarity: "uncommon" as const,
+      status: "queue" as const,
+      rarity: "common" as const,
     },
     {
       id: "nft-5",
@@ -54,7 +66,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1535016120754-881642120dd7?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 0.2,
       currentValue: 0.25,
-      status: "pending" as const,
+      status: "queue" as const,
       rarity: "common" as const,
     },
     {
@@ -63,18 +75,18 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1552820728-8ac41f1ce891?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 1.5,
       currentValue: 1.8,
-      status: "pending" as const,
+      status: "queue" as const,
       rarity: "epic" as const,
     },
   ],
-  listed: [
+  minted: [
     {
       id: "nft-7",
       title: "Viral Clip #1 Listed",
       thumbnail: "https://images.unsplash.com/photo-1538481527238-41cbjecf2c4d?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 3.0,
       currentValue: 4.2,
-      status: "listed" as const,
+      status: "minted" as const,
       rarity: "legendary" as const,
       listedDate: "2 days ago",
     },
@@ -84,7 +96,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1557672172-298e090d0f80?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 1.8,
       currentValue: 2.5,
-      status: "listed" as const,
+      status: "minted" as const,
       rarity: "epic" as const,
       listedDate: "5 days ago",
     },
@@ -94,7 +106,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1552395784-5dd1b0e28326?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 1.2,
       currentValue: 1.6,
-      status: "listed" as const,
+      status: "minted" as const,
       rarity: "rare" as const,
       listedDate: "1 week ago",
     },
@@ -104,7 +116,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1545291026-86e38941b830?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 0.6,
       currentValue: 0.8,
-      status: "listed" as const,
+      status: "minted" as const,
       rarity: "uncommon" as const,
       listedDate: "10 days ago",
     },
@@ -114,7 +126,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1552372052-37b94b71b6e2?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 0.3,
       currentValue: 0.4,
-      status: "listed" as const,
+      status: "minted" as const,
       rarity: "common" as const,
       listedDate: "2 weeks ago",
     },
@@ -124,7 +136,7 @@ const mockNFTData = {
       thumbnail: "https://images.unsplash.com/photo-1551431009-381d36ac3a09?auto=format&fit=crop&q=80&w=300&h=300",
       floorPrice: 2.2,
       currentValue: 3.1,
-      status: "listed" as const,
+      status: "minted" as const,
       rarity: "epic" as const,
       listedDate: "3 weeks ago",
     },
@@ -228,9 +240,9 @@ export default function NFTGrid({ filter }: NFTGridProps) {
 
   const getFilterInfo = () => {
     switch (filter) {
-      case "pending":
+      case "queue":
         return { title: "Pending Mint", description: "NFTs waiting to be minted to blockchain" };
-      case "listed":
+      case "minted":
         return { title: "Listed NFTs", description: "NFTs currently available for sale" };
       case "history":
         return { title: "Minting History", description: "All previously minted NFTs" };
@@ -262,7 +274,7 @@ export default function NFTGrid({ filter }: NFTGridProps) {
       {/* NFT Grid */}
       {filteredNFTs.length > 0 ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredNFTs.map((nft: any) => (
+          {filteredNFTs.map((nft: NFTItem) => (
             <NFTCard
               key={nft.id}
               id={nft.id}

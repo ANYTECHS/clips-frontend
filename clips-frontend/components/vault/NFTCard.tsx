@@ -69,6 +69,8 @@ const NFTCard = memo(function NFTCard({
         return { color: "bg-warning/20 text-warning border-warning/30", label: `Queue #${queuePosition || 1}`, icon: Timer };
       case "minted":
         return { color: "bg-uncommon/20 text-uncommon border-uncommon/30", label: "Minted", icon: Zap };
+      default:
+        return { color: "bg-gray-500/20 text-gray-400 border-gray-500/30", label: "Unknown", icon: Timer };
     }
   };
 

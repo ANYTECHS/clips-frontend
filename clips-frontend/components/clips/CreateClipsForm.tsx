@@ -17,6 +17,8 @@ export default function CreateClipsForm() {
   const [activePlatforms, setActivePlatforms] = useState<string[]>(["TikTok"]);
   const [autoGenerate, setAutoGenerate] = useState(true);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [fileError, setFileError] = useState<string | null>(null);
 
   const platforms = [
     { name: "TikTok", icon: "📱" },
@@ -27,7 +29,49 @@ export default function CreateClipsForm() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
+      validateAndSetFile(file);
+    }
+  };
+
+  const validateAndSetFile = (file: File) => {
+    if (!file.type.startsWith('video/')) {
+      setFileError('Please select a valid video file (MP4, MOV, WEBM, etc.)');
+      setSelectedFile(null);
+    } else if (file.size > 2 * 1024 * 1024 * 1024) {
+      setFileError('File size must be under 2GB');
+      setSelectedFile(null);
+    } else {
       setSelectedFile(file);
+      setFileError(null);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    
+    const files = e.dataTransfer.files;
+    if (files && files[0]) {
+      validateAndSetFile(files[0]);
     }
   };
 
@@ -119,17 +163,37 @@ export default function CreateClipsForm() {
             className="hidden" 
             accept="video/*"
           />
-          <div className="w-full aspect-[21/9] sm:aspect-[4.5/1] border-2 border-dashed border-white/5 group-hover/upload:border-brand/20 rounded-[24px] bg-white/[0.01] group-hover/upload:bg-brand/[0.01] flex flex-col items-center justify-center gap-4 transition-all duration-500 cursor-pointer overflow-hidden">
-            <div className="w-14 h-14 rounded-2xl bg-input border border-white/5 flex items-center justify-center group-hover/upload:scale-110 group-hover/upload:border-brand/20 transition-all duration-500 relative">
-              <div className="absolute inset-0 bg-brand/5 blur-xl group-hover/upload:bg-brand/10 transition-colors rounded-full" />
+          <div 
+            onDragOver={handleDragOver}
+            onDragEnter={handleDragEnter}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`w-full aspect-[21/9] sm:aspect-[4.5/1] border-2 border-dashed rounded-[24px] bg-white/[0.01] flex flex-col items-center justify-center gap-4 transition-all duration-500 cursor-pointer overflow-hidden ${
+              isDragging 
+                ? 'border-brand/60 bg-brand/[0.05]' 
+                : 'border-white/5 group-hover/upload:border-brand/20 group-hover/upload:bg-brand/[0.01]'
+            }`}
+          >
+            <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center transition-all duration-500 relative ${
+              isDragging
+                ? 'bg-brand/20 border-brand/60 scale-110'
+                : 'bg-input border-white/5 group-hover/upload:scale-110 group-hover/upload:border-brand/20'
+            }`}>
+              <div className={`absolute inset-0 blur-xl rounded-full transition-colors ${
+                isDragging ? 'bg-brand/20' : 'bg-brand/5 group-hover/upload:bg-brand/10'
+              }`} />
               {selectedFile ? (
                 <Check className="w-6 h-6 text-brand relative z-10" />
               ) : (
-                <Upload className="w-6 h-6 text-muted-foreground group-hover/upload:text-brand relative z-10" />
+                <Upload className={`w-6 h-6 relative z-10 transition-colors ${
+                  isDragging ? 'text-brand' : 'text-muted-foreground group-hover/upload:text-brand'
+                }`} />
               )}
             </div>
             <div className="text-center space-y-1 relative z-10">
-              <p className="text-[16px] font-bold text-white group-hover/upload:text-brand transition-colors">
+              <p className={`text-[16px] font-bold transition-colors ${
+                isDragging ? 'text-brand' : 'text-white group-hover/upload:text-brand'
+              }`}>
                 {selectedFile ? selectedFile.name : "Click to upload or drag and drop"}
               </p>
               <p className="text-[12px] font-medium text-subtle">
@@ -137,6 +201,9 @@ export default function CreateClipsForm() {
               </p>
             </div>
           </div>
+          {fileError && (
+            <p className="text-[12px] text-rose-500 ml-1 mt-2">{fileError}</p>
+          )}
         </div>
 
         {/* Controls Section */}
