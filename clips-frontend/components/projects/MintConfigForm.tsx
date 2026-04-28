@@ -18,7 +18,7 @@ interface MintFormErrors {
 }
 
 interface MintConfigFormProps {
-  onSubmit?: (data: MintFormData) => Promise<void>;
+  onSubmit: (data: MintFormData) => Promise<void>;
 }
 
 function validate(data: MintFormData): MintFormErrors {
@@ -72,6 +72,16 @@ function getMintErrorMessage(error: unknown): string {
 }
 
 export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
+  // Development-time warning if onSubmit is not provided
+  React.useEffect(() => {
+    if (!onSubmit) {
+      console.error(
+        "MintConfigForm: onSubmit prop is required but was not provided. " +
+        "The form will not function correctly without a submit handler."
+      );
+    }
+  }, [onSubmit]);
+
   const [form, setForm] = useState<MintFormData>({
     collectionName: "",
     description: "",
@@ -122,7 +132,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
     setSubmitting(true);
     setMintError(null);
     try {
-      await onSubmit?.(form);
+      await onSubmit(form);
       setSubmitted(true);
       setRetryCount(0);
     } catch (err) {
@@ -140,16 +150,16 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
           <CheckCircle2 className="w-7 h-7 text-brand" />
         </div>
         <div>
-          <p className="text-[16px] font-bold text-white">Ready to Mint</p>
+          <p className="text-[16px] font-bold text-white">Minting Successful!</p>
           <p className="text-[13px] text-muted-foreground mt-1">
-            Your configuration has been saved and is ready for submission.
+            Your NFT collection has been successfully minted and is now available in your vault.
           </p>
         </div>
         <button
           onClick={() => { setSubmitted(false); setTouched({}); }}
           className="text-[13px] text-brand hover:underline"
         >
-          Edit configuration
+          Mint another collection
         </button>
       </div>
     );
@@ -281,12 +291,12 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
         {submitting ? (
           <>
             <Loader2 className="w-4 h-4 animate-spin" />
-            Preparing...
+            Minting...
           </>
         ) : mintError ? (
-          "Retry"
+          "Retry Minting"
         ) : (
-          "Save & Continue"
+          "Mint Collection"
         )}
       </button>
     </form>
