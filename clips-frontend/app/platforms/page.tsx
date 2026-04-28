@@ -78,7 +78,6 @@ export default function PlatformsPage() {
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const [phantomError, setPhantomError] = useState<string | null>(null);
 
   const {
     isConnected: walletConnected,
@@ -86,6 +85,7 @@ export default function PlatformsPage() {
     address: walletAddress,
     error: walletError,
     connectMetaMask,
+    connectPhantom,
     disconnect: disconnectWallet,
     clearError: clearWalletError,
   } = useWallet();
@@ -130,12 +130,11 @@ export default function PlatformsPage() {
       name: "Phantom Wallet",
       description: "Solana Network",
       icon: PhantomIcon,
-      status: "NOT LINKED",
-      ctaText: "Connect Phantom",
-      onConnect: () => {
-        setPhantomError("Phantom wallet support coming soon");
-        setTimeout(() => setPhantomError(null), 4000);
-      },
+      status: walletConnected && walletAddress ? "LINKED" : "NOT LINKED",
+      ctaText: walletConnecting ? "Connecting..." : "Connect Phantom",
+      onConnect: connectPhantom,
+      onDisconnect: disconnectWallet,
+      isLoading: walletConnecting,
     },
     {
       name: "MetaMask",

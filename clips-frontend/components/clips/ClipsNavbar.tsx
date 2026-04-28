@@ -59,7 +59,10 @@ export default function ClipsNavbar() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-5 sm:gap-7">
-          <button className="lg:hidden text-muted-foreground hover:text-white transition-colors">
+          <button 
+            className="lg:hidden text-muted-foreground hover:text-white transition-colors"
+            aria-label="Open menu"
+          >
             <Menu className="w-6 h-6" />
           </button>
 
