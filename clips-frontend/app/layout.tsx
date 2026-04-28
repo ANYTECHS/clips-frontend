@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { WalletProvider } from "@/components/WalletProvider";
+import { ThemeProvider } from "@/components/theme-provider";
+import CookieConsent from "@/components/CookieConsent";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,14 +19,17 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <div className="radial-bg" />
-        <AuthProvider>
-          <WalletProvider>
-            {children}
-          </WalletProvider>
-        </AuthProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <WalletProvider>
+              {children}
+            </WalletProvider>
+          </AuthProvider>
+        </ThemeProvider>
+        <CookieConsent />
       </body>
     </html>
   );

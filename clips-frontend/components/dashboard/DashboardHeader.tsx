@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Upload, Bell, Menu } from "lucide-react";
+import { Upload, Bell, Menu, Sun, Moon } from "lucide-react";
+import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/AuthProvider";
 import WalletConnectButton from "@/components/WalletConnectButton";
 
@@ -11,6 +12,7 @@ interface HeaderProps {
 
 export default function DashboardHeader({ onMenuClick }: HeaderProps) {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [isUploading, setIsUploading] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifRead, setNotifRead] = useState(false);
@@ -131,10 +133,17 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
         <div className="hidden sm:block">
           <WalletConnectButton compact />
         </div>
+
+        <button 
+          onClick={toggleTheme}
+          className="w-11 h-11 rounded-xl bg-surface border border-border flex items-center justify-center text-muted hover:text-white transition-colors"
+          aria-label={theme === 'dark' ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
 
         <div className="relative" ref={notifRef}>
           <button className="w-11 h-11 rounded-xl bg-surface border border-border flex items-center justify-center text-muted hover:text-white transition-colors relative"

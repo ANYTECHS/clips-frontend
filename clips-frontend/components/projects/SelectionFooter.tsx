@@ -10,7 +10,9 @@ import {
   Hexagon,
   Info,
   AlertCircle,
-  X
+  X,
+  Undo2,
+  Redo2
 } from "lucide-react";
 import { calculateMintCost, formatSol } from "@/app/lib/mintUtils";
 
@@ -18,9 +20,21 @@ interface SelectionFooterProps {
   count: number;
   onMint: () => void;
   isMinting?: boolean;
+  undo?: () => void;
+  redo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
-export default function SelectionFooter({ count, onMint, isMinting = false }: SelectionFooterProps) {
+export default function SelectionFooter({ 
+  count, 
+  onMint, 
+  isMinting = false,
+  undo,
+  redo,
+  canUndo = false,
+  canRedo = false
+}: SelectionFooterProps) {
   const [postError, setPostError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
@@ -71,6 +85,25 @@ export default function SelectionFooter({ count, onMint, isMinting = false }: Se
             <button className="flex items-center gap-2 px-4 py-2.5 rounded-2xl border border-white/5 bg-white/[0.02] text-[13px] font-bold hover:text-white hover:border-white/10 transition-all touch-manipulation">
               <Trash2 className="w-4 h-4 shrink-0" />
               <span>Delete</span>
+            </button>
+            <div className="w-[1px] h-4 bg-white/10 mx-1 hidden sm:block" />
+            <button 
+              onClick={undo}
+              disabled={!canUndo}
+              className="p-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-muted-foreground hover:text-white hover:border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Undo (Ctrl+Z)"
+              aria-label="Undo selection"
+            >
+              <Undo2 className="w-4 h-4" />
+            </button>
+            <button 
+              onClick={redo}
+              disabled={!canRedo}
+              className="p-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-muted-foreground hover:text-white hover:border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+              title="Redo (Ctrl+Shift+Z)"
+              aria-label="Redo selection"
+            >
+              <Redo2 className="w-4 h-4" />
             </button>
           </div>
         </div>

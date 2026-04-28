@@ -112,7 +112,21 @@ export default function EarningsTable({
         </button>
       </div>
 
-      <TransactionTable transactions={filtered} loading={loading} />
+      {filtered.length === 0 && activeTerm ? (
+        <div className="bg-surface border border-border rounded-[24px] p-12 text-center animate-in fade-in duration-300">
+          <p className="text-muted text-[15px]">
+            No results found for <span className="text-white font-bold">"{activeTerm}"</span>
+          </p>
+          <button 
+            onClick={() => { setLocalSearch(""); }}
+            className="mt-4 text-brand hover:underline text-sm font-medium"
+          >
+            Clear search
+          </button>
+        </div>
+      ) : (
+        <TransactionTable transactions={filtered} loading={loading} />
+      )}
     </div>
   );
 }

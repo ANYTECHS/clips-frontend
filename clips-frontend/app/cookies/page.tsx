@@ -1,14 +1,43 @@
-import React from "react";
+'use client'
+
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-export const metadata = {
-  title: "Cookie Settings — ClipCash AI",
-  description: "Manage your cookie preferences for ClipCash AI.",
-};
+interface CookieConsent {
+  essential: boolean
+  analytics: boolean
+  marketing: boolean
+}
 
 export default function CookiesPage() {
+  const [consent, setConsent] = useState<CookieConsent>({
+    essential: true,
+    analytics: false,
+    marketing: false,
+  })
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+    const savedConsent = localStorage.getItem('cookie-consent')
+    if (savedConsent) {
+      setConsent(JSON.parse(savedConsent))
+    }
+  }, [])
+
+  const handleToggle = (key: keyof CookieConsent) => {
+    if (key === 'essential') return
+    
+    const newConsent = { ...consent, [key]: !consent[key] }
+    setConsent(newConsent)
+    localStorage.setItem('cookie-consent', JSON.stringify(newConsent))
+    window.dispatchEvent(new CustomEvent('cookie-consent-updated', { detail: newConsent }))
+  }
+
+  if (!mounted) return null
+
   return (
     <div
       className="min-h-screen text-white font-sans flex flex-col"
@@ -34,54 +63,70 @@ export default function CookiesPage() {
             Legal
           </div>
           <h1 className="text-[40px] font-extrabold tracking-tight leading-tight">Cookie Settings</h1>
-          <p className="text-[#8e9895] text-[15px]">Last updated: January 2025</p>
+          <p className="text-[#8e9895] text-[15px]">Manage your privacy preferences</p>
         </div>
 
-        {/* Placeholder content */}
-        <div className="bg-[#0E1512]/60 border border-[#1E2A24] rounded-[20px] p-8 space-y-6 text-[#a1a1aa] text-[15px] leading-relaxed">
+        {/* Settings Content */}
+        <div className="bg-surface border border-border rounded-[20px] p-8 space-y-8 text-muted text-[15px] leading-relaxed">
           <p>
             We use cookies and similar tracking technologies to improve your experience on ClipCash AI.
-            This page explains what cookies we use and how you can control them.
+            You can control your preferences here.
           </p>
 
-          <section className="space-y-2">
-            <h2 className="text-white font-bold text-[18px]">Essential Cookies</h2>
-            <p>
-              These cookies are required for the platform to function correctly. They enable core features
-              such as authentication and session management. They cannot be disabled.
-            </p>
-            <div className="flex items-center justify-between bg-[#111815] rounded-xl px-4 py-3 mt-2">
-              <span className="text-[14px] font-medium text-white">Essential</span>
-              <span className="text-[12px] font-bold text-brand bg-brand/10 px-3 py-1 rounded-full">Always On</span>
+          <section className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-white font-bold text-[18px]">Essential Cookies</h2>
+                <p className="text-sm">
+                  Required for the platform to function correctly. They enable core features
+                  such as authentication and session management.
+                </p>
+              </div>
+              <div className="w-12 h-6 bg-brand/20 rounded-full relative opacity-50 cursor-not-allowed shrink-0">
+                <div className="absolute right-1 top-1 w-4 h-4 bg-brand rounded-full" />
+              </div>
             </div>
           </section>
 
-          <section className="space-y-2">
-            <h2 className="text-white font-bold text-[18px]">Analytics Cookies</h2>
-            <p>
-              These cookies help us understand how visitors interact with ClipCash AI so we can improve
-              our product. All data is anonymised.
-            </p>
-            <div className="flex items-center justify-between bg-[#111815] rounded-xl px-4 py-3 mt-2">
-              <span className="text-[14px] font-medium text-white">Analytics</span>
-              <span className="text-[12px] font-bold text-[#8e9895] bg-white/5 px-3 py-1 rounded-full">Coming soon</span>
+          <section className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-white font-bold text-[18px]">Analytics Cookies</h2>
+                <p className="text-sm">
+                  These cookies help us understand how visitors interact with ClipCash AI so we can improve
+                  our product. All data is anonymised.
+                </p>
+              </div>
+              <button 
+                onClick={() => handleToggle('analytics')}
+                className={`w-12 h-6 rounded-full relative transition-all shrink-0 ${consent.analytics ? 'bg-brand' : 'bg-border'}`}
+                aria-label="Toggle Analytics Cookies"
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${consent.analytics ? 'right-1' : 'left-1'}`} />
+              </button>
             </div>
           </section>
 
-          <section className="space-y-2">
-            <h2 className="text-white font-bold text-[18px]">Marketing Cookies</h2>
-            <p>
-              These cookies are used to show you relevant advertisements. We do not currently use
-              third-party marketing cookies.
-            </p>
-            <div className="flex items-center justify-between bg-[#111815] rounded-xl px-4 py-3 mt-2">
-              <span className="text-[14px] font-medium text-white">Marketing</span>
-              <span className="text-[12px] font-bold text-[#8e9895] bg-white/5 px-3 py-1 rounded-full">Not used</span>
+          <section className="space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="space-y-1">
+                <h2 className="text-white font-bold text-[18px]">Marketing Cookies</h2>
+                <p className="text-sm">
+                  These cookies are used to show you relevant advertisements and track marketing campaign performance.
+                </p>
+              </div>
+              <button 
+                onClick={() => handleToggle('marketing')}
+                className={`w-12 h-6 rounded-full relative transition-all shrink-0 ${consent.marketing ? 'bg-brand' : 'bg-border'}`}
+                aria-label="Toggle Marketing Cookies"
+              >
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all ${consent.marketing ? 'right-1' : 'left-1'}`} />
+              </button>
             </div>
           </section>
 
-          <div className="border-t border-[#1E2A24] pt-6 text-[13px] text-[#5A6F65]">
-            Cookie preference controls are coming soon. For now, essential cookies only are used.
+          <div className="border-t border-border pt-6 text-[13px] text-muted-foreground italic">
+            Your preferences are saved locally to your browser. Clearing your browser data will reset these settings.
           </div>
         </div>
       </main>

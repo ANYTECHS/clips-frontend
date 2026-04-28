@@ -1,24 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  background-color: var(--color-background);
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-
-@theme {
   --color-brand: #00E58F;
   --color-brand-hover: #00DE8A;
-  --color-background: #080C0B;
-  --color-surface: #101614;
-  --color-surface-hover: #161D1A;
-  --color-border: #1E2923;
-  --color-input: #0B100E;
-  --color-muted: #8e9895;
-  --color-muted-foreground: #5A6F65;
-  --color-subtle: #4A5D54;
   --color-warning: #FACC15;
   --color-error: #EF4444;
   --color-tips: #3B82F6;
@@ -36,13 +20,67 @@
   --color-instagram-end: #bc1888;
   --color-phantom: #AB9FF2;
   --color-metamask: #E2761B;
+
+  /* Default Dark Mode (also defined in [data-theme="dark"]) */
+  --color-background: #080C0B;
+  --color-surface: #101614;
+  --color-surface-hover: #161D1A;
+  --color-border: #1E2923;
+  --color-input: #0B100E;
+  --color-muted: #8e9895;
+  --color-muted-foreground: #5A6F65;
+  --color-subtle: #4A5D54;
+  --color-text: #FFFFFF;
+}
+
+[data-theme="light"] {
+  --color-background: #F8FAF9;
+  --color-surface: #FFFFFF;
+  --color-surface-hover: #F1F5F3;
+  --color-border: #E2E8E5;
+  --color-input: #F1F5F3;
+  --color-muted: #64748B;
+  --color-muted-foreground: #475569;
+  --color-subtle: #94A3B8;
+  --color-text: #080C0B;
+}
+
+@theme {
+  --color-brand: var(--color-brand);
+  --color-brand-hover: var(--color-brand-hover);
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-hover: var(--color-surface-hover);
+  --color-border: var(--color-border);
+  --color-input: var(--color-input);
+  --color-muted: var(--color-muted);
+  --color-muted-foreground: var(--color-muted-foreground);
+  --color-subtle: var(--color-subtle);
+  --color-warning: var(--color-warning);
+  --color-error: var(--color-error);
+  --color-tips: var(--color-tips);
+  --color-legendary-from: var(--color-legendary-from);
+  --color-legendary-to: var(--color-legendary-to);
+  --color-epic-from: var(--color-epic-from);
+  --color-epic-to: var(--color-epic-to);
+  --color-uncommon: var(--color-uncommon);
+  --color-tiktok: var(--color-tiktok);
+  --color-tiktok-accent: var(--color-tiktok-accent);
+  --color-youtube: var(--color-youtube);
+  --color-instagram: var(--color-instagram);
+  --color-instagram-start: var(--color-instagram-start);
+  --color-instagram-mid: var(--color-instagram-mid);
+  --color-instagram-end: var(--color-instagram-end);
+  --color-phantom: var(--color-phantom);
+  --color-metamask: var(--color-metamask);
 }
 
 @layer base {
   body {
     background-color: var(--color-background);
-    color: white;
+    color: var(--color-text);
     font-feature-settings: "rlig" 1, "calt" 1;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 }
 
