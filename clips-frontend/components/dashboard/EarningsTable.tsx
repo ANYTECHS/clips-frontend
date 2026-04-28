@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Download, Search, X, ChevronDown } from "lucide-react";
+import { Search, X, ChevronDown } from "lucide-react";
 import { Transaction, Summary } from "@/app/lib/mockApi";
 import TransactionTable from "@/components/ui/TransactionTable";
 import { useEarningsSearch } from "@/app/lib/EarningsSearchContext";
@@ -11,31 +11,18 @@ interface EarningsTableProps {
   transactions: Transaction[];
   summary: Summary;
   loading: boolean;
-  onExport?: (format: "csv" | "json" | "pdf") => void;
 }
 
 export default function EarningsTable({
   transactions,
   summary,
   loading,
-  onExport,
 }: EarningsTableProps) {
   const [localSearch, setLocalSearch] = useState("");
-  const [exportOpen, setExportOpen] = useState(false);
-  const exportRef = React.useRef<HTMLDivElement>(null);
   const { searchQuery } = useEarningsSearch();
 
   const debouncedLocalSearch = useDebounce(localSearch, 300);
   const debouncedGlobalSearch = useDebounce(searchQuery, 300);
-
-  // Close export dropdown on outside click
-  React.useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
 
   const activeTerm = (debouncedGlobalSearch || debouncedLocalSearch)
     .toLowerCase()
@@ -113,32 +100,6 @@ export default function EarningsTable({
           <div className="text-muted text-[13px]">
             {filtered.length} of {transactions.length} transactions
           </div>
-        </div>
-        <div ref={exportRef} className="relative">
-          <button
-            onClick={() => setExportOpen((o) => !o)}
-            className="bg-brand hover:bg-brand-hover text-black px-6 py-2.5 rounded-xl font-bold text-[14px] flex items-center gap-2 transition-all"
-          >
-            <Download className="w-4 h-4" />
-            Export
-            <ChevronDown className={`w-3.5 h-3.5 transition-transform ${exportOpen ? "rotate-180" : ""}`} />
-          </button>
-          {exportOpen && (
-            <div className="absolute right-0 top-full mt-2 w-52 bg-[#0C120F] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 duration-150">
-              {(["csv", "json", "pdf"] as const).map((fmt) => (
-                <button
-                  key={fmt}
-                  onClick={() => { onExport?.(fmt); setExportOpen(false); }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-                >
-                  <span className="text-[13px] font-bold text-white uppercase">{fmt}</span>
-                  <span className="text-[11px] text-muted-foreground">
-                    {fmt === "csv" ? "Spreadsheet" : fmt === "json" ? "Developer / API" : "Tax / Accountant"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
