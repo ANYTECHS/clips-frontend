@@ -1,20 +1,31 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ProcessingHeader from "@/components/dashboard/ProcessingHeader";
 import { Sparkles, Clock, Zap, RefreshCw, X } from "lucide-react";
+import { useProcessStore } from "@/app/store/processStore";
+
+function formatTimeRemaining(seconds: number | null): string {
+  if (seconds === null) return "Calculating…";
+  if (seconds <= 0) return "Almost done…";
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return m > 0 ? `${m} minute${m > 1 ? "s" : ""} ${s} seconds` : `${s} seconds`;
+}
 
 export default function ProcessingPage() {
-  const [progress, setProgress] = useState(0);
-  
-  // Animate progress to 87% for realistic feel
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setProgress(87);
-    }, 500);
-    return () => clearTimeout(timer);
-  }, []);
+  const router = useRouter();
+  const progress = useProcessStore((s) => s.progress);
+  const momentsFound = useProcessStore((s) => s.momentsFound);
+  const estimatedSecondsRemaining = useProcessStore((s) => s.estimatedSecondsRemaining);
+  const resetProcess = useProcessStore((s) => s.resetProcess);
+
+  const handleCancel = () => {
+    resetProcess();
+    router.back();
+  };
 
   return (
     <div className="min-h-screen bg-background text-white flex flex-col font-sans relative overflow-hidden">
@@ -79,7 +90,7 @@ export default function ProcessingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2.5 text-muted-foreground text-sm font-medium">
                 <Clock className="w-4 h-4" />
-                <span>Estimated time remaining: 1 minute 15 seconds</span>
+                <span>Estimated time remaining: {formatTimeRemaining(estimatedSecondsRemaining)}</span>
               </div>
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <div className="w-2 h-2 rounded-full bg-brand animate-pulse shadow-[0_0_8px_var(--color-brand)]" />
@@ -95,10 +106,7 @@ export default function ProcessingPage() {
           <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2 group hover:border-brand/20 transition-all">
             <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Moments Found</span>
             <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-extrabold text-white">12</span>
-              <span className="text-brand text-sm font-bold flex items-center gap-0.5">
-                <span className="text-[10px]">↑</span>5
-              </span>
+              <span className="text-3xl font-extrabold text-white">{momentsFound}</span>
             </div>
           </div>
 
@@ -125,12 +133,15 @@ export default function ProcessingPage() {
 
         {/* Action Area */}
         <div className="mt-12 flex flex-col items-center space-y-4">
-          <button className="flex items-center gap-2.5 px-8 py-3.5 rounded-full border border-white/10 bg-surface hover:bg-input hover:border-white/20 text-gray-300 font-bold text-sm transition-all active:scale-[0.98]">
+          <button
+            onClick={handleCancel}
+            className="flex items-center gap-2.5 px-8 py-3.5 rounded-full border border-white/10 bg-surface hover:bg-input hover:border-white/20 text-gray-300 font-bold text-sm transition-all active:scale-[0.98]"
+          >
             <X className="w-4 h-4" />
             Cancel Processing
           </button>
           <p className="text-muted-foreground text-xs text-center max-w-sm leading-relaxed">
-            Closing this window won't stop the processing. We'll email you once your clips are ready.
+            Closing this window won&apos;t stop the processing. We&apos;ll email you once your clips are ready.
           </p>
         </div>
       </main>
@@ -149,4 +160,3 @@ export default function ProcessingPage() {
     </div>
   );
 }
-
