@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { Download, Search, X, ChevronDown } from "lucide-react";
 import { Transaction, Summary } from "@/app/lib/mockApi";
 import TransactionTable from "@/components/ui/TransactionTable";
-import { useEarningsSearch } from "@/app/lib/EarningsSearchContext";
+import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 import { useDebounce } from "@/app/lib/useDebounce";
 
 interface EarningsTableProps {
@@ -23,7 +23,15 @@ export default function EarningsTable({
   const [localSearch, setLocalSearch] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = React.useRef<HTMLDivElement>(null);
-  const { searchQuery } = useEarningsSearch();
+  
+  const { filters, updateFilters, resetFilters } = useFilterQueryState({
+    search: "",
+    startDate: "",
+    endDate: "",
+  });
+  const searchQuery = filters.search;
+  const startDate = filters.startDate;
+  const endDate = filters.endDate;
 
   const debouncedLocalSearch = useDebounce(localSearch, 300);
   const debouncedGlobalSearch = useDebounce(searchQuery, 300);
@@ -42,21 +50,36 @@ export default function EarningsTable({
     .trim();
 
   const filtered = useMemo(() => {
-    if (!activeTerm) return transactions;
+    let result = transactions;
 
-    return transactions.filter((tx) => {
-      return (
-        tx.id.toLowerCase().includes(activeTerm) ||
-        tx.description.toLowerCase().includes(activeTerm) ||
-        tx.platform.toLowerCase().includes(activeTerm) ||
-        tx.status.toLowerCase().includes(activeTerm) ||
-        tx.type.toLowerCase().includes(activeTerm) ||
-        tx.date.toLowerCase().includes(activeTerm) ||
-        tx.taxId.toLowerCase().includes(activeTerm) ||
-        tx.amount.toString().includes(activeTerm)
-      );
-    });
-  }, [transactions, activeTerm]);
+    // Filter by search term
+    if (activeTerm) {
+      result = result.filter((tx) => {
+        return (
+          tx.id.toLowerCase().includes(activeTerm) ||
+          tx.description.toLowerCase().includes(activeTerm) ||
+          tx.platform.toLowerCase().includes(activeTerm) ||
+          tx.status.toLowerCase().includes(activeTerm) ||
+          tx.type.toLowerCase().includes(activeTerm) ||
+          tx.date.toLowerCase().includes(activeTerm) ||
+          tx.taxId.toLowerCase().includes(activeTerm) ||
+          tx.amount.toString().includes(activeTerm)
+        );
+      });
+    }
+
+    // Filter by start date
+    if (startDate) {
+      result = result.filter((tx) => tx.date >= startDate);
+    }
+
+    // Filter by end date
+    if (endDate) {
+      result = result.filter((tx) => tx.date <= endDate);
+    }
+
+    return result;
+  }, [transactions, activeTerm, startDate, endDate]);
 
   return (
     <div className="space-y-6">
@@ -110,6 +133,38 @@ export default function EarningsTable({
               </button>
             )}
           </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2 bg-[#111111] border border-white/5 rounded-xl px-3 py-1">
+              <label htmlFor="start-date" className="text-[11px] font-bold text-muted uppercase tracking-wider">From</label>
+              <input
+                id="start-date"
+                type="date"
+                value={startDate}
+                onChange={(e) => updateFilters({ startDate: e.target.value })}
+                className="bg-transparent border-none text-[13px] text-white focus:ring-0 focus:outline-none [color-scheme:dark]"
+              />
+            </div>
+            <div className="flex items-center gap-2 bg-[#111111] border border-white/5 rounded-xl px-3 py-1">
+              <label htmlFor="end-date" className="text-[11px] font-bold text-muted uppercase tracking-wider">To</label>
+              <input
+                id="end-date"
+                type="date"
+                value={endDate}
+                onChange={(e) => updateFilters({ endDate: e.target.value })}
+                className="bg-transparent border-none text-[13px] text-white focus:ring-0 focus:outline-none [color-scheme:dark]"
+              />
+            </div>
+            {(startDate || endDate) && (
+              <button
+                onClick={() => updateFilters({ startDate: "", endDate: "" })}
+                className="text-[12px] text-muted-foreground hover:text-white transition-colors ml-1"
+              >
+                Clear dates
+              </button>
+            )}
+          </div>
+
           <div className="text-muted text-[13px]">
             {filtered.length} of {transactions.length} transactions
           </div>
