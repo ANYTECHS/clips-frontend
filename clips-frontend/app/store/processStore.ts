@@ -14,6 +14,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { ProcessState, ProcessActions, ProcessStatus } from "./types";
+import { secureStorage } from "@/app/lib/secureStorage";
 
 // ─── Default state ────────────────────────────────────────────────────────────
 
@@ -67,7 +68,7 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
     {
       name: "clips_process_state", // same localStorage key as before
       storage: createJSONStorage(() =>
-        typeof window !== "undefined" ? localStorage : sessionStorage
+        typeof window !== "undefined" ? secureStorage : sessionStorage
       ),
       // Only persist the state fields, not the action functions
       partialize: (state) => ({

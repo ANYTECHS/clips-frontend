@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { secureStorage } from "@/app/lib/secureStorage";
 
 // EIP-1193 provider type (window.ethereum)
 declare global {
@@ -69,19 +70,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   // Restore persisted session on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        const parsed: Partial<WalletState> = JSON.parse(stored);
-        if (parsed.address && parsed.walletType) {
-          setState((prev: WalletState) => ({
-            ...prev,
-            address: parsed.address!,
-            chainId: parsed.chainId ?? null,
-            walletType: parsed.walletType!,
-            isConnected: true,
-          }));
+      secureStorage.getItem(STORAGE_KEY).then((stored) => {
+        if (stored) {
+          const parsed: Partial<WalletState> = JSON.parse(stored);
+          if (parsed.address && parsed.walletType) {
+            setState((prev: WalletState) => ({
+              ...prev,
+              address: parsed.address!,
+              chainId: parsed.chainId ?? null,
+              walletType: parsed.walletType!,
+              isConnected: true,
+            }));
+          }
         }
-      }
+      });
     } catch {
       // Ignore malformed storage
     }
@@ -121,15 +123,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   function persistSession(data: { address: string | null; chainId: string | null; walletType: WalletType | null }) {
     if (data.address) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      secureStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     } else {
-      localStorage.removeItem(STORAGE_KEY);
+      secureStorage.removeItem(STORAGE_KEY);
     }
   }
 
   function handleDisconnect() {
     setState({ ...defaultState });
-    localStorage.removeItem(STORAGE_KEY);
+    secureStorage.removeItem(STORAGE_KEY);
   }
 
   const connectMetaMask = useCallback(async () => {
