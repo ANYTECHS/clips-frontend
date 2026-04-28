@@ -7,6 +7,8 @@ import ClipGrid from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { useEffect } from "react";
 
 const RECOMMENDATION_THRESHOLD = 90;
 
@@ -21,13 +23,26 @@ const mockClips = [
 
 export default function ProjectsPage() {
   const { showToast, ToastEl } = useToast();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { 
+    state: selectedIds, 
+    set: setSelectedIds, 
+    undo, 
+    redo, 
+    canUndo, 
+    canRedo, 
+    clear 
+  } = useUndoRedo<string[]>([]);
   const [isMinting, setIsMinting] = useState(false);
   const [captionsStyle, setCaptionsStyle] = useState("All Styles");
   const [viralityLevels, setViralityLevels] = useState<string[]>(["high", "medium", "low"]);
   const [vaultFilter, setVaultFilter] = useState("pending");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState(false);
+
+  // Clear undo/redo stack on navigate away (#277)
+  useEffect(() => {
+    return () => clear();
+  }, [clear]);
 
   const filteredClips = useMemo(() => {
     return mockClips.filter(clip => {
@@ -182,6 +197,10 @@ export default function ProjectsPage() {
             count={selectedIds.length} 
             onMint={handleMint}
             isMinting={isMinting}
+            undo={undo}
+            redo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
           />
 
         </div>
