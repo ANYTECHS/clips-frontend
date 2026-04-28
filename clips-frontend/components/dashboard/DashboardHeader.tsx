@@ -49,17 +49,84 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
       fileInput.onchange = async (event) => {
         const files = (event.target as HTMLInputElement).files;
         if (files && files.length > 0) {
-          // Show upload notification
-          showUploadNotification(files.length);
-          
-          // TODO: Implement actual upload logic here
-          console.log('Files selected for upload:', files);
-          
-          // Simulate upload process
-          setTimeout(() => {
+          // Validate files client-side
+          const validFiles: File[] = [];
+          const errors: string[] = [];
+          const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+          const ALLOWED_TYPES = ['video/mp4', 'video/quicktime', 'video/x-msvideo', 'video/x-matroska'];
+          const ALLOWED_EXTENSIONS = ['.mp4', '.mov', '.avi', '.mkv'];
+
+          for (let i = 0; i < files.length; i++) {
+            const file = files[i];
+            
+            // Check file size
+            if (file.size > MAX_FILE_SIZE) {
+              errors.push(`File "${file.name}" exceeds maximum size of 500MB`);
+              continue;
+            }
+
+            // Check file type
+            const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+            if (!ALLOWED_TYPES.includes(file.type) && !ALLOWED_EXTENSIONS.includes(extension)) {
+              errors.push(`File "${file.name}" has unsupported format. Allowed: MP4, MOV, AVI, MKV`);
+              continue;
+            }
+
+            validFiles.push(file);
+          }
+
+          // Show errors if any
+          if (errors.length > 0) {
+            showErrorNotification(errors.join('; '));
             setIsUploading(false);
-            showUploadCompleteNotification(files.length);
-          }, 2000);
+            return;
+          }
+
+          if (validFiles.length === 0) {
+            setIsUploading(false);
+            return;
+          }
+
+          // Show upload started notification
+          showUploadNotification(validFiles.length);
+          
+          // Create FormData and upload
+          const formData = new FormData();
+          validFiles.forEach((file) => {
+            formData.append('files', file);
+          });
+
+          try {
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            });
+
+            if (!response.ok) {
+              const errorData = await response.json();
+              throw new Error(errorData.error || 'Upload failed');
+            }
+
+            const result = await response.json();
+            
+            // Start processing in the store
+            if (result.jobId) {
+              const { startProcess } = useProcessStore.getState();
+              startProcess(result.jobId, validFiles[0].name);
+            }
+
+            setIsUploading(false);
+            showUploadCompleteNotification(validFiles.length);
+
+            // Request notification permission if not already granted
+            if ('Notification' in window && Notification.permission === 'default') {
+              Notification.requestPermission();
+            }
+          } catch (uploadError) {
+            console.error('Upload error:', uploadError);
+            setIsUploading(false);
+            showErrorNotification(uploadError instanceof Error ? uploadError.message : 'Upload failed. Please try again.');
+          }
         } else {
           setIsUploading(false);
         }
@@ -74,7 +141,7 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
     } catch (error) {
       console.error('Upload error:', error);
       setIsUploading(false);
-      showErrorNotification();
+      showErrorNotification(error instanceof Error ? error.message : 'Upload failed. Please try again.');
     }
   };
 

@@ -1,11 +1,13 @@
 "use client";
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import ProcessingHeader from "@/components/dashboard/ProcessingHeader";
-import { Sparkles, Clock, Zap, RefreshCw, X } from "lucide-react";
-import { useProcessStore } from "@/app/store/processStore";
+import { Sparkles, Clock, Zap, RefreshCw, X, CheckCircle, AlertCircle, RotateCcw } from "lucide-react";
+import { useProcessStore, selectProcess } from "@/app/store/processStore";
+import { useProcessingStatus } from "@/app/hooks/useProcessingStatus";
+import { ProcessStatus } from "@/app/store/types";
 
 function formatTimeRemaining(seconds: number | null): string {
   if (seconds === null) return "Calculating…";
@@ -17,16 +19,171 @@ function formatTimeRemaining(seconds: number | null): string {
 
 export default function ProcessingPage() {
   const router = useRouter();
-  const progress = useProcessStore((s) => s.progress);
-  const momentsFound = useProcessStore((s) => s.momentsFound);
-  const estimatedSecondsRemaining = useProcessStore((s) => s.estimatedSecondsRemaining);
+  const searchParams = useSearchParams();
+  const jobId = searchParams.get("jobId");
+  const [notificationSent, setNotificationSent] = useState(false);
+
+  const process = useProcessStore(selectProcess);
+  const { progress, momentsFound, estimatedSecondsRemaining, status, id } = process;
   const resetProcess = useProcessStore((s) => s.resetProcess);
+
+  // Start polling if we have a jobId
+  const { stopPolling } = useProcessingStatus(jobId || id || null, !!jobId || !!id);
+
+  // Handle completion notification
+  useEffect(() => {
+    if (status === "complete" && !notificationSent) {
+      setNotificationSent(true);
+
+      // Send browser notification if permission granted
+      if ("Notification" in window && Notification.permission === "granted") {
+        const notification = new Notification("Your clips are ready!", {
+          body: `Found ${momentsFound} viral moments from your video`,
+          icon: "/avatar.png",
+          tag: "processing-complete",
+        });
+
+        notification.onclick = () => {
+          window.focus();
+          router.push("/projects");
+        };
+      }
+    }
+  }, [status, notificationSent, momentsFound, router]);
 
   const handleCancel = () => {
     resetProcess();
+    stopPolling();
     router.back();
   };
 
+  const handleRetry = () => {
+    resetProcess();
+    setNotificationSent(false);
+    router.push("/dashboard");
+  };
+
+  // Success state
+  if (status === "complete") {
+    return (
+      <div className="min-h-screen bg-background text-white flex flex-col font-sans relative overflow-hidden">
+        <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
+          <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-brand/5 blur-[120px] rounded-full" />
+        </div>
+
+        <ProcessingHeader />
+
+        <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
+          <div className="flex flex-col items-center text-center space-y-6 mb-12">
+            <div className="relative">
+              <div className="absolute inset-0 bg-green-500/20 blur-2xl rounded-full" />
+              <div className="relative w-24 h-24 rounded-full bg-surface border border-green-500/30 flex items-center justify-center">
+                <CheckCircle className="w-10 h-10 text-green-500" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+                Your clips are ready!
+              </h1>
+              <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto font-medium">
+                Found {momentsFound} viral moments from your video
+              </p>
+            </div>
+          </div>
+
+          <div className="w-full max-w-4xl bg-surface border border-white/5 rounded-[32px] p-8 md:p-10 shadow-2xl">
+            <div className="space-y-8 text-center">
+              <div className="flex flex-col items-center gap-4">
+                <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_8px_#22c55e]" />
+                <span className="text-xl font-bold text-white">Processing Complete</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Moments Found</span>
+                  <span className="text-3xl font-extrabold text-white">{momentsFound}</span>
+                </div>
+                <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Progress</span>
+                  <span className="text-3xl font-extrabold text-green-500">100%</span>
+                </div>
+                <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2">
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Status</span>
+                  <span className="text-3xl font-extrabold text-green-500">Done</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-12 flex flex-col items-center space-y-4">
+            <button
+              onClick={() => router.push("/projects")}
+              className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-brand hover:bg-brand-hover text-black font-bold text-sm transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(0,255,133,0.3)]"
+            >
+              <Sparkles className="w-4 h-4" />
+              View Clips
+            </button>
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-2.5 px-8 py-3.5 rounded-full border border-white/10 bg-surface hover:bg-input hover:border-white/20 text-gray-300 font-bold text-sm transition-all active:scale-[0.98]"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Process Another Video
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Error state
+  if (status === "error") {
+    return (
+      <div className="min-h-screen bg-background text-white flex flex-col font-sans relative overflow-hidden">
+        <ProcessingHeader />
+
+        <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
+          <div className="flex flex-col items-center text-center space-y-6 mb-12">
+            <div className="relative">
+              <div className="absolute inset-0 bg-red-500/20 blur-2xl rounded-full" />
+              <div className="relative w-24 h-24 rounded-full bg-surface border border-red-500/30 flex items-center justify-center">
+                <AlertCircle className="w-10 h-10 text-red-500" />
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
+                Processing Failed
+              </h1>
+              <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto font-medium">
+                Something went wrong while processing your video
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-12 flex flex-col items-center space-y-4">
+            <button
+              onClick={handleRetry}
+              className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-brand hover:bg-brand-hover text-black font-bold text-sm transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(0,255,133,0.3)]"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Retry Processing
+            </button>
+            <button
+              onClick={handleCancel}
+              className="flex items-center gap-2.5 px-8 py-3.5 rounded-full border border-white/10 bg-surface hover:bg-input hover:border-white/20 text-gray-300 font-bold text-sm transition-all active:scale-[0.98]"
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  // Processing state (default)
   return (
     <div className="min-h-screen bg-background text-white flex flex-col font-sans relative overflow-hidden">
       {/* Background Gradients */}
@@ -47,7 +204,7 @@ export default function ProcessingPage() {
               <Sparkles className="w-10 h-10 text-brand drop-shadow-[0_0_10px_rgba(0,255,133,0.5)]" />
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">
               AI is finding viral moments...
@@ -62,7 +219,7 @@ export default function ProcessingPage() {
         <div className="w-full max-w-4xl bg-surface border border-white/5 rounded-[32px] p-8 md:p-10 shadow-2xl relative overflow-hidden group">
           {/* Subtle Glow Edge */}
           <div className="absolute inset-0 border border-brand/10 rounded-[32px] pointer-events-none group-hover:border-brand/20 transition-colors" />
-          
+
           <div className="space-y-8">
             {/* Header Row */}
             <div className="flex items-center justify-between">
@@ -77,7 +234,7 @@ export default function ProcessingPage() {
 
             {/* Progress Bar Container */}
             <div className="relative h-4 w-full bg-input rounded-full overflow-hidden border border-white/5">
-              <div 
+              <div
                 className="absolute top-0 left-0 h-full bg-brand rounded-full transition-all duration-[2000ms] ease-out shadow-[0_0_20px_rgba(0,255,133,0.4)]"
                 style={{ width: `${progress}%` }}
               >
@@ -141,7 +298,7 @@ export default function ProcessingPage() {
             Cancel Processing
           </button>
           <p className="text-muted-foreground text-xs text-center max-w-sm leading-relaxed">
-            Closing this window won&apos;t stop the processing. We&apos;ll email you once your clips are ready.
+            Closing this window won&apos;t stop the processing. We&apos;ll notify you once your clips are ready.
           </p>
         </div>
       </main>

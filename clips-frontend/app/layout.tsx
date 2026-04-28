@@ -10,6 +10,7 @@ import RateLimitToast from "@/components/RateLimitToast";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://clipcash.ai"),
   title: "ClipCash - AI Clipping V2.0",
   description: "Turn 1 long video into 100+ viral clips. Preview, pick, post & mint.",
 };
