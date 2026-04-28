@@ -6,6 +6,7 @@ import { WalletProvider } from "@/components/WalletProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import CookieConsent from "@/components/CookieConsent";
 import RateLimitToast from "@/components/RateLimitToast";
+import { SessionProvider } from "next-auth/react";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -25,12 +26,14 @@ export default function RootLayout({
       <body className={inter.className}>
         <div className="radial-bg" />
         <ThemeProvider>
-          <AuthProvider>
-            <WalletProvider>
-              {children}
-              <RateLimitToast />
-            </WalletProvider>
-          </AuthProvider>
+          <SessionProvider>
+            <AuthProvider>
+              <WalletProvider>
+                {children}
+                <RateLimitToast />
+              </WalletProvider>
+            </AuthProvider>
+          </SessionProvider>
         </ThemeProvider>
         <CookieConsent />
       </body>
