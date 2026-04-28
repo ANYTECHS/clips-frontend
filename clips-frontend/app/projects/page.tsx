@@ -5,8 +5,6 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ProjectFilters from "@/components/projects/ProjectFilters";
 import ClipGrid from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
-import ClipEditorModal, { type ClipEdits } from "@/components/projects/ClipEditorModal";
-import ClipPreviewModal from "@/components/projects/ClipPreviewModal";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
@@ -40,8 +38,6 @@ export default function ProjectsPage() {
   const [vaultFilter, setVaultFilter] = useState("pending");
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState(false);
-  const [editingClip, setEditingClip] = useState<typeof mockClips[0] | null>(null);
-  const [previewClip, setPreviewClip] = useState<typeof mockClips[0] | null>(null);
 
   // Clear undo/redo stack on navigate away (#277)
   useEffect(() => {
@@ -104,31 +100,6 @@ export default function ProjectsPage() {
       }
     });
   }, [filteredClips]);
-
-  const handleSelectNone = useCallback(() => {
-    setSelectedIds([]);
-  }, []);
-
-  const handleSelectByScore = useCallback((minScore: number) => {
-    const ids = filteredClips.filter(c => c.score >= minScore).map(c => c.id);
-    setSelectedIds(ids);
-    showToast(`Selected ${ids.length} clip${ids.length !== 1 ? "s" : ""} with score ≥ ${minScore}`, "success");
-  }, [filteredClips, showToast]);
-
-  const handleEdit = useCallback((id: string) => {
-    const clip = mockClips.find(c => c.id === id);
-    if (clip) setEditingClip(clip);
-  }, []);
-
-  const handleSaveEdits = useCallback((id: string, edits: ClipEdits) => {
-    showToast(`Edits saved for clip ${id}`, "success");
-    console.log("Clip edits:", id, edits);
-  }, [showToast]);
-
-  const handlePreview = useCallback((id: string) => {
-    const clip = mockClips.find(c => c.id === id);
-    if (clip) setPreviewClip(clip);
-  }, []);
 
   const handleMint = useCallback(async () => {
     if (selectedIds.length === 0) return;
@@ -212,15 +183,11 @@ export default function ProjectsPage() {
               selectedIds={selectedIds}
               onSelect={handleSelect}
               onSelectAll={handleSelectAll}
-              onSelectNone={handleSelectNone}
-              onSelectByScore={handleSelectByScore}
               aiRecommendations={aiRecommendations}
               recommendedIds={recommendedIds}
               recommendationThreshold={RECOMMENDATION_THRESHOLD}
               onToggleRecommendations={handleToggleRecommendations}
               onAutoSelect={handleAutoSelect}
-              onEdit={handleEdit}
-              onPreview={handlePreview}
             />
           </div>
           
@@ -239,19 +206,6 @@ export default function ProjectsPage() {
         </div>
       </main>
       {ToastEl}
-      {editingClip && (
-        <ClipEditorModal
-          clip={editingClip}
-          onClose={() => setEditingClip(null)}
-          onSave={handleSaveEdits}
-        />
-      )}
-      {previewClip && (
-        <ClipPreviewModal
-          clip={previewClip}
-          onClose={() => setPreviewClip(null)}
-        />
-      )}
     </div>
   );
 }
