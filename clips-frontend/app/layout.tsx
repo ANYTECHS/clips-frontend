@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { WalletProvider } from "@/components/WalletProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import CookieConsent from "@/components/CookieConsent";
+import RateLimitToast from "@/components/RateLimitToast";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -26,6 +27,7 @@ export default function RootLayout({
           <AuthProvider>
             <WalletProvider>
               {children}
+              <RateLimitToast />
             </WalletProvider>
           </AuthProvider>
         </ThemeProvider>
