@@ -10,6 +10,7 @@ import ClipPreviewModal from "@/components/projects/ClipPreviewModal";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 import { useEffect } from "react";
 
 const RECOMMENDATION_THRESHOLD = 90;
@@ -36,9 +37,17 @@ export default function ProjectsPage() {
   } = useUndoRedo<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMinting, setIsMinting] = useState(false);
-  const [captionsStyle, setCaptionsStyle] = useState("All Styles");
-  const [viralityLevels, setViralityLevels] = useState<string[]>(["high", "medium", "low"]);
-  const [vaultFilter, setVaultFilter] = useState("pending");
+
+  const { filters, updateFilters, resetFilters } = useFilterQueryState({
+    style: "All Styles",
+    virality: ["high", "medium", "low"],
+    vault: "pending",
+  });
+
+  const captionsStyle = filters.style;
+  const viralityLevels = filters.virality;
+  const vaultFilter = filters.vault;
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState(false);
   const [editingClip, setEditingClip] = useState<typeof mockClips[0] | null>(null);
@@ -86,16 +95,15 @@ export default function ProjectsPage() {
   }, []);
 
   const handleViralityToggle = useCallback((level: string) => {
-    setViralityLevels(prev =>
-      prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]
-    );
-  }, []);
+    const next = viralityLevels.includes(level)
+      ? viralityLevels.filter(l => l !== level)
+      : [...viralityLevels, level];
+    updateFilters({ virality: next });
+  }, [viralityLevels, updateFilters]);
 
   const handleResetFilters = useCallback(() => {
-    setCaptionsStyle("All Styles");
-    setViralityLevels(["high", "medium", "low"]);
-    setVaultFilter("pending");
-  }, []);
+    resetFilters();
+  }, [resetFilters]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedIds(prev =>
@@ -184,13 +192,13 @@ export default function ProjectsPage() {
         </button>
         <ProjectFilters
           captionsStyle={captionsStyle}
-          onCaptionsStyleChange={setCaptionsStyle}
+          onCaptionsStyleChange={(style) => updateFilters({ style })}
           viralityLevels={viralityLevels}
           onViralityLevelToggle={handleViralityToggle}
           activeFilterCount={activeFilterCount}
           onResetFilters={handleResetFilters}
           vaultFilter={vaultFilter}
-          onVaultFilterChange={setVaultFilter}
+          onVaultFilterChange={(vault) => updateFilters({ vault })}
           mobile
         />
       </div>
@@ -199,13 +207,13 @@ export default function ProjectsPage() {
       <div className="hidden lg:flex flex-col sticky top-0 h-screen py-10 pl-10 shrink-0">
         <ProjectFilters
           captionsStyle={captionsStyle}
-          onCaptionsStyleChange={setCaptionsStyle}
+          onCaptionsStyleChange={(style) => updateFilters({ style })}
           viralityLevels={viralityLevels}
           onViralityLevelToggle={handleViralityToggle}
           activeFilterCount={activeFilterCount}
           onResetFilters={handleResetFilters}
           vaultFilter={vaultFilter}
-          onVaultFilterChange={setVaultFilter}
+          onVaultFilterChange={(vault) => updateFilters({ vault })}
         />
       </div>
 
@@ -233,10 +241,10 @@ export default function ProjectsPage() {
             />
           </div>
           
-          {/* Docked Actions Footer (now truly always visible and grounded) */}
-
+          {/* Docked Actions Footer - Single instance with all required props */}
           <SelectionFooter 
-            count={selectedIds.length} 
+            count={selectedIds.length}
+            selectedIds={selectedIds}
             onMint={handleMint}
             isMinting={isMinting}
             undo={undo}

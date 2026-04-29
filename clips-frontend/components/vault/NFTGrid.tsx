@@ -7,8 +7,7 @@ import { Search } from "lucide-react";
 import { useDebounce } from "@/app/lib/useDebounce";
 
 interface NFTGridProps {
-  filter: "queue" | "minted" | "history";
-  loading?: boolean;
+  filter: "pending" | "listed" | "history";
 }
 
 interface NFTItem {
@@ -30,7 +29,8 @@ export default function NFTGrid({ filter, loading = false }: NFTGridProps) {
   const debouncedSearch = useDebounce(searchQuery, 300);
 
   const filteredNFTs = useMemo(() => {
-    const baseNFTs = mockNFTData[filter] || [];
+    const filterKey = filter === "pending" ? "queue" : filter === "listed" ? "minted" : "history";
+    const baseNFTs = mockNFTData[filterKey] || [];
     if (!debouncedSearch) return baseNFTs;
     
     return baseNFTs.filter(nft => 
@@ -40,9 +40,9 @@ export default function NFTGrid({ filter, loading = false }: NFTGridProps) {
 
   const getFilterInfo = () => {
     switch (filter) {
-      case "queue":
+      case "pending":
         return { title: "Pending Mint", description: "NFTs waiting to be minted to blockchain" };
-      case "minted":
+      case "listed":
         return { title: "Listed NFTs", description: "NFTs currently available for sale" };
       case "history":
         return { title: "Minting History", description: "All previously minted NFTs" };

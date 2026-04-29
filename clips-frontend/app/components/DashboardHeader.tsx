@@ -20,6 +20,7 @@ export default function DashboardHeader() {
       <button
         type="button"
         className="inline-flex items-center gap-2 rounded-xl bg-[#00E68A] px-5 py-3 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(0,230,138,0.35)] transition hover:brightness-95"
+        aria-label="Quick upload video"
       >
         <CloudUpload className="h-4 w-4" aria-hidden="true" />
         Quick Upload

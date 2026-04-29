@@ -11,9 +11,9 @@ const jobStore = new Map<string, any>();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const jobId = params.id;
+  const { id: jobId } = await context.params;
 
   // Check if job exists in store
   let job = jobStore.get(jobId);
@@ -72,9 +72,9 @@ export async function GET(
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ) {
-  const jobId = params.id;
+  const { id: jobId } = await context.params;
   const body = await request.json();
 
   // Update job status (for retry functionality)

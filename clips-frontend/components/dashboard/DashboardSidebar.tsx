@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import Image from "next/image";
 import { 
   LayoutDashboard, 
   Video, 
@@ -120,9 +121,11 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
       <div className="p-6 border-t border-white/5 bg-[#080C0B]/50">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-zinc-800">
-            <img 
+            <Image 
               src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || user?.email || 'Guest'}`} 
               alt={`${user?.username || user?.name || "User"} avatar`} 
+              width={40}
+              height={40}
               className="w-full h-full object-cover" 
             />
           </div>

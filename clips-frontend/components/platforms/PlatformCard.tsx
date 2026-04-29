@@ -14,9 +14,10 @@ interface PlatformCardProps {
   onConnect?: () => void;
   onDisconnect?: () => void;
   isLoading?: boolean;
+  isComingSoon?: boolean;
 }
 
-export default function PlatformCard({ name, description, icon: Icon, status, ctaText, username, variant = "vertical", onConnect, onDisconnect, isLoading }: PlatformCardProps) {
+export default function PlatformCard({ name, description, icon: Icon, status, ctaText, username, variant = "vertical", onConnect, onDisconnect, isLoading, isComingSoon }: PlatformCardProps) {
   const isActive = status === "ACTIVE" || status === "LINKED";
 
   if (variant === "horizontal") {
@@ -54,7 +55,8 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
           ) : (
             <button
               onClick={onConnect}
-              disabled={isLoading}
+              disabled={isLoading || isComingSoon}
+              title={isComingSoon ? "Phantom Wallet support is coming soon" : undefined}
               className="px-6 py-2.5 rounded-xl border border-white/10 text-white font-bold text-[13px] hover:bg-white/[0.05] transition-all active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {isLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -88,7 +90,8 @@ export default function PlatformCard({ name, description, icon: Icon, status, ct
 
       <button 
         onClick={status === "NOT LINKED" ? onConnect : onDisconnect}
-        disabled={isLoading}
+        disabled={isLoading || isComingSoon}
+        title={isComingSoon ? "Phantom Wallet support is coming soon" : undefined}
         className={`w-full py-4 rounded-xl font-bold text-[14px] transition-all flex items-center justify-center gap-2.5 ${
           status === "NOT LINKED" 
             ? "bg-brand hover:bg-brand-hover text-black shadow-[0_0_20px_rgba(0,229,143,0.2)] hover:shadow-[0_0_35px_rgba(0,229,143,0.35)]" 

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Upload, Bell, Menu, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/AuthProvider";
+import { useProcessStore } from "@/app/store";
 import WalletConnectButton from "@/components/WalletConnectButton";
 
 interface HeaderProps {
@@ -169,11 +170,11 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
     }, 3000);
   };
 
-  const showErrorNotification = () => {
+  const showErrorNotification = (message: string) => {
     // Create toast notification for errors
     const toast = document.createElement('div');
     toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-xl font-bold shadow-lg z-50 animate-in slide-in-from-right duration-300';
-    toast.textContent = 'Upload failed. Please try again.';
+    toast.textContent = message;
     document.body.appendChild(toast);
     
     setTimeout(() => {
@@ -200,6 +201,7 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
+      <div className="flex items-center gap-4">
         <div className="hidden sm:block">
           <WalletConnectButton compact />
         </div>
