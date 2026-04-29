@@ -29,31 +29,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setProfile = useUserStore((state) => state.setProfile);
   const clearUser = useUserStore((state) => state.clearUser);
 
-  useEffect(() => {
-    // Load from local storage on mount
-    const storedUser = localStorage.getItem("clipcash_user");
-    if (storedUser) {
-      try {
-        const parsedUser = JSON.parse(storedUser);
-        setUserState(parsedUser);
-        // Sync the stored user to useUserStore
-        const userProfile = {
-          id: parsedUser.id,
-          name: parsedUser.name || parsedUser.username || "User",
-          email: parsedUser.email,
-          avatarUrl: null,
-          plan: "pro" as const,
-          planUsagePercent: 80,
-        };
-        setProfile(userProfile);
-      } catch (e) {
-        console.error("Failed to parse stored user", e);
-        localStorage.removeItem("clipcash_user");
-        clearUser();
-      }
+ useEffect(() => {
+  if (isLoading) return;
+
+  const protectedRoutes = [
+    "/dashboard",
+    "/onboarding",
+    "/earnings",
+    "/projects",
+    "/vault",
+    "/platforms",
+    "/clips",
+  ];
+
+  const isProtectedRoute = protectedRoutes.some(route =>
+    pathname.startsWith(route)
+  );
+
+  const isAuthRoute = pathname === "/login" || pathname === "/signup";
+
+  // 🔐 Not logged in → block protected pages
+  if (!user && isProtectedRoute) {
+    router.push("/login");
+    return;
+  }
+
+  // 🔓 Logged in → prevent going back to auth pages
+  if (user && isAuthRoute) {
+    if (user.onboardingStep === 1 || user.onboardingStep === 2) {
+      router.push("/onboarding");
+    } else {
+      router.push("/dashboard");
     }
-    setIsLoading(false);
-  }, []);
+    return;
+  }
+
+  // 🚫 Prevent accessing onboarding after completion
+  if (user && pathname === "/onboarding" && user.onboardingStep > 2) {
+    router.push("/dashboard");
+  }
+
+}, [user, isLoading, pathname, router]);
 
   const setUser = (newUser: User | null) => {
     setUserState(newUser);
