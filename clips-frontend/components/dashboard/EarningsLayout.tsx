@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -127,11 +128,13 @@ function EarningsSidebar({
       <div className="p-6 border-t border-border bg-background/50">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-surface">
-            <img
+            <Image
               src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${
                 user?.name || user?.email || "Guest"
               }`}
               alt={`${user?.profile?.username || user?.name || "User"} avatar`}
+              width={40}
+              height={40}
               className="w-full h-full object-cover"
             />
           </div>
