@@ -27,37 +27,7 @@ import type {
 
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-// ─── Mock data (replace with real API call) ───────────────────────────────────
-
-const MOCK_BREAKDOWN: EarningsBreakdownItem[] = [
-  { id: "e1", label: "Apex Legends Clutch Breakdown", amount: 320.5,  date: "2024-03-25", platform: "youtube"   },
-  { id: "e2", label: "React Native Tutorial",         amount: 215.0,  date: "2024-03-24", platform: "tiktok"    },
-  { id: "e3", label: "Valorant Highlights Reel",      amount: 180.75, date: "2024-03-22", platform: "instagram" },
-  { id: "e4", label: "CS2 Pro Tips Series",           amount: 410.0,  date: "2024-03-20", platform: "youtube"   },
-  { id: "e5", label: "Minecraft Build Timelapse",     amount: 95.55,  date: "2024-03-18", platform: "tiktok"    },
-];
-
-async function fetchEarningsFromAPI(): Promise<{
-  totalEarnings: string;
-  totalTrend: number;
-  trendLabel: string;
-  totalFiat: { value: string; change: number };
-  cryptoRevenue: { value: string; change: number };
-  pendingPayouts: { value: string; change: number };
-  breakdown: EarningsBreakdownItem[];
-}> {
-  // TODO: replace with `fetch('/api/earnings')` when the endpoint is ready
-  await new Promise((resolve) => setTimeout(resolve, 800));
-  return {
-    totalEarnings: "$12,450.80",
-    totalTrend: 12.5,
-    trendLabel: "+12.5% from last month",
-    totalFiat: { value: "$12,450.80", change: 12.5 },
-    cryptoRevenue: { value: "1.25 ETH", change: 8.2 },
-    pendingPayouts: { value: "$1,850.25", change: 0 },
-    breakdown: MOCK_BREAKDOWN,
-  };
-}
+import { fetchEarningsFromAPI } from "./api";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 

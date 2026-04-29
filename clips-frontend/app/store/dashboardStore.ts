@@ -27,69 +27,7 @@ import type {
 /** Re-use cached data for 5 minutes before hitting the API again */
 const CACHE_TTL_MS = 5 * 60 * 1000;
 
-// ─── Mock data (replace with real API call) ───────────────────────────────────
-
-const MOCK_STATS: DashboardStats = {
-  earnings: {
-    total: "$12,450.80",
-    trend: 12.5,
-    trendLabel: "+12.5% from last month",
-  },
-  clips: {
-    total: 142,
-    trend: 8.2,
-    trendLabel: "+8.2% from last month",
-  },
-  platforms: {
-    total: 4,
-    trend: 0,
-    trendLabel: "Steady performance",
-  },
-};
-
-const MOCK_REVENUE_TREND: RevenuePoint[] = [
-  { date: "2024-03-01", amount: 400 },
-  { date: "2024-03-05", amount: 600 },
-  { date: "2024-03-10", amount: 800 },
-  { date: "2024-03-15", amount: 700 },
-  { date: "2024-03-20", amount: 900 },
-  { date: "2024-03-25", amount: 1100 },
-];
-
-const MOCK_PROJECTS: Project[] = [
-  {
-    id: "1",
-    title: "Apex Legends Clutch Breakdown and Post Match Analysis",
-    clipsGenerated: 2,
-    status: "processing",
-    accent:
-      "radial-gradient(circle at 30% 25%, rgba(127, 221, 255, 0.55), transparent 32%), linear-gradient(145deg, #0b2230 0%, #112839 45%, #061218 100%)",
-  },
-  {
-    id: "2",
-    title: "React Native Tutorial",
-    clipsGenerated: 12,
-    status: "completed",
-    accent:
-      "radial-gradient(circle at 50% 30%, rgba(170, 220, 206, 0.32), transparent 36%), linear-gradient(145deg, #536f66 0%, #62786f 48%, #241c19 100%)",
-  },
-];
-
-// ─── Async fetcher (swap this for a real API call) ────────────────────────────
-
-async function fetchDashboardFromAPI(): Promise<{
-  stats: DashboardStats;
-  revenueTrend: RevenuePoint[];
-  recentProjects: Project[];
-}> {
-  // TODO: replace with `fetch('/api/dashboard')` when the endpoint is ready
-  await new Promise((resolve) => setTimeout(resolve, 1500));
-  return {
-    stats: MOCK_STATS,
-    revenueTrend: MOCK_REVENUE_TREND,
-    recentProjects: MOCK_PROJECTS,
-  };
-}
+import { fetchDashboardFromAPI } from "./api";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
