@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import VaultSidebar from "@/components/vault/VaultSidebar";
@@ -10,9 +10,16 @@ import { MockApi } from "@/app/lib/mockApi";
 import { ChevronRight } from "lucide-react";
 
 export default function VaultPage() {
+  const [loading, setLoading] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"pending" | "listed" | "history">("pending");
   const [showMintPanel, setShowMintPanel] = useState(false);
+
+  // Simulate loading delay
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleMintSubmit = async (data: {
     collectionName: string;
@@ -82,7 +89,7 @@ export default function VaultPage() {
             <div className="flex-1 min-w-0 flex flex-col lg:flex-row gap-6">
               {/* NFT Grid */}
               <div className="flex-1 min-w-0">
-                <NFTGrid filter={activeFilter} />
+                <NFTGrid filter={activeFilter} loading={loading} />
               </div>
 
               {/* Mint Configuration Panel (Desktop) */}

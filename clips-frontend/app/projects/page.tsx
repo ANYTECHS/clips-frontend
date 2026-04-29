@@ -35,6 +35,7 @@ export default function ProjectsPage() {
     canRedo, 
     clear 
   } = useUndoRedo<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isMinting, setIsMinting] = useState(false);
 
   const { filters, updateFilters, resetFilters } = useFilterQueryState({
@@ -52,19 +53,26 @@ export default function ProjectsPage() {
   const [editingClip, setEditingClip] = useState<typeof mockClips[0] | null>(null);
   const [previewClip, setPreviewClip] = useState<typeof mockClips[0] | null>(null);
 
+  // Simulate loading delay
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
   // Clear undo/redo stack on navigate away (#277)
   useEffect(() => {
     return () => clear();
   }, [clear]);
 
   const filteredClips = useMemo(() => {
+    if (loading) return [];
     return mockClips.filter(clip => {
       const matchesStyle = captionsStyle === "All Styles" || clip.style === captionsStyle;
       const matchesLevel = viralityLevels.includes(clip.scoreKey);
       const matchesVault = clip.status === vaultFilter;
       return matchesStyle && matchesLevel && matchesVault;
     });
-  }, [captionsStyle, viralityLevels, vaultFilter]);
+  }, [captionsStyle, viralityLevels, vaultFilter, loading]);
 
   const activeFilterCount = useMemo(() => {
     return (captionsStyle !== "All Styles" ? 1 : 0) + 
@@ -229,6 +237,7 @@ export default function ProjectsPage() {
               onAutoSelect={handleAutoSelect}
               onEdit={handleEdit}
               onPreview={handlePreview}
+              loading={loading}
             />
           </div>
           
