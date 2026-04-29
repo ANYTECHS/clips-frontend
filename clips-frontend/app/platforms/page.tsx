@@ -31,6 +31,7 @@ type PlatformItem = {
   onConnect?: () => void;
   onDisconnect?: () => void;
   isLoading?: boolean;
+  isComingSoon?: boolean;
 };
 
 /* ================= ICONS ================= */
@@ -130,11 +131,12 @@ export default function PlatformsPage() {
       name: "Phantom Wallet",
       description: "Solana Network",
       icon: PhantomIcon,
-      status: walletConnected && walletAddress ? "LINKED" : "NOT LINKED",
-      ctaText: walletConnecting ? "Connecting..." : "Connect Phantom",
-      onConnect: connectPhantom,
-      onDisconnect: disconnectWallet,
-      isLoading: walletConnecting,
+      status: "NOT LINKED",
+      ctaText: "Coming Soon",
+      onConnect: undefined,
+      onDisconnect: undefined,
+      isLoading: false,
+      isComingSoon: true,
     },
     {
       name: "MetaMask",
