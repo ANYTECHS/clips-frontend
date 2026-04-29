@@ -18,6 +18,7 @@ import { calculateMintCost, formatSol } from "@/app/lib/mintUtils";
 
 interface SelectionFooterProps {
   count: number;
+  selectedIds?: string[];
   onMint: () => void;
   isMinting?: boolean;
   undo?: () => void;
@@ -28,6 +29,7 @@ interface SelectionFooterProps {
 
 export default function SelectionFooter({ 
   count, 
+  selectedIds,
   onMint, 
   isMinting = false,
   undo,

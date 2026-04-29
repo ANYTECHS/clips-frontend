@@ -224,10 +224,10 @@ export default function ProjectsPage() {
             />
           </div>
           
-          {/* Docked Actions Footer (now truly always visible and grounded) */}
-
+          {/* Docked Actions Footer - Single instance with all required props */}
           <SelectionFooter 
-            count={selectedIds.length} 
+            count={selectedIds.length}
+            selectedIds={selectedIds}
             onMint={handleMint}
             isMinting={isMinting}
             undo={undo}
