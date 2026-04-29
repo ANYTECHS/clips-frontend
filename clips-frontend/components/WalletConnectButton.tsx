@@ -27,6 +27,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
             <button
               onClick={disconnect}
               title="Disconnect wallet"
+              aria-label="Disconnect wallet"
               className="p-2 rounded-xl bg-white/[0.03] border border-white/5 text-muted-foreground hover:text-red-400 hover:border-red-400/20 transition-all"
             >
               <LogOut className="w-4 h-4" />
@@ -36,6 +37,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
           <button
             onClick={connectMetaMask}
             disabled={isConnecting}
+            aria-label="Connect MetaMask wallet"
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand/10 border border-brand/20 text-brand font-bold text-[13px] hover:bg-brand/20 transition-all disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.97]"
           >
             {isConnecting ? (
@@ -52,7 +54,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
           <div className="absolute top-full mt-2 right-0 z-50 flex items-start gap-2 bg-red-950/80 border border-red-500/30 rounded-xl px-4 py-3 max-w-[280px] shadow-xl backdrop-blur-md">
             <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
             <p className="text-[12px] text-red-300 leading-snug flex-1">{error}</p>
-            <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors shrink-0">
+            <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors shrink-0" aria-label="Close error message">
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -68,7 +70,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
         <div className="flex items-start gap-2.5 bg-red-950/60 border border-red-500/25 rounded-xl px-4 py-3">
           <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
           <p className="text-[13px] text-red-300 leading-snug flex-1">{error}</p>
-          <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors shrink-0">
+          <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors shrink-0" aria-label="Close error message">
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -77,6 +79,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
       {isConnected && address ? (
         <button
           onClick={disconnect}
+          aria-label="Disconnect wallet"
           className="w-full py-4 rounded-xl font-bold text-[14px] bg-transparent border border-white/10 text-white hover:bg-red-950/30 hover:border-red-500/30 hover:text-red-400 transition-all flex items-center justify-center gap-2.5 active:scale-[0.98]"
         >
           <LogOut className="w-4 h-4" />
@@ -86,6 +89,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
         <button
           onClick={connectMetaMask}
           disabled={isConnecting}
+          aria-label="Connect MetaMask wallet"
           className="w-full py-4 rounded-xl font-bold text-[14px] bg-brand hover:bg-brand-hover text-black shadow-[0_0_20px_rgba(0,229,143,0.2)] hover:shadow-[0_0_35px_rgba(0,229,143,0.35)] transition-all flex items-center justify-center gap-2.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isConnecting ? (
