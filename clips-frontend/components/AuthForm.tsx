@@ -110,6 +110,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
         <div>
           <label htmlFor="auth-email" className="block text-[13px] font-medium text-[#8e9895] mb-2">Email address</label>
           <input 
+            id="auth-email"
             type="email" 
             required
             value={email}
