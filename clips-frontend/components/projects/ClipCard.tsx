@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, memo, useCallback } from "react";
+import Image from "next/image";
 import { 
   Play, 
   Download, 
@@ -116,14 +117,14 @@ const ClipCard = memo(function ClipCard({
       )}
       {/* Thumbnail Area */}
       <div className={`relative aspect-video overflow-hidden group/thumb ${isRecommended && !isSelected ? "mt-[28px]" : ""}`}>
-        <img 
-          src={thumbnail} 
-          alt={title} 
-          loading="lazy"
-          decoding="async"
-          className="w-full h-full object-cover transform transition-transform duration-700 group-hover:scale-110"
+        <Image
+          src={thumbnail}
+          alt={title}
+          fill
+          className="object-cover transform transition-transform duration-700 group-hover:scale-110"
+          sizes="(max-width: 640px) 100vw, 50vw"
         />
-        
+
         {/* Selection Indicator (Top Left) — always visible on touch, hover on desktop */}
         <button
           type="button"
