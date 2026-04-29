@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
@@ -23,6 +23,8 @@ interface AuthFormProps {
 export default function AuthForm({ mode = "login" }: AuthFormProps) {
   const { setUser } = useAuth();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const { showToast, ToastEl } = useToast();
 
   const [currentMode, setCurrentMode] = useState<"login" | "signup">(mode);
   const [email, setEmail] = useState("");
@@ -31,6 +33,15 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [resetMessage, setResetMessage] = useState(false);
+
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error) {
+      showToast("OAuth authentication failed. Please try again.", "error");
+      // Remove error from URL
+      router.replace("/login");
+    }
+  }, [searchParams, showToast, router]);
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,6 +84,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
       <div className="space-y-[14px] mb-8">
         <button
           type="button"
+          onClick={() => signIn("google", { callbackUrl: "/" })}
           className="w-full flex items-center justify-center gap-3 bg-surface-hover hover:bg-border border border-border text-white py-3.5 rounded-[12px] font-medium transition-all text-[14px]"
         >
           <GoogleIcon />
@@ -80,6 +92,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
         </button>
         <button
           type="button"
+          onClick={() => signIn("apple", { callbackUrl: "/" })}
           className="w-full flex items-center justify-center gap-3 bg-surface-hover hover:bg-border border border-border text-white py-3.5 rounded-[12px] font-medium transition-all text-[14px]"
         >
           <AppleIcon />
@@ -162,6 +175,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
           <>Already have an account? <button type="button" onClick={() => { setCurrentMode("login"); setResetMessage(false); }} className="text-brand font-medium hover:underline">Sign in</button></>
         )}
       </div>
+      <ToastEl />
     </div>
   );
 }

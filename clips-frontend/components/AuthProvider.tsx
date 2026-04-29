@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { User } from "../app/lib/mockApi";
 import { useRouter, usePathname } from "next/navigation";
 import { useUserStore } from "@/app/store";
+import { useSession, signOut } from "next-auth/react";
 
 interface AuthContextType {
   user: User | null;
@@ -28,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const setProfile = useUserStore((state) => state.setProfile);
   const clearUser = useUserStore((state) => state.clearUser);
+  const { data: session, status } = useSession();
 
  useEffect(() => {
   if (isLoading) return;
@@ -92,27 +94,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    signOut({ callbackUrl: "/login" });
     setUser(null);
-    router.push("/login");
   };
 
   // Basic routing logic based on auth state
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || status === "loading") return;
 
     const protectedRoutes = ["/dashboard", "/onboarding", "/earnings", "/projects", "/vault", "/platforms", "/clips"];
     const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
     const isAuthRoute = pathname === "/login" || pathname === "/signup";
 
-    if (user) {
+    if (user || session) {
       if (isAuthRoute || pathname === "/") {
-        if (user.onboardingStep === 1 || user.onboardingStep === 2) {
+        if (user?.onboardingStep === 1 || user?.onboardingStep === 2) {
           router.push("/onboarding");
         } else {
           router.push("/dashboard");
         }
       } else if (pathname === "/onboarding") {
-        if (user.onboardingStep > 2) {
+        if (user?.onboardingStep && user.onboardingStep > 2) {
           router.push("/dashboard");
         }
       }
@@ -121,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push("/login");
       }
     }
-  }, [user, isLoading, pathname, router]);
+  }, [user, session, isLoading, status, pathname, router]);
 
   return (
     <AuthContext.Provider value={{ user, setUser, logout, isLoading }}>
