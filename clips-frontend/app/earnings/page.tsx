@@ -265,7 +265,6 @@ export default function EarningsPage() {
           transactions={transactions}
           summary={summary}
           loading={loading}
-          onExport={exportCSV}
         />
       </div>
     </EarningsLayout>
