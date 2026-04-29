@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -46,9 +47,11 @@ export default function ProcessingHeader() {
           Upgrade Plan
         </button>
         <div className="w-10 h-10 rounded-full border border-white/10 bg-zinc-800 flex items-center justify-center overflow-hidden">
-          <img 
-            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.profile?.username || "default"}`} 
-            alt={`${user?.profile?.username || user?.name || 'Guest'} avatar`} 
+          <Image
+            src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.profile?.username || "default"}`}
+            alt={`${user?.profile?.username || user?.name || "Guest"} avatar`}
+            width={40}
+            height={40}
             className="w-full h-full object-cover"
           />
         </div>

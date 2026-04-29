@@ -5,6 +5,7 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { MockApi } from "@/app/lib/mockApi";
 
 // Local inline SVG for Google/Apple to avoid external dependencies perfectly matching
 const GoogleIcon = () => (

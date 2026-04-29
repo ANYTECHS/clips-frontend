@@ -68,7 +68,13 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
     {
       name: "clips_process_state", // same localStorage key as before
       storage: createJSONStorage(() =>
-        typeof window !== "undefined" ? secureStorage : sessionStorage
+        typeof window !== "undefined"
+          ? secureStorage
+          : {
+              getItem: async (name: string) => null,
+              setItem: async (name: string, value: string) => {},
+              removeItem: async (name: string) => {},
+            }
       ),
       // Only persist the state fields, not the action functions
       partialize: (state) => ({
