@@ -15,22 +15,7 @@
 import { create } from "zustand";
 import type { UserState, UserActions, UserProfile } from "./types";
 
-// ─── Mock profile (replace fetchUserFromAPI with a real call) ─────────────────
-
-const MOCK_PROFILE: UserProfile = {
-  id: "usr_001",
-  name: "Alex Rivera",
-  email: "alex@clipcash.ai",
-  avatarUrl: "/avatar.png",
-  plan: "pro",
-  planUsagePercent: 80,
-};
-
-async function fetchUserFromAPI(): Promise<UserProfile> {
-  // TODO: replace with `fetch('/api/user/me')` when the endpoint is ready
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return MOCK_PROFILE;
-}
+import { fetchUserFromAPI } from "./api";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
