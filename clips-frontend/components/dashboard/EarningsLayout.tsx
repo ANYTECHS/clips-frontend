@@ -18,7 +18,7 @@ import {
   Menu,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
-import { EarningsSearchProvider, useEarningsSearch } from "@/app/lib/EarningsSearchContext";
+import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 
 const menuItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/dashboard" },
@@ -155,7 +155,28 @@ function EarningsSidebar({
 // ─── Header ─────────────────────────────────────────────────────────────────
 
 function EarningsHeader({ onMenuClick }: { onMenuClick: () => void }) {
-  const { searchQuery, setSearchQuery } = useEarningsSearch();
+  const { filters, updateFilters } = useFilterQueryState({
+    search: "",
+  });
+  
+  const [inputValue, setInputValue] = useState(filters.search);
+
+  // Sync input value if URL changes (e.g. back button)
+  useEffect(() => {
+    setInputValue(filters.search);
+  }, [filters.search]);
+
+  // Debounce URL update
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (inputValue !== filters.search) {
+        updateFilters({ search: inputValue });
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [inputValue, filters.search, updateFilters]);
+
+  const setSearchQuery = (val: string) => setInputValue(val);
 
   return (
     <header className="flex items-center justify-between py-5 px-4 sm:px-6 lg:px-10 border-b border-border bg-background/80 backdrop-blur-md sticky top-0 z-30">
@@ -175,11 +196,11 @@ function EarningsHeader({ onMenuClick }: { onMenuClick: () => void }) {
             id="earnings-search"
             type="text"
             placeholder="Search transactions, payouts..."
-            value={searchQuery}
+            value={inputValue}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-[#111111] border border-white/5 rounded-xl pl-10 pr-10 py-2.5 text-[14px] text-white placeholder:text-[#4A5D54] focus:outline-none focus:border-brand/30 focus:bg-[#111111] transition-colors"
           />
-          {searchQuery && (
+          {inputValue && (
             <button
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-[#4A5D54] hover:text-white transition-colors"
@@ -223,7 +244,7 @@ export default function EarningsLayout({ children }: EarningsLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
-    <EarningsSearchProvider>
+    <>
       <div className="flex min-h-screen bg-[#050505] text-white font-sans overflow-hidden">
         {/* Ambient glows */}
         <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
@@ -250,6 +271,6 @@ export default function EarningsLayout({ children }: EarningsLayoutProps) {
           </div>
         </main>
       </div>
-    </EarningsSearchProvider>
+    </>
   );
 }
