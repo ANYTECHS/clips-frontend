@@ -4,9 +4,8 @@ import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
-import { signIn } from "next-auth/react";
-import { useToast } from "@/hooks/useToast";
+import { useRouter } from "next/navigation";
+import { MockApi } from "@/app/lib/mockApi";
 
 // Local inline SVG for Google/Apple to avoid external dependencies perfectly matching
 const GoogleIcon = () => (
@@ -125,6 +124,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
         <div>
           <label htmlFor="auth-email" className="block text-[13px] font-medium text-[#8e9895] mb-2">Email address</label>
           <input 
+            id="auth-email"
             type="email" 
             required
             value={email}

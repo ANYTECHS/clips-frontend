@@ -31,54 +31,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const clearUser = useUserStore((state) => state.clearUser);
   const { data: session, status } = useSession();
 
-  useEffect(() => {
-    if (status === "loading") return;
+ useEffect(() => {
+  if (isLoading) return;
 
-    if (session?.user) {
-      // Map session user to User type
-      const mappedUser: User = {
-        id: session.user.id || session.user.email!, // Assuming email as id if not provided
-        email: session.user.email!,
-        name: session.user.name || "",
-        username: session.user.name || "",
-        onboardingStep: (session.user as any).onboardingStep || 1, // From callback
-      };
-      setUserState(mappedUser);
-      localStorage.setItem("clipcash_user", JSON.stringify(mappedUser));
-      const userProfile = {
-        id: mappedUser.id,
-        name: mappedUser.name || mappedUser.username || "User",
-        email: mappedUser.email,
-        avatarUrl: null,
-        plan: "pro" as const,
-        planUsagePercent: 80,
-      };
-      setProfile(userProfile);
+  const protectedRoutes = [
+    "/dashboard",
+    "/onboarding",
+    "/earnings",
+    "/projects",
+    "/vault",
+    "/platforms",
+    "/clips",
+  ];
+
+  const isProtectedRoute = protectedRoutes.some(route =>
+    pathname.startsWith(route)
+  );
+
+  const isAuthRoute = pathname === "/login" || pathname === "/signup";
+
+  // 🔐 Not logged in → block protected pages
+  if (!user && isProtectedRoute) {
+    router.push("/login");
+    return;
+  }
+
+  // 🔓 Logged in → prevent going back to auth pages
+  if (user && isAuthRoute) {
+    if (user.onboardingStep === 1 || user.onboardingStep === 2) {
+      router.push("/onboarding");
     } else {
-      // Load from local storage if no session
-      const storedUser = localStorage.getItem("clipcash_user");
-      if (storedUser) {
-        try {
-          const parsedUser = JSON.parse(storedUser);
-          setUserState(parsedUser);
-          const userProfile = {
-            id: parsedUser.id,
-            name: parsedUser.name || parsedUser.username || "User",
-            email: parsedUser.email,
-            avatarUrl: null,
-            plan: "pro" as const,
-            planUsagePercent: 80,
-          };
-          setProfile(userProfile);
-        } catch (e) {
-          console.error("Failed to parse stored user", e);
-          localStorage.removeItem("clipcash_user");
-          clearUser();
-        }
-      }
+      router.push("/dashboard");
     }
-    setIsLoading(false);
-  }, [session, status]);
+    return;
+  }
+
+  // 🚫 Prevent accessing onboarding after completion
+  if (user && pathname === "/onboarding" && user.onboardingStep > 2) {
+    router.push("/dashboard");
+  }
+
+}, [user, isLoading, pathname, router]);
 
   const setUser = (newUser: User | null) => {
     setUserState(newUser);

@@ -18,11 +18,10 @@ export default function LoginPage() {
     setUrlAnalyzing(true);
     await new Promise(r => setTimeout(r, 1500));
     setUrlAnalyzing(false);
-    const emailInput = document.getElementById("auth-email");
+    const emailInput = document.getElementById("auth-email") as HTMLInputElement;
     if (emailInput) {
       emailInput.focus();
-    } else {
-      router.push("/signup");
+      emailInput.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   };
 

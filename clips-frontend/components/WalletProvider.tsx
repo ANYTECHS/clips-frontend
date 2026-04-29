@@ -12,6 +12,16 @@ declare global {
       on: (event: string, handler: (...args: unknown[]) => void) => void;
       removeListener: (event: string, handler: (...args: unknown[]) => void) => void;
     };
+    solana?: {
+      isPhantom?: boolean;
+      connect: () => Promise<{ publicKey: { toBase58: () => string } }>;
+      disconnect: () => Promise<void>;
+      on: (event: string, handler: (...args: unknown[]) => void) => void;
+      removeListener: (event: string, handler: (...args: unknown[]) => void) => void;
+      publicKey?: {
+        toBase58: () => string;
+      };
+    };
   }
 }
 
@@ -28,6 +38,7 @@ export interface WalletState {
 
 interface WalletContextType extends WalletState {
   connectMetaMask: () => Promise<void>;
+  connectPhantom: () => Promise<void>;
   disconnect: () => void;
   clearError: () => void;
 }
@@ -46,6 +57,7 @@ const defaultState: WalletState = {
 const WalletContext = createContext<WalletContextType>({
   ...defaultState,
   connectMetaMask: async () => {},
+  connectPhantom: async () => {},
   disconnect: () => {},
   clearError: () => {},
 });
@@ -121,6 +133,42 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  // Listen for Solana account changes
+  useEffect(() => {
+    const solana = window.solana;
+    if (!solana) return;
+
+    const handleAccountChanged = (publicKey: { toBase58: () => string } | null) => {
+      if (!publicKey) {
+        handleDisconnect();
+      } else {
+        const address = publicKey.toBase58();
+        setState((prev: WalletState) => ({ ...prev, address }));
+        persistSession({ address, chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h", walletType: "phantom" });
+      }
+    };
+
+    const handleConnect = (publicKey: { toBase58: () => string }) => {
+      const address = publicKey.toBase58();
+      setState((prev: WalletState) => ({
+        ...prev,
+        address,
+        isConnected: true,
+        isConnecting: false,
+        error: null,
+      }));
+      persistSession({ address, chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h", walletType: "phantom" });
+    };
+
+    solana.on("accountChanged", handleAccountChanged);
+    solana.on("connect", handleConnect);
+
+    return () => {
+      solana.removeListener("accountChanged", handleAccountChanged);
+      solana.removeListener("connect", handleConnect);
+    };
+  }, []);
+
   function persistSession(data: { address: string | null; chainId: string | null; walletType: WalletType | null }) {
     if (data.address) {
       secureStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -132,6 +180,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   function handleDisconnect() {
     setState({ ...defaultState });
     secureStorage.removeItem(STORAGE_KEY);
+    
+    // Disconnect from Phantom if connected
+    const solana = window.solana;
+    if (solana && state.walletType === "phantom") {
+      solana.disconnect().catch(() => {});
+    }
   }
 
   const connectMetaMask = useCallback(async () => {
@@ -181,9 +235,49 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const connectPhantom = useCallback(async () => {
+    const solana = window.solana;
+    if (!solana || !solana.isPhantom) {
+      setState((prev: WalletState) => ({
+        ...prev,
+        error: "Phantom wallet not detected. Please install the Phantom browser extension.",
+      }));
+      return;
+    }
+
+    setState((prev: WalletState) => ({ ...prev, isConnecting: true, error: null }));
+
+    try {
+      const response = await solana.connect();
+      const address = response.publicKey.toBase58();
+
+      setState({
+        address,
+        chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h",
+        walletType: "phantom",
+        isConnected: true,
+        isConnecting: false,
+        error: null,
+      });
+
+      persistSession({ address, chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h", walletType: "phantom" });
+    } catch (err: unknown) {
+      const message =
+        (err as { code?: number; message?: string })?.code === 4001
+          ? "Connection rejected. Please approve the request in Phantom."
+          : (err as Error)?.message ?? "Failed to connect Phantom wallet. Please try again.";
+
+      setState((prev: WalletState) => ({
+        ...prev,
+        isConnecting: false,
+        error: message,
+      }));
+    }
+  }, []);
+
   const disconnect = useCallback(() => {
     handleDisconnect();
-  }, []);
+  }, [state.walletType]);
 
   const clearError = useCallback(() => {
     setState((prev: WalletState) => ({ ...prev, error: null }));
@@ -191,7 +285,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <WalletContext.Provider
-      value={{ ...state, connectMetaMask, disconnect, clearError }}
+      value={{ ...state, connectMetaMask, connectPhantom, disconnect, clearError }}
     >
       {children}
     </WalletContext.Provider>
