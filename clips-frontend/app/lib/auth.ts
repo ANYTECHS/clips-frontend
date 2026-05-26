@@ -15,7 +15,7 @@ export const authOptions: NextAuthOptions = {
         teamId: process.env.APPLE_TEAM_ID!,
         privateKey: process.env.APPLE_PRIVATE_KEY!,
         keyId: process.env.APPLE_KEY_ID!,
-      },
+      } as any,
     }),
   ],
   callbacks: {
@@ -28,7 +28,9 @@ export const authOptions: NextAuthOptions = {
     async session({ session, token }) {
       // Assuming the API returns user data including onboardingStep
       // For now, mock it
-      session.user.onboardingStep = session.user.email?.includes("new") ? 1 : 3; // Mock logic
+      if (session.user) {
+        (session.user as any).onboardingStep = session.user.email?.includes("new") ? 1 : 3; // Mock logic
+      }
       return session;
     },
   },

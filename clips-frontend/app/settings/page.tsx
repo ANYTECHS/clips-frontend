@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Bell, BellOff, Check, X } from "lucide-react";
+import { Bell, BellOff, Check, X, Key, Wallet, Shield, Download } from "lucide-react";
 import {
   getStoredPermission,
   requestNotificationPermission,
@@ -12,6 +12,10 @@ import {
 export default function SettingsPage() {
   const [permission, setPermission] = useState<"granted" | "denied" | "default">("default");
   const [isLoading, setIsLoading] = useState(false);
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [advancedWalletEnabled, setAdvancedWalletEnabled] = useState(false);
+
+  const mockPrivateKey = "0x8f2a7b9c3d4e5f6a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4";
 
   useEffect(() => {
     // Get current permission state
@@ -145,6 +149,89 @@ export default function SettingsPage() {
                   <span>Your preference is saved locally in your browser</span>
                 </li>
               </ul>
+            </div>
+          </div>
+
+          {/* Advanced Wallet Settings */}
+          <div className="space-y-6 mt-12">
+            <div>
+              <h2 className="text-xl font-bold mb-4">Advanced Wallet Mode</h2>
+              <p className="text-muted-foreground text-sm mb-6">
+                For power users: Export your secret key or connect an external wallet as a backup for your ClipCash account.
+              </p>
+            </div>
+
+            <div className="bg-input/50 rounded-2xl p-6 border border-white/5">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center">
+                    <Shield className="w-6 h-6 text-brand" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-white">Advanced Features</p>
+                    <p className="text-sm text-muted-foreground">
+                      {advancedWalletEnabled
+                        ? "Advanced wallet features are enabled"
+                        : "Enable to access private keys and external backups"}
+                    </p>
+                  </div>
+                </div>
+                
+                <button
+                  onClick={() => setAdvancedWalletEnabled(!advancedWalletEnabled)}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    advancedWalletEnabled ? "bg-brand" : "bg-white/10"
+                  }`}
+                  aria-label="Toggle Advanced Wallet Mode"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      advancedWalletEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {advancedWalletEnabled && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Key className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-bold text-sm text-white">Export Secret Key</p>
+                        <p className="text-xs text-muted-foreground">
+                          {showPrivateKey ? mockPrivateKey : "••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <button 
+                        onClick={() => setShowPrivateKey(!showPrivateKey)}
+                        className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/5 transition-colors"
+                      >
+                        {showPrivateKey ? "Hide" : "Reveal"}
+                      </button>
+                      <button className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-colors">
+                        <Download className="w-3 h-3" />
+                        Export
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Wallet className="w-5 h-5 text-muted-foreground" />
+                      <div>
+                        <p className="font-bold text-sm text-white">External Backup Wallet</p>
+                        <p className="text-xs text-muted-foreground">Connect a Web3 wallet as recovery backup</p>
+                      </div>
+                    </div>
+                    <button className="px-4 py-1.5 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/5 transition-colors">
+                      Connect Backup
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

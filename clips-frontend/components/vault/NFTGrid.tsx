@@ -8,6 +8,7 @@ import { useDebounce } from "@/app/lib/useDebounce";
 
 interface NFTGridProps {
   filter: "pending" | "listed" | "history";
+  loading?: boolean;
 }
 
 interface NFTItem {

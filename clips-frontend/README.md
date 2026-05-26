@@ -95,6 +95,25 @@ When a processing job completes, users receive browser push notifications (if pe
 - `app/sitemap.ts`: Includes only public marketing pages
 - Public routes: `/`, `/login`, `/privacy`, `/terms`, `/status`
 
+## Hybrid Web2 -> Web3 Wallet Architecture
+
+ClipCash employs a sophisticated hybrid Web2 -> Web3 architecture to seamlessly transition users from traditional authentication methods to Web3 paradigms, allowing frictionless onboarding while maintaining decentralization options for power users.
+
+### 1. Seamless Onboarding (Web2 Focus)
+- **Authentication**: Users can sign up via traditional OAuth providers (Google, Apple) using `next-auth`.
+- **Embedded Wallets**: Upon registration, an invisible "smart wallet" is generated on the backend using multi-party computation (MPC) or smart contract accounts (ERC-4337). This shields users from mnemonic phrases or gas fees.
+- **Custody Management**: The backend manages transactions temporarily, signing them on behalf of the user to provide a smooth "Web2-like" experience.
+
+### 2. Transition and Backup (Advanced Mode)
+- **Advanced Wallet Mode**: Power users can navigate to Settings > Advanced Wallet Mode to reveal their underlying cryptographic identities.
+- **Export Secret Key**: Users can view and export the raw private key associated with their embedded smart wallet to take full self-custody.
+- **External Backup Wallet**: To secure assets and ensure redundancy, users can connect an external Web3 wallet (MetaMask or Phantom) via the `WalletProvider.tsx`.
+- **State Management**: Wallet states and current active connections are managed securely through browser-level encryption (`secureStorage.ts`) and global context (`WalletProvider.tsx`).
+
+### 3. Integration with Smart Contracts
+- **Minting NFTs**: When a user mints their clips into NFTs (Vault), the app determines if they are using an embedded wallet or an external connection.
+- **Transaction Flow**: For external wallets, a signature is requested directly via window injections (`window.ethereum` or `window.solana`). For embedded wallets, the server signs and dispatches the payload automatically.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

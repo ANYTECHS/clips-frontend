@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { MockApi } from "@/app/lib/mockApi";
-import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, Instagram, Youtube, CheckCircle2 } from "lucide-react";
+import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import Navbar from "@/components/Navbar";
 import { useRouter } from "next/navigation";
@@ -408,7 +408,7 @@ export default function OnboardingPage() {
               {/* Instagram */}
               <div>
                 <label className="flex items-center gap-2 text-[13px] font-medium text-muted mb-2">
-                  <Instagram className="w-4 h-4 text-[#E1306C]" /> Instagram Handle
+                  <InstagramIcon className="w-4 h-4 text-[#E1306C]" /> Instagram Handle
                 </label>
                 <input 
                   type="text" 
@@ -426,7 +426,7 @@ export default function OnboardingPage() {
               {/* YouTube */}
               <div>
                 <label className="flex items-center gap-2 text-[13px] font-medium text-muted mb-2">
-                  <Youtube className="w-4 h-4 text-[#FF0000]" /> YouTube Channel
+                  <YoutubeIcon className="w-4 h-4 text-[#FF0000]" /> YouTube Channel
                 </label>
                 <input 
                   type="text" 
