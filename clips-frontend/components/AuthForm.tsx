@@ -1,11 +1,14 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, Wallet, CheckCircle, AlertCircle } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signIn } from "next-auth/react";
 import { MockApi } from "@/app/lib/mockApi";
+import { useWalletConnection } from "@/app/hooks/useWalletConnection";
+import { useToast } from "@/hooks/useToast";
 
 // Local inline SVG for Google/Apple to avoid external dependencies perfectly matching
 const GoogleIcon = () => (
@@ -25,6 +28,18 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { showToast, ToastEl } = useToast();
+  
+  // Wallet connection hook
+  const {
+    connect: connectWallet,
+    disconnect: disconnectWallet,
+    isConnecting: isWalletConnecting,
+    isConnected: isWalletConnected,
+    publicKey: walletPublicKey,
+    error: walletError,
+    getTruncatedAddress,
+    resetError: resetWalletError,
+  } = useWalletConnection();
 
   const [currentMode, setCurrentMode] = useState<"login" | "signup">(mode);
   const [email, setEmail] = useState("");
@@ -42,6 +57,24 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
       router.replace("/login");
     }
   }, [searchParams, showToast, router]);
+
+  // Handle wallet connection
+  const handleWalletConnect = async () => {
+    resetWalletError();
+    const success = await connectWallet();
+    
+    if (success && walletPublicKey) {
+      showToast("Wallet connected successfully!", "success");
+    } else if (walletError) {
+      showToast(walletError.message, "error");
+    }
+  };
+
+  // Handle wallet disconnection
+  const handleWalletDisconnect = () => {
+    disconnectWallet();
+    showToast("Wallet disconnected", "info");
+  };
 
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,6 +131,54 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
           <AppleIcon />
           Continue with Apple
         </button>
+        
+        {/* Wallet Connection Button */}
+        {!isWalletConnected ? (
+          <button
+            type="button"
+            onClick={handleWalletConnect}
+            disabled={isWalletConnecting}
+            className="w-full flex items-center justify-center gap-3 bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand py-3.5 rounded-[12px] font-medium transition-all text-[14px] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isWalletConnecting ? (
+              <>
+                <Loader2 className="w-[18px] h-[18px] animate-spin" />
+                Connecting Wallet...
+              </>
+            ) : (
+              <>
+                <Wallet className="w-[18px] h-[18px]" />
+                Connect Stellar Wallet
+              </>
+            )}
+          </button>
+        ) : (
+          <div className="w-full flex items-center justify-between gap-3 bg-brand/10 border border-brand/30 text-brand py-3.5 px-4 rounded-[12px] text-[14px]">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-[18px] h-[18px]" />
+              <span className="font-medium">
+                {walletPublicKey ? getTruncatedAddress(walletPublicKey) : "Connected"}
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={handleWalletDisconnect}
+              className="text-brand/70 hover:text-brand text-[12px] font-medium underline"
+            >
+              Disconnect
+            </button>
+          </div>
+        )}
+        
+        {/* Wallet Error Display */}
+        {walletError && (
+          <div className="flex items-start gap-2 p-3 bg-error/10 border border-error/30 rounded-[12px]">
+            <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+            <p className="text-error text-[12px] leading-relaxed">
+              {walletError.message}
+            </p>
+          </div>
+        )}
       </div>
 
       <div className="flex items-center gap-4 text-muted-foreground text-[11px] font-bold tracking-[0.1em] uppercase mb-8">
