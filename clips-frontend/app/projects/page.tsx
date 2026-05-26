@@ -5,7 +5,13 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ProjectFilters from "@/components/projects/ProjectFilters";
 import ClipGrid from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
+import ClipEditorModal, { type ClipEdits } from "@/components/projects/ClipEditorModal";
+import ClipPreviewModal from "@/components/projects/ClipPreviewModal";
 import { X } from "lucide-react";
+import { useToast } from "@/hooks/useToast";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
+import { useFilterQueryState } from "@/hooks/useFilterQueryState";
+import { useEffect } from "react";
 
 const RECOMMENDATION_THRESHOLD = 90;
 
@@ -19,22 +25,54 @@ const mockClips = [
 ];
 
 export default function ProjectsPage() {
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const { showToast, ToastEl } = useToast();
+  const { 
+    state: selectedIds, 
+    set: setSelectedIds, 
+    undo, 
+    redo, 
+    canUndo, 
+    canRedo, 
+    clear 
+  } = useUndoRedo<string[]>([]);
+  const [loading, setLoading] = useState(true);
   const [isMinting, setIsMinting] = useState(false);
-  const [captionsStyle, setCaptionsStyle] = useState("All Styles");
-  const [viralityLevels, setViralityLevels] = useState<string[]>(["high", "medium", "low"]);
-  const [vaultFilter, setVaultFilter] = useState("pending");
+
+  const { filters, updateFilters, resetFilters } = useFilterQueryState({
+    style: "All Styles",
+    virality: ["high", "medium", "low"],
+    vault: "pending",
+  });
+
+  const captionsStyle = filters.style;
+  const viralityLevels = filters.virality;
+  const vaultFilter = filters.vault;
+
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState(false);
+  const [editingClip, setEditingClip] = useState<typeof mockClips[0] | null>(null);
+  const [previewClip, setPreviewClip] = useState<typeof mockClips[0] | null>(null);
+
+  // Simulate loading delay
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 1500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Clear undo/redo stack on navigate away (#277)
+  useEffect(() => {
+    return () => clear();
+  }, [clear]);
 
   const filteredClips = useMemo(() => {
+    if (loading) return [];
     return mockClips.filter(clip => {
       const matchesStyle = captionsStyle === "All Styles" || clip.style === captionsStyle;
       const matchesLevel = viralityLevels.includes(clip.scoreKey);
       const matchesVault = clip.status === vaultFilter;
       return matchesStyle && matchesLevel && matchesVault;
     });
-  }, [captionsStyle, viralityLevels, vaultFilter]);
+  }, [captionsStyle, viralityLevels, vaultFilter, loading]);
 
   const activeFilterCount = useMemo(() => {
     return (captionsStyle !== "All Styles" ? 1 : 0) + 
@@ -57,16 +95,15 @@ export default function ProjectsPage() {
   }, []);
 
   const handleViralityToggle = useCallback((level: string) => {
-    setViralityLevels(prev =>
-      prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level]
-    );
-  }, []);
+    const next = viralityLevels.includes(level)
+      ? viralityLevels.filter(l => l !== level)
+      : [...viralityLevels, level];
+    updateFilters({ virality: next });
+  }, [viralityLevels, updateFilters]);
 
   const handleResetFilters = useCallback(() => {
-    setCaptionsStyle("All Styles");
-    setViralityLevels(["high", "medium", "low"]);
-    setVaultFilter("pending");
-  }, []);
+    resetFilters();
+  }, [resetFilters]);
 
   const handleSelect = useCallback((id: string) => {
     setSelectedIds(prev =>
@@ -84,6 +121,31 @@ export default function ProjectsPage() {
     });
   }, [filteredClips]);
 
+  const handleSelectNone = useCallback(() => {
+    setSelectedIds([]);
+  }, []);
+
+  const handleSelectByScore = useCallback((minScore: number) => {
+    const ids = filteredClips.filter(c => c.score >= minScore).map(c => c.id);
+    setSelectedIds(ids);
+    showToast(`Selected ${ids.length} clip${ids.length !== 1 ? "s" : ""} with score ≥ ${minScore}`, "success");
+  }, [filteredClips, showToast]);
+
+  const handleEdit = useCallback((id: string) => {
+    const clip = mockClips.find(c => c.id === id);
+    if (clip) setEditingClip(clip);
+  }, []);
+
+  const handleSaveEdits = useCallback((id: string, edits: ClipEdits) => {
+    showToast(`Edits saved for clip ${id}`, "success");
+    console.log("Clip edits:", id, edits);
+  }, [showToast]);
+
+  const handlePreview = useCallback((id: string) => {
+    const clip = mockClips.find(c => c.id === id);
+    if (clip) setPreviewClip(clip);
+  }, []);
+
   const handleMint = useCallback(async () => {
     if (selectedIds.length === 0) return;
     
@@ -92,18 +154,19 @@ export default function ProjectsPage() {
       console.log(`Minting NFTs with IDs: ${selectedIds.join(", ")}`);
       // Simulate an API call for minting
       await new Promise(resolve => setTimeout(resolve, 2000));
-      alert(`Successfully minted ${selectedIds.length} clip(s)!`);
+      showToast(`Successfully minted ${selectedIds.length} clip(s)!`, "success");
       setSelectedIds([]); // Clear selection after successful mint
     } catch (error) {
       console.error("Minting failed", error);
-      alert("Failed to mint clips");
+      const errorMessage = error instanceof Error ? error.message : "Failed to mint clips";
+      showToast(errorMessage, "error");
     } finally {
       setIsMinting(false);
     }
   }, [selectedIds]);
 
   return (
-    <div className="flex h-screen bg-[#050505] text-white font-sans overflow-hidden">
+    <div className="flex h-screen bg-background text-white font-sans overflow-hidden">
       {/* Background Effects */}
       <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
       <div className="fixed bottom-0 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3 translate-y-1/3" />
@@ -117,25 +180,25 @@ export default function ProjectsPage() {
       )}
 
       {/* Mobile Filter Drawer */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-[#050505] border-r border-white/5 py-10 pl-8 transition-transform duration-300 lg:hidden ${
+      <div className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-background border-r border-white/5 py-10 pl-8 transition-transform duration-300 lg:hidden ${
         mobileFiltersOpen ? "translate-x-0" : "-translate-x-full"
       }`}>
         <button
           onClick={() => setMobileFiltersOpen(false)}
-          className="absolute top-4 right-4 p-2 text-[#5A6F65] hover:text-white transition-colors"
+          className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-white transition-colors"
           aria-label="Close filters"
         >
           <X className="w-5 h-5" />
         </button>
         <ProjectFilters
           captionsStyle={captionsStyle}
-          onCaptionsStyleChange={setCaptionsStyle}
+          onCaptionsStyleChange={(style) => updateFilters({ style })}
           viralityLevels={viralityLevels}
           onViralityLevelToggle={handleViralityToggle}
           activeFilterCount={activeFilterCount}
           onResetFilters={handleResetFilters}
           vaultFilter={vaultFilter}
-          onVaultFilterChange={setVaultFilter}
+          onVaultFilterChange={(vault) => updateFilters({ vault })}
           mobile
         />
       </div>
@@ -144,13 +207,13 @@ export default function ProjectsPage() {
       <div className="hidden lg:flex flex-col sticky top-0 h-screen py-10 pl-10 shrink-0">
         <ProjectFilters
           captionsStyle={captionsStyle}
-          onCaptionsStyleChange={setCaptionsStyle}
+          onCaptionsStyleChange={(style) => updateFilters({ style })}
           viralityLevels={viralityLevels}
           onViralityLevelToggle={handleViralityToggle}
           activeFilterCount={activeFilterCount}
           onResetFilters={handleResetFilters}
           vaultFilter={vaultFilter}
-          onVaultFilterChange={setVaultFilter}
+          onVaultFilterChange={(vault) => updateFilters({ vault })}
         />
       </div>
 
@@ -165,24 +228,47 @@ export default function ProjectsPage() {
               selectedIds={selectedIds}
               onSelect={handleSelect}
               onSelectAll={handleSelectAll}
+              onSelectNone={handleSelectNone}
+              onSelectByScore={handleSelectByScore}
               aiRecommendations={aiRecommendations}
               recommendedIds={recommendedIds}
               recommendationThreshold={RECOMMENDATION_THRESHOLD}
               onToggleRecommendations={handleToggleRecommendations}
               onAutoSelect={handleAutoSelect}
+              onEdit={handleEdit}
+              onPreview={handlePreview}
+              loading={loading}
             />
           </div>
           
-          {/* Docked Actions Footer (now truly always visible and grounded) */}
-
+          {/* Docked Actions Footer - Single instance with all required props */}
           <SelectionFooter 
-            count={selectedIds.length} 
+            count={selectedIds.length}
+            selectedIds={selectedIds}
             onMint={handleMint}
             isMinting={isMinting}
+            undo={undo}
+            redo={redo}
+            canUndo={canUndo}
+            canRedo={canRedo}
           />
 
         </div>
       </main>
+      {ToastEl}
+      {editingClip && (
+        <ClipEditorModal
+          clip={editingClip}
+          onClose={() => setEditingClip(null)}
+          onSave={handleSaveEdits}
+        />
+      )}
+      {previewClip && (
+        <ClipPreviewModal
+          clip={previewClip}
+          onClose={() => setPreviewClip(null)}
+        />
+      )}
     </div>
   );
 }

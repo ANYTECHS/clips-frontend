@@ -1,7 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/components/AuthProvider";
 import { Bell, Zap, Menu } from "lucide-react";
@@ -9,6 +10,13 @@ import { Bell, Zap, Menu } from "lucide-react";
 export default function ClipsNavbar() {
   const { user } = useAuth();
   const pathname = usePathname();
+
+  const defaultAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || user?.email || 'Guest'}`;
+  const [imgSrc, setImgSrc] = useState(defaultAvatar);
+
+  useEffect(() => {
+    setImgSrc(defaultAvatar);
+  }, [user?.name, user?.email, defaultAvatar]);
 
   const navLinks = [
     { label: "Dashboard", href: "/dashboard" },
@@ -18,7 +26,7 @@ export default function ClipsNavbar() {
   ];
 
   return (
-    <nav className="w-full border-b border-white/[0.05] bg-[#050505]/60 backdrop-blur-xl sticky top-0 z-50 px-4 sm:px-6 lg:px-12 py-4">
+    <nav className="w-full border-b border-white/[0.05] bg-background/60 backdrop-blur-xl sticky top-0 z-50 px-4 sm:px-6 lg:px-12 py-4">
       <div className="max-w-[1400px] mx-auto flex items-center justify-between">
         {/* Left: Logo */}
         <Link href="/dashboard" className="flex items-center gap-2.5 group">
@@ -37,7 +45,7 @@ export default function ClipsNavbar() {
                 key={link.label}
                 href={link.href}
                 className={`text-[13px] font-bold uppercase tracking-wider relative py-1 transition-all duration-300 ${
-                  isActive ? "text-white" : "text-[#5A6F65] hover:text-white"
+                  isActive ? "text-white" : "text-muted-foreground"
                 }`}
               >
                 {link.label}
@@ -51,7 +59,10 @@ export default function ClipsNavbar() {
 
         {/* Right: Actions */}
         <div className="flex items-center gap-5 sm:gap-7">
-          <button className="lg:hidden text-[#5A6F65] hover:text-white transition-colors">
+          <button 
+            className="lg:hidden text-muted-foreground hover:text-white transition-colors"
+            aria-label="Open menu"
+          >
             <Menu className="w-6 h-6" />
           </button>
 
@@ -62,11 +73,13 @@ export default function ClipsNavbar() {
 
           <div className="flex items-center gap-4">
             <div className="hidden md:block w-px h-8 bg-white/[0.05]" />
-            <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-[#111] hover:border-brand/40 transition-colors cursor-pointer group">
-              <img 
-                src={`https://api.dicebear.com/7.x/avataaars/svg?seed=${user?.name || user?.email || 'Guest'}`} 
-                alt="avatar" 
-                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+            <div className="w-10 h-10 rounded-full border border-white/10 overflow-hidden bg-surface hover:border-brand/40 transition-colors cursor-pointer group relative">
+              <Image 
+                src={imgSrc} 
+                alt={`${user?.name || user?.email || "User"} avatar`} 
+                fill
+                className="object-cover group-hover:scale-110 transition-transform duration-500" 
+                onError={() => setImgSrc('/avatar.png')}
               />
             </div>
           </div>

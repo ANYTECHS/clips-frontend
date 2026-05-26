@@ -10,7 +10,7 @@ export default function Hero() {
         <span className="text-brand inline-block drop-shadow-[0_0_15px_rgba(0,229,143,0.3)]">Viral Clips</span>
       </h1>
       
-      <p className="text-[#5A6F65] text-[14px] sm:text-[18px] max-w-2xl mx-auto font-medium leading-relaxed">
+      <p className="text-muted-foreground text-[14px] sm:text-[18px] max-w-2xl mx-auto font-medium leading-relaxed">
         AI-powered extraction for TikTok, Reels, and Shorts. Just paste a link and let our engine do the work.
       </p>
     </div>

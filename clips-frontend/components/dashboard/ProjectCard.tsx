@@ -1,6 +1,7 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import { Play } from "lucide-react";
 
 interface ProjectCardProps {
@@ -11,10 +12,22 @@ interface ProjectCardProps {
 }
 
 export default function ProjectCard({ title, clipsCount, status, thumbnail }: ProjectCardProps) {
+  const [imgSrc, setImgSrc] = useState(thumbnail);
+
+  useEffect(() => {
+    setImgSrc(thumbnail);
+  }, [thumbnail]);
+
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-[24px] p-5 flex items-center gap-5 group hover:border-white/10 transition-all duration-300">
+    <div className="bg-surface border border-border rounded-[24px] p-5 flex items-center gap-5 group hover:border-white/10 transition-all duration-300">
       <div className="w-24 h-24 rounded-[18px] overflow-hidden relative shrink-0">
-        <img src={thumbnail} alt={title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
+        <Image 
+          src={imgSrc} 
+          alt={title} 
+          fill
+          className="object-cover group-hover:scale-110 transition-transform duration-500" 
+          onError={() => setImgSrc('/projects/thumb1.png')}
+        />
         <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="w-8 h-8 rounded-full bg-brand/90 flex items-center justify-center text-black">
             <Play className="w-4 h-4 fill-current ml-0.5" />
@@ -26,7 +39,7 @@ export default function ProjectCard({ title, clipsCount, status, thumbnail }: Pr
         <h4 className="text-[15px] font-bold text-white truncate group-hover:text-brand transition-colors">
           {title}
         </h4>
-        <p className="text-[12px] text-[#5A6F65] font-medium">
+        <p className="text-[12px] text-muted-foreground font-medium">
           {clipsCount} clips generated
         </p>
         
@@ -34,7 +47,7 @@ export default function ProjectCard({ title, clipsCount, status, thumbnail }: Pr
           <div className={`px-3 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-widest ${
             status === "processing" 
               ? "bg-brand/10 text-brand border border-brand/20 shadow-[0_0_10px_rgba(0,229,143,0.15)]" 
-              : "bg-white/[0.03] text-[#8e9895] border border-white/5"
+              : "bg-white/[0.03] text-muted border border-border"
           }`}>
             {status}
           </div>

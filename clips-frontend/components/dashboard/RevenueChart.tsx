@@ -1,7 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { ChevronDown } from "lucide-react";
+import {
+  useDashboardStore,
+  selectRevenueTrend,
+  selectDashboardMeta,
+} from "@/app/store";
 
 type Range = "6M" | "7D" | "30D" | "90D";
 
@@ -50,11 +55,47 @@ const RANGE_LABELS: Record<Range, string> = {
   "90D": "Last 90 Days",
 };
 
-const COLOR_ADS  = "#00E58F";
-const COLOR_TIPS = "#3B82F6";
+const COLOR_ADS  = "var(--color-brand)";
+const COLOR_TIPS = "var(--color-tips)";
 
 const fmt = (v: number) =>
   v >= 1000 ? `$${(v / 1000).toFixed(1)}k` : `$${v}`;
+
+// ── Data transformation ───────────────────────────────────────────────────────
+
+/**
+ * Transform RevenuePoint[] from store into lineChart format
+ * Expected format: { label, value }[]
+ */
+function transformRevenuePointsToLineChart(
+  points: Array<{ date: string; amount: number }>
+): Array<{ label: string; value: number }> {
+  if (!points || points.length === 0) return [];
+  
+  return points.map((p) => {
+    // Extract day from ISO date (e.g., "2024-03-01" -> "01")
+    const day = p.date.split("-")[2] || "";
+    return {
+      label: day,
+      value: p.amount,
+    };
+  });
+}
+
+/**
+ * Transform RevenuePoint[] into 6M bar chart format
+ * Expected format: { label, ads, tips }[]
+ * For now, uses mock data since real API structure may differ
+ */
+function transformRevenuePointsTo6MChart(
+  points: Array<{ date: string; amount: number }>
+): Array<{ label: string; ads: number; tips: number }> {
+  if (!points || points.length === 0) return DATA_6M;
+  
+  // Fallback to mock data if transformation isn't applicable
+  // In production, you'd need the API to return the breakdown by category (ads/tips)
+  return DATA_6M;
+}
 
 // ── Grouped Bar Chart (6M) ────────────────────────────────────────────────────
 
@@ -65,7 +106,35 @@ const PAD_R = 16;
 const PAD_T = 16;
 const PAD_B = 32;
 
-function BarChart({ data }: { data: MonthPoint[] }) {
+// ── Loading Skeleton ──────────────────────────────────────────────────────────
+
+function RevenueChartSkeleton() {
+  return (
+    <div className="bg-surface border border-border rounded-[24px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden">
+      {/* Header skeleton */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="space-y-1 flex-1">
+          <div className="h-6 bg-surface-hover rounded-lg w-32 animate-pulse" />
+          <div className="h-4 bg-surface-hover rounded-lg w-40 mt-2 animate-pulse" />
+        </div>
+        <div className="h-10 bg-surface-hover rounded-xl w-32 animate-pulse" />
+      </div>
+
+      {/* Legend skeleton */}
+      <div className="flex items-center gap-5">
+        <div className="h-4 bg-surface-hover rounded-lg w-24 animate-pulse" />
+        <div className="h-4 bg-surface-hover rounded-lg w-24 animate-pulse" />
+      </div>
+
+      {/* Chart skeleton */}
+      <div className="relative w-full" style={{ minHeight: SVG_H + 8 }}>
+        <div className="h-full bg-surface-hover rounded-lg animate-pulse" />
+      </div>
+    </div>
+  );
+}
+
+function BarChart({ data, rangeLabel }: { data: MonthPoint[], rangeLabel: string }) {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const chartW = SVG_W - PAD_L - PAD_R;
@@ -83,6 +152,8 @@ function BarChart({ data }: { data: MonthPoint[] }) {
     label: fmt(yMax * t),
   }));
 
+  const ariaLabel = `Bar chart showing revenue trend for ${rangeLabel}`;
+
   return (
     <div className="relative w-full" style={{ minHeight: SVG_H + 8 }}>
       <svg
@@ -90,19 +161,22 @@ function BarChart({ data }: { data: MonthPoint[] }) {
         className="w-full"
         style={{ height: SVG_H }}
         preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label={ariaLabel}
       >
+        <title>{ariaLabel}</title>
         <defs>
           <linearGradient id="gradAds" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor={COLOR_ADS} stopOpacity="1" />
-            <stop offset="100%" stopColor={COLOR_ADS} stopOpacity="0.55" />
+            <stop offset="0%" stopColor="var(--color-brand)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--color-brand)" stopOpacity="0.55" />
           </linearGradient>
           <linearGradient id="gradTips" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={COLOR_TIPS} stopOpacity="1" />
             <stop offset="100%" stopColor={COLOR_TIPS} stopOpacity="0.55" />
           </linearGradient>
           <linearGradient id="gradHover" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#ffffff" stopOpacity="0.04" />
-            <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
+            <stop offset="0%" stopColor="white" stopOpacity="0.04" />
+            <stop offset="100%" stopColor="white" stopOpacity="0" />
           </linearGradient>
         </defs>
 
@@ -110,9 +184,9 @@ function BarChart({ data }: { data: MonthPoint[] }) {
         {ticks.map((t) => (
           <g key={t.y}>
             <line x1={PAD_L} y1={t.y} x2={SVG_W - PAD_R} y2={t.y}
-              stroke="#ffffff" strokeOpacity="0.05" strokeWidth="1" />
+              stroke="white" strokeOpacity="0.05" strokeWidth="1" />
             <text x={PAD_L - 6} y={t.y + 4} textAnchor="end"
-              fontSize="10" fill="#4A5D54" fontFamily="inherit">
+              fontSize="10" fill="var(--color-subtle)" fontFamily="inherit">
               {t.label}
             </text>
           </g>
@@ -152,10 +226,10 @@ function BarChart({ data }: { data: MonthPoint[] }) {
               {isHov && (
                 <g>
                   <rect x={groupX - 52} y={ttY} width={104} height={46}
-                    rx="8" fill="#1A1A1A"
-                    stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
+                    rx="8" fill="var(--color-surface-hover)"
+                    stroke="var(--color-border)" strokeWidth="1" />
                   <text x={groupX} y={ttY + 16} textAnchor="middle"
-                    fontSize="10" fill={COLOR_ADS} fontFamily="inherit" fontWeight="600">
+                    fontSize="10" fill="var(--color-brand)" fontFamily="inherit" fontWeight="600">
                     Ads {fmt(d.ads)}
                   </text>
                   <text x={groupX} y={ttY + 32} textAnchor="middle"
@@ -167,7 +241,7 @@ function BarChart({ data }: { data: MonthPoint[] }) {
 
               <text x={groupX} y={baseY + 18} textAnchor="middle"
                 fontSize="11" fontWeight="700"
-                fill={isHov ? "#ffffff" : "#4A5D54"}
+                fill={isHov ? "white" : "var(--color-subtle)"}
                 fontFamily="inherit">
                 {d.label}
               </text>
@@ -177,7 +251,7 @@ function BarChart({ data }: { data: MonthPoint[] }) {
 
         {/* Baseline */}
         <line x1={PAD_L} y1={PAD_T + chartH} x2={SVG_W - PAD_R} y2={PAD_T + chartH}
-          stroke="#ffffff" strokeOpacity="0.08" strokeWidth="1" />
+          stroke="white" strokeOpacity="0.08" strokeWidth="1" />
       </svg>
     </div>
   );
@@ -207,13 +281,16 @@ function buildLinePaths(points: { label: string; value: number }[]) {
   return { line, fill, xs, ys };
 }
 
-function LineChart({ data }: { data: { label: string; value: number }[] }) {
+function LineChart({ data, rangeLabel }: { data: { label: string; value: number }[], rangeLabel: string }) {
   const { line, fill, xs, ys } = buildLinePaths(data);
   const peakIdx = ys.indexOf(Math.min(...ys));
+  const ariaLabel = `Line chart showing revenue trend for ${rangeLabel}`;
   return (
     <div className="relative w-full" style={{ minHeight: 200 }}>
       <svg viewBox={`0 0 ${LC_W} ${LC_H}`} className="w-full"
-        style={{ height: 160 }} preserveAspectRatio="none">
+        style={{ height: 160 }} preserveAspectRatio="none"
+        role="img" aria-label={ariaLabel}>
+        <title>{ariaLabel}</title>
         <defs>
           <linearGradient id="revFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={COLOR_ADS} stopOpacity="0.18" />
@@ -232,7 +309,7 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
           <g key={i}>
             <circle cx={x} cy={ys[i]}
               r={i === peakIdx ? 5 : 3}
-              fill={i === peakIdx ? COLOR_ADS : "#1A1A1A"}
+              fill={i === peakIdx ? COLOR_ADS : "var(--color-surface-hover)"}
               stroke={COLOR_ADS}
               strokeWidth={i === peakIdx ? 0 : 1.5}
               opacity={i === peakIdx ? 1 : 0.5} />
@@ -249,7 +326,7 @@ function LineChart({ data }: { data: { label: string; value: number }[] }) {
         {data.map((d, i) => (
           <span key={d.label}
             className={`text-[11px] font-bold tracking-wider ${
-              i === peakIdx ? "text-brand" : "text-[#4A5D54]"
+              i === peakIdx ? "text-brand" : "text-subtle"
             }`}>
             {d.label}
           </span>
@@ -266,6 +343,33 @@ export default function RevenueChart() {
   const [open, setOpen]   = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  // Get data from store
+  const revenueTrend = useDashboardStore(selectRevenueTrend);
+  const { loading } = useDashboardStore(selectDashboardMeta);
+
+  // Fetch dashboard data on mount (via store's caching mechanism)
+  useEffect(() => {
+    const fetchDashboard = useDashboardStore.getState().fetchDashboard;
+    fetchDashboard();
+  }, []);
+
+  // Transform store data to chart format
+  const chartData6M = useMemo(() => {
+    if (revenueTrend && revenueTrend.length > 0) {
+      return transformRevenuePointsTo6MChart(revenueTrend);
+    }
+    return DATA_6M;
+  }, [revenueTrend]);
+
+  const chartDataLine = useMemo(() => {
+    if (revenueTrend && revenueTrend.length > 0) {
+      return transformRevenuePointsToLineChart(revenueTrend);
+    }
+    // For 7D/30D/90D when no real data, use mock
+    return DATA_LEGACY["7D"];
+  }, [revenueTrend]);
+
+  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -276,15 +380,20 @@ export default function RevenueChart() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Show loading skeleton
+  if (loading && !revenueTrend.length) {
+    return <RevenueChartSkeleton />;
+  }
+
   const is6M      = range === "6M";
-  const totalAds  = DATA_6M.reduce((s, d) => s + d.ads, 0);
-  const totalTips = DATA_6M.reduce((s, d) => s + d.tips, 0);
+  const totalAds  = chartData6M.reduce((s, d) => s + d.ads, 0);
+  const totalTips = chartData6M.reduce((s, d) => s + d.tips, 0);
   const legacyPeak = !is6M
-    ? Math.max(...DATA_LEGACY[range as Exclude<Range, "6M">].map((d) => d.value))
+    ? Math.max(...chartDataLine.map((d) => d.value))
     : 0;
 
   return (
-    <div className="bg-[#111111] border border-white/5 rounded-[24px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-brand/10 transition-all duration-300">
+    <div className="bg-surface border border-border rounded-[24px] p-6 sm:p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-brand/10 transition-all duration-300">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -293,15 +402,15 @@ export default function RevenueChart() {
             Revenue Trend
           </h3>
           {is6M ? (
-            <p className="text-[#5A6F65] text-[12px] font-medium">
+            <p className="text-muted-foreground text-[12px] font-medium">
               Ads{" "}
               <span className="text-brand">{fmt(totalAds)}</span>
               {"  ·  "}
               Tips{" "}
-              <span className="text-[#3B82F6]">{fmt(totalTips)}</span>
+              <span className="text-tips">{fmt(totalTips)}</span>
             </p>
           ) : (
-            <p className="text-[#5A6F65] text-[12px] font-medium">
+            <p className="text-muted-foreground text-[12px] font-medium">
               Peak: <span className="text-brand">{fmt(legacyPeak)}</span>
             </p>
           )}
@@ -311,7 +420,7 @@ export default function RevenueChart() {
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setOpen((o) => !o)}
-            className="flex items-center gap-2 px-4 py-2 bg-[#1A1A1A] border border-white/5 rounded-xl text-[13px] text-[#8e9895] hover:text-white transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-surface-hover border border-border rounded-xl text-[13px] text-muted hover:text-white transition-colors"
           >
             {RANGE_LABELS[range]}
             <ChevronDown
@@ -320,7 +429,7 @@ export default function RevenueChart() {
           </button>
 
           {open && (
-            <div className="absolute right-0 top-full mt-2 bg-[#1A1A1A] border border-white/10 rounded-xl overflow-hidden z-20 min-w-[150px] shadow-xl">
+            <div className="absolute right-0 top-full mt-2 bg-surface-hover border border-border rounded-xl overflow-hidden z-20 min-w-[150px] shadow-xl">
               {(Object.keys(RANGE_LABELS) as Range[]).map((r) => (
                 <button
                   key={r}
@@ -328,7 +437,7 @@ export default function RevenueChart() {
                   className={`w-full text-left px-4 py-2.5 text-[13px] font-medium transition-colors ${
                     r === range
                       ? "text-brand bg-brand/5"
-                      : "text-[#8e9895] hover:text-white hover:bg-white/5"
+                      : "text-muted hover:text-white hover:bg-surface-hover"
                   }`}
                 >
                   {RANGE_LABELS[r]}
@@ -342,11 +451,11 @@ export default function RevenueChart() {
       {/* Legend (6M only) */}
       {is6M && (
         <div className="flex items-center gap-5">
-          <span className="flex items-center gap-2 text-[12px] font-semibold text-[#8e9895]">
+          <span className="flex items-center gap-2 text-[12px] font-semibold text-muted">
             <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_ADS }} />
             Platform Ads
           </span>
-          <span className="flex items-center gap-2 text-[12px] font-semibold text-[#8e9895]">
+          <span className="flex items-center gap-2 text-[12px] font-semibold text-muted">
             <span className="w-3 h-3 rounded-sm" style={{ background: COLOR_TIPS }} />
             Direct Tips
           </span>
@@ -355,8 +464,8 @@ export default function RevenueChart() {
 
       {/* Chart */}
       {is6M
-        ? <BarChart data={DATA_6M} />
-        : <LineChart data={DATA_LEGACY[range as Exclude<Range, "6M">]} />
+        ? <BarChart data={chartData6M} rangeLabel={RANGE_LABELS[range]} />
+        : <LineChart data={chartDataLine} rangeLabel={RANGE_LABELS[range]} />
       }
 
       {/* Bottom glow on hover */}

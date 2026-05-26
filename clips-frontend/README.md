@@ -1,3 +1,5 @@
+# ClipCash - AI Clipping Platform
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
 ## Getting Started
@@ -18,7 +20,80 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## API Endpoints
+
+### Upload Video
+`POST /api/upload`
+
+Uploads video files for AI processing.
+
+**Request:**
+- Method: `POST`
+- Content-Type: `multipart/form-data`
+- Body:
+  - `files`: Video file(s) (max 500MB per file)
+  - Supported formats: MP4, MOV, AVI, MKV
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Successfully uploaded 1 file(s)",
+  "jobId": "job_1234567890_abc123xyz",
+  "files": [
+    {
+      "name": "video.mp4",
+      "size": 104857600,
+      "type": "video/mp4"
+    }
+  ]
+}
+```
+
+**Error Response:**
+```json
+{
+  "error": "File exceeds maximum size of 500MB"
+}
+```
+
+### Check Job Status
+`GET /api/jobs/:jobId`
+
+Poll this endpoint to get real-time processing status updates.
+
+**Response:**
+```json
+{
+  "progress": 45,
+  "status": "processing",
+  "momentsFound": 3,
+  "estimatedSecondsRemaining": 120
+}
+```
+
+**Status Values:**
+- `processing`: Job is actively being processed
+- `complete`: Processing finished successfully
+- `error`: Processing failed
+
+## Features
+
+### Real-Time Processing Progress
+The `/dashboard/processing` page uses a polling mechanism (every 3 seconds) to fetch real-time job status from the backend via the `useProcessingStatus` hook.
+
+### Push Notifications
+When a processing job completes, users receive browser push notifications (if permission granted). Notification preferences are persisted to localStorage.
+
+- Permission request happens on first upload
+- Clicking notification navigates to `/projects` page
+- Works with service worker for background notifications
+- Users can manage preferences in settings
+
+### SEO Optimization
+- `app/robots.ts`: Disallows crawling of authenticated routes
+- `app/sitemap.ts`: Includes only public marketing pages
+- Public routes: `/`, `/login`, `/privacy`, `/terms`, `/status`
 
 ## Learn More
 

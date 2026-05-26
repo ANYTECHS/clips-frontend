@@ -26,8 +26,8 @@ export default function Switch({ checked, onChange, ariaLabel }: SwitchProps) {
       tabIndex={0}
       onClick={toggle}
       onKeyDown={onKeyDown}
-      className={`relative inline-flex items-center h-7 w-12 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-[#00E58F]/40 ${
-        checked ? "bg-[#00E58F]" : "bg-[#1A221E]"
+      className={`relative inline-flex items-center h-7 w-12 rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-brand/40 ${
+        checked ? "bg-brand" : "bg-surface-hover"
       }`}
     >
       <span
