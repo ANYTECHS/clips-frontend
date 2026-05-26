@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { MockApi, type Summary, type Transaction } from "@/app/lib/mockApi";
 import { useAuth } from "@/components/AuthProvider";
+import analytics from "@/lib/analytics";
 
 type ExportFormat = "csv" | "json" | "pdf";
 
@@ -98,6 +99,9 @@ export default function EarningsPage() {
 
   const exportCSV = (format: "csv" | "json" | "pdf") => {
     if (!user?.id || transactions.length === 0) return;
+
+    // Track earnings export event
+    analytics.trackEarningsExport(format);
 
     try {
       if (format === "csv") {

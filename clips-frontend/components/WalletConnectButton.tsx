@@ -3,6 +3,7 @@
 import React from "react";
 import { Loader2, Wallet, LogOut, AlertCircle, X } from "lucide-react";
 import { useWallet, truncateAddress } from "./WalletProvider";
+import analytics from "@/lib/analytics";
 
 interface WalletConnectButtonProps {
   /** Compact mode renders a smaller pill button (e.g. for headers/navbars) */
@@ -12,6 +13,19 @@ interface WalletConnectButtonProps {
 export default function WalletConnectButton({ compact = false }: WalletConnectButtonProps) {
   const { isConnected, isConnecting, address, error, connectMetaMask, disconnect, clearError } =
     useWallet();
+
+  const handleConnect = async () => {
+    await connectMetaMask();
+    // Track wallet connection (will be called after successful connection)
+    if (address) {
+      analytics.trackWalletConnect('metamask');
+    }
+  };
+
+  const handleDisconnect = () => {
+    disconnect();
+    analytics.trackEvent('wallet_disconnect', { wallet_type: 'metamask' });
+  };
 
   if (compact) {
     return (
@@ -25,7 +39,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
               </span>
             </div>
             <button
-              onClick={disconnect}
+              onClick={handleDisconnect}
               title="Disconnect wallet"
               aria-label="Disconnect wallet"
               className="p-2 rounded-xl bg-white/[0.03] border border-white/5 text-muted-foreground hover:text-red-400 hover:border-red-400/20 transition-all"
@@ -35,7 +49,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
           </div>
         ) : (
           <button
-            onClick={connectMetaMask}
+            onClick={handleConnect}
             disabled={isConnecting}
             aria-label="Connect MetaMask wallet"
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand/10 border border-brand/20 text-brand font-bold text-[13px] hover:bg-brand/20 transition-all disabled:opacity-60 disabled:cursor-not-allowed active:scale-[0.97]"
@@ -78,7 +92,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
 
       {isConnected && address ? (
         <button
-          onClick={disconnect}
+          onClick={handleDisconnect}
           aria-label="Disconnect wallet"
           className="w-full py-4 rounded-xl font-bold text-[14px] bg-transparent border border-white/10 text-white hover:bg-red-950/30 hover:border-red-500/30 hover:text-red-400 transition-all flex items-center justify-center gap-2.5 active:scale-[0.98]"
         >
@@ -87,7 +101,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
         </button>
       ) : (
         <button
-          onClick={connectMetaMask}
+          onClick={handleConnect}
           disabled={isConnecting}
           aria-label="Connect MetaMask wallet"
           className="w-full py-4 rounded-xl font-bold text-[14px] bg-brand hover:bg-brand-hover text-black shadow-[0_0_20px_rgba(0,229,143,0.2)] hover:shadow-[0_0_35px_rgba(0,229,143,0.35)] transition-all flex items-center justify-center gap-2.5 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed"

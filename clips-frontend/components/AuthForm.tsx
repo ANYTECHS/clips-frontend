@@ -4,8 +4,11 @@ import React, { useState, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { useAuth } from "./AuthProvider";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { MockApi } from "@/app/lib/mockApi";
+import { signIn } from "next-auth/react";
+import { useToast } from "@/hooks/useToast";
+import analytics from "@/lib/analytics";
 
 // Local inline SVG for Google/Apple to avoid external dependencies perfectly matching
 const GoogleIcon = () => (
@@ -55,6 +58,8 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
       } else {
         const res = await MockApi.signup(email, password, fullName);
         setUser(res.user);
+        // Track signup event
+        analytics.trackSignup('email');
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
@@ -84,7 +89,10 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
       <div className="space-y-[14px] mb-8">
         <button
           type="button"
-          onClick={() => signIn("google", { callbackUrl: "/" })}
+          onClick={() => {
+            analytics.trackEvent('signup_attempt', { method: 'google' });
+            signIn("google", { callbackUrl: "/" });
+          }}
           className="w-full flex items-center justify-center gap-3 bg-surface-hover hover:bg-border border border-border text-white py-3.5 rounded-[12px] font-medium transition-all text-[14px]"
         >
           <GoogleIcon />
@@ -92,7 +100,10 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
         </button>
         <button
           type="button"
-          onClick={() => signIn("apple", { callbackUrl: "/" })}
+          onClick={() => {
+            analytics.trackEvent('signup_attempt', { method: 'apple' });
+            signIn("apple", { callbackUrl: "/" });
+          }}
           className="w-full flex items-center justify-center gap-3 bg-surface-hover hover:bg-border border border-border text-white py-3.5 rounded-[12px] font-medium transition-all text-[14px]"
         >
           <AppleIcon />

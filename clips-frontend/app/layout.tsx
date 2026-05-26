@@ -8,6 +8,7 @@ import CookieConsent from "@/components/CookieConsent";
 import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,6 +31,7 @@ export default function RootLayout({
           <ErrorBoundary>
             <AuthProvider>
               <WalletProvider>
+                <AnalyticsProvider />
                 <KeyboardShortcuts />
                 {children}
                 <RateLimitToast />
