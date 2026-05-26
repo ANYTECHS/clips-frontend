@@ -267,3 +267,89 @@ export function truncateStellarAddress(publicKey: string): string {
   if (publicKey.length < 10) return publicKey;
   return `${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
 }
+
+// ─── Transaction submission ────────────────────────────────────────────────────
+
+import {
+  submitStellarTransaction,
+  getStellarErrorMessage,
+  StellarTransactionPayload,
+  StellarTransactionResult,
+  StellarTransactionError,
+} from "./stellarTransaction";
+
+export { getStellarErrorMessage, StellarTransactionError };
+export type { StellarTransactionPayload, StellarTransactionResult };
+
+/**
+ * Submit a Stellar transaction on behalf of an embedded wallet user.
+ *
+ * Automatically handles sequence number conflicts by re-fetching the account
+ * sequence from Horizon and rebuilding the transaction (up to 3 retries).
+ * Transient network errors are retried with exponential backoff.
+ *
+ * @param userId          - The user whose embedded wallet will sign the transaction
+ * @param operationType   - Stellar operation type (e.g. "payment", "invoke_contract")
+ * @param operationParams - Operation-specific parameters
+ * @param options         - Optional: memo, network override, retry callback
+ *
+ * @throws StellarTransactionError with a user-friendly `.message` and `.code`
+ *
+ * @example
+ * ```ts
+ * try {
+ *   const result = await submitEmbeddedWalletTransaction(userId, "payment", {
+ *     destination: "GABCD...",
+ *     asset: "native",
+ *     amount: "10",
+ *   });
+ *   console.log("Submitted:", result.hash, "after", result.attempts, "attempt(s)");
+ * } catch (err) {
+ *   if (err instanceof StellarTransactionError) {
+ *     console.error(err.code, err.message);
+ *   }
+ * }
+ * ```
+ */
+export async function submitEmbeddedWalletTransaction(
+  userId: string,
+  operationType: string,
+  operationParams: Record<string, unknown>,
+  options?: {
+    memo?: string;
+    network?: StellarNetwork;
+    onRetry?: (info: { attempt: number; reason: string; nextDelayMs: number }) => void;
+  }
+): Promise<StellarTransactionResult> {
+  // Retrieve the wallet record
+  const record = WalletStorage.get(userId);
+  if (!record) {
+    throw new StellarTransactionError(
+      "tx_no_account",
+      "No embedded wallet found for this user. Please create a wallet first.",
+      false
+    );
+  }
+
+  // Retrieve the secret key for signing (never stored after this call)
+  const secretKey = WalletStorage.getSecretKey(userId);
+  if (!secretKey) {
+    throw new StellarTransactionError(
+      "tx_bad_auth",
+      "Could not retrieve wallet signing key. Please reconnect your wallet.",
+      false
+    );
+  }
+
+  const network = options?.network ?? (record.network as StellarNetwork);
+
+  const payload: StellarTransactionPayload = {
+    sourcePublicKey: record.publicKey,
+    operationType,
+    operationParams,
+    network,
+    memo: options?.memo,
+  };
+
+  return submitStellarTransaction(payload, secretKey, options?.onRetry);
+}

@@ -97,18 +97,28 @@ export const MockApi = {
   },
 
   /**
-   * Simulate minting an NFT collection — randomly fails to test error handling
+   * Simulate minting an NFT collection — randomly fails to test error handling.
+   *
+   * Failure scenarios (cumulative probability):
+   *   0–15%  → tx_bad_seq  (sequence number conflict — retryable)
+   *   15–30% → WALLET_REJECTED
+   *   30–40% → NETWORK_ERROR
+   *   40–50% → UPLOAD_FAILED
    */
   mintCollection: async (data: { collectionName: string; description: string; creatorRoyalty: string; listingPrice: string }) => {
     await delay(1800);
 
-    // Simulate random failure scenarios
     const roll = Math.random();
-    if (roll < 0.25) throw new Error("WALLET_REJECTED");
-    if (roll < 0.4) throw new Error("NETWORK_ERROR");
-    if (roll < 0.5) throw new Error("UPLOAD_FAILED");
+    if (roll < 0.15) throw new Error("tx_bad_seq");
+    if (roll < 0.30) throw new Error("WALLET_REJECTED");
+    if (roll < 0.40) throw new Error("NETWORK_ERROR");
+    if (roll < 0.50) throw new Error("UPLOAD_FAILED");
 
-    return { success: true, txHash: `0x${Math.random().toString(16).slice(2, 18)}`, collection: data.collectionName };
+    return {
+      success: true,
+      txHash: `0x${Math.random().toString(16).slice(2, 18)}`,
+      collection: data.collectionName,
+    };
   },
 
   /**
