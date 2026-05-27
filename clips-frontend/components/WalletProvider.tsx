@@ -4,6 +4,28 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { secureStorage } from "@/app/lib/secureStorage";
 import analytics from "@/lib/analytics";
 
+/**
+ * WalletProvider - Manages wallet connections and state for MetaMask and Phantom wallets
+ * 
+ * This provider handles:
+ * - Wallet connection/disconnection for MetaMask (Ethereum/L2s) and Phantom (Solana)
+ * - Session persistence using secure storage
+ * - Event listener management for wallet changes
+ * - Error handling and user feedback
+ * 
+ * Usage:
+ * ```tsx
+ * <WalletProvider>
+ *   <YourApp />
+ * </WalletProvider>
+ * ```
+ * 
+ * Then use the useWallet hook in any component:
+ * ```tsx
+ * const { address, isConnected, connectMetaMask } = useWallet();
+ * ```
+ */
+
 // EIP-1193 provider type (window.ethereum)
 declare global {
   interface Window {
@@ -106,6 +128,16 @@ const WalletContext = createContext<WalletContextType>({
   stellarMnemonic: null,
 });
 
+/**
+ * useWallet - Hook to access wallet state and methods
+ * 
+ * Returns the current wallet context with all state and methods
+ * 
+ * @returns {WalletContextType} Wallet state and methods
+ * 
+ * @example
+ * const { address, isConnected, connectMetaMask } = useWallet();
+ */
 export const useWallet = () => useContext(WalletContext);
 
 /** Truncate a wallet address for display: 0x1234...5678 or GABC...XYZ */
@@ -122,6 +154,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const stateRef = useRef(state);
 
   // Sync ref with state so event listeners always see latest values
+  // This is necessary because event listeners are set up once and need access to current state
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
@@ -223,7 +256,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Listen for Solana account changes
+  /**
+   * Listen for Solana/Phantom account changes
+   * 
+   * Phantom emits events when:
+   * - User connects their wallet
+   * - User switches accounts
+   * - User disconnects from the app
+   * 
+   * We update state accordingly to keep the UI in sync with wallet state
+   */
   useEffect(() => {
     const solana = window.solana;
     if (!solana) return;
@@ -273,6 +315,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  /**
+   * Connect to MetaMask wallet
+   * 
+   * Flow:
+   * 1. Check if MetaMask is installed
+   * 2. Request account access from user
+   * 3. Get current chain ID
+   * 4. Update state with wallet info
+   * 5. Persist session to storage
+   * 
+   * Handles errors:
+   * - MetaMask not installed
+   * - User rejects connection (code 4001)
+   * - No accounts available
+   * - Other connection errors
+   */
   const connectMetaMask = useCallback(async () => {
     if (!window.ethereum || !window.ethereum.isMetaMask) {
       setState((prev: WalletState) => ({
@@ -354,6 +412,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /**
+   * Connect to Phantom wallet (Solana)
+   * 
+   * Flow:
+   * 1. Check if Phantom is installed
+   * 2. Request connection from user
+   * 3. Get public key and convert to Base58 format
+   * 4. Update state with wallet info
+   * 5. Persist session to storage
+   * 
+   * Handles errors:
+   * - Phantom not installed
+   * - User rejects connection (code 4001)
+   * - Other connection errors
+   */
   const connectPhantom = useCallback(async () => {
     const solana = window.solana;
     if (!solana || !solana.isPhantom) {
@@ -533,6 +606,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     handleDisconnect();
   }, [state.walletType]);
 
+  /**
+   * Clear any error messages
+   * 
+   * Useful for dismissing error notifications
+   */
   const clearError = useCallback(() => {
     setState((prev: WalletState) => ({ ...prev, error: null }));
   }, []);
