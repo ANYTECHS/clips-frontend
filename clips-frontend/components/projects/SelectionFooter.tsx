@@ -15,6 +15,7 @@ import {
   Redo2
 } from "lucide-react";
 import { calculateMintCost, formatSol } from "@/app/lib/mintUtils";
+import MintConfirmationModal from "./MintConfirmationModal";
 
 interface SelectionFooterProps {
   count: number;
@@ -39,13 +40,49 @@ export default function SelectionFooter({
 }: SelectionFooterProps) {
   const [postError, setPostError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [showConfirmation, setShowConfirmation] = useState(false);
 
   if (count === 0) return null;
 
   const { gasFee, storageCost, totalCost } = calculateMintCost(count);
 
+  /**
+   * Handle mint button click - show confirmation modal instead of minting directly
+   */
+  const handleMintClick = () => {
+    setShowConfirmation(true);
+  };
+
+  /**
+   * Handle confirmation - proceed with actual minting
+   */
+  const handleConfirmMint = () => {
+    setShowConfirmation(false);
+    onMint();
+  };
+
+  /**
+   * Handle cancellation - close modal without minting
+   */
+  const handleCancelMint = () => {
+    setShowConfirmation(false);
+  };
+
   return (
     <div className="w-full py-6 animate-in slide-in-from-bottom-5 fade-in duration-500 border-t border-white/5 bg-black/40 backdrop-blur-md">
+      {/* Mint Confirmation Modal */}
+      {showConfirmation && (
+        <MintConfirmationModal
+          clipCount={count}
+          gasFee={gasFee}
+          storageCost={storageCost}
+          totalCost={totalCost}
+          isMinting={isMinting}
+          onConfirm={handleConfirmMint}
+          onCancel={handleCancelMint}
+        />
+      )}
+
       {/* Error Banner */}
       {postError && (
         <div className="flex items-center gap-3 bg-red-500/10 border border-red-500/30 rounded-2xl px-5 py-3 mb-4 mx-1">
@@ -137,7 +174,7 @@ export default function SelectionFooter({
             </button>
             
             <button 
-              onClick={onMint}
+              onClick={handleMintClick}
               disabled={isMinting || count === 0}
               className={`flex items-center gap-3 px-10 py-4 rounded-3xl text-black font-black text-[15px] transition-all ${
                 isMinting 
