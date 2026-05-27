@@ -1,182 +1,156 @@
 "use client";
 
 import React, { useState } from "react";
-import { Wallet, ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
-import { useWalletConnection } from "@/app/hooks/useWalletConnection";
-import BalanceDisplay from "@/components/wallet/BalanceDisplay";
+import { Wallet, Send, Loader2, CheckCircle, AlertCircle } from "lucide-react";
+import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 
+/**
+ * #337 – Web2-style wallet card.
+ * Shows "My Wallet • X XLM" instead of raw public key.
+ * Clean Venmo-style send form – no blockchain jargon visible by default.
+ */
 export default function WalletInfoCard() {
-  const {
-    connect,
-    disconnect,
-    isConnecting,
-    isConnected,
-    publicKey,
-    network,
-    error: walletError,
-    getTruncatedAddress,
-  } = useWalletConnection();
+  const { publicKey, status, balance, error } = useAutoStellarWallet();
 
-  const [copied, setCopied] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+  const [recipient, setRecipient] = useState("");
+  const [amount, setAmount] = useState("");
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
 
-  const handleCopyAddress = async () => {
-    if (!publicKey) return;
+  const xlmDisplay = balance
+    ? `${parseFloat(balance.xlm).toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`
+    : status === "loading"
+    ? "Loading…"
+    : "— XLM";
 
-    try {
-      await navigator.clipboard.writeText(publicKey);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy address:", err);
-    }
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!recipient || !amount) return;
+    setSending(true);
+    // PoC: simulate send delay
+    await new Promise((r) => setTimeout(r, 1200));
+    setSending(false);
+    setSent(true);
+    setTimeout(() => {
+      setSent(false);
+      setSendOpen(false);
+      setRecipient("");
+      setAmount("");
+    }, 2000);
   };
-
-  const handleViewOnExplorer = () => {
-    if (!publicKey) return;
-
-    const explorerUrl =
-      network === "PUBLIC"
-        ? `https://stellar.expert/explorer/public/account/${publicKey}`
-        : `https://stellar.expert/explorer/testnet/account/${publicKey}`;
-
-    window.open(explorerUrl, "_blank", "noopener,noreferrer");
-  };
-
-  if (!isConnected) {
-    return (
-      <div className="bg-surface border border-border rounded-[24px] p-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
-            <Wallet className="w-6 h-6 text-brand" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[16px] font-bold text-white mb-1">
-              Stellar Wallet
-            </h3>
-            <p className="text-[13px] text-muted mb-4">
-              Connect your Freighter wallet to view your balance and manage transactions
-            </p>
-            <button
-              onClick={connect}
-              disabled={isConnecting}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand font-bold text-[13px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isConnecting ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Connecting...
-                </>
-              ) : (
-                <>
-                  <Wallet className="w-4 h-4" />
-                  Connect Wallet
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        {walletError && (
-          <div className="mt-4 flex items-start gap-2 p-3 bg-error/10 border border-error/30 rounded-xl">
-            <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
-            <p className="text-error text-[12px] leading-relaxed">
-              {walletError.message}
-            </p>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div className="bg-surface border border-border rounded-[24px] p-6">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-6">
-        <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
-            <Wallet className="w-6 h-6 text-brand" />
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-5">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
+            <Wallet className="w-5 h-5 text-brand" />
           </div>
-          <div className="flex-1 min-w-0">
-            <h3 className="text-[16px] font-bold text-white mb-1">
-              Stellar Wallet
-            </h3>
-            <div className="flex items-center gap-2">
-              <span className="text-[13px] text-muted font-mono">
-                {getTruncatedAddress(publicKey!)}
-              </span>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={handleCopyAddress}
-                  className="p-1 rounded hover:bg-surface-hover transition-colors"
-                  title="Copy full address"
-                >
-                  {copied ? (
-                    <Check className="w-3.5 h-3.5 text-brand" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5 text-muted hover:text-white" />
-                  )}
-                </button>
-                <button
-                  onClick={handleViewOnExplorer}
-                  className="p-1 rounded hover:bg-surface-hover transition-colors"
-                  title="View on Stellar Explorer"
-                >
-                  <ExternalLink className="w-3.5 h-3.5 text-muted hover:text-white" />
-                </button>
-              </div>
-            </div>
+          <div>
+            <p className="text-[11px] text-muted font-medium uppercase tracking-wider">My Wallet</p>
+            <p className="text-[22px] font-black text-white leading-tight">{xlmDisplay}</p>
           </div>
         </div>
 
+        {/* Status badge */}
+        {status === "ready" && (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand/10 border border-brand/20 text-brand text-[11px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-brand animate-pulse" />
+            Wallet Ready
+          </span>
+        )}
+        {status === "loading" && (
+          <Loader2 className="w-4 h-4 text-muted animate-spin" />
+        )}
+        {status === "error" && (
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-error/10 border border-error/30 text-error text-[11px] font-bold">
+            <AlertCircle className="w-3 h-3" />
+            Error
+          </span>
+        )}
+      </div>
+
+      {/* Error message */}
+      {error && (
+        <p className="text-error text-[12px] mb-4">{error}</p>
+      )}
+
+      {/* USD sub-value */}
+      {balance && (
+        <p className="text-muted text-[13px] mb-5">≈ ${parseFloat(balance.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })} USD</p>
+      )}
+
+      {/* Send button */}
+      {status === "ready" && !sendOpen && (
         <button
-          onClick={disconnect}
-          className="text-[12px] text-muted hover:text-error font-medium transition-colors"
+          onClick={() => setSendOpen(true)}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand font-bold text-[13px] transition-all"
         >
-          Disconnect
+          <Send className="w-4 h-4" />
+          Send XLM
         </button>
-      </div>
+      )}
 
-      {/* Network Badge */}
-      <div className="mb-4">
-        <span
-          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold ${
-            network === "PUBLIC"
-              ? "bg-brand/10 text-brand border border-brand/20"
-              : "bg-warning/10 text-warning border border-warning/20"
-          }`}
-        >
-          <div
-            className={`w-1.5 h-1.5 rounded-full ${
-              network === "PUBLIC" ? "bg-brand" : "bg-warning"
-            }`}
-          />
-          {network === "PUBLIC" ? "Mainnet" : "Testnet"}
-        </span>
-      </div>
+      {/* Send form – Venmo-style */}
+      {sendOpen && (
+        <form onSubmit={handleSend} className="space-y-3 mt-2">
+          <div>
+            <label className="block text-[11px] text-muted font-medium mb-1">To (username or address)</label>
+            <input
+              type="text"
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              placeholder="e.g. @alice or G…"
+              required
+              className="w-full bg-surface-hover border border-border rounded-xl px-4 py-2.5 text-[13px] text-white placeholder:text-muted focus:outline-none focus:border-brand/50 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] text-muted font-medium mb-1">Amount (XLM)</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              min="0.0000001"
+              step="any"
+              required
+              className="w-full bg-surface-hover border border-border rounded-xl px-4 py-2.5 text-[13px] text-white placeholder:text-muted focus:outline-none focus:border-brand/50 transition-colors"
+            />
+          </div>
+          <div className="flex gap-2 pt-1">
+            <button
+              type="submit"
+              disabled={sending || sent}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-black font-bold text-[13px] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+            >
+              {sent ? (
+                <><CheckCircle className="w-4 h-4" /> Sent!</>
+              ) : sending ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+              ) : (
+                <><Send className="w-4 h-4" /> Send</>
+              )}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSendOpen(false); setRecipient(""); setAmount(""); }}
+              className="px-4 py-2.5 rounded-xl border border-border text-muted hover:text-white text-[13px] font-medium transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
 
-      {/* Balance Display with Auto-refresh */}
-      <BalanceDisplay
-        publicKey={publicKey}
-        network={network}
-        refreshInterval={30000} // 30 seconds
-        autoRefresh={true}
-        mode="full"
-        showLastUpdate={true}
-        showRefreshButton={true}
-      />
-
-      {/* Quick Actions */}
-      <div className="mt-4 pt-4 border-t border-border">
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={handleViewOnExplorer}
-            className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-surface-hover hover:bg-border border border-border text-white font-medium text-[12px] transition-all"
-          >
-            <ExternalLink className="w-3.5 h-3.5" />
-            Explorer
-          </button>
-        </div>
-      </div>
+      {/* No wallet state */}
+      {status === "idle" && !publicKey && (
+        <p className="text-muted text-[13px]">
+          Your Stellar wallet will appear here after login.
+        </p>
+      )}
     </div>
   );
 }

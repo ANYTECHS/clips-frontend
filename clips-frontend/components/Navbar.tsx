@@ -5,9 +5,11 @@ import Link from "next/link";
 import { useAuth } from "./AuthProvider";
 import { LogOut } from "lucide-react";
 import { useComingSoonToast } from "./useComingSoonToast";
+import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 
 export default function Navbar() {
   const { user, setUser } = useAuth();
+  const { balance: stellarBalance, status: stellarStatus } = useAutoStellarWallet();
   const [dropdownOpen, setDropdownOpen] = React.useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
   const { showToast, ToastEl } = useComingSoonToast();
@@ -59,7 +61,19 @@ export default function Navbar() {
                 </Link>
               </>
             ) : (
-              <div className="relative" ref={dropdownRef}>
+              <div className="flex items-center gap-3" ref={dropdownRef}>
+                {/* #338 – Stellar balance pill in navbar */}
+                {stellarStatus === "ready" && (
+                  <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-brand/10 border border-brand/20">
+                    <span className="w-1.5 h-1.5 rounded-full bg-brand" />
+                    <span className="text-[12px] font-bold text-brand">
+                      {stellarBalance
+                        ? `${parseFloat(stellarBalance.xlm).toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`
+                        : "Wallet Ready"}
+                    </span>
+                  </div>
+                )}
+                <div className="relative">
                 <button 
                   onClick={() => setDropdownOpen(!dropdownOpen)}
                   className="text-[14px] text-white font-medium px-4 py-2 bg-[#1A221E] border border-[#2A3B34] rounded-full shadow-sm hover:bg-[#212c26] transition-colors"
@@ -81,6 +95,7 @@ export default function Navbar() {
                     </button>
                   </div>
                 )}
+              </div>
               </div>
             )}
           </div>
