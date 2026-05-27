@@ -79,7 +79,7 @@ export default function LoginPage() {
           </div>
 
           {/* Right side - Login Modal */}
-          <div className="w-full max-w-[340px] flex justify-end">
+          <div className="w-full lg:w-auto lg:max-w-[440px] flex lg:justify-end">
             <AuthForm mode="login" />
           </div>
         </div>

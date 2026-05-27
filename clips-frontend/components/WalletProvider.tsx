@@ -2,6 +2,29 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { secureStorage } from "@/app/lib/secureStorage";
+import analytics from "@/lib/analytics";
+
+/**
+ * WalletProvider - Manages wallet connections and state for MetaMask and Phantom wallets
+ * 
+ * This provider handles:
+ * - Wallet connection/disconnection for MetaMask (Ethereum/L2s) and Phantom (Solana)
+ * - Session persistence using secure storage
+ * - Event listener management for wallet changes
+ * - Error handling and user feedback
+ * 
+ * Usage:
+ * ```tsx
+ * <WalletProvider>
+ *   <YourApp />
+ * </WalletProvider>
+ * ```
+ * 
+ * Then use the useWallet hook in any component:
+ * ```tsx
+ * const { address, isConnected, connectMetaMask } = useWallet();
+ * ```
+ */
 
 // EIP-1193 provider type (window.ethereum)
 declare global {
@@ -25,7 +48,7 @@ declare global {
   }
 }
 
-export type WalletType = "metamask" | "phantom";
+export type WalletType = "metamask" | "phantom" | "stellar";
 
 export interface WalletState {
   address: string | null;
@@ -33,17 +56,53 @@ export interface WalletState {
   walletType: WalletType | null;
   isConnected: boolean;
   isConnecting: boolean;
+  isRestoringSession: boolean;
   error: string | null;
 }
 
 interface WalletContextType extends WalletState {
   connectMetaMask: () => Promise<void>;
   connectPhantom: () => Promise<void>;
+  connectStellar: () => Promise<void>;
+  importStellarKey: (secret: string) => Promise<void>;
+  fundWithFriendbot: () => Promise<void>;
+  refreshBalance: () => Promise<void>;
+  sendXlmPayment: (destination: string, amount: string) => Promise<{ success: boolean; hash: string }>;
   disconnect: () => void;
   clearError: () => void;
+  balance: string | null;
+  stellarSecret: string | null;
+  stellarMnemonic: string | null;
 }
 
 const STORAGE_KEY = "clipcash_wallet";
+
+/**
+ * Allowed chain IDs.
+ * 0x1 = Ethereum Mainnet, 0xaa36a7 = Sepolia testnet.
+ * Extend this set when adding support for other networks.
+ */
+const ALLOWED_CHAIN_IDS = new Set(["0x1", "0xaa36a7"]);
+
+/** Validate an Ethereum address: 0x followed by exactly 40 hex characters. */
+function isValidEthAddress(address: unknown): address is string {
+  return typeof address === "string" && /^0x[0-9a-fA-F]{40}$/.test(address);
+}
+
+/** Validate a chainId: must be a hex string like "0x1". */
+function isValidChainId(chainId: unknown): chainId is string {
+  return typeof chainId === "string" && /^0x[0-9a-fA-F]+$/.test(chainId);
+}
+
+/** Wrap a promise with a timeout to prevent indefinite UI hangs. */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    ),
+  ]);
+}
 
 const defaultState: WalletState = {
   address: null,
@@ -51,20 +110,40 @@ const defaultState: WalletState = {
   walletType: null,
   isConnected: false,
   isConnecting: false,
+  isRestoringSession: true,
   error: null,
 };
 
 const WalletContext = createContext<WalletContextType>({
   ...defaultState,
+  isRestoringSession: false,
   connectMetaMask: async () => {},
   connectPhantom: async () => {},
+  connectStellar: async () => {},
+  importStellarKey: async () => {},
+  fundWithFriendbot: async () => {},
+  refreshBalance: async () => {},
+  sendXlmPayment: async () => ({ success: false, hash: "" }),
   disconnect: () => {},
   clearError: () => {},
+  balance: null,
+  stellarSecret: null,
+  stellarMnemonic: null,
 });
 
+/**
+ * useWallet - Hook to access wallet state and methods
+ * 
+ * Returns the current wallet context with all state and methods
+ * 
+ * @returns {WalletContextType} Wallet state and methods
+ * 
+ * @example
+ * const { address, isConnected, connectMetaMask } = useWallet();
+ */
 export const useWallet = () => useContext(WalletContext);
 
-/** Truncate a wallet address for display: 0x1234...5678 */
+/** Truncate a wallet address for display: 0x1234...5678 or GABC...XYZ */
 export function truncateAddress(address: string): string {
   if (address.length < 10) return address;
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -72,19 +151,38 @@ export function truncateAddress(address: string): string {
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WalletState>(defaultState);
+  const [balance, setBalance] = useState<string | null>(null);
+  const [stellarSecret, setStellarSecret] = useState<string | null>(null);
+  const [stellarMnemonic, setStellarMnemonic] = useState<string | null>(null);
   const stateRef = useRef(state);
 
   // Sync ref with state so event listeners always see latest values
+  // This is necessary because event listeners are set up once and need access to current state
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
+  function persistSession(data: {
+    address: string | null;
+    chainId: string | null;
+    walletType: WalletType | null;
+    stellarSecret?: string | null;
+    stellarMnemonic?: string | null;
+  }) {
+    if (data.address) {
+      secureStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } else {
+      secureStorage.removeItem(STORAGE_KEY);
+    }
+  }
+
   // Restore persisted session on mount
   useEffect(() => {
-    try {
-      secureStorage.getItem(STORAGE_KEY).then((stored) => {
+    secureStorage
+      .getItem(STORAGE_KEY)
+      .then((stored) => {
         if (stored) {
-          const parsed: Partial<WalletState> = JSON.parse(stored);
+          const parsed = JSON.parse(stored);
           if (parsed.address && parsed.walletType) {
             setState((prev: WalletState) => ({
               ...prev,
@@ -93,13 +191,44 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
               walletType: parsed.walletType!,
               isConnected: true,
             }));
+            if (parsed.walletType === "stellar") {
+              setStellarSecret(parsed.stellarSecret ?? null);
+              setStellarMnemonic(parsed.stellarMnemonic ?? null);
+            }
           }
         }
+        setState((prev: WalletState) => ({ ...prev, isRestoringSession: false }));
+      })
+      .catch(() => {
+        setState((prev: WalletState) => ({ ...prev, isRestoringSession: false }));
       });
     } catch {
-      // Ignore malformed storage
+      // Malformed JSON — clear it
+      sessionStorage.removeItem(STORAGE_KEY);
     }
   }, []);
+
+  // Balance updater helper
+  const refreshBalance = useCallback(async () => {
+    if (state.walletType !== "stellar" || !state.address) return;
+    try {
+      const bal = await getBalance(state.address);
+      setBalance(bal);
+    } catch (err: any) {
+      console.error("Failed to fetch balance:", err);
+    }
+  }, [state.address, state.walletType]);
+
+  // Sync balance update on Stellar connection
+  useEffect(() => {
+    if (state.walletType === "stellar" && state.address) {
+      refreshBalance();
+      const interval = setInterval(refreshBalance, 8000);
+      return () => clearInterval(interval);
+    } else {
+      setBalance(null);
+    }
+  }, [state.address, state.walletType, refreshBalance]);
 
   // Listen for MetaMask account / chain changes
   useEffect(() => {
@@ -107,8 +236,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     if (!ethereum) return;
 
     const handleAccountsChanged = (accounts: unknown) => {
+      // Runtime type guard — never trust provider data blindly
+      if (!Array.isArray(accounts) || !accounts.every((a) => typeof a === "string")) return;
       const accs = accounts as string[];
-      if (!accs || accs.length === 0) {
+      if (accs.length === 0) {
         // User disconnected from MetaMask side
         handleDisconnect();
       } else {
@@ -133,7 +264,16 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  // Listen for Solana account changes
+  /**
+   * Listen for Solana/Phantom account changes
+   * 
+   * Phantom emits events when:
+   * - User connects their wallet
+   * - User switches accounts
+   * - User disconnects from the app
+   * 
+   * We update state accordingly to keep the UI in sync with wallet state
+   */
   useEffect(() => {
     const solana = window.solana;
     if (!solana) return;
@@ -169,18 +309,13 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  function persistSession(data: { address: string | null; chainId: string | null; walletType: WalletType | null }) {
-    if (data.address) {
-      secureStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } else {
-      secureStorage.removeItem(STORAGE_KEY);
-    }
-  }
-
   function handleDisconnect() {
     setState({ ...defaultState });
+    setBalance(null);
+    setStellarSecret(null);
+    setStellarMnemonic(null);
     secureStorage.removeItem(STORAGE_KEY);
-    
+
     // Disconnect from Phantom if connected
     const solana = window.solana;
     if (solana && state.walletType === "phantom") {
@@ -188,6 +323,22 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  /**
+   * Connect to MetaMask wallet
+   * 
+   * Flow:
+   * 1. Check if MetaMask is installed
+   * 2. Request account access from user
+   * 3. Get current chain ID
+   * 4. Update state with wallet info
+   * 5. Persist session to storage
+   * 
+   * Handles errors:
+   * - MetaMask not installed
+   * - User rejects connection (code 4001)
+   * - No accounts available
+   * - Other connection errors
+   */
   const connectMetaMask = useCallback(async () => {
     if (!window.ethereum || !window.ethereum.isMetaMask) {
       setState((prev: WalletState) => ({
@@ -200,16 +351,47 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     setState((prev: WalletState) => ({ ...prev, isConnecting: true, error: null }));
 
     try {
-      const accounts = (await window.ethereum.request({
-        method: "eth_requestAccounts",
-      })) as string[];
+      // Request accounts with a 30-second timeout to prevent UI freeze
+      const rawAccounts = await withTimeout(
+        window.ethereum.request({ method: "eth_requestAccounts" }),
+        30_000,
+        "eth_requestAccounts"
+      );
 
-      if (!accounts || accounts.length === 0) {
+      // Runtime type guard — never trust the provider blindly
+      if (!Array.isArray(rawAccounts) || !rawAccounts.every((a) => typeof a === "string")) {
+        throw new Error("Unexpected response from wallet provider.");
+      }
+      const accounts = rawAccounts as string[];
+
+      if (accounts.length === 0) {
         throw new Error("No accounts returned. Please unlock MetaMask and try again.");
       }
 
-      const chainId = (await window.ethereum.request({ method: "eth_chainId" })) as string;
       const address = accounts[0];
+
+      // Validate the address format before storing it
+      if (!isValidEthAddress(address)) {
+        throw new Error("Wallet returned an invalid address. Please try again.");
+      }
+
+      const rawChainId = await withTimeout(
+        window.ethereum.request({ method: "eth_chainId" }),
+        10_000,
+        "eth_chainId"
+      );
+
+      if (!isValidChainId(rawChainId)) {
+        throw new Error("Unexpected chain ID format from wallet provider.");
+      }
+      const chainId = rawChainId;
+
+      // Enforce network allowlist
+      if (!ALLOWED_CHAIN_IDS.has(chainId)) {
+        throw new Error(
+          "Unsupported network. Please switch MetaMask to Ethereum Mainnet or Sepolia."
+        );
+      }
 
       setState({
         address,
@@ -221,6 +403,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
 
       persistSession({ address, chainId, walletType: "metamask" });
+      
+      // Track successful wallet connection
+      analytics.trackWalletConnect("metamask");
     } catch (err: unknown) {
       const message =
         (err as { code?: number; message?: string })?.code === 4001
@@ -235,6 +420,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  /**
+   * Connect to Phantom wallet (Solana)
+   * 
+   * Flow:
+   * 1. Check if Phantom is installed
+   * 2. Request connection from user
+   * 3. Get public key and convert to Base58 format
+   * 4. Update state with wallet info
+   * 5. Persist session to storage
+   * 
+   * Handles errors:
+   * - Phantom not installed
+   * - User rejects connection (code 4001)
+   * - Other connection errors
+   */
   const connectPhantom = useCallback(async () => {
     const solana = window.solana;
     if (!solana || !solana.isPhantom) {
@@ -261,6 +461,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       });
 
       persistSession({ address, chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h", walletType: "phantom" });
+      
+      // Track successful wallet connection
+      analytics.trackWalletConnect("phantom");
     } catch (err: unknown) {
       const message =
         (err as { code?: number; message?: string })?.code === 4001
@@ -275,17 +478,168 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Connect/Generate Stellar wallet
+  const connectStellar = useCallback(async () => {
+    setState((prev: WalletState) => ({ ...prev, isConnecting: true, error: null }));
+    try {
+      const stored = await secureStorage.getItem(STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.walletType === "stellar" && parsed.stellarSecret) {
+          const keypair = StellarSdk.Keypair.fromSecret(parsed.stellarSecret);
+          const addr = keypair.publicKey();
+          setState({
+            address: addr,
+            chainId: "stellar",
+            walletType: "stellar",
+            isConnected: true,
+            isConnecting: false,
+            error: null,
+          });
+          setStellarSecret(parsed.stellarSecret);
+          setStellarMnemonic(parsed.stellarMnemonic ?? null);
+          return;
+        }
+      }
+
+      const newWallet = await createRandomWallet();
+      setState({
+        address: newWallet.publicKey,
+        chainId: "stellar",
+        walletType: "stellar",
+        isConnected: true,
+        isConnecting: false,
+        error: null,
+      });
+      setStellarSecret(newWallet.secretKey);
+      setStellarMnemonic(newWallet.mnemonic);
+
+      persistSession({
+        address: newWallet.publicKey,
+        chainId: "stellar",
+        walletType: "stellar",
+        stellarSecret: newWallet.secretKey,
+        stellarMnemonic: newWallet.mnemonic,
+      });
+    } catch (err: any) {
+      setState((prev: WalletState) => ({
+        ...prev,
+        isConnecting: false,
+        error: err.message || "Failed to connect/create Stellar wallet",
+      }));
+    }
+  }, []);
+
+  // Import existing Stellar key
+  const importStellarKey = useCallback(async (secret: string) => {
+    setState((prev: WalletState) => ({ ...prev, isConnecting: true, error: null }));
+    try {
+      if (!secret.startsWith("S") || secret.length !== 56) {
+        throw new Error("Invalid secret key format. Must be a 56-character string starting with 'S'.");
+      }
+      const keypair = StellarSdk.Keypair.fromSecret(secret);
+      const addr = keypair.publicKey();
+
+      setState({
+        address: addr,
+        chainId: "stellar",
+        walletType: "stellar",
+        isConnected: true,
+        isConnecting: false,
+        error: null,
+      });
+      setStellarSecret(secret);
+      setStellarMnemonic(null); // Imported secret doesn't have a derived mnemonic phrase
+
+      persistSession({
+        address: addr,
+        chainId: "stellar",
+        walletType: "stellar",
+        stellarSecret: secret,
+        stellarMnemonic: null,
+      });
+    } catch (err: any) {
+      setState((prev: WalletState) => ({
+        ...prev,
+        isConnecting: false,
+        error: err.message || "Failed to import secret key",
+      }));
+      throw err;
+    }
+  }, []);
+
+  // Fund Stellar Wallet on Testnet via Friendbot
+  const fundWithFriendbotAction = useCallback(async () => {
+    if (state.walletType !== "stellar" || !state.address) {
+      throw new Error("Stellar wallet not connected");
+    }
+    setState((prev) => ({ ...prev, isConnecting: true, error: null }));
+    try {
+      await fundWithFriendbot(state.address);
+      // Wait for ledger consensus and refresh balance
+      await new Promise((r) => setTimeout(r, 2500));
+      await refreshBalance();
+      setState((prev) => ({ ...prev, isConnecting: false }));
+    } catch (err: any) {
+      setState((prev) => ({
+        ...prev,
+        isConnecting: false,
+        error: err.message || "Friendbot funding failed",
+      }));
+    }
+  }, [state.address, state.walletType, refreshBalance]);
+
+  // Build, sign, and submit an XLM payment
+  const sendXlmPayment = useCallback(
+    async (destination: string, amount: string) => {
+      if (state.walletType !== "stellar" || !stellarSecret || !state.address) {
+        throw new Error("Stellar wallet is not connected");
+      }
+      try {
+        const { transaction } = await buildPaymentTransaction(state.address, destination, amount);
+        const senderKeypair = StellarSdk.Keypair.fromSecret(stellarSecret);
+        transaction.sign(senderKeypair);
+        const result = await submitTransaction(transaction);
+        await refreshBalance();
+        return { success: true, hash: result.hash };
+      } catch (err: any) {
+        console.error("XLM Payment execution failed:", err);
+        throw err;
+      }
+    },
+    [state.address, state.walletType, stellarSecret, refreshBalance]
+  );
+
   const disconnect = useCallback(() => {
     handleDisconnect();
   }, [state.walletType]);
 
+  /**
+   * Clear any error messages
+   * 
+   * Useful for dismissing error notifications
+   */
   const clearError = useCallback(() => {
     setState((prev: WalletState) => ({ ...prev, error: null }));
   }, []);
 
   return (
     <WalletContext.Provider
-      value={{ ...state, connectMetaMask, connectPhantom, disconnect, clearError }}
+      value={{
+        ...state,
+        balance,
+        stellarSecret,
+        stellarMnemonic,
+        connectMetaMask,
+        connectPhantom,
+        connectStellar,
+        importStellarKey,
+        fundWithFriendbot: fundWithFriendbotAction,
+        refreshBalance,
+        sendXlmPayment,
+        disconnect,
+        clearError,
+      }}
     >
       {children}
     </WalletContext.Provider>

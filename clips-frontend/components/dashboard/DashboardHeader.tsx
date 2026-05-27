@@ -6,6 +6,7 @@ import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/AuthProvider";
 import { useProcessStore } from "@/app/store";
 import WalletConnectButton from "@/components/WalletConnectButton";
+import analytics from "@/lib/analytics";
 
 interface HeaderProps {
   onMenuClick: () => void;
@@ -110,6 +111,10 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
 
             const result = await response.json();
             
+            // Track video upload event
+            const totalSize = validFiles.reduce((sum, file) => sum + file.size, 0);
+            analytics.trackVideoUpload(totalSize, validFiles.length);
+            
             // Start processing in the store
             if (result.jobId) {
               const { startProcess } = useProcessStore.getState();
@@ -201,10 +206,8 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-4">
-        <div className="hidden sm:block">
-          <WalletConnectButton compact />
-        </div>
+      <div className="flex items-center gap-2 sm:gap-4">
+        <WalletConnectButton compact />
 
         <button 
           onClick={toggleTheme}

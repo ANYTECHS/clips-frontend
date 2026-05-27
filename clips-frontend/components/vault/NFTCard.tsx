@@ -11,6 +11,7 @@ import {
   Sparkles,
   Timer
 } from "lucide-react";
+import analytics from "@/lib/analytics";
 
 interface NFTCardProps {
   id: string;
@@ -45,6 +46,12 @@ const NFTCard = memo(function NFTCard({
 }: NFTCardProps) {
   const [isHovered, setIsHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+
+  const handleMintClick = () => {
+    // Track NFT mint event
+    analytics.trackNFTMint(id);
+    // Additional mint logic would go here
+  };
 
   const getRarityStyle = (r: string) => {
     switch (r) {
@@ -155,7 +162,10 @@ const NFTCard = memo(function NFTCard({
           <div className={`absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center transition-all duration-300 ${
             isHovered ? "opacity-100" : "opacity-0"
           }`}>
-            <button className="bg-brand hover:bg-brand-hover text-black px-4 py-2.5 rounded-lg font-bold text-[12px] flex items-center gap-2 transition-all active:scale-[0.98]">
+            <button 
+              onClick={handleMintClick}
+              className="bg-brand hover:bg-brand-hover text-black px-4 py-2.5 rounded-lg font-bold text-[12px] flex items-center gap-2 transition-all active:scale-[0.98]"
+            >
               <Sparkles className="w-4 h-4" />
               Mint Now
             </button>

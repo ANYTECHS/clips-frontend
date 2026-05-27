@@ -153,6 +153,12 @@
   to { transform: rotate(360deg); }
 }
 
+@keyframes ping-once {
+  0% { transform: scale(1); opacity: 0.6; }
+  70% { transform: scale(1.4); opacity: 0; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
 @layer utilities {
   .animate-spin-slow {
     animation: spin-slow 3s linear infinite;

@@ -8,6 +8,7 @@ interface StatCardProps {
   value: string;
   trend: string;
   isPositive?: boolean;
+  hideTrendIcon?: boolean;
   icon: LucideIcon;
   hideTrendIcon?: boolean;
 }

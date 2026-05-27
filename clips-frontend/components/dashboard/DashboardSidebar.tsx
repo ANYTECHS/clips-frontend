@@ -24,7 +24,7 @@ const menuItems = [
   { id: "projects", label: "Projects", icon: Video, href: "/projects" },
   { id: "vault", label: "NFT Vault", icon: Gem, href: "/vault" },
   { id: "platforms", label: "Platforms", icon: Share2, href: "/platforms" },
-  // { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
+  { id: "settings", label: "Settings", icon: Settings, href: "/settings" },
 ];
 
 interface SidebarProps {

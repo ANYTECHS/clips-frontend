@@ -2,6 +2,19 @@
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## 📚 Component Documentation
+
+**[View Storybook Component Library](http://localhost:6006/)** (when running locally)
+
+Our component library is documented using Storybook, featuring 11+ reusable components with interactive examples, accessibility testing, and auto-generated documentation.
+
+To run Storybook locally:
+```bash
+npm run storybook
+```
+
+See [STORYBOOK.md](./STORYBOOK.md) for detailed documentation.
+
 ## Getting Started
 
 First, run the development server:

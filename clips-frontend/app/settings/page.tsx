@@ -1,65 +1,46 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { Bell, BellOff, Check, X, Key, Wallet, Shield, Download } from "lucide-react";
+import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import { useWallet } from "@/components/WalletProvider";
+import SocialRecoveryConfig from "@/components/SocialRecoveryConfig";
+import WalletConnectButton from "@/components/WalletConnectButton";
+import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff } from "lucide-react";
 import {
   getStoredPermission,
   requestNotificationPermission,
   storePermission,
-  canSendNotification,
 } from "@/app/lib/notifications";
 
 export default function SettingsPage() {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [permission, setPermission] = useState<"granted" | "denied" | "default">("default");
-  const [isLoading, setIsLoading] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(false);
+  
+  // Wallet visibility and inputs
   const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [showMnemonic, setShowMnemonic] = useState(false);
   const [advancedWalletEnabled, setAdvancedWalletEnabled] = useState(false);
-  const [keyTimeoutSeconds, setKeyTimeoutSeconds] = useState<number | null>(null);
-  const keyTimeoutRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
+  const [importKeyInput, setImportKeyInput] = useState("");
+  const [importError, setImportError] = useState("");
+  const [importSuccess, setImportSuccess] = useState(false);
+  const [copiedKey, setCopiedKey] = useState(false);
+  const [copiedMnemonic, setCopiedMnemonic] = useState(false);
 
-  // SECURITY: Private key is never stored in plaintext. This mock represents
-  // a key that would be retrieved from encrypted storage (AES-GCM via Web Crypto API).
-  // Attack vectors documented:
-  //   1. Shoulder surfing — mitigated by auto-hide timeout (KEY_DISPLAY_TIMEOUT_SECS)
-  //   2. Screen recording / screenshots — warn user before reveal
-  //   3. Clipboard hijacking — avoid auto-copy; user must explicitly export
-  //   4. XSS — key is never injected into innerHTML; rendered as text node only
-  //   5. Memory scraping — key is not persisted in component state beyond display window
-  const KEY_DISPLAY_TIMEOUT_SECS = 30;
-  const mockPrivateKey = "S•••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••";
+  const {
+    isConnected,
+    walletType,
+    address,
+    stellarSecret,
+    stellarMnemonic,
+    importStellarKey,
+  } = useWallet();
 
-  const handleRevealKey = () => {
-    if (showPrivateKey) {
-      clearKeyTimeout();
-      setShowPrivateKey(false);
-      return;
-    }
-    setShowPrivateKey(true);
-    let remaining = KEY_DISPLAY_TIMEOUT_SECS;
-    setKeyTimeoutSeconds(remaining);
-    keyTimeoutRef.current = setInterval(() => {
-      remaining -= 1;
-      setKeyTimeoutSeconds(remaining);
-      if (remaining <= 0) {
-        clearKeyTimeout();
-        setShowPrivateKey(false);
-      }
-    }, 1000);
-  };
-
-  const clearKeyTimeout = () => {
-    if (keyTimeoutRef.current) {
-      clearInterval(keyTimeoutRef.current);
-      keyTimeoutRef.current = null;
-    }
-    setKeyTimeoutSeconds(null);
-  };
-
-  // Cleanup on unmount
-  React.useEffect(() => () => clearKeyTimeout(), []);
+  const isStellarConnected = isConnected && walletType === "stellar";
 
   useEffect(() => {
-    // Get current permission state
+    // Get notification permissions
     const stored = getStoredPermission();
     if (stored) {
       setPermission(stored);
@@ -69,25 +50,14 @@ export default function SettingsPage() {
   }, []);
 
   const handleEnableNotifications = async () => {
-    setIsLoading(true);
+    setNotificationsLoading(true);
     try {
       const result = await requestNotificationPermission();
       setPermission(result);
-      
-      if (result === "granted") {
-        // Send a test notification
-        if ("serviceWorker" in navigator) {
-          const registration = await navigator.serviceWorker.ready;
-          registration.showNotification("Notifications Enabled!", {
-            body: "You'll be notified when your clips are ready.",
-            icon: "/avatar.png",
-          });
-        }
-      }
     } catch (error) {
       console.error("Error requesting notification permission:", error);
     } finally {
-      setIsLoading(false);
+      setNotificationsLoading(false);
     }
   };
 
@@ -96,131 +66,143 @@ export default function SettingsPage() {
     setPermission("denied");
   };
 
+  const handleImportKeySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setImportError("");
+    setImportSuccess(false);
+
+    if (!importKeyInput) {
+      setImportError("Please enter a private key.");
+      return;
+    }
+
+    try {
+      await importStellarKey(importKeyInput);
+      setImportSuccess(true);
+      setImportKeyInput("");
+      setTimeout(() => setImportSuccess(false), 5000);
+    } catch (err: any) {
+      setImportError(err.message || "Failed to import secret key. Make sure it starts with 'S' and is 56 characters.");
+    }
+  };
+
+  const handleCopyKey = () => {
+    if (!stellarSecret) return;
+    navigator.clipboard.writeText(stellarSecret);
+    setCopiedKey(true);
+    setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  const handleCopyMnemonic = () => {
+    if (!stellarMnemonic) return;
+    navigator.clipboard.writeText(stellarMnemonic);
+    setCopiedMnemonic(true);
+    setTimeout(() => setCopiedMnemonic(false), 2000);
+  };
+
   return (
-    <div className="min-h-screen bg-background text-white flex flex-col font-sans relative overflow-hidden">
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-brand/5 blur-[120px] rounded-full" />
-      </div>
+    <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
+      {/* Radial Glows */}
+      <div className="glow-large fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
+      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
+      
+      {/* Sidebar Backdrop Overlay (Mobile) */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300" 
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
 
-      <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
-        <div className="w-full max-w-2xl bg-surface border border-white/5 rounded-[32px] p-8 md:p-10 shadow-2xl">
-          <h1 className="text-3xl font-extrabold tracking-tight mb-8">Settings</h1>
+      {/* Sidebar */}
+      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
-          {/* Notification Settings */}
-          <div className="space-y-6">
-            <div>
-              <h2 className="text-xl font-bold mb-4">Notifications</h2>
-              <p className="text-muted-foreground text-sm mb-6">
-                Manage your push notification preferences. You'll be notified when your video processing is complete.
-              </p>
-            </div>
+      {/* Main Content Area */}
+      <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
+        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
 
-            <div className="bg-input/50 rounded-2xl p-6 border border-white/5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  {permission === "granted" ? (
-                    <div className="w-12 h-12 rounded-full bg-green-500/20 flex items-center justify-center">
-                      <Bell className="w-6 h-6 text-green-500" />
-                    </div>
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
-                      <BellOff className="w-6 h-6 text-red-500" />
-                    </div>
-                  )}
-                  <div>
-                    <p className="font-bold text-white">
-                      {permission === "granted" ? "Notifications Enabled" : "Notifications Disabled"}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {permission === "granted"
-                        ? "You'll receive notifications when your clips are ready"
-                        : "Enable to get notified when processing completes"}
-                    </p>
+        <div className="dashboard-main space-y-8 max-w-[900px] mx-auto w-full p-6 md:p-8">
+          <div>
+            <h1 className="text-3xl font-extrabold tracking-tight">Settings</h1>
+            <p className="text-muted-foreground text-sm mt-1">Configure your notifications, wallets, and recovery plans.</p>
+          </div>
+
+          {/* Notifications */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-extrabold text-white">Push Notifications</h2>
+            
+            <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-4">
+                {permission === "granted" ? (
+                  <div className="w-12 h-12 rounded-full bg-green-500/10 border border-green-500/25 flex items-center justify-center text-green-400 shrink-0">
+                    <Bell className="w-6 h-6" />
                   </div>
-                </div>
-
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/25 flex items-center justify-center text-red-400 shrink-0">
+                    <BellOff className="w-6 h-6" />
+                  </div>
+                )}
                 <div>
-                  {permission === "granted" ? (
-                    <button
-                      onClick={handleDisableNotifications}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl border border-red-500/30 bg-red-500/10 text-red-500 text-sm font-bold hover:bg-red-500/20 transition-all"
-                    >
-                      <X className="w-4 h-4" />
-                      Disable
-                    </button>
-                  ) : (
-                    <button
-                      onClick={handleEnableNotifications}
-                      disabled={isLoading || permission === "denied"}
-                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand text-black text-sm font-bold hover:bg-brand-hover transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Check className="w-4 h-4" />
-                      {isLoading ? "Enabling..." : "Enable"}
-                    </button>
-                  )}
+                  <p className="font-bold text-white">
+                    {permission === "granted" ? "Notifications Enabled" : "Notifications Disabled"}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {permission === "granted"
+                      ? "You will receive updates when clip rendering is complete"
+                      : "Authorize browser notifications to receive background alerts"}
+                  </p>
                 </div>
               </div>
 
-              {permission === "denied" && (
-                <div className="mt-4 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
-                  <p className="text-sm text-yellow-500">
-                    Notifications are blocked. To enable them, you'll need to reset permissions in your browser settings.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-input/50 rounded-2xl p-6 border border-white/5">
-              <h3 className="font-bold text-white mb-2">About Notifications</h3>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-brand mt-0.5 shrink-0" />
-                  <span>You'll be notified when your video processing completes</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-brand mt-0.5 shrink-0" />
-                  <span>Clicking a notification takes you to your projects</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-brand mt-0.5 shrink-0" />
-                  <span>Notifications work even when the tab is closed (via service worker)</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <Check className="w-4 h-4 text-brand mt-0.5 shrink-0" />
-                  <span>Your preference is saved locally in your browser</span>
-                </li>
-              </ul>
+              <div>
+                {permission === "granted" ? (
+                  <button
+                    onClick={handleDisableNotifications}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/15 text-red-400 text-xs font-bold transition-all cursor-pointer"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Disable
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleEnableNotifications}
+                    disabled={notificationsLoading || permission === "denied"}
+                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all disabled:opacity-50 cursor-pointer"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    {notificationsLoading ? "Enabling..." : "Enable System Notifications"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* Advanced Wallet Settings */}
-          <div className="space-y-6 mt-12">
-            <div>
-              <h2 className="text-xl font-bold mb-4">Advanced Wallet Mode</h2>
-              <p className="text-muted-foreground text-sm mb-6">
-                For power users: Export your secret key or connect an external wallet as a backup for your ClipCash account.
-              </p>
-            </div>
+          <div className="h-px bg-white/5 my-4" />
 
-            <div className="bg-input/50 rounded-2xl p-6 border border-white/5">
+          {/* Advanced Wallet Settings */}
+          <div className="space-y-4">
+            <h2 className="text-lg font-extrabold text-white">Advanced Wallet Mode</h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Enable advanced wallet tools to manage on-chain Stellar keys, import custom keypairs, and set up Social Recovery guardians.
+            </p>
+
+            <div className="bg-surface border border-white/5 rounded-2xl p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center">
-                    <Shield className="w-6 h-6 text-brand" />
+                  <div className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                    <Shield className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="font-bold text-white">Advanced Features</p>
-                    <p className="text-sm text-muted-foreground">
-                      {advancedWalletEnabled
-                        ? "Advanced wallet features are enabled"
-                        : "Enable to access private keys and external backups"}
+                    <p className="font-bold text-white">Developer & Wallet Mode</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Toggle to reveal cryptographic secret keys and seed backups.
                     </p>
                   </div>
                 </div>
                 
                 <button
                   onClick={() => setAdvancedWalletEnabled(!advancedWalletEnabled)}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
                     advancedWalletEnabled ? "bg-brand" : "bg-white/10"
                   }`}
                   aria-label="Toggle Advanced Wallet Mode"
@@ -234,59 +216,141 @@ export default function SettingsPage() {
               </div>
 
               {advancedWalletEnabled && (
-                <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
-                  {/* Security warning before reveal */}
-                  {!showPrivateKey && (
-                    <div className="p-3 rounded-xl bg-yellow-500/10 border border-yellow-500/20 flex items-start gap-2 mb-3">
-                      <Shield className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5" />
-                      <p className="text-xs text-yellow-300 leading-relaxed">
-                        <span className="font-bold">Security warning:</span> Never share your secret key. Anyone with it has full control of your wallet. Make sure no one can see your screen before revealing.
-                      </p>
+                <div className="space-y-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                  
+                  {/* If Stellar Wallet is Connected */}
+                  {isStellarConnected ? (
+                    <div className="space-y-5">
+                      <div className="p-4 rounded-xl bg-black/40 border border-white/5">
+                        <div className="flex justify-between items-center mb-1">
+                          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Connected Stellar Address</span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand/10 border border-brand/25 text-brand uppercase font-mono">Active</span>
+                        </div>
+                        <p className="text-xs font-mono text-white break-all mt-1">{address}</p>
+                      </div>
+
+                      <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                        <div className="space-y-1">
+                          <p className="font-bold text-sm text-white">Reveal Secret Key</p>
+                          <p className="text-xs text-muted-foreground leading-normal max-w-md">
+                            Export the raw Stellar Secret Key (starts with S). Never share this key with anyone.
+                          </p>
+                          {showPrivateKey && (
+                            <p className="text-xs font-mono text-brand break-all bg-brand/5 border border-brand/20 p-2 rounded-lg mt-2 select-all">
+                              {stellarSecret}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 shrink-0 items-end">
+                          <button
+                            onClick={() => setShowPrivateKey(!showPrivateKey)}
+                            className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:text-brand hover:border-brand/30 transition-all flex items-center gap-1 cursor-pointer"
+                          >
+                            {showPrivateKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                            {showPrivateKey ? "Hide" : "Reveal"}
+                          </button>
+                          {showPrivateKey && (
+                            <button
+                              onClick={handleCopyKey}
+                              className="px-3 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              {copiedKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                              Copy
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {stellarMnemonic && (
+                        <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                          <div className="space-y-1">
+                            <p className="font-bold text-sm text-white">Recovery Mnemonic Phrase</p>
+                            <p className="text-xs text-muted-foreground leading-normal max-w-md">
+                              This 12-word phrase restores your wallet connection. Store it offline.
+                            </p>
+                            {showMnemonic && (
+                              <p className="text-xs font-mono text-brand bg-brand/5 border border-brand/20 p-2.5 rounded-lg mt-2 leading-relaxed select-all">
+                                {stellarMnemonic}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex gap-2 shrink-0 items-end">
+                            <button
+                              onClick={() => setShowMnemonic(!showMnemonic)}
+                              className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:text-brand hover:border-brand/30 transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              {showMnemonic ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                              {showMnemonic ? "Hide" : "Reveal"}
+                            </button>
+                            {showMnemonic && (
+                              <button
+                                onClick={handleCopyMnemonic}
+                                className="px-3 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all flex items-center gap-1 cursor-pointer"
+                              >
+                                {copiedMnemonic ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+                                Copy
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Social Recovery Section inside advanced settings */}
+                      <SocialRecoveryConfig />
+                    </div>
+                  ) : (
+                    // If Stellar wallet is NOT connected
+                    <div className="space-y-5">
+                      <div className="p-4 rounded-xl bg-white/[0.01] border border-white/5 border-dashed text-center">
+                        <Wallet className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-muted-foreground">
+                          Stellar Wallet is currently disconnected. Please connect or generate a wallet to enable advanced modes.
+                        </p>
+                      </div>
+
+                      <div className="max-w-md mx-auto">
+                        <WalletConnectButton />
+                      </div>
+
+                      <div className="h-px bg-white/5 my-4" />
+
+                      {/* Import Key Form */}
+                      <form onSubmit={handleImportKeySubmit} className="space-y-3.5">
+                        <div className="space-y-2">
+                          <label className="block text-[11px] font-bold text-muted-foreground tracking-wider uppercase">
+                            Or Import Stellar Private Key
+                          </label>
+                          <input
+                            type="password"
+                            placeholder="Starts with 'S'... (56 characters)"
+                            value={importKeyInput}
+                            onChange={(e) => setImportKeyInput(e.target.value)}
+                            className="w-full bg-input border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none transition-colors"
+                          />
+                        </div>
+
+                        {importError && (
+                          <div className="p-3 bg-red-950/40 border border-red-500/20 rounded-xl text-center">
+                            <span className="text-xs text-red-400 font-semibold">{importError}</span>
+                          </div>
+                        )}
+
+                        {importSuccess && (
+                          <div className="p-3 bg-emerald-950/40 border border-emerald-500/20 rounded-xl text-center">
+                            <span className="text-xs text-emerald-400 font-semibold">Stellar private key imported successfully!</span>
+                          </div>
+                        )}
+
+                        <button
+                          type="submit"
+                          className="w-full py-3.5 rounded-xl border border-white/10 hover:border-brand/35 text-white hover:text-brand transition-colors text-xs font-bold cursor-pointer"
+                        >
+                          Import Secret Key
+                        </button>
+                      </form>
                     </div>
                   )}
 
-                  <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <Key className="w-5 h-5 text-muted-foreground shrink-0" />
-                      <div className="min-w-0">
-                        <p className="font-bold text-sm text-white">Export Secret Key</p>
-                        <p className="text-xs text-muted-foreground font-mono truncate">
-                          {showPrivateKey ? mockPrivateKey : "••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••"}
-                        </p>
-                        {/* Auto-hide countdown */}
-                        {showPrivateKey && keyTimeoutSeconds !== null && (
-                          <p className="text-xs text-yellow-400 mt-1">
-                            Auto-hiding in {keyTimeoutSeconds}s
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 shrink-0 ml-3">
-                      <button
-                        onClick={handleRevealKey}
-                        className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/5 transition-colors"
-                      >
-                        {showPrivateKey ? "Hide" : "Reveal"}
-                      </button>
-                      <button className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-colors">
-                        <Download className="w-3 h-3" />
-                        Export
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Wallet className="w-5 h-5 text-muted-foreground" />
-                      <div>
-                        <p className="font-bold text-sm text-white">External Backup Wallet</p>
-                        <p className="text-xs text-muted-foreground">Connect a Web3 wallet as recovery backup</p>
-                      </div>
-                    </div>
-                    <button className="px-4 py-1.5 rounded-lg border border-white/10 text-xs font-bold hover:bg-white/5 transition-colors">
-                      Connect Backup
-                    </button>
-                  </div>
                 </div>
               )}
             </div>

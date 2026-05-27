@@ -23,6 +23,18 @@ You always stay in control:
 - **NFT Vault** — mint and manage your video NFTs on Stellar
 - **Wallet integration** — connect MetaMask for Web3 features
 
+## Stellar Wallet Integration
+
+- `clips-frontend/components/StellarWalletProvider.tsx` provides app-wide Stellar wallet state.
+- Use the exported `useStellarWallet()` hook to read `address`, `isConnected`, `isLoading`, and access the initialized `kit`.
+- The provider dynamically initializes `StellarWalletsKit` with default modules such as `injected`, `ledger`, and `walletconnect`.
+
+If you plan to use the Stellar wallet flow, install the matching package and configure it in your app.
+
+```bash
+npm install stellar-wallets-kit
+```
+
 ## Tech Stack
 
 | Part           | Technology                          | Why we chose it                     |

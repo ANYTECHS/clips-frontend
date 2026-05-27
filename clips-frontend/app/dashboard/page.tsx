@@ -10,6 +10,8 @@ import PlatformDistribution from "@/components/dashboard/PlatformDistribution";
 import AIInsightCard from "@/components/dashboard/AIInsightCard";
 import ProjectCard from "@/components/dashboard/ProjectCard";
 import EarningsSummaryCards from "@/components/dashboard/EarningsSummaryCards";
+import SendPaymentForm from "@/components/SendPaymentForm";
+import WalletConnectButton from "@/components/WalletConnectButton";
 import WalletInfoCard from "@/components/dashboard/WalletInfoCard";
 import { DollarSign, Video, Globe } from "lucide-react";
 
@@ -79,6 +81,23 @@ export default function DashboardPage() {
             {/* Platform Distribution — 1 col */}
             <div>
               <PlatformDistribution />
+            </div>
+          </div>
+
+          {/* Stellar Payments Hub */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+            <div className="lg:col-span-2 space-y-4">
+              <h3 className="text-[18px] font-extrabold text-[#ffffff] tracking-tight">Payments Hub</h3>
+              <SendPaymentForm />
+            </div>
+            
+            <div className="space-y-4 flex flex-col">
+              <h3 className="text-[18px] font-extrabold text-[#ffffff] tracking-tight">Stellar Wallet Status</h3>
+              <div className="bg-surface/80 border border-white/5 rounded-[24px] p-6 text-center backdrop-blur-md flex-1 flex flex-col justify-center items-center">
+                <div className="w-full">
+                  <WalletConnectButton />
+                </div>
+              </div>
             </div>
           </div>
 

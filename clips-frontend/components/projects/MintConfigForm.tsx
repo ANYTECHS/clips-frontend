@@ -63,12 +63,38 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-function getMintErrorMessage(error: unknown): string {
+function getMintErrorMessage(error: unknown): { message: string; retryable: boolean } {
   const msg = error instanceof Error ? error.message : String(error);
-  if (msg === "WALLET_REJECTED") return "Transaction was rejected by your wallet. Please try again.";
-  if (msg === "NETWORK_ERROR") return "Network error — check your connection and retry.";
-  if (msg === "UPLOAD_FAILED") return "Metadata upload failed. The IPFS node may be busy. Please retry.";
-  return "Something went wrong while minting. Please try again.";
+
+  if (msg === "tx_bad_seq") {
+    return {
+      message:
+        "Transaction failed due to a sequence number conflict. This happens when multiple transactions are submitted at the same time. Retrying automatically…",
+      retryable: true,
+    };
+  }
+  if (msg === "WALLET_REJECTED") {
+    return {
+      message: "Transaction was rejected by your wallet. Please try again.",
+      retryable: true,
+    };
+  }
+  if (msg === "NETWORK_ERROR") {
+    return {
+      message: "Network error — check your connection and retry.",
+      retryable: true,
+    };
+  }
+  if (msg === "UPLOAD_FAILED") {
+    return {
+      message: "Metadata upload failed. The IPFS node may be busy. Please retry.",
+      retryable: true,
+    };
+  }
+  return {
+    message: "Something went wrong while minting. Please try again.",
+    retryable: false,
+  };
 }
 
 export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
@@ -94,6 +120,10 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
   const [submitted, setSubmitted] = useState(false);
   const [mintError, setMintError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isAutoRetrying, setIsAutoRetrying] = useState(false);
+
+  /** Max automatic retries for sequence number conflicts before surfacing the error */
+  const MAX_SEQ_AUTO_RETRIES = 3;
 
   const inputClass = (field: keyof MintFormErrors) =>
     `w-full bg-[var(--color-input)] border rounded-xl px-4 py-3 text-[14px] text-white placeholder:text-subtle focus:outline-none transition-colors ${
@@ -119,6 +149,36 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
     setErrors(validate(form));
   }
 
+  async function attemptMint(seqAttempt = 0): Promise<void> {
+    try {
+      await onSubmit?.(form);
+      setSubmitted(true);
+      setRetryCount(0);
+      setIsAutoRetrying(false);
+    } catch (err) {
+      const { message, retryable } = getMintErrorMessage(err);
+      const errMsg = err instanceof Error ? err.message : String(err);
+
+      // Sequence number conflict: auto-retry up to MAX_SEQ_AUTO_RETRIES
+      if (errMsg === "tx_bad_seq" && seqAttempt < MAX_SEQ_AUTO_RETRIES) {
+        setIsAutoRetrying(true);
+        setMintError(message);
+        // Brief pause before retry to allow the network to settle
+        await new Promise((resolve) => setTimeout(resolve, 400 * (seqAttempt + 1)));
+        return attemptMint(seqAttempt + 1);
+      }
+
+      setIsAutoRetrying(false);
+      setMintError(message);
+      if (!retryable) {
+        // Non-retryable errors increment the counter to show extra guidance
+        setRetryCount((c) => c + 1);
+      } else {
+        setRetryCount((c) => c + 1);
+      }
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const allTouched = Object.fromEntries(
@@ -131,6 +191,7 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
 
     setSubmitting(true);
     setMintError(null);
+    setIsAutoRetrying(false);
     try {
       await onSubmit(form);
       setSubmitted(true);
@@ -269,11 +330,21 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
 
       {/* Error Banner */}
       {mintError && (
-        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+        <div className={`flex items-start gap-3 rounded-xl px-4 py-3 border ${
+          isAutoRetrying
+            ? "bg-yellow-500/10 border-yellow-500/30"
+            : "bg-red-500/10 border-red-500/30"
+        }`}>
+          {isAutoRetrying ? (
+            <Loader2 className="w-4 h-4 text-yellow-400 shrink-0 mt-0.5 animate-spin" />
+          ) : (
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          )}
           <div className="flex-1 min-w-0">
-            <p className="text-[13px] text-red-300">{mintError}</p>
-            {retryCount >= 3 && (
+            <p className={`text-[13px] ${isAutoRetrying ? "text-yellow-300" : "text-red-300"}`}>
+              {mintError}
+            </p>
+            {!isAutoRetrying && retryCount >= 3 && (
               <p className="text-[11px] text-red-400/70 mt-1">
                 Still failing? Check your wallet connection or try again later.
               </p>

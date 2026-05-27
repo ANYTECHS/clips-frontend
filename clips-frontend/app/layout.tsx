@@ -3,11 +3,13 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { WalletProvider } from "@/components/WalletProvider";
+import { StellarWalletProvider } from "@/components/StellarWalletProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import CookieConsent from "@/components/CookieConsent";
 import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
+import AnalyticsProvider from "@/components/AnalyticsProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,9 +32,11 @@ export default function RootLayout({
           <ErrorBoundary>
             <AuthProvider>
               <WalletProvider>
+                <AnalyticsProvider />
                 <KeyboardShortcuts />
                 {children}
                 <RateLimitToast />
+                </StellarWalletProvider>
               </WalletProvider>
             </AuthProvider>
           </ErrorBoundary>

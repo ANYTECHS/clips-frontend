@@ -14,13 +14,33 @@ export type User = {
   email: string;
   name?: string;
   username?: string;
-  password?: string;
   onboardingStep: number;
   profile?: OnboardingData;
+  guardians?: string[];
+  encryptedWalletBackup?: string;
 };
 
 // In-memory fake database
-const users: User[] = [];
+const users: User[] = [
+  {
+    id: "test-user-id",
+    email: "test@example.com",
+    name: "Test User",
+    username: "testuser",
+    password: "Password123",
+    onboardingStep: 3,
+    profile: { niche: "gaming", username: "testuser" },
+    guardians: ["guardian1@example.com", "guardian2@example.com", "guardian3@example.com"],
+    encryptedWalletBackup: "abandon ability able about above absent absorb abstract absurd abuse access accident"
+  }
+];
+
+// In-memory social recovery sessions
+const socialRecoverySessions: Record<string, {
+  email: string;
+  guardians: { email: string; approved: boolean }[];
+  recoveryKeyEncrypted: string;
+}> = {};
 
 // Password reset tokens storage
 const resetTokens: Record<string, { token: string; expiresAt: number }> = {};
@@ -202,6 +222,58 @@ export const getEarningsReport = rateLimiter(async (userId: string) => {
   };
 }, 10, 10000);
 
+export const saveSocialRecoveryConfig = rateLimiter(async (email: string, guardians: string[], encryptedBackup: string) => {
+  await delay(600);
+  const user = users.find(u => u.email === email);
+  if (!user) throw new Error("User not found");
+  user.guardians = guardians;
+  user.encryptedWalletBackup = encryptedBackup;
+  return { success: true };
+}, 10, 10000);
+
+export const initiateSocialRecovery = rateLimiter(async (email: string) => {
+  await delay(800);
+  const user = users.find(u => u.email === email);
+  if (!user) throw new Error("User not found");
+  if (!user.guardians || user.guardians.length === 0) {
+    throw new Error("No guardians configured for this account. Use mnemonic recovery instead.");
+  }
+  const sessionId = crypto.randomUUID();
+  socialRecoverySessions[sessionId] = {
+    email,
+    guardians: user.guardians.map(g => ({ email: g, approved: false })),
+    recoveryKeyEncrypted: user.encryptedWalletBackup || ""
+  };
+  return { sessionId, guardians: user.guardians };
+}, 10, 10000);
+
+export const approveGuardian = rateLimiter(async (sessionId: string, guardianEmail: string) => {
+  await delay(400);
+  const session = socialRecoverySessions[sessionId];
+  if (!session) throw new Error("Invalid or expired session");
+  const guardian = session.guardians.find(g => g.email === guardianEmail);
+  if (!guardian) throw new Error("Guardian not found in this session");
+  guardian.approved = true;
+  return { success: true, guardians: session.guardians };
+}, 20, 10000);
+
+export const checkSocialRecovery = rateLimiter(async (sessionId: string) => {
+  await delay(600);
+  const session = socialRecoverySessions[sessionId];
+  if (!session) throw new Error("Invalid or expired session");
+  const approvedCount = session.guardians.filter(g => g.approved).length;
+  const totalCount = session.guardians.length;
+  const isRecoverable = approvedCount >= Math.ceil(totalCount / 2);
+  return {
+    success: true,
+    isRecoverable,
+    approvedCount,
+    totalCount,
+    guardians: session.guardians,
+    encryptedBackup: isRecoverable ? session.recoveryKeyEncrypted : null
+  };
+}, 20, 10000);
+
 // MockApi object for backward compatibility
 export const MockApi = {
   checkEmail,
@@ -213,4 +285,8 @@ export const MockApi = {
   postClips,
   saveOnboarding,
   getEarningsReport,
+  saveSocialRecoveryConfig,
+  initiateSocialRecovery,
+  approveGuardian,
+  checkSocialRecovery,
 };
