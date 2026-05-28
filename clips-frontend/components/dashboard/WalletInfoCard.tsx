@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { Wallet, ExternalLink, Copy, Check, AlertCircle } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Wallet, ExternalLink, Copy, Check, AlertCircle, Send, Loader2, CheckCircle } from "lucide-react";
 import { useWalletConnection } from "@/app/hooks/useWalletConnection";
+import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import BalanceDisplay from "@/components/wallet/BalanceDisplay";
 import TransactionHistory from "@/components/wallet/TransactionHistory";
 
@@ -12,13 +13,23 @@ import TransactionHistory from "@/components/wallet/TransactionHistory";
  * Clean Venmo-style send form – no blockchain jargon visible by default.
  */
 export default function WalletInfoCard() {
-  const { publicKey, status, balance, error } = useAutoStellarWallet();
+  const { publicKey, status, balance, error, network } = useAutoStellarWallet();
+  const formRef = useRef<HTMLFormElement>(null);
+  const recipientInputRef = useRef<HTMLInputElement>(null);
+  const amountInputRef = useRef<HTMLInputElement>(null);
+  const successRef = useRef<HTMLDivElement>(null);
 
   const [sendOpen, setSendOpen] = useState(false);
   const [recipient, setRecipient] = useState("");
   const [amount, setAmount] = useState("");
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  const recipientId = React.useId();
+  const amountId = React.useId();
+  const errorId = React.useId();
+  const successId = React.useId();
 
   const xlmDisplay = balance
     ? `${parseFloat(balance.xlm).toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`
@@ -28,12 +39,29 @@ export default function WalletInfoCard() {
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!recipient || !amount) return;
+    setFormError(null);
+    
+    if (!recipient || !amount) {
+      setFormError("Please fill in all fields");
+      return;
+    }
+    
+    if (parseFloat(amount) <= 0) {
+      setFormError("Amount must be greater than 0");
+      return;
+    }
+    
     setSending(true);
     // PoC: simulate send delay
     await new Promise((r) => setTimeout(r, 1200));
     setSending(false);
     setSent(true);
+    
+    // Focus success message for screen readers
+    setTimeout(() => {
+      successRef.current?.focus();
+    }, 100);
+    
     setTimeout(() => {
       setSent(false);
       setSendOpen(false);
@@ -41,6 +69,30 @@ export default function WalletInfoCard() {
       setAmount("");
     }, 2000);
   };
+
+  const handleCancel = () => {
+    setSendOpen(false);
+    setRecipient("");
+    setAmount("");
+    setFormError(null);
+  };
+
+  const networkUpper = network === "testnet" ? "TESTNET" : "PUBLIC";
+
+  const handleViewOnExplorer = () => {
+    if (!publicKey) return;
+    const url = networkUpper === "TESTNET" 
+      ? `https://stellar.expert/explorer/testnet/account/${publicKey}`
+      : `https://stellar.expert/explorer/public/account/${publicKey}`;
+    window.open(url, "_blank", "noopener,noreferrer");
+  };
+
+  // Focus recipient input when form opens
+  useEffect(() => {
+    if (sendOpen && recipientInputRef.current) {
+      recipientInputRef.current.focus();
+    }
+  }, [sendOpen]);
 
   return (
     <div className="bg-surface border border-border rounded-[24px] p-6">
@@ -76,7 +128,14 @@ export default function WalletInfoCard() {
 
       {/* Error message */}
       {error && (
-        <p className="text-error text-[12px] mb-4">{error}</p>
+        <div 
+          role="alert"
+          aria-live="assertive"
+          className="flex items-start gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-3 mb-4"
+        >
+          <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" aria-hidden="true" />
+          <p className="text-error text-[12px] leading-relaxed flex-1">{error}</p>
+        </div>
       )}
 
       {/* USD sub-value */}
@@ -88,30 +147,79 @@ export default function WalletInfoCard() {
       {status === "ready" && !sendOpen && (
         <button
           onClick={() => setSendOpen(true)}
+          aria-label="Open send XLM form"
           className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand font-bold text-[13px] transition-all"
         >
-          <Send className="w-4 h-4" />
+          <Send className="w-4 h-4" aria-hidden="true" />
           Send XLM
         </button>
       )}
 
       {/* Send form – Venmo-style */}
       {sendOpen && (
-        <form onSubmit={handleSend} className="space-y-3 mt-2">
+        <form 
+          ref={formRef}
+          onSubmit={handleSend} 
+          className="space-y-3 mt-2"
+          aria-labelledby="send-form-title"
+        >
+          <h3 id="send-form-title" className="sr-only">Send XLM Form</h3>
+          
+          {formError && (
+            <div 
+              role="alert"
+              aria-live="assertive"
+              id={errorId}
+              className="flex items-start gap-2 bg-error/10 border border-error/30 rounded-xl px-4 py-3"
+            >
+              <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" aria-hidden="true" />
+              <p className="text-error text-[12px] leading-relaxed flex-1">{formError}</p>
+            </div>
+          )}
+          
+          {sent && (
+            <div 
+              ref={successRef}
+              role="status"
+              aria-live="polite"
+              id={successId}
+              className="flex items-center gap-2 bg-brand/10 border border-brand/30 rounded-xl px-4 py-3"
+              tabIndex={-1}
+            >
+              <CheckCircle className="w-4 h-4 text-brand" aria-hidden="true" />
+              <p className="text-brand text-[12px] font-medium">XLM sent successfully!</p>
+            </div>
+          )}
+          
           <div>
-            <label className="block text-[11px] text-muted font-medium mb-1">To (username or address)</label>
+            <label 
+              htmlFor={recipientId}
+              className="block text-[11px] text-muted font-medium mb-1"
+            >
+              To (username or address)
+            </label>
             <input
+              ref={recipientInputRef}
+              id={recipientId}
               type="text"
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
               placeholder="e.g. @alice or G…"
               required
+              aria-describedby={formError ? errorId : undefined}
               className="w-full bg-surface-hover border border-border rounded-xl px-4 py-2.5 text-[13px] text-white placeholder:text-muted focus:outline-none focus:border-brand/50 transition-colors"
             />
           </div>
           <div>
-            <label className="block text-[11px] text-muted font-medium mb-1">Amount (XLM)</label>
+            <label 
+              htmlFor={amountId}
+              className="block text-[11px] text-muted font-medium mb-1"
+            >
+              Amount (XLM)
+            </label>
             <input
+              ref={amountInputRef}
+              id={amountId}
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
@@ -119,6 +227,7 @@ export default function WalletInfoCard() {
               min="0.0000001"
               step="any"
               required
+              aria-describedby={formError ? errorId : undefined}
               className="w-full bg-surface-hover border border-border rounded-xl px-4 py-2.5 text-[13px] text-white placeholder:text-muted focus:outline-none focus:border-brand/50 transition-colors"
             />
           </div>
@@ -126,19 +235,20 @@ export default function WalletInfoCard() {
             <button
               type="submit"
               disabled={sending || sent}
+              aria-describedby={sent ? successId : undefined}
               className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-brand hover:bg-brand-hover text-black font-bold text-[13px] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
               {sent ? (
-                <><CheckCircle className="w-4 h-4" /> Sent!</>
+                <><CheckCircle className="w-4 h-4" aria-hidden="true" /> Sent!</>
               ) : sending ? (
-                <><Loader2 className="w-4 h-4 animate-spin" /> Sending…</>
+                <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Sending…</>
               ) : (
-                <><Send className="w-4 h-4" /> Send</>
+                <><Send className="w-4 h-4" aria-hidden="true" /> Send</>
               )}
             </button>
             <button
               type="button"
-              onClick={() => { setSendOpen(false); setRecipient(""); setAmount(""); }}
+              onClick={handleCancel}
               className="px-4 py-2.5 rounded-xl border border-border text-muted hover:text-white text-[13px] font-medium transition-colors"
             >
               Cancel
@@ -152,9 +262,10 @@ export default function WalletInfoCard() {
         <div className="grid grid-cols-2 gap-2">
           <button
             onClick={handleViewOnExplorer}
+            aria-label="View wallet on Stellar Explorer (opens in new tab)"
             className="flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-surface-hover hover:bg-border border border-border text-white font-medium text-[12px] transition-all"
           >
-            <ExternalLink className="w-3.5 h-3.5" />
+            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
             Explorer
           </button>
         </div>
@@ -162,7 +273,7 @@ export default function WalletInfoCard() {
 
       {/* Transaction History */}
       <div className="mt-4 pt-4 border-t border-border">
-        <TransactionHistory publicKey={publicKey!} network={network} limit={8} />
+        <TransactionHistory publicKey={publicKey!} network={networkUpper || "TESTNET"} limit={8} />
       </div>
     </div>
   );

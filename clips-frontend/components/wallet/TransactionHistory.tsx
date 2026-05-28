@@ -115,31 +115,51 @@ export default function TransactionHistory({
         <button
           onClick={load}
           disabled={loading}
+          aria-label={loading ? "Refreshing transaction history" : "Refresh transaction history"}
+          aria-busy={loading}
           className="p-1 rounded hover:bg-surface-hover transition-colors disabled:opacity-50"
           title="Refresh"
         >
-          <RefreshCw className={`w-3.5 h-3.5 text-muted ${loading ? "animate-spin" : ""}`} />
+          <RefreshCw className={`w-3.5 h-3.5 text-muted ${loading ? "animate-spin" : ""}`} aria-hidden="true" />
         </button>
       </div>
 
       {loading && txs.length === 0 && (
-        <div className="flex justify-center py-6">
-          <Loader2 className="w-5 h-5 text-brand animate-spin" />
+        <div 
+          className="flex justify-center py-6"
+          role="status"
+          aria-live="polite"
+        >
+          <Loader2 className="w-5 h-5 text-brand animate-spin" aria-hidden="true" />
+          <span className="sr-only">Loading transactions</span>
         </div>
       )}
 
       {error && (
-        <p className="text-error text-[12px] py-2">{error}</p>
+        <p 
+          className="text-error text-[12px] py-2"
+          role="alert"
+          aria-live="assertive"
+        >
+          {error}
+        </p>
       )}
 
       {!loading && !error && txs.length === 0 && (
-        <p className="text-muted text-[12px] py-4 text-center">No transactions yet</p>
+        <p 
+          className="text-muted text-[12px] py-4 text-center"
+          role="status"
+          aria-live="polite"
+        >
+          No transactions yet
+        </p>
       )}
 
       {txs.map((tx) => (
         <div
           key={tx.id}
           className="flex items-center gap-3 p-3 rounded-xl bg-surface-hover border border-border hover:border-brand/20 transition-colors"
+          role="listitem"
         >
           {/* Direction icon */}
           <div
@@ -148,6 +168,7 @@ export default function TransactionHistory({
                 ? "bg-brand/10 text-brand"
                 : "bg-error/10 text-error"
             }`}
+            aria-hidden="true"
           >
             {tx.type === "received" ? (
               <ArrowDownLeft className="w-4 h-4" />
@@ -181,8 +202,9 @@ export default function TransactionHistory({
                   rel="noopener noreferrer"
                   className="text-muted hover:text-brand transition-colors"
                   title="View on explorer"
+                  aria-label={`View transaction ${tx.txHash} on Stellar Explorer (opens in new tab)`}
                 >
-                  <ExternalLink className="w-3 h-3" />
+                  <ExternalLink className="w-3 h-3" aria-hidden="true" />
                 </a>
               </div>
             </div>

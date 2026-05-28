@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Loader2, Wallet, LogOut, AlertCircle, X, ChevronDown, Coins } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Loader2, Wallet, LogOut, AlertCircle, X, ChevronDown, Coins, ExternalLink } from "lucide-react";
 import { useWallet, truncateAddress } from "./WalletProvider";
 import analytics from "@/lib/analytics";
 
@@ -32,6 +32,35 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
   } = useWallet();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Focus error message when error appears
+  useEffect(() => {
+    if (error && errorRef.current) {
+      errorRef.current.focus();
+    }
+  }, [error]);
+
+  // Keyboard navigation for dropdown
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      setDropdownOpen(false);
+      buttonRef.current?.focus();
+    }
+  };
 
   const getWalletIcon = (type: string | null) => {
     switch (type) {
@@ -96,6 +125,10 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
     });
   };
 
+  const toggleDropdown = () => {
+    setDropdownOpen(!dropdownOpen);
+  };
+
   const metaMaskInstalled = isMetaMaskInstalled();
 
   // ─── Compact variant (header / navbar) ───────────────────────────────────
@@ -155,10 +188,20 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
 
         {/* Inline error toast */}
         {error && (
-          <div className="absolute top-full mt-2 right-0 z-50 flex items-start gap-2 bg-red-950/85 border border-red-500/30 rounded-xl px-4 py-3 max-w-[280px] shadow-xl backdrop-blur-md">
-            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+          <div 
+            ref={errorRef}
+            role="alert"
+            aria-live="assertive"
+            className="absolute top-full mt-2 right-0 z-50 flex items-start gap-2 bg-red-950/85 border border-red-500/30 rounded-xl px-4 py-3 max-w-[280px] shadow-xl backdrop-blur-md"
+            tabIndex={-1}
+          >
+            <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
             <p className="text-[12px] text-red-300 leading-snug flex-1">{error}</p>
-            <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors shrink-0 cursor-pointer" aria-label="Close error message">
+            <button 
+              onClick={clearError} 
+              className="text-red-400 hover:text-red-200 transition-colors shrink-0 cursor-pointer" 
+              aria-label="Close error message"
+            >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -172,10 +215,18 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
     <div className="flex flex-col gap-3 w-full">
       {/* Error banner */}
       {error && (
-        <div className="flex items-start gap-2.5 bg-red-950/60 border border-red-500/25 rounded-xl px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-200">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+        <div 
+          role="alert"
+          aria-live="assertive"
+          className="flex items-start gap-2.5 bg-red-950/60 border border-red-500/25 rounded-xl px-4 py-3 animate-in fade-in slide-in-from-top-2 duration-200"
+        >
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
           <p className="text-[13px] text-red-300 leading-snug flex-1">{error}</p>
-          <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors shrink-0 cursor-pointer" aria-label="Close error message">
+          <button 
+            onClick={clearError} 
+            className="text-red-400 hover:text-red-200 transition-colors shrink-0 cursor-pointer" 
+            aria-label="Close error message"
+          >
             <X className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -216,15 +267,20 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
           target="_blank"
           rel="noopener noreferrer"
           className="w-full py-4 rounded-xl font-bold text-[14px] bg-brand/10 border border-brand/20 text-brand hover:bg-brand/20 transition-all flex items-center justify-center gap-2.5 active:scale-[0.98]"
+          aria-label="Install MetaMask browser extension (opens in new tab)"
         >
-          <ExternalLink className="w-5 h-5" />
+          <ExternalLink className="w-5 h-5" aria-hidden="true" />
           Install MetaMask to Connect
         </a>
       )}
 
       {/* Connecting progress indicator */}
       {isConnecting && (
-        <p className="text-center text-[12px] text-[#5A6F65] animate-in fade-in duration-300">
+        <p 
+          role="status"
+          aria-live="polite"
+          className="text-center text-[12px] text-[#5A6F65] animate-in fade-in duration-300"
+        >
           Check the MetaMask popup to approve the connection.
         </p>
       )}

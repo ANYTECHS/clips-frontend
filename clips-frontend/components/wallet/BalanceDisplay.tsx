@@ -109,8 +109,12 @@ export default function BalanceDisplay({
   if (error && !balance) {
     return (
       <div className={`${className}`}>
-        <div className="flex items-start gap-2 p-4 bg-error/10 border border-error/30 rounded-xl">
-          <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" />
+        <div 
+          role="alert"
+          aria-live="assertive"
+          className="flex items-start gap-2 p-4 bg-error/10 border border-error/30 rounded-xl"
+        >
+          <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" aria-hidden="true" />
           <div className="flex-1 min-w-0">
             <p className="text-error text-[13px] leading-relaxed mb-2">
               {error.message}
@@ -121,6 +125,7 @@ export default function BalanceDisplay({
                 refresh();
               }}
               className="text-[12px] text-error hover:underline font-medium"
+              aria-label="Retry loading balance"
             >
               Try again
             </button>
@@ -150,6 +155,8 @@ export default function BalanceDisplay({
           <button
             onClick={refresh}
             disabled={isLoading}
+            aria-label={isLoading ? "Refreshing balance" : "Refresh balance"}
+            aria-busy={isLoading}
             className="p-1.5 rounded-lg hover:bg-surface-hover transition-colors disabled:opacity-50"
             title="Refresh balance"
           >
@@ -157,6 +164,7 @@ export default function BalanceDisplay({
               className={`w-4 h-4 text-muted hover:text-white ${
                 isLoading ? "animate-spin" : ""
               }`}
+              aria-hidden="true"
             />
           </button>
         )}
@@ -177,6 +185,8 @@ export default function BalanceDisplay({
             <button
               onClick={refresh}
               disabled={isLoading}
+              aria-label={isLoading ? "Refreshing balance" : "Refresh balance"}
+              aria-busy={isLoading}
               className="p-1 rounded hover:bg-surface transition-colors disabled:opacity-50"
               title="Refresh balance"
             >
@@ -184,6 +194,7 @@ export default function BalanceDisplay({
                 className={`w-3.5 h-3.5 text-muted hover:text-white ${
                   isLoading ? "animate-spin" : ""
                 }`}
+                aria-hidden="true"
               />
             </button>
           )}
@@ -248,14 +259,19 @@ export default function BalanceDisplay({
 
       {/* Error indicator (if balance exists but there's an error on refresh) */}
       {error && balance && (
-        <div className="flex items-center gap-2 p-2 bg-error/10 border border-error/30 rounded-lg">
-          <AlertCircle className="w-3 h-3 text-error shrink-0" />
+        <div 
+          role="alert"
+          aria-live="polite"
+          className="flex items-center gap-2 p-2 bg-error/10 border border-error/30 rounded-lg"
+        >
+          <AlertCircle className="w-3 h-3 text-error shrink-0" aria-hidden="true" />
           <p className="text-error text-[11px] flex-1">
             Failed to refresh: {error.message}
           </p>
           <button
             onClick={clearError}
             className="text-error hover:text-error/70 text-[10px] font-medium"
+            aria-label="Dismiss error message"
           >
             Dismiss
           </button>

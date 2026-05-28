@@ -74,10 +74,18 @@ export default function WalletStatusCard() {
 
       {/* Error state */}
       {error && (
-        <div className="flex items-start gap-2.5 bg-red-950/40 border border-red-500/20 rounded-[12px] px-4 py-3">
-          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+        <div 
+          role="alert"
+          aria-live="assertive"
+          className="flex items-start gap-2.5 bg-red-950/40 border border-red-500/20 rounded-[12px] px-4 py-3"
+        >
+          <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" aria-hidden="true" />
           <p className="text-[12px] text-red-300 leading-snug flex-1">{error}</p>
-          <button onClick={clearError} className="text-red-400 hover:text-red-200 transition-colors text-[11px] shrink-0">
+          <button 
+            onClick={clearError} 
+            className="text-red-400 hover:text-red-200 transition-colors text-[11px] shrink-0"
+            aria-label="Dismiss error message"
+          >
             Dismiss
           </button>
         </div>
@@ -96,18 +104,20 @@ export default function WalletStatusCard() {
             <button
               onClick={handleCopy}
               title="Copy full address"
+              aria-label={copied ? "Address copied to clipboard" : "Copy full address to clipboard"}
               className="p-2 rounded-[8px] bg-[#131A17] border border-[#1E2A24] text-[#5A6F65] hover:text-brand hover:border-brand/30 transition-all"
             >
-              {copied ? <CheckCheck className="w-3.5 h-3.5 text-brand" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? <CheckCheck className="w-3.5 h-3.5 text-brand" aria-hidden="true" /> : <Copy className="w-3.5 h-3.5" aria-hidden="true" />}
             </button>
             <a
               href={horizonUrl}
               target="_blank"
               rel="noopener noreferrer"
               title="View on Stellar Explorer"
+              aria-label="View wallet on Stellar Explorer (opens in new tab)"
               className="p-2 rounded-[8px] bg-[#131A17] border border-[#1E2A24] text-[#5A6F65] hover:text-brand hover:border-brand/30 transition-all"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
+              <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
             </a>
           </div>
         </div>
@@ -119,12 +129,14 @@ export default function WalletStatusCard() {
           <button
             onClick={handleCreate}
             disabled={isCreating}
+            aria-busy={isCreating}
+            aria-live="polite"
             className="flex items-center justify-center gap-2 w-full py-3 rounded-[12px] bg-brand hover:bg-brand-hover text-black font-bold text-[13px] transition-all disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {isCreating ? (
-              <><Loader2 className="w-4 h-4 animate-spin" /> Creating wallet…</>
+              <><Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> Creating wallet…</>
             ) : (
-              <><Wallet className="w-4 h-4" /> Create My Wallet</>
+              <><Wallet className="w-4 h-4" aria-hidden="true" /> Create My Wallet</>
             )}
           </button>
         </div>
@@ -132,8 +144,12 @@ export default function WalletStatusCard() {
 
       {/* Info footer */}
       {publicKey && (
-        <div className="flex items-center gap-2 text-[11px] text-[#3A4A43]">
-          <div className="w-1.5 h-1.5 rounded-full bg-brand/60" />
+        <div 
+          className="flex items-center gap-2 text-[11px] text-[#3A4A43]"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="w-1.5 h-1.5 rounded-full bg-brand/60" aria-hidden="true" />
           Wallet auto-created on signup · Powered by Stellar
         </div>
       )}

@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { secureStorage } from "@/app/lib/secureStorage";
 import analytics from "@/lib/analytics";
+import { captureWalletError, logWalletOperation, addWalletBreadcrumb } from "@/app/lib/walletErrorTracking";
 
 /**
  * WalletProvider - Manages wallet connections and state for MetaMask and Phantom wallets
@@ -340,10 +341,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
    * - Other connection errors
    */
   const connectMetaMask = useCallback(async () => {
+    addWalletBreadcrumb("Starting MetaMask connection", "wallet");
+    
     if (!window.ethereum || !window.ethereum.isMetaMask) {
+      const error = "MetaMask is not installed. Please install the MetaMask browser extension.";
+      captureWalletError(new Error(error), "connect_metamask", { walletType: "metamask" });
       setState((prev: WalletState) => ({
         ...prev,
-        error: "MetaMask is not installed. Please install the MetaMask browser extension.",
+        error,
       }));
       return;
     }
@@ -406,11 +411,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       
       // Track successful wallet connection
       analytics.trackWalletConnect("metamask");
+      logWalletOperation("connect_metamask", "success", { walletAddress: address, chainId });
     } catch (err: unknown) {
       const message =
         (err as { code?: number; message?: string })?.code === 4001
           ? "Connection rejected. Please approve the request in MetaMask."
           : (err as Error)?.message ?? "Failed to connect wallet. Please try again.";
+
+      captureWalletError(err, "connect_metamask", { walletType: "metamask", error: message });
+      logWalletOperation("connect_metamask", "error", { error: err, walletType: "metamask" });
 
       setState((prev: WalletState) => ({
         ...prev,
@@ -436,11 +445,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
    * - Other connection errors
    */
   const connectPhantom = useCallback(async () => {
+    addWalletBreadcrumb("Starting Phantom connection", "wallet");
+    
     const solana = window.solana;
     if (!solana || !solana.isPhantom) {
+      const error = "Phantom wallet not detected. Please install the Phantom browser extension.";
+      captureWalletError(new Error(error), "connect_phantom", { walletType: "phantom" });
       setState((prev: WalletState) => ({
         ...prev,
-        error: "Phantom wallet not detected. Please install the Phantom browser extension.",
+        error,
       }));
       return;
     }
@@ -464,11 +477,15 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       
       // Track successful wallet connection
       analytics.trackWalletConnect("phantom");
+      logWalletOperation("connect_phantom", "success", { walletAddress: address });
     } catch (err: unknown) {
       const message =
         (err as { code?: number; message?: string })?.code === 4001
           ? "Connection rejected. Please approve the request in Phantom."
           : (err as Error)?.message ?? "Failed to connect Phantom wallet. Please try again.";
+
+      captureWalletError(err, "connect_phantom", { walletType: "phantom", error: message });
+      logWalletOperation("connect_phantom", "error", { error: err, walletType: "phantom" });
 
       setState((prev: WalletState) => ({
         ...prev,
@@ -480,6 +497,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Connect/Generate Stellar wallet
   const connectStellar = useCallback(async () => {
+    addWalletBreadcrumb("Starting Stellar wallet connection", "wallet");
     setState((prev: WalletState) => ({ ...prev, isConnecting: true, error: null }));
     try {
       const stored = await secureStorage.getItem(STORAGE_KEY);
@@ -498,6 +516,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           });
           setStellarSecret(parsed.stellarSecret);
           setStellarMnemonic(parsed.stellarMnemonic ?? null);
+          logWalletOperation("connect_stellar", "success", { walletAddress: addr, network: "stellar" });
           return;
         }
       }
@@ -521,7 +540,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         stellarSecret: newWallet.secretKey,
         stellarMnemonic: newWallet.mnemonic,
       });
+      logWalletOperation("connect_stellar", "success", { walletAddress: newWallet.publicKey, network: "stellar" });
     } catch (err: any) {
+      captureWalletError(err, "connect_stellar", { walletType: "stellar", error: err.message });
+      logWalletOperation("connect_stellar", "error", { error: err, walletType: "stellar" });
       setState((prev: WalletState) => ({
         ...prev,
         isConnecting: false,
@@ -532,6 +554,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Import existing Stellar key
   const importStellarKey = useCallback(async (secret: string) => {
+    addWalletBreadcrumb("Starting Stellar key import", "wallet");
     setState((prev: WalletState) => ({ ...prev, isConnecting: true, error: null }));
     try {
       if (!secret.startsWith("S") || secret.length !== 56) {
@@ -558,7 +581,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         stellarSecret: secret,
         stellarMnemonic: null,
       });
+      logWalletOperation("import_stellar_key", "success", { walletAddress: addr, network: "stellar" });
     } catch (err: any) {
+      captureWalletError(err, "import_stellar_key", { walletType: "stellar", error: err.message });
+      logWalletOperation("import_stellar_key", "error", { error: err, walletType: "stellar" });
       setState((prev: WalletState) => ({
         ...prev,
         isConnecting: false,
