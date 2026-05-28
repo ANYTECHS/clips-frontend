@@ -15,6 +15,7 @@ import {
 import { MultiWalletStorage, MultiWalletRecord, WalletProviderType } from "@/app/lib/multiWalletStorage";
 import { truncateAddress } from "./WalletProvider";
 import { truncateStellarAddress } from "@/app/lib/embeddedWallet";
+import { useToast } from "@/hooks/useToast";
 
 interface WalletSelectorProps {
   userId: string | null;
@@ -29,6 +30,7 @@ export default function WalletSelector({
   onAddWallet,
   compact = false 
 }: WalletSelectorProps) {
+  const { showToast } = useToast();
   const [isOpen, setIsOpen] = useState(false);
   const [wallets, setWallets] = useState<MultiWalletRecord[]>([]);
   const [activeWallet, setActiveWallet] = useState<MultiWalletRecord | null>(null);
@@ -101,6 +103,7 @@ export default function WalletSelector({
     e.stopPropagation();
     navigator.clipboard.writeText(address).then(() => {
       setCopied(true);
+      showToast("Wallet address copied to clipboard", "success");
       setTimeout(() => setCopied(false), 2000);
     });
   };

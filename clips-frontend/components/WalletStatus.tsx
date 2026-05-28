@@ -5,6 +5,7 @@ import { useWallet, truncateAddress } from "./WalletProvider";
 import { useAuth } from "./AuthProvider";
 import { Wallet, ChevronDown, LogOut, Copy, Check, Layers } from "lucide-react";
 import WalletSelector from "./WalletSelector";
+import { useToast } from "@/hooks/useToast";
 
 /**
  * WalletStatus - Displays wallet connection status in the navbar
@@ -21,6 +22,7 @@ import WalletSelector from "./WalletSelector";
 export default function WalletStatus() {
   const { address, isConnected, walletType, disconnect } = useWallet();
   const { user } = useAuth();
+  const { showToast } = useToast();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const dropdownRef = React.useRef<HTMLDivElement>(null);
@@ -60,6 +62,7 @@ export default function WalletStatus() {
     if (address) {
       await navigator.clipboard.writeText(address);
       setCopied(true);
+      showToast("Wallet address copied to clipboard", "success");
       setTimeout(() => setCopied(false), 2000);
     }
   };

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Loader2, Wallet, LogOut, AlertCircle, X, ChevronDown, Coins, ExternalLink } from "lucide-react";
 import { useWallet, truncateAddress } from "./WalletProvider";
 import analytics from "@/lib/analytics";
+import { useToast } from "@/hooks/useToast";
 
 interface WalletConnectButtonProps {
   /** Compact mode renders a smaller pill button (e.g. for headers/navbars) */
@@ -31,6 +32,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
     clearError,
   } = useWallet();
 
+  const { showToast } = useToast();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -121,6 +123,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
     if (!address) return;
     navigator.clipboard.writeText(address).then(() => {
       setCopied(true);
+      showToast("Wallet address copied to clipboard", "success");
       setTimeout(() => setCopied(false), 1500);
     });
   };

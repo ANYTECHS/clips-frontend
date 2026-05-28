@@ -4,6 +4,7 @@ import React, { useState, useMemo } from "react";
 import { ChevronUp, ChevronDown, Copy, Check } from "lucide-react";
 import { Transaction } from "@/app/lib/mockApi";
 import StatusBadge from "./StatusBadge";
+import { useToast } from "@/hooks/useToast";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -38,10 +39,12 @@ const typeColors: Record<Transaction["type"], string> = {
 
 function CopyId({ id }: { id: string }) {
   const [copied, setCopied] = useState(false);
+  const { showToast } = useToast();
 
   const handleCopy = () => {
     navigator.clipboard.writeText(id);
     setCopied(true);
+    showToast("Transaction ID copied to clipboard", "success");
     setTimeout(() => setCopied(false), 1500);
   };
 

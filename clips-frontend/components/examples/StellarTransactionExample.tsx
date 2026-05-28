@@ -2,7 +2,8 @@
 
 import React, { useState } from "react";
 import { useStellarTransaction } from "@/app/hooks/useStellarTransaction";
-import { Loader2, CheckCircle2, AlertCircle, Wallet } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Wallet, ExternalLink, FlaskConical } from "lucide-react";
+import { getStellarLabUrl } from "@/app/lib/networkConfig";
 
 /**
  * Example component demonstrating how to use the useStellarTransaction hook
@@ -117,6 +118,26 @@ export default function StellarTransactionExample() {
                     <code className="text-xs text-brand font-mono">
                       {transactionHash}
                     </code>
+                    <div className="flex items-center gap-1.5 ml-2">
+                      <a
+                        href={`https://stellar.expert/explorer/testnet/tx/${transactionHash}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted hover:text-brand transition-colors"
+                        title="View on explorer"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                      <a
+                        href={getStellarLabUrl(transactionHash || "")}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-muted hover:text-brand transition-colors"
+                        title="Open in Stellar Lab"
+                      >
+                        <FlaskConical className="w-3 h-3" />
+                      </a>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-muted">Ledger:</span>

@@ -5,6 +5,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { WalletProvider } from "@/components/WalletProvider";
 import { StellarWalletProvider } from "@/components/StellarWalletProvider";
 import { ThemeProvider } from "@/components/theme-provider";
+import { ToastProvider } from "@/components/ToastProvider";
 import CookieConsent from "@/components/CookieConsent";
 import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -31,13 +32,16 @@ export default function RootLayout({
         <ThemeProvider>
           <ErrorBoundary>
             <AuthProvider>
-              <WalletProvider>
-                <AnalyticsProvider />
-                <KeyboardShortcuts />
-                {children}
-                <RateLimitToast />
-                </StellarWalletProvider>
-              </WalletProvider>
+              <ToastProvider>
+                <WalletProvider>
+                  <StellarWalletProvider>
+                    <AnalyticsProvider />
+                    <KeyboardShortcuts />
+                    {children}
+                    <RateLimitToast />
+                  </StellarWalletProvider>
+                </WalletProvider>
+              </ToastProvider>
             </AuthProvider>
           </ErrorBoundary>
         </ThemeProvider>

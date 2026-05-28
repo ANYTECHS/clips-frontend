@@ -5,6 +5,8 @@ import {
   getNetworkPassphrase,
   getFriendbotUrl,
 } from "./networkConfig";
+import type { StellarOperation } from "./stellarOperations";
+import { validateOperations } from "./stellarOperations";
 
 // Re-export so existing callers that import these from stellar.ts keep working.
 export { STELLAR_NETWORK };
@@ -166,4 +168,200 @@ export const submitTransaction = async (signedTx: StellarSdk.Transaction) => {
     const details = errorResult ? JSON.stringify(errorResult) : error.message || "Unknown error";
     throw new Error(`Horizon Submission Failed: ${details}`);
   }
+};
+
+// ─── Batch transaction builder ────────────────────────────────────────────────
+
+/**
+ * Convert a typed `StellarOperation` descriptor into a real Stellar SDK
+ * `xdr.Operation` object.
+ */
+function toSdkOperation(op: StellarOperation): StellarSdk.xdr.Operation {
+  switch (op.type) {
+    case "payment": {
+      const asset =
+        op.assetCode && op.assetIssuer
+          ? new StellarSdk.Asset(op.assetCode, op.assetIssuer)
+          : StellarSdk.Asset.native();
+      return StellarSdk.Operation.payment({
+        destination: op.destination,
+        asset,
+        amount: op.amount,
+        ...(op.source ? { source: op.source } : {}),
+      });
+    }
+
+    case "change_trust": {
+      const asset = new StellarSdk.Asset(op.assetCode, op.assetIssuer);
+      return StellarSdk.Operation.changeTrust({
+        asset,
+        ...(op.limit !== undefined ? { limit: op.limit } : {}),
+        ...(op.source ? { source: op.source } : {}),
+      });
+    }
+
+    case "manage_sell_offer": {
+      const selling =
+        op.sellingAssetCode && op.sellingAssetIssuer
+          ? new StellarSdk.Asset(op.sellingAssetCode, op.sellingAssetIssuer)
+          : StellarSdk.Asset.native();
+      const buying =
+        op.buyingAssetCode && op.buyingAssetIssuer
+          ? new StellarSdk.Asset(op.buyingAssetCode, op.buyingAssetIssuer)
+          : StellarSdk.Asset.native();
+      return StellarSdk.Operation.manageSellOffer({
+        selling,
+        buying,
+        amount: op.amount,
+        price: op.price,
+        offerId: op.offerId ?? "0",
+        ...(op.source ? { source: op.source } : {}),
+      });
+    }
+
+    case "manage_buy_offer": {
+      const selling =
+        op.sellingAssetCode && op.sellingAssetIssuer
+          ? new StellarSdk.Asset(op.sellingAssetCode, op.sellingAssetIssuer)
+          : StellarSdk.Asset.native();
+      const buying =
+        op.buyingAssetCode && op.buyingAssetIssuer
+          ? new StellarSdk.Asset(op.buyingAssetCode, op.buyingAssetIssuer)
+          : StellarSdk.Asset.native();
+      return StellarSdk.Operation.manageBuyOffer({
+        selling,
+        buying,
+        buyAmount: op.buyAmount,
+        price: op.price,
+        offerId: op.offerId ?? "0",
+        ...(op.source ? { source: op.source } : {}),
+      });
+    }
+
+    case "account_merge":
+      return StellarSdk.Operation.accountMerge({
+        destination: op.destination,
+        ...(op.source ? { source: op.source } : {}),
+      });
+
+    case "set_options": {
+      const opts: StellarSdk.Operation.SetOptionsOptions = {};
+      if (op.inflationDest !== undefined) opts.inflationDest = op.inflationDest;
+      if (op.clearFlags !== undefined) opts.clearFlags = op.clearFlags;
+      if (op.setFlags !== undefined) opts.setFlags = op.setFlags;
+      if (op.masterWeight !== undefined) opts.masterWeight = op.masterWeight;
+      if (op.lowThreshold !== undefined) opts.lowThreshold = op.lowThreshold;
+      if (op.medThreshold !== undefined) opts.medThreshold = op.medThreshold;
+      if (op.highThreshold !== undefined) opts.highThreshold = op.highThreshold;
+      if (op.homeDomain !== undefined) opts.homeDomain = op.homeDomain;
+      if (op.signer?.ed25519PublicKey !== undefined) {
+        opts.signer = {
+          ed25519PublicKey: op.signer.ed25519PublicKey,
+          weight: op.signer.weight,
+        };
+      }
+      if (op.source) opts.source = op.source;
+      return StellarSdk.Operation.setOptions(opts);
+    }
+
+    case "invoke_contract":
+      // Soroban contract invocations require the Soroban RPC path and a
+      // SorobanDataBuilder — this stub builds a placeholder operation.
+      // Replace with a full Soroban client call in production.
+      throw new Error(
+        "invoke_contract operations must be built via the Soroban RPC client. " +
+          "Use SorobanRpc.Server and assembleTransaction() before calling submitTransaction()."
+      );
+
+    default: {
+      const _exhaustive: never = op;
+      throw new Error(`Unknown operation type: ${(_exhaustive as StellarOperation).type}`);
+    }
+  }
+}
+
+export interface BatchTransactionResult {
+  /** Unsigned transaction XDR ready for Freighter to sign */
+  xdr: string;
+  /** Total fee in stroops (baseFee × operationCount) */
+  feeStroops: number;
+  /** Number of operations in the transaction */
+  operationCount: number;
+}
+
+/**
+ * Build a multi-operation Stellar transaction and return the unsigned XDR.
+ *
+ * The XDR is intended to be passed to Freighter (or another wallet) for
+ * signing, then submitted via `submitTransaction`.
+ *
+ * Fee is automatically scaled: baseFee × numberOfOperations.
+ *
+ * @example
+ * const { xdr } = await buildBatchTransaction(senderPublicKey, [
+ *   createChangeTrustOp({ assetCode: "USDC", assetIssuer: "G..." }),
+ *   createPaymentOp({ destination: recipientKey, amount: "10", assetCode: "USDC", assetIssuer: "G..." }),
+ * ]);
+ *
+ * // Sign with Freighter
+ * const signedXdr = await freighter.signTransaction(xdr, { network: "TESTNET", accountToSign: senderPublicKey });
+ * await submitTransaction(StellarSdk.TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE));
+ */
+export const buildBatchTransaction = async (
+  senderPublicKey: string,
+  operations: StellarOperation[],
+  options: {
+    memo?: string;
+    timeoutSeconds?: number;
+  } = {}
+): Promise<BatchTransactionResult> => {
+  const { memo, timeoutSeconds = 30 } = options;
+
+  // Validate before touching the network
+  validateOperations(operations);
+
+  const server = getStellarServer();
+
+  // Load source account (verifies it exists and fetches sequence number)
+  let sourceAccount: StellarSdk.AccountResponse;
+  try {
+    sourceAccount = await server.loadAccount(senderPublicKey);
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number } };
+    if (err.response?.status === 404) {
+      throw new Error("Sender account is not funded. Please fund it first.");
+    }
+    throw error;
+  }
+
+  // Fetch base fee and scale by operation count
+  let baseFee = 100;
+  try {
+    baseFee = await server.fetchBaseFee();
+  } catch {
+    console.warn("Failed to fetch base fee, using default 100 stroops");
+  }
+  const totalFee = baseFee * operations.length;
+
+  // Build the transaction with all operations
+  const builder = new StellarSdk.TransactionBuilder(sourceAccount, {
+    fee: totalFee.toString(),
+    networkPassphrase: NETWORK_PASSPHRASE,
+  });
+
+  for (const op of operations) {
+    builder.addOperation(toSdkOperation(op));
+  }
+
+  if (memo) {
+    builder.addMemo(StellarSdk.Memo.text(memo));
+  }
+
+  const transaction = builder.setTimeout(timeoutSeconds).build();
+
+  return {
+    xdr: transaction.toEnvelope().toXDR("base64"),
+    feeStroops: totalFee,
+    operationCount: operations.length,
+  };
 };

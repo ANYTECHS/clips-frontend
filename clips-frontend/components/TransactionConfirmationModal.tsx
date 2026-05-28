@@ -12,9 +12,12 @@ import {
   ExternalLink,
   ShieldCheck,
   AlertCircle,
+  FlaskConical,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { buildPaymentTransaction } from "@/app/lib/stellar";
+import { getStellarLabUrl } from "@/app/lib/networkConfig";
+import { useToast } from "@/hooks/useToast";
 
 interface TransactionConfirmationModalProps {
   recipient: string;
@@ -32,6 +35,7 @@ export default function TransactionConfirmationModal({
   onSuccess,
 }: TransactionConfirmationModalProps) {
   const { sendXlmPayment, address } = useWallet();
+  const { showToast } = useToast();
 
   const [step, setStep] = useState<"calculating" | "confirm" | "submitting" | "success" | "error">(
     "calculating"
@@ -92,6 +96,7 @@ export default function TransactionConfirmationModal({
   const handleCopyHash = () => {
     navigator.clipboard.writeText(txHash);
     setCopied(true);
+    showToast("Transaction hash copied to clipboard", "success");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -249,27 +254,36 @@ export default function TransactionConfirmationModal({
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex gap-3 pt-2">
                 <a
                   href={getStellarExpertUrl()}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex-1 py-3.5 rounded-xl border border-white/10 hover:border-brand/35 text-white hover:text-brand text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer bg-white/[0.01]"
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-[13px] border border-white/5 transition-all cursor-pointer"
                 >
-                  <span>View on Explorer</span>
-                  <ExternalLink className="w-3.5 h-3.5" />
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Stellar Expert</span>
                 </a>
-                
-                <button
-                  onClick={() => {
-                    onSuccess();
-                    onClose();
-                  }}
-                  className="flex-1 py-3.5 rounded-xl bg-brand hover:bg-brand-hover text-black text-xs font-bold transition-all cursor-pointer text-center"
+                <a
+                  href={getStellarLabUrl(txHash, network === "mainnet" ? "mainnet" : "testnet")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-brand/10 hover:bg-brand/20 text-brand font-bold text-[13px] border border-brand/20 transition-all cursor-pointer"
                 >
-                  Done
-                </button>
+                  <FlaskConical className="w-4 h-4" />
+                  <span>Stellar Lab</span>
+                </a>
               </div>
+
+              <button
+                onClick={() => {
+                  onSuccess();
+                  onClose();
+                }}
+                className="w-full mt-3 py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] transition-all active:scale-[0.98] cursor-pointer shadow-[0_0_20px_rgba(0,229,143,0.15)]"
+              >
+                Done
+              </button>
             </div>
           )}
 

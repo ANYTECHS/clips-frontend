@@ -16,11 +16,13 @@ import { Wallet, Copy, CheckCheck, RefreshCw, ExternalLink, AlertCircle, Loader2
 import { useEmbeddedWallet } from "@/components/EmbeddedWalletProvider";
 import { truncateStellarAddress } from "@/app/lib/embeddedWallet";
 import { useAuth } from "@/components/AuthProvider";
+import { useToast } from "@/hooks/useToast";
 
 export default function WalletStatusCard() {
   const { user } = useAuth();
   const { wallet, isCreating, error, initWallet, clearError } = useEmbeddedWallet();
   const [copied, setCopied] = useState(false);
+  const { showToast } = useToast();
 
   // Prefer live wallet state; fall back to user record (persisted across refreshes)
   const publicKey = wallet?.publicKey ?? user?.walletAddress ?? null;
@@ -31,6 +33,7 @@ export default function WalletStatusCard() {
     if (!publicKey) return;
     await navigator.clipboard.writeText(publicKey);
     setCopied(true);
+    showToast("Wallet address copied to clipboard", "success");
     setTimeout(() => setCopied(false), 2000);
   };
 

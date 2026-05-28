@@ -36,6 +36,7 @@
  */
 
 import { STELLAR_NETWORKS, StellarNetwork } from "./embeddedWallet";
+import { StellarOperation, validateOperations } from "./stellarOperations";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -107,6 +108,10 @@ export interface HorizonErrorResponse {
 
 // ─── Transaction payload ──────────────────────────────────────────────────────
 
+/**
+ * Single-operation payload (legacy / convenience form).
+ * Kept for backward compatibility — internally converted to a batch of one.
+ */
 export interface StellarTransactionPayload {
   /** Source account public key */
   sourcePublicKey: string;
@@ -120,11 +125,42 @@ export interface StellarTransactionPayload {
   memo?: string;
 }
 
+/**
+ * Batch transaction payload — supports one or more typed operations in a
+ * single atomic Stellar transaction.
+ *
+ * All operations share the same source account and are signed together.
+ * The fee is automatically scaled: baseFee × numberOfOperations.
+ *
+ * @example
+ * const payload: BatchTransactionPayload = {
+ *   sourcePublicKey: "G...",
+ *   operations: [
+ *     createChangeTrustOp({ assetCode: "USDC", assetIssuer: "G..." }),
+ *     createPaymentOp({ destination: "G...", amount: "10", assetCode: "USDC", assetIssuer: "G..." }),
+ *   ],
+ *   network: "testnet",
+ *   memo: "batch payment",
+ * };
+ */
+export interface BatchTransactionPayload {
+  /** Source account public key */
+  sourcePublicKey: string;
+  /** One or more operations to include in the transaction (max 100) */
+  operations: StellarOperation[];
+  /** Network to submit on */
+  network: StellarNetwork;
+  /** Optional text memo (max 28 bytes) */
+  memo?: string;
+}
+
 export interface StellarTransactionResult {
   hash: string;
   ledger: number;
   sequenceUsed: string;
   attempts: number;
+  /** Number of operations included in the transaction */
+  operationCount: number;
 }
 
 // ─── Horizon client (mock-compatible, swap for real SDK in production) ────────
@@ -168,27 +204,38 @@ export async function fetchAccountSequence(
 /**
  * Build and sign a Stellar transaction envelope (XDR).
  *
- * This is a stub for the prototype — in production replace with:
+ * Accepts either a single-operation `StellarTransactionPayload` (legacy) or a
+ * multi-operation `BatchTransactionPayload`. The fee is scaled automatically:
+ *   fee = baseFee × numberOfOperations
+ *
+ * This is a stub for the prototype — in production replace with the real SDK
+ * call in `buildBatchTransaction` (stellar.ts):
  *   const tx = new TransactionBuilder(account, { fee, networkPassphrase })
- *     .addOperation(Operation[operationType](operationParams))
+ *     .addOperation(...)   // called once per operation
  *     .setTimeout(30)
  *     .build();
  *   tx.sign(Keypair.fromSecret(secretKey));
  *   return tx.toEnvelope().toXDR("base64");
  */
 export function buildTransactionEnvelope(
-  payload: StellarTransactionPayload,
+  payload: StellarTransactionPayload | BatchTransactionPayload,
   sequence: string,
   secretKey: string
 ): string {
+  // Normalise to a list of operation descriptors for the mock envelope
+  const isBatch = "operations" in payload;
+  const operations = isBatch
+    ? payload.operations
+    : [{ type: payload.operationType, ...payload.operationParams }];
+
   // Prototype stub — returns a mock XDR envelope string
   // In production this would be a real base64-encoded XDR envelope
   const mockEnvelope = btoa(
     JSON.stringify({
       source: payload.sourcePublicKey,
       sequence,
-      operation: payload.operationType,
-      params: payload.operationParams,
+      operations,
+      operationCount: operations.length,
       memo: payload.memo,
       // secretKey is used for signing but never included in the envelope
       sig: btoa(`${secretKey.slice(0, 8)}:${sequence}`),
@@ -300,26 +347,39 @@ function backoffDelay(attempt: number): Promise<void> {
 /**
  * Submit a Stellar transaction with automatic sequence number retry logic.
  *
+ * Accepts either a single-operation `StellarTransactionPayload` (legacy) or a
+ * multi-operation `BatchTransactionPayload`. When using the batch form, all
+ * operations are validated before the first network call.
+ *
  * Algorithm:
- * 1. Fetch the current account sequence number from Horizon.
- * 2. Build and sign the transaction envelope.
- * 3. Submit to Horizon.
- * 4. If `tx_bad_seq` is returned:
+ * 1. (Batch only) Validate all operations.
+ * 2. Fetch the current account sequence number from Horizon.
+ * 3. Build and sign the transaction envelope.
+ * 4. Submit to Horizon.
+ * 5. If `tx_bad_seq` is returned:
  *    a. Re-fetch the sequence number (it may have been incremented by another tx).
  *    b. Rebuild and resubmit (up to MAX_SEQ_RETRIES times).
- * 5. If a transient network error occurs, apply exponential backoff and retry
+ * 6. If a transient network error occurs, apply exponential backoff and retry
  *    (up to MAX_NETWORK_RETRIES times).
- * 6. Non-retryable errors are thrown immediately.
+ * 7. Non-retryable errors are thrown immediately.
  *
- * @param payload   - Transaction details (source, operation, network)
+ * @param payload   - Transaction details (source, operation(s), network)
  * @param secretKey - Signing key (retrieved from WalletStorage, never persisted)
  * @param onRetry   - Optional callback invoked before each retry attempt
  */
 export async function submitStellarTransaction(
-  payload: StellarTransactionPayload,
+  payload: StellarTransactionPayload | BatchTransactionPayload,
   secretKey: string,
   onRetry?: (info: { attempt: number; reason: StellarErrorCode; nextDelayMs: number }) => void
 ): Promise<StellarTransactionResult> {
+  // Validate batch operations before touching the network
+  if ("operations" in payload) {
+    validateOperations(payload.operations);
+  }
+
+  const operationCount =
+    "operations" in payload ? payload.operations.length : 1;
+
   let seqRetries = 0;
   let networkRetries = 0;
   let totalAttempts = 0;
@@ -353,6 +413,7 @@ export async function submitStellarTransaction(
         ledger: result.ledger,
         sequenceUsed: nextSequence,
         attempts: totalAttempts,
+        operationCount,
       };
     } catch (err) {
       if (!(err instanceof StellarTransactionError)) {

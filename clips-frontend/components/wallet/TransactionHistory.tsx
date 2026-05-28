@@ -1,7 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
-import { ArrowDownLeft, ArrowUpRight, Loader2, RefreshCw, ExternalLink } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Loader2, RefreshCw, ExternalLink, FlaskConical, Copy, Check } from "lucide-react";
+import { getStellarLabUrl } from "@/app/lib/networkConfig";
+import { useToast } from "@/hooks/useToast";
 
 export interface Transaction {
   id: string;
@@ -83,6 +85,8 @@ export default function TransactionHistory({
   const [txs, setTxs] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { showToast } = useToast();
+  const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
   const explorerBase =
     network === "PUBLIC"
@@ -101,6 +105,14 @@ export default function TransactionHistory({
       setLoading(false);
     }
   }, [publicKey, network, limit]);
+
+  const handleCopy = useCallback((text: string, type: "address" | "hash") => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedHash(text);
+      showToast(`${type === "address" ? "Address" : "Transaction hash"} copied to clipboard`, "success");
+      setTimeout(() => setCopiedHash(null), 1500);
+    });
+  }, [showToast]);
 
   useEffect(() => {
     load();
@@ -191,21 +203,49 @@ export default function TransactionHistory({
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
-              <span className="text-[11px] text-muted truncate font-mono">
-                {truncate(tx.counterparty)}
-              </span>
+              <button 
+                onClick={() => handleCopy(tx.counterparty, "address")}
+                className="text-[11px] text-muted hover:text-white transition-colors font-mono flex items-center gap-1 group"
+                title="Copy counterparty address"
+              >
+                <span className="truncate">{truncate(tx.counterparty)}</span>
+                <Copy className="w-2.5 h-2.5 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </button>
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-[11px] text-muted">{formatDate(tx.timestamp)}</span>
-                <a
-                  href={`${explorerBase}/${tx.txHash}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted hover:text-brand transition-colors"
-                  title="View on explorer"
-                  aria-label={`View transaction ${tx.txHash} on Stellar Explorer (opens in new tab)`}
-                >
-                  <ExternalLink className="w-3 h-3" aria-hidden="true" />
-                </a>
+                <div className="flex items-center gap-1 border-l border-border pl-1.5 ml-0.5">
+                  <button
+                    onClick={() => handleCopy(tx.txHash, "hash")}
+                    className="text-muted hover:text-brand transition-colors"
+                    title="Copy transaction hash"
+                  >
+                    {copiedHash === tx.txHash ? (
+                      <Check className="w-3 h-3 text-brand" />
+                    ) : (
+                      <Copy className="w-3 h-3" />
+                    )}
+                  </button>
+                  <a
+                    href={`${explorerBase}/${tx.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted hover:text-brand transition-colors"
+                    title="View on explorer"
+                    aria-label={`View transaction ${tx.txHash} on Stellar Explorer (opens in new tab)`}
+                  >
+                    <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                  </a>
+                  <a
+                    href={getStellarLabUrl(tx.txHash, network === "PUBLIC" ? "mainnet" : "testnet")}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted hover:text-brand transition-colors"
+                    title="Open in Stellar Lab"
+                    aria-label={`Open transaction ${tx.txHash} in Stellar Laboratory (opens in new tab)`}
+                  >
+                    <FlaskConical className="w-3 h-3" aria-hidden="true" />
+                  </a>
+                </div>
               </div>
             </div>
           </div>

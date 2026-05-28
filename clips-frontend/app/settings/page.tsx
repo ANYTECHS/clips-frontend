@@ -7,6 +7,7 @@ import { useWallet } from "@/components/WalletProvider";
 import SocialRecoveryConfig from "@/components/SocialRecoveryConfig";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff } from "lucide-react";
+import { useToast } from "@/hooks/useToast";
 import {
   getStoredPermission,
   requestNotificationPermission,
@@ -14,6 +15,7 @@ import {
 } from "@/app/lib/notifications";
 
 export default function SettingsPage() {
+  const { showToast } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [permission, setPermission] = useState<"granted" | "denied" | "default">("default");
   const [notificationsLoading, setNotificationsLoading] = useState(false);
@@ -90,6 +92,7 @@ export default function SettingsPage() {
     if (!stellarSecret) return;
     navigator.clipboard.writeText(stellarSecret);
     setCopiedKey(true);
+    showToast("Secret key copied to clipboard", "success");
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
@@ -97,6 +100,7 @@ export default function SettingsPage() {
     if (!stellarMnemonic) return;
     navigator.clipboard.writeText(stellarMnemonic);
     setCopiedMnemonic(true);
+    showToast("Recovery phrase copied to clipboard", "success");
     setTimeout(() => setCopiedMnemonic(false), 2000);
   };
 

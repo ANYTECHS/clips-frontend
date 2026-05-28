@@ -108,3 +108,14 @@ export function getFriendbotUrl(network?: StellarNetwork): string {
 export function getFreighterNetwork(network?: StellarNetwork): "PUBLIC" | "TESTNET" {
   return NETWORK_CONFIGS[network ?? STELLAR_NETWORK].freighterNetwork;
 }
+
+/**
+ * Returns the Stellar Laboratory URL for a specific transaction.
+ * @param txHash The transaction hash to view
+ * @param network Optional network override
+ */
+export function getStellarLabUrl(txHash: string, network?: StellarNetwork): string {
+  const freighterNetwork = getFreighterNetwork(network).toLowerCase();
+  const labNetwork = freighterNetwork === "public" ? "public" : "test";
+  return `https://laboratory.stellar.org/#explorer?resource=transactions&endpoint=single&values=${txHash}&network=${labNetwork}`;
+}
