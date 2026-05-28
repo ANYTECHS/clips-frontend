@@ -61,6 +61,18 @@ export interface WalletState {
   error: string | null;
 }
 
+export interface PendingTransaction {
+  id: string;
+  publicKey: string;
+  type: "sent" | "received";
+  amount: string;
+  asset: string;
+  counterparty: string;
+  timestamp: string;
+  txHash: string;
+  status: "pending" | "failed";
+}
+
 interface WalletContextType extends WalletState {
   connectMetaMask: () => Promise<void>;
   connectPhantom: () => Promise<void>;
@@ -69,6 +81,10 @@ interface WalletContextType extends WalletState {
   fundWithFriendbot: () => Promise<void>;
   refreshBalance: () => Promise<void>;
   sendXlmPayment: (destination: string, amount: string) => Promise<{ success: boolean; hash: string }>;
+  pendingTransactions: PendingTransaction[];
+  addPendingTransaction: (tx: Omit<PendingTransaction, "id">) => string;
+  removePendingTransaction: (id: string) => void;
+  updatePendingTransaction: (id: string, updates: Partial<PendingTransaction>) => void;
   disconnect: () => void;
   clearError: () => void;
   balance: string | null;
@@ -125,6 +141,10 @@ const WalletContext = createContext<WalletContextType>({
   fundWithFriendbot: async () => {},
   refreshBalance: async () => {},
   sendXlmPayment: async () => ({ success: false, hash: "" }),
+  pendingTransactions: [],
+  addPendingTransaction: () => "",
+  removePendingTransaction: () => {},
+  updatePendingTransaction: () => {},
   disconnect: () => {},
   clearError: () => {},
   balance: null,
@@ -155,7 +175,27 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [balance, setBalance] = useState<string | null>(null);
   const [stellarSecret, setStellarSecret] = useState<string | null>(null);
   const [stellarMnemonic, setStellarMnemonic] = useState<string | null>(null);
+  const [pendingTransactions, setPendingTransactions] = useState<PendingTransaction[]>([]);
   const stateRef = useRef(state);
+
+  const addPendingTransaction = useCallback((tx: Omit<PendingTransaction, "id">) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    setPendingTransactions((prev) => [{ id, ...tx }, ...prev]);
+    return id;
+  }, []);
+
+  const removePendingTransaction = useCallback((id: string) => {
+    setPendingTransactions((prev) => prev.filter((tx) => tx.id !== id));
+  }, []);
+
+  const updatePendingTransaction = useCallback(
+    (id: string, updates: Partial<PendingTransaction>) => {
+      setPendingTransactions((prev) =>
+        prev.map((tx) => (tx.id === id ? { ...tx, ...updates } : tx))
+      );
+    },
+    []
+  );
 
   // Sync ref with state so event listeners always see latest values
   // This is necessary because event listeners are set up once and need access to current state
@@ -621,19 +661,38 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       if (state.walletType !== "stellar" || !stellarSecret || !state.address) {
         throw new Error("Stellar wallet is not connected");
       }
+
+      const pendingId = addPendingTransaction({
+        publicKey: state.address,
+        type: "sent",
+        amount,
+        asset: "XLM",
+        counterparty: destination,
+        timestamp: new Date().toISOString(),
+        txHash: "",
+        status: "pending",
+      });
+
       try {
         const { transaction } = await buildPaymentTransaction(state.address, destination, amount);
         const senderKeypair = StellarSdk.Keypair.fromSecret(stellarSecret);
         transaction.sign(senderKeypair);
         const result = await submitTransaction(transaction);
+
+        updatePendingTransaction(pendingId, {
+          txHash: result.hash,
+          status: "pending",
+        });
+
         await refreshBalance();
         return { success: true, hash: result.hash };
       } catch (err: any) {
+        removePendingTransaction(pendingId);
         console.error("XLM Payment execution failed:", err);
         throw err;
       }
     },
-    [state.address, state.walletType, stellarSecret, refreshBalance]
+    [state.address, state.walletType, stellarSecret, refreshBalance, addPendingTransaction, removePendingTransaction, updatePendingTransaction]
   );
 
   const disconnect = useCallback(() => {
@@ -663,6 +722,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         fundWithFriendbot: fundWithFriendbotAction,
         refreshBalance,
         sendXlmPayment,
+        pendingTransactions,
+        addPendingTransaction,
+        removePendingTransaction,
+        updatePendingTransaction,
         disconnect,
         clearError,
       }}

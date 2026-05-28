@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { ArrowDownLeft, ArrowUpRight, Loader2, RefreshCw, ExternalLink, FlaskConical, Copy, Check } from "lucide-react";
 import {
   getStellarLabUrl,
@@ -10,6 +10,8 @@ import {
   getStellarScanTransactionUrl,
 } from "@/app/lib/networkConfig";
 import { useToast } from "@/hooks/useToast";
+import { useWallet } from "@/components/WalletProvider";
+import StatusBadge from "@/components/ui/StatusBadge";
 
 export interface Transaction {
   id: string;
@@ -20,6 +22,7 @@ export interface Transaction {
   timestamp: Date;
   memo?: string;
   txHash: string;
+  status?: "completed" | "pending" | "failed";
 }
 
 interface TransactionHistoryProps {
@@ -92,10 +95,36 @@ export default function TransactionHistory({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
+  const { pendingTransactions } = useWallet();
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   const stellarNetwork = network === "PUBLIC" ? "mainnet" : "testnet";
   const accountExpertUrl = getStellarExpertAccountUrl(publicKey, stellarNetwork);
   const accountScanUrl = getStellarScanAccountUrl(publicKey, stellarNetwork);
+
+  const displayedTxs = useMemo(() => {
+    const relevantPending = pendingTransactions.filter(
+      (tx) => tx.publicKey === publicKey
+    );
+
+    const pendingHashes = new Set(relevantPending.filter((tx) => tx.txHash).map((tx) => tx.txHash));
+
+    const completeTxs = txs.map((tx): Transaction => ({ ...tx, status: "completed" }));
+
+    return [
+      ...relevantPending.map((tx) => ({
+        id: tx.id,
+        type: tx.type,
+        amount: tx.amount,
+        asset: tx.asset,
+        counterparty: tx.counterparty,
+        timestamp: new Date(tx.timestamp),
+        memo: undefined,
+        txHash: tx.txHash || "",
+        status: tx.status,
+      })),
+      ...completeTxs.filter((tx) => tx.txHash && !pendingHashes.has(tx.txHash)),
+    ];
+  }, [pendingTransactions, publicKey, txs]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,7 +222,7 @@ export default function TransactionHistory({
         </p>
       )}
 
-      {txs.map((tx) => (
+      {displayedTxs.map((tx) => (
         <div
           key={tx.id}
           className="flex items-center gap-3 p-3 rounded-xl bg-surface-hover border border-border hover:border-brand/20 transition-colors"
@@ -218,7 +247,10 @@ export default function TransactionHistory({
           {/* Details */}
           <div className="flex-1 min-w-0">
             <div className="flex items-baseline justify-between gap-2">
-              <span className="text-[13px] font-bold text-white capitalize">{tx.type}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-[13px] font-bold text-white capitalize">{tx.type}</span>
+                {tx.status && <StatusBadge status={tx.status} size="sm" />}
+              </div>
               <span
                 className={`text-[13px] font-bold shrink-0 ${
                   tx.type === "received" ? "text-brand" : "text-error"
@@ -240,12 +272,14 @@ export default function TransactionHistory({
               <div className="flex items-center gap-1.5 shrink-0">
                 <span className="text-[11px] text-muted">{formatDate(tx.timestamp)}</span>
                 <div className="flex items-center gap-1 border-l border-border pl-1.5 ml-0.5">
-                  <button
-                    onClick={() => handleCopy(tx.txHash, "hash")}
-                    className="text-muted hover:text-brand transition-colors"
-                    title="Copy transaction hash"
-                  >
-                    {copiedHash === tx.txHash ? (
+                  {tx.txHash ? (
+                    <>
+                      <button
+                        onClick={() => handleCopy(tx.txHash, "hash")}
+                        className="text-muted hover:text-brand transition-colors"
+                        title="Copy transaction hash"
+                      >
+                        {copiedHash === tx.txHash ? (
                       <Check className="w-3 h-3 text-brand" />
                     ) : (
                       <Copy className="w-3 h-3" />
