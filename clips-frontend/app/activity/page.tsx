@@ -6,6 +6,7 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ActivityFeed from "@/components/wallet/ActivityFeed";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { Loader2, AlertCircle, Activity } from "lucide-react";
+import Skeleton from "@/components/ui/Skeleton";
 
 export default function ActivityPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -59,8 +60,39 @@ export default function ActivityPage() {
 
           {/* Loading state */}
           {status === "loading" && (
-            <div className="flex justify-center py-16">
-              <Loader2 className="w-6 h-6 text-brand animate-spin" />
+            <div className="bg-surface border border-border rounded-[24px] p-5 sm:p-6 space-y-6">
+              {/* Header Skeleton */}
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-6 w-6 rounded-lg" />
+              </div>
+              
+              {/* Filter Chips Skeleton */}
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-4 rounded-full animate-pulse" />
+                <Skeleton className="h-7 w-12 rounded-lg" />
+                <Skeleton className="h-7 w-20 rounded-lg" />
+                <Skeleton className="h-7.5 w-16 rounded-lg" />
+              </div>
+
+              {/* Transactions Skeleton List */}
+              <div className="space-y-2">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-surface-hover/50">
+                    <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-4 w-20" />
+                        <Skeleton className="h-4 w-24" />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <Skeleton className="h-3 w-32" />
+                        <Skeleton className="h-3 w-16" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 

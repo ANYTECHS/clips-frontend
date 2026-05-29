@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { getStellarLabUrl } from "@/app/lib/networkConfig";
 import { useToast } from "@/hooks/useToast";
+import Skeleton from "@/components/ui/Skeleton";
 
 export interface ActivityTransaction {
   id: string;
@@ -259,12 +260,22 @@ export default function ActivityFeed({
 
       {/* Loading state */}
       {loading && allTxs.length === 0 && (
-        <div
-          className="flex justify-center py-8"
-          role="status"
-          aria-live="polite"
-        >
-          <Loader2 className="w-5 h-5 text-brand animate-spin" aria-hidden="true" />
+        <div className="space-y-2" role="status" aria-label="Loading transactions">
+          {[...Array(5)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-surface-hover/50">
+              <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-4 w-20" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <div className="flex items-center justify-between">
+                  <Skeleton className="h-3 w-32" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            </div>
+          ))}
           <span className="sr-only">Loading transactions</span>
         </div>
       )}

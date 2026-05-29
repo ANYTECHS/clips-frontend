@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useWallet, truncateAddress } from "@/components/WalletProvider";
+import Skeleton from "@/components/ui/Skeleton";
 
 /* ================= TYPES ================= */
 
@@ -75,7 +76,7 @@ const MetaMaskIcon = ({ className }: { className?: string }) => (
 /* ================= PAGE ================= */
 
 export default function PlatformsPage() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -89,7 +90,10 @@ export default function PlatformsPage() {
     connectPhantom,
     disconnect: disconnectWallet,
     clearError: clearWalletError,
+    isRestoringSession,
   } = useWallet();
+
+  const pageLoading = authLoading || isRestoringSession;
 
   /* ================= DATA ================= */
 
@@ -210,32 +214,75 @@ export default function PlatformsPage() {
             Connect <span className="text-brand">Accounts</span>
           </h1>
 
-          {noResults && (
-            <p className="text-muted-foreground text-sm">
-              No platforms found.
-            </p>
-          )}
+          {pageLoading ? (
+            <>
+              <section className="space-y-4">
+                <SectionHeader title="Social Platforms" icon={Share2} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="bg-surface/40 border border-white/[0.03] rounded-[24px] p-8 flex flex-col gap-8">
+                      <div className="flex items-start justify-between">
+                        <Skeleton className="w-16 h-16 rounded-[22px]" />
+                        <Skeleton className="w-20 h-6 rounded-lg" />
+                      </div>
+                      <div className="space-y-2">
+                        <Skeleton className="h-6 w-1/3" />
+                        <Skeleton className="h-4 w-2/3" />
+                      </div>
+                      <Skeleton className="w-full h-12 rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+              </section>
 
-          {filteredSocial.length > 0 && (
-            <section>
-              <SectionHeader title="Social Platforms" icon={Share2} />
-              <div className="grid grid-cols-2 gap-4">
-                {filteredSocial.map((p) => (
-                  <PlatformCard key={p.name} {...p} variant="vertical" />
-                ))}
-              </div>
-            </section>
-          )}
+              <section className="space-y-4">
+                <SectionHeader title="Web3 Wallets" icon={Wallet} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[...Array(2)].map((_, i) => (
+                    <div key={i} className="bg-surface/40 border border-white/[0.03] rounded-[24px] p-6 flex items-center justify-between">
+                      <div className="flex items-center gap-5">
+                        <Skeleton className="w-14 h-14 rounded-full" />
+                        <div className="space-y-2">
+                          <Skeleton className="h-5 w-24" />
+                          <Skeleton className="h-4 w-40" />
+                        </div>
+                      </div>
+                      <Skeleton className="w-28 h-10 rounded-xl" />
+                    </div>
+                  ))}
+                </div>
+              </section>
+            </>
+          ) : (
+            <>
+              {noResults && (
+                <p className="text-muted-foreground text-sm">
+                  No platforms found.
+                </p>
+              )}
 
-          {filteredWallets.length > 0 && (
-            <section>
-              <SectionHeader title="Web3 Wallets" icon={Wallet} />
-              <div className="grid grid-cols-2 gap-4">
-                {filteredWallets.map((p) => (
-                  <PlatformCard key={p.name} {...p} variant="horizontal" />
-                ))}
-              </div>
-            </section>
+              {filteredSocial.length > 0 && (
+                <section>
+                  <SectionHeader title="Social Platforms" icon={Share2} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredSocial.map((p) => (
+                      <PlatformCard key={p.name} {...p} variant="vertical" />
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {filteredWallets.length > 0 && (
+                <section>
+                  <SectionHeader title="Web3 Wallets" icon={Wallet} />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {filteredWallets.map((p) => (
+                      <PlatformCard key={p.name} {...p} variant="horizontal" />
+                    ))}
+                  </div>
+                </section>
+              )}
+            </>
           )}
 
           <HelpBanner />
