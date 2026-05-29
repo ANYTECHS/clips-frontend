@@ -10,7 +10,9 @@ const STORAGE_KEY = "clipcash_locale";
 
 const AVAILABLE_LOCALES: { value: Locale; label: string }[] = [
   { value: "en", label: "English" },
-  { value: "es", label: "Espa\u00f1ol" },
+  { value: "es", label: "Español" },
+  { value: "fr", label: "Français" },
+  { value: "pt", label: "Português" },
 ];
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
@@ -18,8 +20,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "en" || stored === "es") {
-      setLocaleState(stored);
+    if (stored === "en" || stored === "es" || stored === "fr" || stored === "pt") {
+      setLocaleState(stored as Locale);
     }
   }, []);
 

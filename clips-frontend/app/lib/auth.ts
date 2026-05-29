@@ -1,12 +1,19 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import AppleProvider from "next-auth/providers/apple";
+import TwitterProvider from "next-auth/providers/twitter";
+import InstagramProvider from "next-auth/providers/instagram";
 
 export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      authorization: {
+        params: {
+          scope: "openid email profile https://www.googleapis.com/auth/youtube.readonly",
+        },
+      },
     }),
     AppleProvider({
       clientId: process.env.APPLE_ID!,
@@ -17,19 +24,57 @@ export const authOptions: NextAuthOptions = {
         keyId: process.env.APPLE_KEY_ID!,
       } as any,
     }),
+    TwitterProvider({
+      clientId: process.env.TWITTER_CLIENT_ID!,
+      clientSecret: process.env.TWITTER_CLIENT_SECRET!,
+      version: "2.0",
+    }),
+    InstagramProvider({
+      clientId: process.env.INSTAGRAM_CLIENT_ID!,
+      clientSecret: process.env.INSTAGRAM_CLIENT_SECRET!,
+    }),
+    {
+      id: "tiktok",
+      name: "TikTok",
+      type: "oauth",
+      authorization: {
+        url: "https://www.tiktok.com/v2/auth/authorize/",
+        params: {
+          client_key: process.env.TIKTOK_CLIENT_KEY,
+          scope: "user.info.basic,video.list",
+          response_type: "code",
+        },
+      },
+      token: "https://open.tiktokapis.com/v2/oauth/token/",
+      userinfo: "https://open.tiktokapis.com/v2/user/info/",
+      profile(profile: any) {
+        return {
+          id: profile.data.user.open_id,
+          name: profile.data.user.display_name,
+          image: profile.data.user.avatar_url,
+        };
+      },
+      clientId: process.env.TIKTOK_CLIENT_KEY,
+      clientSecret: process.env.TIKTOK_CLIENT_SECRET,
+    },
   ],
   callbacks: {
     async jwt({ token, account, profile }) {
       if (account) {
         token.accessToken = account.access_token;
+        token.provider = account.provider;
+        if (profile) {
+          token.profile = profile;
+        }
       }
       return token;
     },
     async session({ session, token }) {
-      // Assuming the API returns user data including onboardingStep
-      // For now, mock it
       if (session.user) {
-        (session.user as any).onboardingStep = session.user.email?.includes("new") ? 1 : 3; // Mock logic
+        (session.user as any).onboardingStep = session.user.email?.includes("new") ? 1 : 3;
+        (session.user as any).accessToken = token.accessToken;
+        (session.user as any).provider = token.provider;
+        (session.user as any).profile = token.profile;
       }
       return session;
     },

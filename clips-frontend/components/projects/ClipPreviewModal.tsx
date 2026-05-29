@@ -1,28 +1,79 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
-import { X, Play, Download } from "lucide-react";
+import React, { useRef, useEffect, useState } from "react";
+import { X, Play, Download, Pause, Volume2, VolumeX, Maximize } from "lucide-react";
 
 interface ClipPreviewModalProps {
-  clip: { id: string; title: string; thumbnail: string; duration: string; score: number };
+  clip: { 
+    id: string; 
+    title: string; 
+    thumbnail: string; 
+    duration: string; 
+    score: number;
+    resolution?: string;
+    videoUrl?: string;
+  };
   onClose: () => void;
   onDownload?: (id: string) => void;
 }
 
 export default function ClipPreviewModal({ clip, onClose, onDownload }: ClipPreviewModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isMuted, setIsMuted] = useState(true);
 
-  // Close on Escape
+  // Close on Escape & Play/Pause on Space
   useEffect(() => {
-    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === " ") {
+        e.preventDefault();
+        togglePlay();
+      }
+    };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  // Auto-play when modal opens
+  // Auto-play when modal opens (muted)
   useEffect(() => {
-    videoRef.current?.play().catch(() => {/* autoplay blocked — user can click play */});
+    if (videoRef.current) {
+      videoRef.current.muted = true;
+      videoRef.current.play().then(() => {
+        setIsPlaying(true);
+      }).catch(() => {
+        setIsPlaying(false);
+      });
+    }
   }, []);
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  const toggleMute = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      }
+    }
+  };
 
   const getScoreColor = (s: number) =>
     s >= 90 ? "text-brand" : s >= 70 ? "text-yellow-400" : "text-red-400";
@@ -39,6 +90,9 @@ export default function ClipPreviewModal({ clip, onClose, onDownload }: ClipPrev
             <h2 className="text-[15px] font-extrabold text-white truncate">{clip.title}</h2>
             <div className="flex items-center gap-3 mt-0.5">
               <span className="text-[12px] text-muted-foreground">{clip.duration}</span>
+              {clip.resolution && (
+                <span className="text-[12px] text-muted-foreground">{clip.resolution}</span>
+              )}
               <span className={`text-[12px] font-black ${getScoreColor(clip.score)}`}>
                 AI Score {clip.score}%
               </span>
@@ -54,29 +108,69 @@ export default function ClipPreviewModal({ clip, onClose, onDownload }: ClipPrev
         </div>
 
         {/* Video Player */}
-        <div className="relative bg-black aspect-video">
-          {/* HTML5 video — falls back to poster (thumbnail) when no real src is available */}
+        <div className="relative bg-black aspect-video group">
           <video
             ref={videoRef}
-            className="w-full h-full object-contain"
+            className="w-full h-full object-contain cursor-pointer"
             poster={clip.thumbnail}
-            controls
             playsInline
-            preload="metadata"
-            aria-label={`Preview of ${clip.title}`}
+            preload="auto"
+            loop
+            muted={isMuted}
+            onClick={togglePlay}
+            aria-label={`Video preview of ${clip.title}`}
           >
-            {/* In production, replace with real clip URL e.g. /api/clips/{clip.id}/stream */}
-            <source src="" type="video/mp4" />
+            {clip.videoUrl ? (
+              <source src={clip.videoUrl} type="video/mp4" />
+            ) : (
+              <source src="" type="video/mp4" />
+            )}
+            {/* Captions track support */}
+            <track kind="captions" src="" label="English" default />
             Your browser does not support the video element.
           </video>
 
-          {/* Overlay shown when no real video src — remove once real URLs are wired */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <div className="w-16 h-16 rounded-full bg-white/10 border border-white/20 flex items-center justify-center backdrop-blur-xl mb-3">
-              <Play className="w-7 h-7 text-white fill-white ml-1" />
-            </div>
-            <p className="text-[12px] text-white/50">Connect a real video source to enable playback</p>
+          {/* Custom Controls Overlay */}
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity">
+            {!isPlaying && (
+              <div className="w-16 h-16 rounded-full bg-black/40 border border-white/20 flex items-center justify-center backdrop-blur-xl">
+                <Play className="w-8 h-8 text-white fill-white ml-1" />
+              </div>
+            )}
           </div>
+
+          {/* Controls Bar */}
+          <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={togglePlay}
+                className="text-white hover:text-brand transition-colors"
+                aria-label={isPlaying ? "Pause" : "Play"}
+              >
+                {isPlaying ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
+              </button>
+              <button 
+                onClick={toggleMute}
+                className="text-white hover:text-brand transition-colors"
+                aria-label={isMuted ? "Unmute" : "Mute"}
+              >
+                {isMuted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+              </button>
+            </div>
+            <button 
+              onClick={toggleFullscreen}
+              className="text-white hover:text-brand transition-colors"
+              aria-label="Fullscreen"
+            >
+              <Maximize className="w-5 h-5" />
+            </button>
+          </div>
+
+          {!clip.videoUrl && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none bg-black/60">
+              <p className="text-[12px] text-white/50">Video source not available</p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

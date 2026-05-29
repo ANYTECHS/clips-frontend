@@ -1,16 +1,13 @@
 "use client";
 
-import { useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
-import { useProcessStore } from "@/app/store/processStore";
-import { useWallet } from "@/components/WalletProvider";
+import { useKeyboardShortcuts } from "@/app/hooks/useKeyboardShortcuts";
+import KeyboardShortcutsModal from "./KeyboardShortcutsModal";
 
 export default function KeyboardShortcuts() {
   const router = useRouter();
-  const { user } = useAuth();
-  const resetProcess = useProcessStore((s) => s.resetProcess);
-  const { disconnect } = useWallet();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleOpenSearch = useCallback(() => {
     const searchInput = document.querySelector('input[type="text"][placeholder*="Search"]');
@@ -39,6 +36,12 @@ export default function KeyboardShortcuts() {
   }, [router]);
 
   const handleCloseModals = useCallback(() => {
+    // If our shortcuts modal is open, close it first
+    if (isModalOpen) {
+      setIsModalOpen(false);
+      return;
+    }
+
     const modals = document.querySelectorAll('[role="dialog"], [role="alertdialog"]');
     modals.forEach((modal) => {
       const closeButtons = modal.querySelectorAll('button[aria-label*="Close"], button[aria-label*="close"]');
@@ -61,45 +64,26 @@ export default function KeyboardShortcuts() {
         }
       });
     });
+  }, [isModalOpen]);
+
+  const handleOpenShortcuts = useCallback(() => {
+    setIsModalOpen(true);
   }, []);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isMeta = e.metaKey || e.ctrlKey;
-      
-      if (isMeta && e.key === "k") {
-        e.preventDefault();
-        handleOpenSearch();
-      }
-      
-      if (isMeta && e.key === "u") {
-        e.preventDefault();
-        handleOpenUpload();
-      }
-      
-      if (isMeta && e.key === "e") {
-        e.preventDefault();
-        handleNavigateEarnings();
-      }
-      
-      if (isMeta && e.key === "p") {
-        e.preventDefault();
-        handleNavigateProjects();
-      }
-      
-      if (isMeta && e.key === "v") {
-        e.preventDefault();
-        handleNavigateVault();
-      }
-      
-      if (e.key === "Escape") {
-        handleCloseModals();
-      }
-    };
+  useKeyboardShortcuts({
+    onOpenSearch: handleOpenSearch,
+    onOpenUpload: handleOpenUpload,
+    onNavigateEarnings: handleNavigateEarnings,
+    onNavigateProjects: handleNavigateProjects,
+    onNavigateVault: handleNavigateVault,
+    onCloseModals: handleCloseModals,
+    onOpenShortcuts: handleOpenShortcuts,
+  });
 
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleOpenSearch, handleOpenUpload, handleNavigateEarnings, handleNavigateProjects, handleNavigateVault, handleCloseModals]);
-
-  return null;
+  return (
+    <KeyboardShortcutsModal 
+      isOpen={isModalOpen} 
+      onClose={() => setIsModalOpen(false)} 
+    />
+  );
 }

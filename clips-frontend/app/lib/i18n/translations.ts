@@ -1,8 +1,10 @@
 import type { Locale } from "./types";
 import en from "./locales/en.json";
 import es from "./locales/es.json";
+import fr from "./locales/fr.json";
+import pt from "./locales/pt.json";
 
-const translations: Record<Locale, Record<string, any>> = { en, es };
+const translations: Record<Locale, Record<string, any>> = { en, es, fr, pt };
 
 function getNestedValue(obj: Record<string, any>, path: string): string | undefined {
   const keys = path.split(".");

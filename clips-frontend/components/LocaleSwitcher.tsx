@@ -3,6 +3,7 @@
 import React from "react";
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { Globe } from "lucide-react";
+import type { Locale } from "@/app/lib/i18n/types";
 
 interface LocaleSwitcherProps {
   compact?: boolean;
@@ -17,7 +18,7 @@ export default function LocaleSwitcher({ compact = false }: LocaleSwitcherProps)
         <Globe className="w-3.5 h-3.5 text-muted" aria-hidden="true" />
         <select
           value={locale}
-          onChange={(e) => setLocale(e.target.value as "en" | "es")}
+          onChange={(e) => setLocale(e.target.value as Locale)}
           aria-label="Select language"
           className="bg-transparent text-muted hover:text-white text-[11px] font-bold border-none outline-none cursor-pointer appearance-none pr-4"
           style={{

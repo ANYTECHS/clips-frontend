@@ -1,4 +1,4 @@
-export type Locale = "en" | "es";
+export type Locale = "en" | "es" | "fr" | "pt";
 
 export interface I18nContextType {
   locale: Locale;

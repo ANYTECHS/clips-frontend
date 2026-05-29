@@ -48,5 +48,21 @@ describe("i18n translations", () => {
       });
       expect(result).toBe("Mostrando 3 de 15 transacciones");
     });
+
+    it("should handle French nested keys with parameters", () => {
+      const result = translate("fr", "activity.showing", {
+        count: 10,
+        total: 50,
+      });
+      expect(result).toBe("Affichage de 10 sur 50 transactions");
+    });
+
+    it("should handle Portuguese nested keys with parameters", () => {
+      const result = translate("pt", "activity.showing", {
+        count: 2,
+        total: 10,
+      });
+      expect(result).toBe("Mostrando 2 de 10 transações");
+    });
   });
 });

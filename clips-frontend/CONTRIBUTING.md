@@ -97,4 +97,12 @@ CI may run linters, tests and Storybook builds — ensure these pass locally bef
 ## Questions and support
 If you have questions, make a note in the issue or open a new one titled `help wanted:` followed by a short description. For PR review help, mention `@ANYTECHS` maintainers in a comment.
 
+## Adding new locales (i18n)
+The project uses a custom i18n system located in `app/lib/i18n/`. To add a new locale:
+1.  **Define the locale type**: Add the new locale code (e.g., `de`, `it`) to the `Locale` type in `app/lib/i18n/types.ts`.
+2.  **Create translation file**: Create a new JSON file in `app/lib/i18n/locales/` (e.g., `de.json`). Use `en.json` as a template and ensure all keys are translated.
+3.  **Register the translation**: Import the new JSON file in `app/lib/i18n/translations.ts` and add it to the `translations` object.
+4.  **Update the Provider**: Add the new locale to the `AVAILABLE_LOCALES` array in `app/lib/i18n/I18nProvider.tsx`. Update the `useEffect` hook that restores the locale from `localStorage` to include the new code.
+5.  **Add tests**: Extend `__tests__/lib/i18n.test.ts` to verify that the new locale is correctly loaded and falls back to English for missing keys.
+
 Thanks again — contributions make ClipCash better for everyone!
