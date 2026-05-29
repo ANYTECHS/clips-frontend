@@ -30,6 +30,10 @@ interface ClipGridProps {
   onEdit?: (id: string) => void;
   onPreview?: (id: string) => void;
   loading?: boolean;
+  totalClips: number;
+  loadingNextPage?: boolean;
+  onLoadMore?: () => void;
+  hasMore?: boolean;
 }
 
 const ClipGrid = memo(function ClipGrid({ 
@@ -47,9 +51,16 @@ const ClipGrid = memo(function ClipGrid({
   onEdit,
   onPreview,
   loading = false,
+  totalClips,
+  loadingNextPage,
+  onLoadMore,
+  hasMore,
 }: ClipGridProps) {
   const [scoreFilter, setScoreFilter] = React.useState(80);
-  const allSelected = !loading && clips.length > 0 && selectedIds.length === clips.length;
+  const allSelected = !loading && selectedIds.length === totalClips;
+
+  const startRange = clips.length > 0 ? 1 : 0;
+  const endRange = clips.length > totalClips ? totalClips : clips.length;
 
   return (
     <div 
@@ -61,8 +72,13 @@ const ClipGrid = memo(function ClipGrid({
         <div className="space-y-1.5 min-w-0">
           <div className="flex items-center gap-3 flex-wrap">
             <h2 className="text-[24px] sm:text-[32px] lg:text-[36px] font-black text-white tracking-tight leading-none">
-              {loading ? "AI is finding clips..." : `AI found ${clips.length} clips`}
+              {loading ? "AI is finding clips..." : `AI found ${totalClips} clips`}
             </h2>
+            {!loading && totalClips > 0 && (
+              <div className="px-3 py-1 rounded-md bg-white/5 border border-white/10 text-muted-foreground text-[11px] font-bold tracking-wider leading-none shrink-0">
+                Showing {startRange}–{endRange}
+              </div>
+            )}
             <div className="px-2.5 py-1 rounded-md bg-brand/10 border border-brand/20 text-brand text-[10px] font-black tracking-widest leading-none shrink-0">
               ACTIVE
             </div>
@@ -137,26 +153,45 @@ const ClipGrid = memo(function ClipGrid({
       )}
 
       {/* Grid Layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 pb-12">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 pb-6">
         {loading ? (
           // Render 6 skeletons during loading
           Array.from({ length: 6 }).map((_, i) => (
             <ProjectCardSkeleton key={`skeleton-${i}`} />
           ))
         ) : (
-          clips.map((clip) => (
-            <ClipCard 
-              key={clip.id}
-              {...clip}
-              isSelected={selectedIds.includes(clip.id)}
-              isRecommended={aiRecommendations && recommendedIds.includes(clip.id)}
-              onSelect={onSelect}
-              onEdit={onEdit}
-              onPreview={onPreview}
-            />
-          ))
+          <>
+            {clips.map((clip) => (
+              <ClipCard 
+                key={clip.id}
+                {...clip}
+                isSelected={selectedIds.includes(clip.id)}
+                isRecommended={aiRecommendations && recommendedIds.includes(clip.id)}
+                onSelect={onSelect}
+                onEdit={onEdit}
+                onPreview={onPreview}
+              />
+            ))}
+            {loadingNextPage && (
+              Array.from({ length: 3 }).map((_, i) => (
+                <ProjectCardSkeleton key={`next-skeleton-${i}`} />
+              ))
+            )}
+          </>
         )}
       </div>
+      {/* Load More Button */}
+      {!loading && hasMore && onLoadMore && (
+        <div className="flex justify-center pb-12">
+          <button
+            onClick={onLoadMore}
+            disabled={loadingNextPage}
+            className="px-8 py-4 rounded-xl bg-black border border-white/10 text-white font-bold text-[14px] transition-all hover:bg-zinc-900 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loadingNextPage ? "Loading more clips..." : "Load More"}
+          </button>
+        </div>
+      )}
     </div>
   );
 });

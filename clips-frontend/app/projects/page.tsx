@@ -15,14 +15,29 @@ import { useEffect } from "react";
 
 const RECOMMENDATION_THRESHOLD = 90;
 
-const mockClips = [
-  { id: "1", title: "Clip #01 - The Big Reveal Hook", thumbnail: "/projects/thumb1.png", score: 94, scoreKey: "high", duration: "00:45", style: "Bold & Dynamic", status: "pending" },
-  { id: "2", title: "Clip #02 - Technical Deep Dive", thumbnail: "/projects/thumb2.png", score: 68, scoreKey: "medium", duration: "00:58", style: "Minimalist", status: "listed" },
-  { id: "3", title: "Clip #03 - Audience Reaction", thumbnail: "/projects/thumb3.png", score: 82, scoreKey: "high", duration: "00:32", style: "Emoji-Rich", status: "pending" },
-  { id: "4", title: "Clip #04 - Feature Walkthrough", thumbnail: "/projects/thumb1.png", score: 91, scoreKey: "high", duration: "00:52", style: "Subtitles Only", status: "history" },
-  { id: "5", title: "Clip #05 - Closing Remarks", thumbnail: "/projects/thumb2.png", score: 42, scoreKey: "low", duration: "01:12", style: "Minimalist", status: "pending" },
-  { id: "6", title: "Clip #06 - Product Detail B-Roll", thumbnail: "/projects/thumb3.png", score: 89, scoreKey: "high", duration: "00:44", style: "Bold & Dynamic", status: "listed" },
-];
+const generateMockClips = (count: number) => {
+  const styles = ["Bold & Dynamic", "Minimalist", "Emoji-Rich", "Subtitles Only"];
+  const statuses = ["pending", "listed", "history"];
+  const scoreKeys = ["high", "medium", "low"];
+  const clips = [];
+  for (let i = 1; i <= count; i++) {
+    const score = Math.floor(Math.random() * 100);
+    let scoreKey = score >= 70 ? "high" : score >= 40 ? "medium" : "low";
+    clips.push({
+      id: String(i),
+      title: `Clip #${String(i).padStart(2, "0")} - ${["The Big Reveal Hook", "Technical Deep Dive", "Audience Reaction", "Feature Walkthrough", "Closing Remarks"][i % 5]}`,
+      thumbnail: `/projects/thumb${(i % 3) + 1}.png`,
+      score,
+      scoreKey,
+      duration: `00:${String(20 + Math.floor(Math.random() * 40)).padStart(2, "0")}`,
+      style: styles[i % styles.length],
+      status: statuses[i % statuses.length],
+    });
+  }
+  return clips;
+};
+
+const mockClips = generateMockClips(142);
 
 export default function ProjectsPage() {
   const { showToast, ToastEl } = useToast();
@@ -42,11 +57,15 @@ export default function ProjectsPage() {
     style: "All Styles",
     virality: ["high", "medium", "low"],
     vault: "pending",
+    page: 1,
   });
 
   const captionsStyle = filters.style;
   const viralityLevels = filters.virality;
   const vaultFilter = filters.vault;
+  const currentPage = filters.page;
+  const PAGE_SIZE = 20;
+  const [loadingNextPage, setLoadingNextPage] = useState(false);
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState(false);
@@ -64,6 +83,11 @@ export default function ProjectsPage() {
     return () => clear();
   }, [clear]);
 
+  // Reset page to 1 whenever filter changes
+  useEffect(() => {
+    updateFilters({ page: 1 });
+  }, [captionsStyle, viralityLevels, vaultFilter, updateFilters]);
+
   const filteredClips = useMemo(() => {
     if (loading) return [];
     return mockClips.filter(clip => {
@@ -73,6 +97,20 @@ export default function ProjectsPage() {
       return matchesStyle && matchesLevel && matchesVault;
     });
   }, [captionsStyle, viralityLevels, vaultFilter, loading]);
+
+  const paginatedClips = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    const endIndex = startIndex + PAGE_SIZE;
+    return filteredClips.slice(0, endIndex);
+  }, [filteredClips, currentPage, PAGE_SIZE]);
+
+  const handleLoadMore = useCallback(async () => {
+    setLoadingNextPage(true);
+    // Simulate loading delay for skeletons
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    updateFilters({ page: currentPage + 1 });
+    setLoadingNextPage(false);
+  }, [currentPage, updateFilters]);
 
   const activeFilterCount = useMemo(() => {
     return (captionsStyle !== "All Styles" ? 1 : 0) + 
@@ -224,7 +262,7 @@ export default function ProjectsPage() {
         <div className="flex-1 flex flex-col overflow-hidden w-full max-w-[1400px] mx-auto pt-6">
           <div key={vaultFilter} className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500">
             <ClipGrid
-              clips={filteredClips}
+              clips={paginatedClips}
               selectedIds={selectedIds}
               onSelect={handleSelect}
               onSelectAll={handleSelectAll}
@@ -238,6 +276,10 @@ export default function ProjectsPage() {
               onEdit={handleEdit}
               onPreview={handlePreview}
               loading={loading}
+              totalClips={filteredClips.length}
+              loadingNextPage={loadingNextPage}
+              onLoadMore={handleLoadMore}
+              hasMore={paginatedClips.length < filteredClips.length}
             />
           </div>
           
