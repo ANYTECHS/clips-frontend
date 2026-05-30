@@ -44,6 +44,25 @@ export default function WalletStatusCard() {
     await initWallet(user.id, "testnet");
   };
 
+  const generateQr = async () => {
+    if (!publicKey) return;
+    setQrLoading(true);
+    try {
+      const src = await QRCode.toDataURL(publicKey, { width: 600, margin: 2 });
+      setQrSrc(src);
+    } catch (e) {
+      showToast("Failed to generate QR code", "error");
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleToggleQr = async () => {
+    if (!publicKey) return;
+    if (!qrSrc) await generateQr();
+    setShowQR((s) => !s);
+  };
+
   const horizonUrl = network === "testnet"
     ? `https://stellar.expert/explorer/testnet/account/${publicKey}`
     : `https://stellar.expert/explorer/public/account/${publicKey}`;
