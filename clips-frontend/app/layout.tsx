@@ -6,6 +6,7 @@ import { WalletProvider } from "@/components/WalletProvider";
 import { StellarWalletProvider } from "@/components/StellarWalletProvider";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ToastProvider";
+import { I18nProvider } from "@/app/lib/i18n/I18nProvider";
 import CookieConsent from "@/components/CookieConsent";
 import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
@@ -31,18 +32,20 @@ export default function RootLayout({
         <div className="radial-bg" />
         <ThemeProvider>
           <ErrorBoundary>
-            <AuthProvider>
-              <ToastProvider>
-                <WalletProvider>
-                  <StellarWalletProvider>
-                    <AnalyticsProvider />
-                    <KeyboardShortcuts />
-                    {children}
-                    <RateLimitToast />
-                  </StellarWalletProvider>
-                </WalletProvider>
-              </ToastProvider>
-            </AuthProvider>
+            <I18nProvider>
+              <AuthProvider>
+                <ToastProvider>
+                  <WalletProvider>
+                    <StellarWalletProvider>
+                      <AnalyticsProvider />
+                      <KeyboardShortcuts />
+                      {children}
+                      <RateLimitToast />
+                    </StellarWalletProvider>
+                  </WalletProvider>
+                </ToastProvider>
+              </AuthProvider>
+            </I18nProvider>
           </ErrorBoundary>
         </ThemeProvider>
         <CookieConsent />

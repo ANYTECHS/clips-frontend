@@ -5,6 +5,7 @@ import { Loader2, Wallet, LogOut, AlertCircle, X, ChevronDown, Coins, ExternalLi
 import { useWallet, truncateAddress } from "./WalletProvider";
 import analytics from "@/lib/analytics";
 import { useToast } from "@/hooks/useToast";
+import { formatXLMAmount } from "@/app/lib/formatAmount";
 
 interface WalletConnectButtonProps {
   /** Compact mode renders a smaller pill button (e.g. for headers/navbars) */
@@ -154,7 +155,7 @@ export default function WalletConnectButton({ compact = false }: WalletConnectBu
                 </span>
                 {walletType === "stellar" && balance !== null && (
                   <span className="text-[10px] text-muted-foreground font-semibold mt-0.5">
-                    {parseFloat(balance).toFixed(2)} XLM
+                    {formatXLMAmount(balance, 2)} XLM
                   </span>
                 )}
               </div>

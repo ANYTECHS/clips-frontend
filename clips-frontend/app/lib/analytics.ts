@@ -347,6 +347,78 @@ class Analytics {
       wallet_type: walletType,
     });
   }
+
+  /**
+   * Track wallet disconnection
+   */
+  public trackWalletDisconnect(walletType?: string): void {
+    this.trackEvent('wallet_disconnect', {
+      wallet_type: walletType,
+    });
+  }
+
+  /**
+   * Track wallet creation (embedded/auto-generated wallet)
+   */
+  public trackWalletCreated(walletType?: string): void {
+    this.trackEvent('wallet_created', {
+      wallet_type: walletType,
+    });
+  }
+
+  /**
+   * Track secret key import
+   */
+  public trackWalletImport(walletType?: string): void {
+    this.trackEvent('wallet_import', {
+      wallet_type: walletType,
+    });
+  }
+
+  /**
+   * Track Friendbot funding (testnet only)
+   */
+  public trackWalletFunded(walletType?: string): void {
+    this.trackEvent('wallet_funded', {
+      wallet_type: walletType,
+    });
+  }
+
+  /**
+   * Track an on-chain payment transaction.
+   * Amount is bucketed to avoid storing precise financial data.
+   */
+  public trackTransaction(params: {
+    walletType?: string;
+    assetCode?: string;
+    /** Bucketed amount range, e.g. "0-1", "1-10", "10-100", "100+" */
+    amountBucket?: string;
+    network?: string;
+  }): void {
+    this.trackEvent('wallet_transaction', {
+      wallet_type: params.walletType,
+      asset_code: params.assetCode ?? 'XLM',
+      amount_bucket: params.amountBucket,
+      network: params.network,
+    });
+  }
+
+  /**
+   * Track a trustline change (add or remove).
+   */
+  public trackTrustlineChange(params: {
+    action: 'add' | 'remove';
+    assetCode: string;
+    walletType?: string;
+    network?: string;
+  }): void {
+    this.trackEvent('trustline_change', {
+      action: params.action,
+      asset_code: params.assetCode,
+      wallet_type: params.walletType,
+      network: params.network,
+    });
+  }
 }
 
 // Singleton instance
@@ -355,6 +427,19 @@ const analytics = new Analytics();
 // Export the instance and types
 export default analytics;
 export type { EventProperties, AnalyticsProvider };
+
+/**
+ * Bucket a numeric amount into a range string for privacy-safe analytics.
+ * e.g. 0.5 → "0-1", 5 → "1-10", 50 → "10-100", 500 → "100+"
+ */
+export function bucketAmount(amount: number): string {
+  if (amount <= 0) return "0";
+  if (amount < 1) return "0-1";
+  if (amount < 10) return "1-10";
+  if (amount < 100) return "10-100";
+  if (amount < 1000) return "100-1000";
+  return "1000+";
+}
 
 // Extend Window interface for TypeScript
 declare global {

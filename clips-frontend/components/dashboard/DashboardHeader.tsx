@@ -5,7 +5,9 @@ import { Upload, Bell, Menu, Sun, Moon } from "lucide-react";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/components/AuthProvider";
 import { useProcessStore } from "@/app/store";
+import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import WalletConnectButton from "@/components/WalletConnectButton";
+import LocaleSwitcher from "@/components/LocaleSwitcher";
 import analytics from "@/lib/analytics";
 
 interface HeaderProps {
@@ -209,6 +211,8 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-2 sm:gap-4">
         <WalletConnectButton compact />
+
+        <LocaleSwitcher compact />
 
         <button 
           onClick={toggleTheme}

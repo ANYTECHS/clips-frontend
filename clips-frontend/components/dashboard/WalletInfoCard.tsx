@@ -1,11 +1,11 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { Wallet, ExternalLink, Copy, Check, AlertCircle, Send, Loader2, CheckCircle } from "lucide-react";
+import Link from "next/link";
+import { Wallet, ExternalLink, Copy, Check, AlertCircle, Send, Loader2, CheckCircle, Activity } from "lucide-react";
 import { useWalletConnection } from "@/app/hooks/useWalletConnection";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
-import BalanceDisplay from "@/components/wallet/BalanceDisplay";
-import TransactionHistory from "@/components/wallet/TransactionHistory";
+import ActivityFeed from "@/components/wallet/ActivityFeed";
 
 /**
  * #337 – Web2-style wallet card.
@@ -14,6 +14,7 @@ import TransactionHistory from "@/components/wallet/TransactionHistory";
  */
 export default function WalletInfoCard() {
   const { publicKey, status, balance, error, network } = useAutoStellarWallet();
+  const { stellarSecret, refreshBalance } = useWallet();
   const formRef = useRef<HTMLFormElement>(null);
   const recipientInputRef = useRef<HTMLInputElement>(null);
   const amountInputRef = useRef<HTMLInputElement>(null);
@@ -32,7 +33,7 @@ export default function WalletInfoCard() {
   const successId = React.useId();
 
   const xlmDisplay = balance
-    ? `${parseFloat(balance.xlm).toLocaleString(undefined, { maximumFractionDigits: 2 })} XLM`
+    ? formatXLM(balance.xlm, { decimals: 2, includeCurrency: true })
     : status === "loading"
     ? "Loading…"
     : "— XLM";
@@ -140,7 +141,7 @@ export default function WalletInfoCard() {
 
       {/* USD sub-value */}
       {balance && (
-        <p className="text-muted text-[13px] mb-5">≈ ${parseFloat(balance.usd).toLocaleString(undefined, { maximumFractionDigits: 2 })} USD</p>
+        <p className="text-muted text-[13px] mb-5">≈ {formatUSD(balance.usd, { currencyFormat: 'symbol' })}</p>
       )}
 
       {/* Send button */}
@@ -271,9 +272,19 @@ export default function WalletInfoCard() {
         </div>
       </div>
 
-      {/* Transaction History */}
+      {/* Activity Feed */}
       <div className="mt-4 pt-4 border-t border-border">
-        <TransactionHistory publicKey={publicKey!} network={networkUpper || "TESTNET"} limit={8} />
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-[13px] font-bold text-white uppercase tracking-wider">Recent Activity</h4>
+          <Link
+            href="/activity"
+            className="flex items-center gap-1 text-[11px] font-bold text-brand hover:underline"
+          >
+            View All
+            <Activity className="w-3 h-3" />
+          </Link>
+        </div>
+        <ActivityFeed publicKey={publicKey!} network={networkUpper || "TESTNET"} pageSize={5} />
       </div>
     </div>
   );

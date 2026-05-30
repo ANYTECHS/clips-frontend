@@ -13,10 +13,13 @@ import EarningsSummaryCards from "@/components/dashboard/EarningsSummaryCards";
 import SendPaymentForm from "@/components/SendPaymentForm";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import WalletInfoCard from "@/components/dashboard/WalletInfoCard";
+import WalletHealthCard from "@/components/wallet/WalletHealthCard";
+import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { DollarSign, Video, Globe } from "lucide-react";
 
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { publicKey } = useAutoStellarWallet();
 
   return (
     <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
@@ -93,11 +96,7 @@ export default function DashboardPage() {
             
             <div className="space-y-4 flex flex-col">
               <h3 className="text-[18px] font-extrabold text-[#ffffff] tracking-tight">Stellar Wallet Status</h3>
-              <div className="bg-surface/80 border border-white/5 rounded-[24px] p-6 text-center backdrop-blur-md flex-1 flex flex-col justify-center items-center">
-                <div className="w-full">
-                  <WalletConnectButton />
-                </div>
-              </div>
+              <WalletHealthCard publicKey={publicKey} />
             </div>
           </div>
 

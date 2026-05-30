@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { buildPaymentTransaction } from "@/app/lib/stellar";
-import { getStellarLabUrl } from "@/app/lib/networkConfig";
+import { getStellarLabUrl, getStellarExpertTransactionUrl, getStellarScanTransactionUrl } from "@/app/lib/networkConfig";
 import { useToast } from "@/hooks/useToast";
 
 interface TransactionConfirmationModalProps {
@@ -254,15 +254,24 @@ export default function TransactionConfirmationModal({
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row">
                 <a
-                  href={getStellarExpertUrl()}
+                  href={getStellarExpertTransactionUrl(txHash, network === "mainnet" ? "mainnet" : "testnet")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-[13px] border border-white/5 transition-all cursor-pointer"
                 >
                   <ExternalLink className="w-4 h-4" />
                   <span>Stellar Expert</span>
+                </a>
+                <a
+                  href={getStellarScanTransactionUrl(txHash, network === "mainnet" ? "mainnet" : "testnet")}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white/5 hover:bg-white/10 text-white font-bold text-[13px] border border-white/5 transition-all cursor-pointer"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>StellarScan</span>
                 </a>
                 <a
                   href={getStellarLabUrl(txHash, network === "mainnet" ? "mainnet" : "testnet")}

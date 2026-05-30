@@ -5,20 +5,9 @@ import { ChevronUp, ChevronDown, Copy, Check } from "lucide-react";
 import { Transaction } from "@/app/lib/mockApi";
 import StatusBadge from "./StatusBadge";
 import { useToast } from "@/hooks/useToast";
+import { formatUSD, formatCrypto } from "@/app/lib/formatAmount";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function formatUSD(amount: number) {
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    minimumFractionDigits: 2,
-  }).format(amount);
-}
-
-function formatCrypto(amount: number, currency: string) {
-  return `${amount.toFixed(4)} ${currency}`;
-}
 
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", {
@@ -241,11 +230,11 @@ export default function TransactionTable({
                 <td className="py-4 px-4 pr-6 text-right">
                   <div className="flex flex-col items-end gap-0.5">
                     <span className="text-[14px] font-bold text-white">
-                      {formatUSD(tx.amount)}
+                      {formatUSD(tx.amount, { locale: 'en-US' })}
                     </span>
                     {tx.cryptoAmount && tx.cryptoCurrency && (
                       <span className="text-[11px] text-muted font-mono">
-                        {formatCrypto(tx.cryptoAmount, tx.cryptoCurrency)}
+                        {formatCrypto(tx.cryptoAmount, tx.cryptoCurrency, 4, 'en-US')}
                       </span>
                     )}
                   </div>
@@ -280,10 +269,10 @@ export default function TransactionTable({
                 {tx.description}
               </span>
               <div className="text-right shrink-0 ml-2">
-                <div className="text-[15px] font-bold text-white">{formatUSD(tx.amount)}</div>
+                <div className="text-[15px] font-bold text-white">{formatUSD(tx.amount, { locale: 'en-US' })}</div>
                 {tx.cryptoAmount && tx.cryptoCurrency && (
                   <div className="text-[11px] text-muted font-mono">
-                    {formatCrypto(tx.cryptoAmount, tx.cryptoCurrency)}
+                    {formatCrypto(tx.cryptoAmount, tx.cryptoCurrency, 4, 'en-US')}
                   </div>
                 )}
               </div>

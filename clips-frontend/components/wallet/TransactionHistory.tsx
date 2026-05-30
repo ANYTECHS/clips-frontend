@@ -2,8 +2,15 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { ArrowDownLeft, ArrowUpRight, Loader2, RefreshCw, ExternalLink, FlaskConical, Copy, Check } from "lucide-react";
-import { getStellarLabUrl } from "@/app/lib/networkConfig";
+import {
+  getStellarLabUrl,
+  getStellarExpertAccountUrl,
+  getStellarExpertTransactionUrl,
+  getStellarScanAccountUrl,
+  getStellarScanTransactionUrl,
+} from "@/app/lib/networkConfig";
 import { useToast } from "@/hooks/useToast";
+import { formatTransactionAmount } from "@/app/lib/formatAmount";
 
 export interface Transaction {
   id: string;
@@ -87,11 +94,9 @@ export default function TransactionHistory({
   const [error, setError] = useState<string | null>(null);
   const { showToast } = useToast();
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
-
-  const explorerBase =
-    network === "PUBLIC"
-      ? "https://stellar.expert/explorer/public/tx"
-      : "https://stellar.expert/explorer/testnet/tx";
+  const stellarNetwork = network === "PUBLIC" ? "mainnet" : "testnet";
+  const accountExpertUrl = getStellarExpertAccountUrl(publicKey, stellarNetwork);
+  const accountScanUrl = getStellarScanAccountUrl(publicKey, stellarNetwork);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -120,10 +125,32 @@ export default function TransactionHistory({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <h4 className="text-[13px] font-bold text-white uppercase tracking-wider">
-          Recent Activity
-        </h4>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h4 className="text-[13px] font-bold text-white uppercase tracking-wider">
+            Recent Activity
+          </h4>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <a
+              href={accountExpertUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-semibold text-brand hover:text-white transition-colors"
+              title="View account on Stellar Expert"
+            >
+              View account on Stellar Expert
+            </a>
+            <a
+              href={accountScanUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[11px] font-semibold text-muted hover:text-white transition-colors"
+              title="View account on StellarScan"
+            >
+              View account on StellarScan
+            </a>
+          </div>
+        </div>
         <button
           onClick={load}
           disabled={loading}
@@ -199,7 +226,7 @@ export default function TransactionHistory({
                 }`}
               >
                 {tx.type === "received" ? "+" : "-"}
-                {parseFloat(tx.amount).toFixed(2)} {tx.asset}
+                {formatTransactionAmount(tx.amount, tx.asset, 2)}
               </span>
             </div>
             <div className="flex items-center justify-between gap-2 mt-0.5">
@@ -226,17 +253,27 @@ export default function TransactionHistory({
                     )}
                   </button>
                   <a
-                    href={`${explorerBase}/${tx.txHash}`}
+                    href={getStellarExpertTransactionUrl(tx.txHash, stellarNetwork)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted hover:text-brand transition-colors"
-                    title="View on explorer"
-                    aria-label={`View transaction ${tx.txHash} on Stellar Explorer (opens in new tab)`}
+                    title="View on Stellar Expert"
+                    aria-label={`View transaction ${tx.txHash} on Stellar Expert (opens in new tab)`}
                   >
                     <ExternalLink className="w-3 h-3" aria-hidden="true" />
                   </a>
                   <a
-                    href={getStellarLabUrl(tx.txHash, network === "PUBLIC" ? "mainnet" : "testnet")}
+                    href={getStellarScanTransactionUrl(tx.txHash, stellarNetwork)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-muted hover:text-brand transition-colors"
+                    title="View on StellarScan"
+                    aria-label={`View transaction ${tx.txHash} on StellarScan (opens in new tab)`}
+                  >
+                    <ExternalLink className="w-3 h-3" aria-hidden="true" />
+                  </a>
+                  <a
+                    href={getStellarLabUrl(tx.txHash, stellarNetwork)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-muted hover:text-brand transition-colors"

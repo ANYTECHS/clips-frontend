@@ -3,9 +3,10 @@
 import React, { useState } from "react";
 import { useWallet, truncateAddress } from "./WalletProvider";
 import { useAuth } from "./AuthProvider";
-import { Wallet, ChevronDown, LogOut, Copy, Check, Layers } from "lucide-react";
+import { Wallet, ChevronDown, LogOut, Copy, Check, ExternalLink } from "lucide-react";
 import WalletSelector from "./WalletSelector";
 import { useToast } from "@/hooks/useToast";
+import { getStellarExpertAccountUrl, getStellarScanAccountUrl } from "@/app/lib/networkConfig";
 
 /**
  * WalletStatus - Displays wallet connection status in the navbar
@@ -74,6 +75,10 @@ export default function WalletStatus() {
     disconnect();
     setDropdownOpen(false);
   };
+
+  const stellarNetwork = process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
+  const stellarExpertAccountUrl = address ? getStellarExpertAccountUrl(address, stellarNetwork) : "#";
+  const stellarScanAccountUrl = address ? getStellarScanAccountUrl(address, stellarNetwork) : "#";
 
   if (!isConnected || !address) {
     return (
@@ -154,6 +159,29 @@ export default function WalletStatus() {
                   <Copy className="w-4 h-4" aria-hidden="true" />
                 )}
               </button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              <a
+                href={stellarExpertAccountUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] font-semibold text-brand hover:bg-white/10 transition-colors"
+                title="View account on Stellar Expert"
+              >
+                <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                Expert
+              </a>
+              <a
+                href={stellarScanAccountUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[12px] font-semibold text-muted hover:text-white hover:bg-white/10 transition-colors"
+                title="View account on StellarScan"
+              >
+                <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+                Scan
+              </a>
             </div>
           </div>
 

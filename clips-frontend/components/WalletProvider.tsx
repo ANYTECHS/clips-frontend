@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { secureStorage } from "@/app/lib/secureStorage";
-import analytics from "@/lib/analytics";
+import analytics, { bucketAmount } from "@/lib/analytics";
 import { captureWalletError, logWalletOperation, addWalletBreadcrumb } from "@/app/lib/walletErrorTracking";
 
 /**
@@ -311,15 +311,21 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   function handleDisconnect() {
+    const prevWalletType = stateRef.current.walletType;
     setState({ ...defaultState });
     setBalance(null);
     setStellarSecret(null);
     setStellarMnemonic(null);
     secureStorage.removeItem(STORAGE_KEY);
 
+    // Track disconnect
+    if (prevWalletType) {
+      analytics.trackWalletDisconnect(prevWalletType);
+    }
+
     // Disconnect from Phantom if connected
     const solana = window.solana;
-    if (solana && state.walletType === "phantom") {
+    if (solana && stateRef.current.walletType === "phantom") {
       solana.disconnect().catch(() => {});
     }
   }
@@ -517,6 +523,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           setStellarSecret(parsed.stellarSecret);
           setStellarMnemonic(parsed.stellarMnemonic ?? null);
           logWalletOperation("connect_stellar", "success", { walletAddress: addr, network: "stellar" });
+          analytics.trackWalletConnect("stellar");
           return;
         }
       }
@@ -541,6 +548,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         stellarMnemonic: newWallet.mnemonic,
       });
       logWalletOperation("connect_stellar", "success", { walletAddress: newWallet.publicKey, network: "stellar" });
+      analytics.trackWalletCreated("stellar");
     } catch (err: any) {
       captureWalletError(err, "connect_stellar", { walletType: "stellar", error: err.message });
       logWalletOperation("connect_stellar", "error", { error: err, walletType: "stellar" });
@@ -582,6 +590,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         stellarMnemonic: null,
       });
       logWalletOperation("import_stellar_key", "success", { walletAddress: addr, network: "stellar" });
+      analytics.trackWalletImport("stellar");
     } catch (err: any) {
       captureWalletError(err, "import_stellar_key", { walletType: "stellar", error: err.message });
       logWalletOperation("import_stellar_key", "error", { error: err, walletType: "stellar" });
@@ -605,6 +614,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       // Wait for ledger consensus and refresh balance
       await new Promise((r) => setTimeout(r, 2500));
       await refreshBalance();
+      analytics.trackWalletFunded("stellar");
       setState((prev) => ({ ...prev, isConnecting: false }));
     } catch (err: any) {
       setState((prev) => ({
@@ -627,6 +637,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         transaction.sign(senderKeypair);
         const result = await submitTransaction(transaction);
         await refreshBalance();
+        analytics.trackTransaction({
+          walletType: "stellar",
+          assetCode: "XLM",
+          amountBucket: bucketAmount(parseFloat(amount)),
+          network: "stellar",
+        });
         return { success: true, hash: result.hash };
       } catch (err: any) {
         console.error("XLM Payment execution failed:", err);

@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { Loader2, Link2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -79,9 +80,15 @@ export default function Home() {
 
             <div className="flex items-center gap-4 text-sm text-muted pt-2">
               <div className="flex -space-x-2.5">
-                <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-800 flex items-center justify-center text-[10px] overflow-hidden"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="" className="w-full h-full object-cover"/></div>
-                <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-700 flex items-center justify-center text-[10px] overflow-hidden"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka" alt="" className="w-full h-full object-cover"/></div>
-                <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-600 flex items-center justify-center text-[10px] overflow-hidden"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jocelyn" alt="" className="w-full h-full object-cover"/></div>
+                <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-800 flex items-center justify-center text-[10px] overflow-hidden">
+                  <Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix" alt="Avatar for Felix" width={36} height={36} className="w-full h-full object-cover" />
+                </div>
+                <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-700 flex items-center justify-center text-[10px] overflow-hidden">
+                  <Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka" alt="Avatar for Aneka" width={36} height={36} className="w-full h-full object-cover" />
+                </div>
+                <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-600 flex items-center justify-center text-[10px] overflow-hidden">
+                  <Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jocelyn" alt="Avatar for Jocelyn" width={36} height={36} className="w-full h-full object-cover" />
+                </div>
               </div>
               Joined by 10,000+ creators this month
             </div>

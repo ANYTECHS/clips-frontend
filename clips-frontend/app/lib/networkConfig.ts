@@ -119,3 +119,31 @@ export function getStellarLabUrl(txHash: string, network?: StellarNetwork): stri
   const labNetwork = freighterNetwork === "public" ? "public" : "test";
   return `https://laboratory.stellar.org/#explorer?resource=transactions&endpoint=single&values=${txHash}&network=${labNetwork}`;
 }
+
+function getStellarExpertBaseUrl(network?: StellarNetwork) {
+  return network === "mainnet"
+    ? "https://stellar.expert/explorer/public"
+    : "https://stellar.expert/explorer/testnet";
+}
+
+function getStellarScanBaseUrl(network?: StellarNetwork) {
+  return network === "mainnet"
+    ? "https://stellarscan.io"
+    : "https://testnet.stellarscan.io";
+}
+
+export function getStellarExpertAccountUrl(accountId: string, network?: StellarNetwork): string {
+  return `${getStellarExpertBaseUrl(network)}/account/${encodeURIComponent(accountId)}`;
+}
+
+export function getStellarExpertTransactionUrl(txHash: string, network?: StellarNetwork): string {
+  return `${getStellarExpertBaseUrl(network)}/tx/${encodeURIComponent(txHash)}`;
+}
+
+export function getStellarScanAccountUrl(accountId: string, network?: StellarNetwork): string {
+  return `${getStellarScanBaseUrl(network)}/account/${encodeURIComponent(accountId)}`;
+}
+
+export function getStellarScanTransactionUrl(txHash: string, network?: StellarNetwork): string {
+  return `${getStellarScanBaseUrl(network)}/tx/${encodeURIComponent(txHash)}`;
+}

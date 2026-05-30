@@ -3,16 +3,25 @@
 import { useToastContext } from "@/components/ToastProvider";
 
 /**
- * A hook that provides access to the global toast system.
- * Now powered by ToastProvider for global availability.
+ * Reusable toast hook. Provides typed helpers for success, error, and info toasts.
+ * All toasts are rendered globally by ToastProvider in the root layout.
+ *
+ * @example
+ * const { success, error, info } = useToast();
+ * success("Clip saved!");
+ * error("Upload failed.");
+ * info("Processing started.");
  */
 export function useToast() {
   const { showToast, hideToast } = useToastContext();
 
-  return { 
-    showToast, 
+  return {
+    showToast,
     hideToast,
-    // ToastEl is now rendered by ToastProvider, so we return null for backward compatibility
-    ToastEl: null 
+    success: (message: string, duration?: number) => showToast(message, "success", duration),
+    error: (message: string, duration?: number) => showToast(message, "error", duration),
+    info: (message: string, duration?: number) => showToast(message, "info", duration),
+    // Kept for backward compatibility
+    ToastEl: null,
   };
 }

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useWallet } from "./WalletProvider";
 import { Coins, Send, AlertTriangle, ArrowRight, RefreshCw } from "lucide-react";
 import TransactionConfirmationModal from "./TransactionConfirmationModal";
+import { formatXLMAmount } from "@/app/lib/formatAmount";
 
 export default function SendPaymentForm() {
   const {
@@ -208,7 +209,7 @@ export default function SendPaymentForm() {
             </span>
           </div>
           <span className="text-[11px] text-muted-foreground mt-1.5 block">
-            Wallet Balance: <span className="text-white font-mono">{balance ? parseFloat(balance).toFixed(4) : "0.00"} XLM</span>
+            Wallet Balance: <span className="text-white font-mono">{balance ? formatXLMAmount(balance, 4) : "0.00"} XLM</span>
           </span>
         </div>
 

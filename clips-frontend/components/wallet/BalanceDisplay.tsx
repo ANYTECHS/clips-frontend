@@ -3,6 +3,7 @@
 import React from "react";
 import { Loader2, RefreshCw, AlertCircle, TrendingUp, Clock } from "lucide-react";
 import { useBalance } from "@/app/hooks/useBalance";
+import { formatCrypto } from "@/app/lib/formatAmount";
 
 interface BalanceDisplayProps {
   /** Stellar public key */
@@ -224,7 +225,7 @@ export default function BalanceDisplay({
           {balance.otherAssets.map((asset) => (
             <div key={`${asset.code}-${asset.issuer}`} className="flex items-baseline justify-between">
               <span className="text-[13px] text-muted font-medium">{asset.code}</span>
-              <span className="text-[15px] font-bold text-white">{parseFloat(asset.balance).toFixed(2)}</span>
+              <span className="text-[15px] font-bold text-white">{formatCrypto(asset.balance, asset.code, 2)}</span>
             </div>
           ))}
         </div>
