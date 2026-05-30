@@ -12,12 +12,13 @@ interface JobStatus {
 }
 
 /**
- * Hook to poll job status from the backend
+ * Hook to get job status from the backend (uses SSE first, falls back to polling)
  * @param jobId - The job ID to poll
  * @param enabled - Whether polling is enabled (default: true)
  */
 export function useProcessingStatus(jobId: string | null, enabled: boolean = true) {
   const { update, startProcess, resetProcess } = useProcessStore();
+  const eventSourceRef = useRef<EventSource | null>(null);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isPollingRef = useRef(false);
 
@@ -28,6 +29,35 @@ export function useProcessingStatus(jobId: string | null, enabled: boolean = tru
     }
     isPollingRef.current = false;
   }, []);
+
+  const stopSSE = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }, []);
+
+  const stopAll = useCallback(() => {
+    stopSSE();
+    stopPolling();
+  }, [stopSSE, stopPolling]);
+
+  const updateFromData = useCallback((data: JobStatus) => {
+    update({
+      progress: data.progress,
+      status: data.status,
+      momentsFound: data.momentsFound,
+      estimatedSecondsRemaining: data.estimatedSecondsRemaining,
+    });
+
+    if (data.status === "complete" || data.status === "error") {
+      stopAll();
+
+      if (data.status === "complete") {
+        update({ completedAt: Date.now() });
+      }
+    }
+  }, [update, stopAll]);
 
   const fetchStatus = useCallback(async () => {
     if (!jobId || isPollingRef.current) return;
@@ -40,49 +70,53 @@ export function useProcessingStatus(jobId: string | null, enabled: boolean = tru
       }
 
       const data: JobStatus = await response.json();
-
-      // Update the process store with live data
-      update({
-        progress: data.progress,
-        status: data.status,
-        momentsFound: data.momentsFound,
-        estimatedSecondsRemaining: data.estimatedSecondsRemaining,
-      });
-
-      // Stop polling if job is complete or errored
-      if (data.status === "complete" || data.status === "error") {
-        stopPolling();
-        
-        if (data.status === "complete") {
-          update({ completedAt: Date.now() });
-        }
-      }
+      updateFromData(data);
     } catch (error) {
       console.error("Error fetching job status:", error);
-      // Don't stop polling on network errors - will retry
     }
-  }, [jobId, update, stopPolling]);
+  }, [jobId, updateFromData]);
 
   useEffect(() => {
     if (!enabled || !jobId) {
-      stopPolling();
+      stopAll();
       return;
     }
 
-    // Start polling immediately
-    isPollingRef.current = true;
-    fetchStatus();
+    // Try SSE first
+    const startSSE = () => {
+      const es = new EventSource(`/api/jobs/${jobId}/stream`);
+      eventSourceRef.current = es;
 
-    // Then poll every 3 seconds
-    intervalRef.current = setInterval(fetchStatus, 3000);
+      es.onmessage = (event) => {
+        try {
+          const data: JobStatus = JSON.parse(event.data);
+          updateFromData(data);
+        } catch (error) {
+          console.error("Error parsing SSE data:", error);
+        }
+      };
 
-    // Cleanup on unmount
-    return () => {
-      stopPolling();
+      es.onerror = () => {
+        console.warn("SSE connection failed, falling back to polling");
+        stopSSE();
+        startPollingFallback();
+      };
     };
-  }, [jobId, enabled, fetchStatus, stopPolling]);
 
-  return { stopPolling };
+    const startPollingFallback = () => {
+      isPollingRef.current = true;
+      fetchStatus();
+      intervalRef.current = setInterval(fetchStatus, 3000);
+    };
+
+    startSSE();
+
+    return () => {
+      stopAll();
+    };
+  }, [jobId, enabled, fetchStatus, updateFromData, stopAll]);
+
+  return { stopPolling: stopAll };
 }
 
 /**

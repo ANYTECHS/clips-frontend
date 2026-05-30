@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
+import { jobStore } from "../shared/jobStore";
 
 /**
  * Mock API endpoint for job status
  * In production, this would fetch from a real backend/database
  */
-
-// In-memory storage for demo purposes
-// Production would use Redis/Database
-const jobStore = new Map<string, any>();
 
 export async function GET(
   request: NextRequest,
