@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 
 /**
  * Balance data structure
@@ -144,37 +144,41 @@ export async function getBalance(
   }
 }
 
+// Module-level price cache — shared across all hook instances to avoid redundant fetches
+let _xlmPriceCache: { price: number; expiresAt: number } | null = null;
+let _xlmPriceFetch: Promise<number> | null = null;
+
 /**
- * Fetch current XLM price in USD
- * 
- * @returns XLM price in USD
+ * Fetch current XLM price in USD with a 60-second module-level cache.
  */
 async function fetchXLMPrice(): Promise<number> {
-  try {
-    const response = await fetch(
-      "https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd",
-      {
-        // Add cache control to avoid rate limiting
-        headers: {
-          "Cache-Control": "public, max-age=60",
-        },
-      }
-    );
+  const now = Date.now();
+  if (_xlmPriceCache && now < _xlmPriceCache.expiresAt) return _xlmPriceCache.price;
+  // Deduplicate concurrent fetches
+  if (_xlmPriceFetch) return _xlmPriceFetch;
 
-    if (response.ok) {
-      const data = await response.json();
-      const price = data.stellar?.usd;
-      
-      if (price && typeof price === "number") {
-        return price;
+  _xlmPriceFetch = (async () => {
+    try {
+      const response = await fetch(
+        "https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd"
+      );
+      if (response.ok) {
+        const data = await response.json();
+        const price = data.stellar?.usd;
+        if (price && typeof price === "number") {
+          _xlmPriceCache = { price, expiresAt: Date.now() + 60_000 };
+          return price;
+        }
       }
+    } catch (err) {
+      console.warn("Failed to fetch XLM price from CoinGecko:", err);
+    } finally {
+      _xlmPriceFetch = null;
     }
-  } catch (err) {
-    console.warn("Failed to fetch XLM price from CoinGecko:", err);
-  }
+    return _xlmPriceCache?.price ?? 0.12;
+  })();
 
-  // Fallback price (approximate)
-  return 0.12;
+  return _xlmPriceFetch;
 }
 
 /**
@@ -211,66 +215,59 @@ export function useBalance(options: UseBalanceOptions) {
     onError,
   } = options;
 
-  const [state, setState] = useState<UseBalanceState>({
-    balance: null,
-    isLoading: false,
-    error: null,
-    lastFetchTime: null,
-  });
+  const [balance, setBalance] = useState<Balance | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<BalanceError | null>(null);
+  const [lastFetchTime, setLastFetchTime] = useState<Date | null>(null);
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  // Stable refs for callbacks so fetchBalance doesn't change identity on every render
+  const onSuccessRef = useRef(onSuccess);
+  const onErrorRef = useRef(onError);
+  useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
+  useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
   /**
    * Fetch balance
    */
   const fetchBalance = useCallback(async () => {
     if (!publicKey) {
-      setState({
-        balance: null,
-        isLoading: false,
-        error: null,
-        lastFetchTime: null,
-      });
+      setBalance(null);
+      setIsLoading(false);
+      setError(null);
+      setLastFetchTime(null);
       return;
     }
 
-    setState((prev) => ({
-      ...prev,
-      isLoading: true,
-      error: null,
-    }));
+    setIsLoading(true);
+    setError(null);
 
     try {
-      const balance = await getBalance(publicKey, network);
+      const result = await getBalance(publicKey, network);
 
       if (isMountedRef.current) {
-        setState({
-          balance,
-          isLoading: false,
-          error: null,
-          lastFetchTime: new Date(),
-        });
+        setBalance(result);
+        setIsLoading(false);
+        setError(null);
+        setLastFetchTime(new Date());
 
-        onSuccess?.(balance);
+        onSuccessRef.current?.(result);
       }
     } catch (err: any) {
-      const error: BalanceError = {
+      const balanceError: BalanceError = {
         code: err.code || "UNKNOWN_ERROR",
         message: err.message || "Failed to fetch balance",
       };
 
       if (isMountedRef.current) {
-        setState((prev) => ({
-          ...prev,
-          isLoading: false,
-          error,
-        }));
+        setIsLoading(false);
+        setError(balanceError);
 
-        onError?.(error);
+        onErrorRef.current?.(balanceError);
       }
     }
-  }, [publicKey, network, onSuccess, onError]);
+  }, [publicKey, network]);
 
   /**
    * Manual refresh
@@ -283,10 +280,7 @@ export function useBalance(options: UseBalanceOptions) {
    * Clear error
    */
   const clearError = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      error: null,
-    }));
+    setError(null);
   }, []);
 
   /**
@@ -311,12 +305,10 @@ export function useBalance(options: UseBalanceOptions) {
       }
     } else {
       // Clear state if no public key
-      setState({
-        balance: null,
-        isLoading: false,
-        error: null,
-        lastFetchTime: null,
-      });
+      setBalance(null);
+      setIsLoading(false);
+      setError(null);
+      setLastFetchTime(null);
     }
 
     // Cleanup
@@ -337,12 +329,12 @@ export function useBalance(options: UseBalanceOptions) {
     };
   }, []);
 
-  return {
+  return useMemo(() => ({
     // State
-    balance: state.balance,
-    isLoading: state.isLoading,
-    error: state.error,
-    lastFetchTime: state.lastFetchTime,
+    balance,
+    isLoading,
+    error,
+    lastFetchTime,
 
     // Actions
     refresh,
@@ -350,5 +342,5 @@ export function useBalance(options: UseBalanceOptions) {
 
     // Utilities
     isAutoRefreshing: autoRefresh && !!publicKey && refreshInterval > 0,
-  };
+  }), [balance, isLoading, error, lastFetchTime, refresh, clearError, autoRefresh, publicKey, refreshInterval]);
 }
