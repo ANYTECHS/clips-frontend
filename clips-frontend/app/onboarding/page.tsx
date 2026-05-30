@@ -114,7 +114,6 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
           We've automatically set up a Stellar wallet for you. You can use it to receive earnings, mint NFTs, and manage your creator payments — no crypto experience needed.
         </p>
 
-        {/* Learn More tooltip trigger */}
         <div className="relative inline-block mb-8">
           <button
             onClick={() => setShowTooltip(!showTooltip)}
@@ -141,6 +140,19 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
               </button>
             </div>
           )}
+        </div>
+
+        {/* Backup Reminder */}
+        <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left animate-pulse">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-[14px] font-bold text-amber-500 mb-1">Important: Backup your wallet!</p>
+              <p className="text-[12px] text-amber-200/80 leading-relaxed">
+                Since we don't store your keys, you must backup your secret key to ensure you never lose access to your funds. You can do this in your Dashboard settings later.
+              </p>
+            </div>
+          </div>
         </div>
 
         <button

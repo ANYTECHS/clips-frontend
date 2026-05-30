@@ -264,6 +264,17 @@ function toSdkOperation(op: StellarOperation): StellarSdk.xdr.Operation {
       return StellarSdk.Operation.setOptions(opts);
     }
 
+    case "begin_sponsoring_future_reserves":
+      return StellarSdk.Operation.beginSponsoringFutureReserves({
+        sponsoredId: op.sponsoredId,
+        ...(op.source ? { source: op.source } : {}),
+      });
+
+    case "end_sponsoring_future_reserves":
+      return StellarSdk.Operation.endSponsoringFutureReserves({
+        ...(op.source ? { source: op.source } : {}),
+      });
+
     case "invoke_contract":
       // Soroban contract invocations require the Soroban RPC path and a
       // SorobanDataBuilder — this stub builds a placeholder operation.

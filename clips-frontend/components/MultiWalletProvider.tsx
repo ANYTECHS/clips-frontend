@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useAuth } from "./AuthProvider";
 import { 
   MultiWalletStorage, 
@@ -263,22 +263,27 @@ export function MultiWalletProvider({ children }: MultiWalletProviderProps) {
     loadWallets();
   }, [loadWallets]);
 
+  const contextValue = useMemo(
+    () => ({
+      wallets,
+      activeWallet,
+      primaryWallet: primaryWalletState,
+      isOperating,
+      error,
+      addWallet,
+      removeWallet,
+      switchWallet,
+      setPrimaryWallet,
+      updateWallet,
+      clearError,
+      refreshWallets,
+    }),
+    [wallets, activeWallet, primaryWalletState, isOperating, error, addWallet, removeWallet, switchWallet, setPrimaryWallet, updateWallet, clearError, refreshWallets]
+  );
+
   return (
     <MultiWalletContext.Provider
-      value={{
-        wallets,
-        activeWallet,
-        primaryWallet: primaryWalletState,
-        isOperating,
-        error,
-        addWallet,
-        removeWallet,
-        switchWallet,
-        setPrimaryWallet,
-        updateWallet,
-        clearError,
-        refreshWallets,
-      }}
+      value={contextValue}
     >
       {children}
     </MultiWalletContext.Provider>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/useToast";
 
 type StellarKitAny = any;
@@ -182,8 +182,13 @@ export function StellarWalletProvider({ children }: { children: React.ReactNode 
     setIsConnected(false);
   }, []);
 
+  const contextValue = useMemo(
+    () => ({ address, isConnected, isLoading, kit, connect, disconnect }),
+    [address, isConnected, isLoading, kit, connect, disconnect]
+  );
+
   return (
-    <StellarContext.Provider value={{ address, isConnected, isLoading, kit, connect, disconnect }}>
+    <StellarContext.Provider value={contextValue}>
       {children}
       {ToastEl}
     </StellarContext.Provider>

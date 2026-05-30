@@ -64,6 +64,9 @@ export default function EarningsTable({
   const filtered = useMemo(() => {
     let result = transactions;
 
+    // Combine global and local search terms
+    const activeTerm = globalSearchActive ? debouncedGlobalSearch.toLowerCase() : (localSearchActive ? debouncedLocalSearch.toLowerCase() : "");
+
     // Filter by search term
     if (activeTerm) {
       result = result.filter((tx) => {
@@ -91,7 +94,7 @@ export default function EarningsTable({
     }
 
     return result;
-  }, [transactions, activeTerm, startDate, endDate]);
+  }, [transactions, debouncedGlobalSearch, debouncedLocalSearch, globalSearchActive, localSearchActive, startDate, endDate]);
 
   return (
     <div className="space-y-6">

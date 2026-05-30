@@ -145,11 +145,16 @@ export default function BalanceDisplay({
   if (mode === "compact") {
     return (
       <div className={`flex items-center gap-3 ${className}`}>
-        <div className="flex items-baseline gap-2">
-          <span className="text-[20px] font-black text-white">
-            {balance.xlm}
-          </span>
-          <span className="text-[13px] text-muted font-medium">XLM</span>
+        <div className="flex flex-col">
+          <div className="flex items-baseline gap-2">
+            <span className="text-[20px] font-black text-white">
+              {balance.xlm}
+            </span>
+            <span className="text-[13px] text-muted font-medium">XLM</span>
+          </div>
+          <div className="text-[11px] text-muted">
+            ≈ ${balance.usd} USD
+          </div>
         </div>
         
         {showRefreshButton && (
@@ -206,21 +211,8 @@ export default function BalanceDisplay({
           </span>
           <span className="text-[14px] text-muted font-medium">XLM</span>
         </div>
-      </div>
-
-      {/* USD Value */}
-      <div className="p-4 bg-surface-hover border border-border rounded-xl">
-        <div className="flex items-baseline justify-between mb-1">
-          <span className="text-[12px] text-muted font-medium uppercase tracking-wider">
-            USD Value
-          </span>
-          <TrendingUp className="w-3.5 h-3.5 text-brand" />
-        </div>
-        <div className="flex items-baseline gap-2">
-          <span className="text-[24px] font-bold text-brand">
-            ${balance.usd}
-          </span>
-          <span className="text-[12px] text-muted">USD</span>
+        <div className="text-[14px] text-muted mt-0.5">
+          ≈ ${balance.usd} USD
         </div>
       </div>
 
