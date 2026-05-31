@@ -20,7 +20,7 @@ import analytics from "@/lib/analytics";
 
 type ExportFormat = "csv" | "json" | "pdf";
 
-function ExportMenu({ onExport }: { onExport: (f: ExportFormat) => void }) {
+function ExportMenu({ onExport, exporting }: { onExport: (f: ExportFormat) => void; exporting: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -41,12 +41,17 @@ function ExportMenu({ onExport }: { onExport: (f: ExportFormat) => void }) {
   return (
     <div ref={ref} className="relative self-start lg:self-auto">
       <button
-        onClick={() => setOpen((o) => !o)}
-        className="bg-brand hover:bg-brand-hover text-black px-6 py-3 rounded-xl font-bold text-[14px] flex items-center gap-2 transition-all"
+        onClick={() => !exporting && setOpen((o) => !o)}
+        disabled={exporting}
+        className="bg-brand hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed text-black px-6 py-3 rounded-xl font-bold text-[14px] flex items-center gap-2 transition-all"
       >
-        <Download className="w-4 h-4" />
-        Export
-        <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        {exporting ? (
+          <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/></svg>
+        ) : (
+          <Download className="w-4 h-4" />
+        )}
+        {exporting ? "Exporting…" : "Export"}
+        {!exporting && <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} />}
       </button>
 
       {open && (
@@ -77,7 +82,9 @@ export default function EarningsPage() {
     pending: "0.00",
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -97,17 +104,18 @@ export default function EarningsPage() {
     loadData();
   }, [user?.id]);
 
-  const exportCSV = (format: "csv" | "json" | "pdf") => {
-    if (!user?.id || transactions.length === 0) return;
+  const exportCSV = async (format: "csv" | "json" | "pdf") => {
+    const exportData = filteredTransactions.length > 0 ? filteredTransactions : transactions;
+    if (!user?.id || exportData.length === 0) return;
 
-    // Track earnings export event
+    setExporting(true);
     analytics.trackEarningsExport(format);
 
     try {
       if (format === "csv") {
         const csvContent = [
           ["Date", "Description", "Amount", "Platform", "Status", "Tax ID"],
-          ...transactions.map((tx) => [
+          ...exportData.map((tx) => [
             tx.date,
             tx.description,
             tx.amount.toFixed(2),
@@ -122,16 +130,16 @@ export default function EarningsPage() {
           .join("\r\n");
 
         const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-        triggerDownload(blob, `clipcash-earnings-${today()}.csv`);
+        triggerDownload(blob, `clipcash-earnings-${monthStamp()}.csv`);
 
       } else if (format === "json") {
-        const json = JSON.stringify({ summary, transactions }, null, 2);
+        const json = JSON.stringify({ summary, transactions: exportData }, null, 2);
         const blob = new Blob([json], { type: "application/json;charset=utf-8;" });
-        triggerDownload(blob, `clipcash-earnings-${today()}.json`);
+        triggerDownload(blob, `clipcash-earnings-${monthStamp()}.json`);
 
       } else if (format === "pdf") {
         // Build a minimal printable HTML document and open the browser print dialog
-        const rows = transactions
+        const rows = exportData
           .map(
             (tx) =>
               `<tr>
@@ -190,6 +198,8 @@ export default function EarningsPage() {
     } catch (error) {
       console.error("Export failed:", error);
       alert("Export failed. Please try again.");
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -205,7 +215,7 @@ export default function EarningsPage() {
     URL.revokeObjectURL(url);
   };
 
-  const today = () => new Date().toISOString().split("T")[0];
+  const monthStamp = () => new Date().toISOString().slice(0, 7);
 
   if (loading) {
     return (
@@ -247,7 +257,7 @@ export default function EarningsPage() {
               </span>
             </p>
           </div>
-          <ExportMenu onExport={exportCSV} />
+          <ExportMenu onExport={exportCSV} exporting={exporting} />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -283,6 +293,7 @@ export default function EarningsPage() {
           transactions={transactions}
           summary={summary}
           loading={loading}
+          onFilteredTransactionsChange={setFilteredTransactions}
         />
       </div>
     </EarningsLayout>

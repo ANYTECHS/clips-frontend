@@ -11,12 +11,14 @@ interface EarningsTableProps {
   transactions: Transaction[];
   summary: Summary;
   loading: boolean;
+  onFilteredTransactionsChange?: (filtered: Transaction[]) => void;
 }
 
 export default function EarningsTable({
   transactions,
   summary,
   loading,
+  onFilteredTransactionsChange,
 }: EarningsTableProps) {
   const [localSearch, setLocalSearch] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
@@ -95,6 +97,10 @@ export default function EarningsTable({
 
     return result;
   }, [transactions, debouncedGlobalSearch, debouncedLocalSearch, globalSearchActive, localSearchActive, startDate, endDate]);
+
+  React.useEffect(() => {
+    onFilteredTransactionsChange?.(filtered);
+  }, [filtered, onFilteredTransactionsChange]);
 
   return (
     <div className="space-y-6">

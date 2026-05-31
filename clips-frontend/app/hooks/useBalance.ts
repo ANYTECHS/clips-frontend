@@ -45,6 +45,13 @@ export interface UseBalanceOptions {
   refreshInterval?: number;
   /** Enable auto-refresh (default: true) */
   autoRefresh?: boolean;
+  /**
+   * Use Horizon's live SSE stream (server.payments / server.effects) to
+   * push balance updates instantly when funds arrive.  Falls back to the
+   * polling interval if the browser does not support EventSource.
+   * (default: true)
+   */
+  enableStreaming?: boolean;
   /** XLM/USD price cache TTL in milliseconds (default: 300000 = 5 minutes) */
   priceCacheTtlMs?: number;
   /** Callback when balance is successfully fetched */
@@ -248,8 +255,9 @@ export function useBalance(options: UseBalanceOptions) {
   const {
     publicKey,
     network = "TESTNET",
-    refreshInterval = 30000, // 30 seconds default
+    refreshInterval = 30000,
     autoRefresh = true,
+    enableStreaming = true,
     priceCacheTtlMs = DEFAULT_PRICE_CACHE_TTL_MS,
     onSuccess,
     onError,
@@ -267,6 +275,7 @@ export function useBalance(options: UseBalanceOptions) {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
+  const streamRef = useRef<EventSource | null>(null);
   // Stable refs for callbacks so fetchBalance doesn't change identity on every render
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
@@ -369,11 +378,56 @@ export function useBalance(options: UseBalanceOptions) {
   }, [publicKey, network, autoRefresh, refreshInterval, fetchBalance]);
 
   /**
+   * Horizon live streaming — open an SSE connection for payments so the
+   * balance updates instantly when funds arrive instead of waiting for the
+   * next poll interval.
+   */
+  useEffect(() => {
+    if (!publicKey || !enableStreaming || typeof EventSource === "undefined") return;
+
+    const horizonUrl =
+      network === "PUBLIC"
+        ? "https://horizon.stellar.org"
+        : "https://horizon-testnet.stellar.org";
+
+    // Close any existing stream before opening a new one
+    if (streamRef.current) {
+      streamRef.current.close();
+      streamRef.current = null;
+    }
+
+    const es = new EventSource(
+      `${horizonUrl}/accounts/${publicKey}/payments?cursor=now`
+    );
+
+    es.addEventListener("message", () => {
+      // A new payment arrived — refresh the balance immediately
+      fetchBalance();
+    });
+
+    es.addEventListener("error", () => {
+      // SSE error (network drop, etc.) — the browser will attempt to
+      // reconnect automatically; no explicit action needed here.
+    });
+
+    streamRef.current = es;
+
+    return () => {
+      es.close();
+      streamRef.current = null;
+    };
+  }, [publicKey, network, enableStreaming, fetchBalance]);
+
+  /**
    * Cleanup on unmount
    */
   useEffect(() => {
     return () => {
       isMountedRef.current = false;
+      if (streamRef.current) {
+        streamRef.current.close();
+        streamRef.current = null;
+      }
     };
   }, []);
 
@@ -388,5 +442,6 @@ export function useBalance(options: UseBalanceOptions) {
     clearError,
 
     isAutoRefreshing: autoRefresh && !!publicKey && refreshInterval > 0,
-  }), [balance, isLoading, error, lastFetchTime, isPriceStale, refresh, clearError, autoRefresh, publicKey, refreshInterval]);
+    isStreaming: enableStreaming && !!publicKey && typeof EventSource !== "undefined",
+  }), [balance, isLoading, error, lastFetchTime, isPriceStale, refresh, clearError, autoRefresh, publicKey, refreshInterval, enableStreaming]);
 }
