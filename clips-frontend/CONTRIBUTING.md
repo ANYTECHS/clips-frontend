@@ -41,14 +41,13 @@ npm run dev
 Open http://localhost:3000 to view the app.
 
 ## Environment variables
-We keep an `.env.example` at the repo root. Copy it to `.env.local` and fill in values. Typical variables used by the app include:
+We keep an `.env.example` at the repository root. Copy it into this directory before running the app:
 
-- `NEXT_PUBLIC_API_URL` — API base URL for local/dev
-- `NEXT_PUBLIC_STELLAR_RPC` — Stellar RPC endpoint
-- `NEXT_PUBLIC_STELLAR_NETWORK` — `testnet` or `mainnet`
-- `NEXT_PUBLIC_SENTRY_DSN` — (optional) Sentry DSN for error reporting
+```bash
+cp ../.env.example .env.local
+```
 
-See [README.md](README.md) and `.env.example` for a full list and guidance.
+Required variables (OAuth, NextAuth, Sentry) and optional variables (Stellar contracts, analytics, extra providers) are documented in that file. CI runs a startup check that fails the build when required variables are missing.
 
 ## Running tests & Storybook
 - Unit tests (Jest): `npm run test`

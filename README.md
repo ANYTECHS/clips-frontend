@@ -71,9 +71,9 @@ npm install
 
 3. Set up environment variables:
 ```bash
-cp .env.example .env.local
+cp .env.example clips-frontend/.env.local
 ```
-Edit `.env.local` with your configuration (see Environment Variables section below).
+Edit `clips-frontend/.env.local` using the template at [.env.example](.env.example). Each variable is documented there with links to where you can obtain credentials.
 
 4. Start the development server:
 ```bash
@@ -84,21 +84,9 @@ npm run dev
 
 ### Environment Variables
 
-Create a `.env.local` file in the `clips-frontend` directory with the following variables:
+Copy the repository root [`.env.example`](.env.example) to `clips-frontend/.env.local` and fill in the values. Required variables include Google/Apple OAuth credentials, NextAuth settings, and the Sentry DSN. Optional variables (Stellar contract IDs, extra OAuth providers, analytics) are marked in the template with their defaults.
 
-```env
-# API Configuration
-NEXT_PUBLIC_API_URL=http://localhost:3000
-
-# Stellar Blockchain
-NEXT_PUBLIC_STELLAR_RPC=https://soroban-testnet.stellar.org
-NEXT_PUBLIC_STELLAR_NETWORK=testnet
-
-# Optional: Analytics
-# NEXT_PUBLIC_GA_ID=G-XXXXXXXXXX
-```
-
-See `.env.example` for a complete list of available environment variables.
+In CI, the build validates that all required variables are set. Locally, the same check runs when `CI=true` (for example during GitHub Actions).
 
 ## Project Structure
 

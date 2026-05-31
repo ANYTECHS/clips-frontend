@@ -1,4 +1,4 @@
-import { secureStorage } from './secureStorage';
+import { secureStorage, getSecureStorageWarning, __testing__ } from './secureStorage';
 
 describe('secureStorage', () => {
   beforeEach(() => {
@@ -26,11 +26,41 @@ describe('secureStorage', () => {
     expect(result).toBeNull();
   });
 
-  it('clears unencrypted data on first read', async () => {
+  it('returns null and warns when data is not encrypted', async () => {
     localStorage.setItem('mixed-key', 'plain-text');
     const result = await secureStorage.getItem('mixed-key');
     expect(result).toBeNull();
-    expect(localStorage.getItem('mixed-key')).toBeNull();
+    expect(localStorage.getItem('mixed-key')).toBe('plain-text');
+    expect(getSecureStorageWarning()).toMatch(/Unable to decrypt/);
+  });
+
+  it('stores salt in localStorage so it survives sessionStorage clears', async () => {
+    await secureStorage.setItem('persist-key', 'wallet-session');
+    expect(localStorage.getItem(__testing__.CRYPTO_SALT_KEY)).not.toBeNull();
+
+    sessionStorage.clear();
+    expect(await secureStorage.getItem('persist-key')).toBe('wallet-session');
+  });
+
+  it('migrates salt from sessionStorage to localStorage', async () => {
+    const legacySalt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+    sessionStorage.setItem(__testing__.CRYPTO_SALT_KEY, legacySalt);
+
+    await secureStorage.setItem('legacy-key', 'legacy-value');
+    expect(localStorage.getItem(__testing__.CRYPTO_SALT_KEY)).toBe(legacySalt);
+    expect(sessionStorage.getItem(__testing__.CRYPTO_SALT_KEY)).toBeNull();
+
+    sessionStorage.clear();
+    expect(await secureStorage.getItem('legacy-key')).toBe('legacy-value');
+  });
+
+  it('surfaces a warning when encrypted data cannot be decrypted after salt loss', async () => {
+    await secureStorage.setItem('wallet-key', 'secret-payload');
+    localStorage.removeItem(__testing__.CRYPTO_SALT_KEY);
+
+    const result = await secureStorage.getItem('wallet-key');
+    expect(result).toBeNull();
+    expect(getSecureStorageWarning()).toMatch(/Unable to decrypt/);
   });
 });
 

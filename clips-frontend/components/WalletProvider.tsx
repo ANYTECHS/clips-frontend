@@ -1,7 +1,8 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
-import { secureStorage } from "@/app/lib/secureStorage";
+import { secureStorage, getSecureStorageWarning } from "@/app/lib/secureStorage";
+import { useToast } from "@/hooks/useToast";
 import analytics, { bucketAmount } from "@/lib/analytics";
 import { captureWalletError, logWalletOperation, addWalletBreadcrumb } from "@/app/lib/walletErrorTracking";
 
@@ -177,6 +178,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [stellarMnemonic, setStellarMnemonic] = useState<string | null>(null);
   const [pendingTransactions, setPendingTransactions] = useState<PendingTransaction[]>([]);
   const stateRef = useRef(state);
+  const { error: showErrorToast } = useToast();
 
   const addPendingTransaction = useCallback((tx: Omit<PendingTransaction, "id">) => {
     const id = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -222,6 +224,10 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     async function restoreSession() {
       try {
         const stored = await secureStorage.getItem(STORAGE_KEY);
+        const decryptionWarning = getSecureStorageWarning();
+        if (decryptionWarning) {
+          showErrorToast(decryptionWarning, 8000);
+        }
         if (stored) {
           try {
             const parsed = JSON.parse(stored);
@@ -250,7 +256,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     }
 
     void restoreSession();
-  }, []);
+  }, [showErrorToast]);
 
   // Balance updater helper
   const refreshBalance = useCallback(async () => {
