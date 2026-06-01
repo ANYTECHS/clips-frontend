@@ -1,86 +1,26 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+/**
+ * useProcessStore — compatibility re-export.
+ *
+ * The store has moved to app/store/processStore.ts (Zustand + persist).
+ * This file keeps the old import path working so existing consumers
+ * (ProcessDashboard, create/page.tsx) need zero changes.
+ *
+ * The returned shape is identical to the old hook:
+ *   { process, update, startProcess, resetProcess }
+ */
 
-export type ProcessStatus = "idle" | "processing" | "complete" | "error";
+import { useProcessStore as _useProcessStore, selectProcess, type ProcessState, type ProcessActions } from "@/app/store";
 
-export interface ProcessState {
-  id: string;
-  label: string;
-  progress: number; // 0–100
-  status: ProcessStatus;
-  startedAt: number | null;
-  completedAt: number | null;
-  momentsFound: number;
-  estimatedSecondsRemaining: number | null;
-}
-
-const STORAGE_KEY = "clips_process_state";
-
-const defaultState: ProcessState = {
-  id: "",
-  label: "",
-  progress: 0,
-  status: "idle",
-  startedAt: null,
-  completedAt: null,
-  momentsFound: 0,
-  estimatedSecondsRemaining: null,
-};
-
-function loadFromStorage(): ProcessState {
-  if (typeof window === "undefined") return defaultState;
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ProcessState) : defaultState;
-  } catch {
-    return defaultState;
-  }
-}
-
-function saveToStorage(state: ProcessState) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-}
+// Re-export types so existing imports from this file keep working
+export type { ProcessStatus, ProcessState } from "@/app/store";
 
 export function useProcessStore() {
-  const [process, setProcessState] = useState<ProcessState>(defaultState);
-
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    setProcessState(loadFromStorage());
-  }, []);
-
-  const update = useCallback(
-    (patch: Partial<ProcessState> | ((prev: ProcessState) => Partial<ProcessState>)) => {
-      setProcessState((prev: ProcessState) => {
-        const resolved = typeof patch === "function" ? patch(prev) : patch;
-        const next = { ...prev, ...resolved };
-        saveToStorage(next);
-        return next;
-      });
-    },
-    []
-  );
-
-  const startProcess = useCallback((id: string, label: string) => {
-    const next: ProcessState = {
-      id,
-      label,
-      progress: 0,
-      status: "processing",
-      startedAt: Date.now(),
-      completedAt: null,
-      momentsFound: 0,
-      estimatedSecondsRemaining: null,
-    };
-    saveToStorage(next);
-    setProcessState(next);
-  }, []);
-
-  const resetProcess = useCallback(() => {
-    saveToStorage(defaultState);
-    setProcessState(defaultState);
-  }, []);
+  const process = _useProcessStore(selectProcess);
+  const update = _useProcessStore((s: ProcessState & ProcessActions) => s.update);
+  const startProcess = _useProcessStore((s: ProcessState & ProcessActions) => s.startProcess);
+  const resetProcess = _useProcessStore((s: ProcessState & ProcessActions) => s.resetProcess);
 
   return { process, update, startProcess, resetProcess };
 }

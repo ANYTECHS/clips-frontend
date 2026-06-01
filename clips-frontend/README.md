@@ -1,53 +1,23 @@
+# ClipCash - AI Clipping Platform
+
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Clips Frontend - AI-Powered Video Clip Generator
+## 📚 Component Documentation
 
-A modern web application for generating AI-powered video clips from long-form content and distributing them across social media platforms.
+**[View Storybook Component Library](http://localhost:6006/)** (when running locally)
 
-## Features
+Our component library is documented using Storybook, featuring 11+ reusable components with interactive examples, accessibility testing, and auto-generated documentation.
 
-- **Video Upload & Processing**: Upload videos or provide URLs for AI-powered clip generation
-- **Multi-Platform Distribution**: Generate clips optimized for TikTok, Instagram, and YouTube
-- **Real-Time Progress Tracking**: WebSocket-based live updates during clip generation
-- **Auto-Publishing**: Optional automatic publishing to connected platforms
-- **Process Dashboard**: Monitor clip generation progress with detailed metrics
+To run Storybook locally:
+```bash
+npm run storybook
+```
 
-## Recent Updates
-
-### Form Submission Feature
-Complete implementation of the clip generation form with:
-- Video input via URL or file upload
-- Platform selection (TikTok, Instagram, YouTube)
-- Auto-publish toggle
-- Real-time validation and error handling
-- Loading states and submission prevention
-
-See [FEATURE_SUMMARY.md](./FEATURE_SUMMARY.md) for details.
+See [STORYBOOK.md](./STORYBOOK.md) for detailed documentation.
 
 ## Getting Started
 
-### Prerequisites
-
-- Node.js 18+ installed
-- Backend API service running (see backend documentation)
-
-### Installation
-
-```bash
-# Install dependencies
-npm install
-```
-
-### Environment Setup
-
-Create a `.env.local` file:
-
-```bash
-NEXT_PUBLIC_API_URL=http://localhost:8000
-NEXT_PUBLIC_WS_URL=ws://localhost:8000/ws/progress
-```
-
-### Run Development Server
+First, run the development server:
 
 ```bash
 npm run dev
@@ -61,82 +31,101 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-### Key Routes
-
-- `/` - Landing page
-- `/dashboard` - Main dashboard with process tracking
-- `/create` - Clip generation form (NEW)
-- `/library` - Clip library (coming soon)
-- `/billing` - Billing management (coming soon)
-
-## Project Structure
-
-```
-clips-frontend/
-├── app/
-│   ├── create/              # Clip generation form
-│   ├── dashboard/           # Main dashboard
-│   ├── components/          # Reusable UI components
-│   ├── hooks/              # Custom React hooks
-│   └── api/                # API route handlers
-├── public/                 # Static assets
-└── docs/                   # Documentation
-```
-
-## Documentation
-
-- [FEATURE_SUMMARY.md](./FEATURE_SUMMARY.md) - Latest feature overview
-- [SETUP_GUIDE.md](./SETUP_GUIDE.md) - Detailed setup instructions
-- [FORM_SUBMISSION_IMPLEMENTATION.md](./FORM_SUBMISSION_IMPLEMENTATION.md) - Technical implementation details
-- [BENTO_GRID_IMPLEMENTATION.md](./BENTO_GRID_IMPLEMENTATION.md) - Grid layout system
-- [RESPONSIVE_DESIGN.md](./RESPONSIVE_DESIGN.md) - Responsive design guidelines
-
-## Development
-
-### Running Tests
-
-```bash
-npm run test
-```
-
-### Building for Production
-
-```bash
-npm run build
-npm start
-```
-
-### Linting
-
-```bash
-npm run lint
-```
-
-## Tech Stack
-
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS 4
-- **Icons**: Lucide React
-- **State Management**: Zustand + Custom Hooks
-- **Testing**: Vitest + Testing Library
-- **Real-Time**: WebSocket
-
-## Contributing
-
-1. Create a feature branch
-2. Make your changes
-3. Add tests if applicable
-4. Run linting and tests
-5. Submit a pull request
-
-## Troubleshooting
-
-See [SETUP_GUIDE.md](./SETUP_GUIDE.md#troubleshooting) for common issues and solutions.
-
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## API Endpoints
+
+### Upload Video
+`POST /api/upload`
+
+Uploads video files for AI processing.
+
+**Request:**
+- Method: `POST`
+- Content-Type: `multipart/form-data`
+- Body:
+  - `files`: Video file(s) (max 500MB per file)
+  - Supported formats: MP4, MOV, AVI, MKV
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Successfully uploaded 1 file(s)",
+  "jobId": "job_1234567890_abc123xyz",
+  "files": [
+    {
+      "name": "video.mp4",
+      "size": 104857600,
+      "type": "video/mp4"
+    }
+  ]
+}
+```
+
+**Error Response:**
+```json
+{
+  "error": "File exceeds maximum size of 500MB"
+}
+```
+
+### Check Job Status
+`GET /api/jobs/:jobId`
+
+Poll this endpoint to get real-time processing status updates.
+
+**Response:**
+```json
+{
+  "progress": 45,
+  "status": "processing",
+  "momentsFound": 3,
+  "estimatedSecondsRemaining": 120
+}
+```
+
+**Status Values:**
+- `processing`: Job is actively being processed
+- `complete`: Processing finished successfully
+- `error`: Processing failed
+
+## Features
+
+### Real-Time Processing Progress
+The `/dashboard/processing` page uses a polling mechanism (every 3 seconds) to fetch real-time job status from the backend via the `useProcessingStatus` hook.
+
+### Push Notifications
+When a processing job completes, users receive browser push notifications (if permission granted). Notification preferences are persisted to localStorage.
+
+- Permission request happens on first upload
+- Clicking notification navigates to `/projects` page
+- Works with service worker for background notifications
+- Users can manage preferences in settings
+
+### SEO Optimization
+- `app/robots.ts`: Disallows crawling of authenticated routes
+- `app/sitemap.ts`: Includes only public marketing pages
+- Public routes: `/`, `/login`, `/privacy`, `/terms`, `/status`
+
+## Hybrid Web2 -> Web3 Wallet Architecture
+
+ClipCash employs a sophisticated hybrid Web2 -> Web3 architecture to seamlessly transition users from traditional authentication methods to Web3 paradigms, allowing frictionless onboarding while maintaining decentralization options for power users.
+
+### 1. Seamless Onboarding (Web2 Focus)
+- **Authentication**: Users can sign up via traditional OAuth providers (Google, Apple) using `next-auth`.
+- **Embedded Wallets**: Upon registration, an invisible "smart wallet" is generated on the backend using multi-party computation (MPC) or smart contract accounts (ERC-4337). This shields users from mnemonic phrases or gas fees.
+- **Custody Management**: The backend manages transactions temporarily, signing them on behalf of the user to provide a smooth "Web2-like" experience.
+
+### 2. Transition and Backup (Advanced Mode)
+- **Advanced Wallet Mode**: Power users can navigate to Settings > Advanced Wallet Mode to reveal their underlying cryptographic identities.
+- **Export Secret Key**: Users can view and export the raw private key associated with their embedded smart wallet to take full self-custody.
+- **External Backup Wallet**: To secure assets and ensure redundancy, users can connect an external Web3 wallet (MetaMask or Phantom) via the `WalletProvider.tsx`.
+- **State Management**: Wallet states and current active connections are managed securely through browser-level encryption (`secureStorage.ts`) and global context (`WalletProvider.tsx`).
+
+### 3. Integration with Smart Contracts
+- **Minting NFTs**: When a user mints their clips into NFTs (Vault), the app determines if they are using an embedded wallet or an external connection.
+- **Transaction Flow**: For external wallets, a signature is requested directly via window injections (`window.ethereum` or `window.solana`). For embedded wallets, the server signs and dispatches the payload automatically.
 
 ## Learn More
 

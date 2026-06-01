@@ -1,110 +1,67 @@
 "use client";
 
-import { useState, useEffect } from "react";
+/**
+ * useDashboardData — thin hook over the Zustand dashboard store.
+ *
+ * Keeps the same return shape as before so every existing consumer
+ * (RevenueTrendCard, RecentProjects, StatCardGroup) works without changes.
+ *
+ * The store handles:
+ *  - Deduplication: only one in-flight fetch at a time
+ *  - Caching: data is reused for 5 minutes before re-fetching
+ *  - Shared state: all components read from the same store instance
+ */
 
-export interface DashboardStats {
-  earnings: {
-    total: string;
-    trend: number;
-    trendLabel: string;
-  };
-  clips: {
-    total: number;
-    trend: number;
-    trendLabel: string;
-  };
-  platforms: {
-    total: number;
-    trend: number;
-    trendLabel: string;
-  };
-}
+import { useEffect } from "react";
+import {
+  useDashboardStore,
+  selectStats,
+  selectRevenueTrend,
+  selectRecentProjects,
+  selectDashboardMeta,
+  type DashboardState,
+  type DashboardActions,
+} from "@/app/store";
 
-export interface RevenuePoint {
-  date: string;
-  amount: number;
-}
+// Re-export types so existing imports from this file keep working
+export type {
+  DashboardStats,
+  RevenuePoint,
+  Project,
+} from "@/app/store";
 
-export interface Project {
-  id: string;
-  title: string;
-  clipsGenerated: number;
-  status: "processing" | "completed";
-  image?: string;
-  accent?: string;
-}
+export type { EarningsStats } from "@/app/store";
 
 export interface DashboardData {
-  stats: DashboardStats;
-  revenueTrend: RevenuePoint[];
-  recentProjects: Project[];
+  stats: import("@/app/store").DashboardStats;
+  revenueTrend: import("@/app/store").RevenuePoint[];
+  recentProjects: import("@/app/store").Project[];
 }
 
-const MOCK_DATA: DashboardData = {
-  stats: {
-    earnings: {
-      total: "$12,450.80",
-      trend: 12.5,
-      trendLabel: "+12.5% from last month",
-    },
-    clips: {
-      total: 142,
-      trend: 8.2,
-      trendLabel: "+8.2% from last month",
-    },
-    platforms: {
-      total: 4,
-      trend: 0,
-      trendLabel: "Steady performance",
-    },
-  },
-  revenueTrend: [
-    { date: "2024-03-01", amount: 400 },
-    { date: "2024-03-05", amount: 600 },
-    { date: "2024-03-10", amount: 800 },
-    { date: "2024-03-15", amount: 700 },
-    { date: "2024-03-20", amount: 900 },
-    { date: "2024-03-25", amount: 1100 },
-  ],
-  recentProjects: [
-    {
-      id: "1",
-      title: "Apex Legends Clutch Breakdown and Post Match Analysis",
-      clipsGenerated: 2,
-      status: "processing",
-      accent: "radial-gradient(circle at 30% 25%, rgba(127, 221, 255, 0.55), transparent 32%), linear-gradient(145deg, #0b2230 0%, #112839 45%, #061218 100%)",
-    },
-    {
-      id: "2",
-      title: "React Native Tutorial",
-      clipsGenerated: 12,
-      status: "completed",
-      accent: "radial-gradient(circle at 50% 30%, rgba(170, 220, 206, 0.32), transparent 36%), linear-gradient(145deg, #536f66 0%, #62786f 48%, #241c19 100%)",
-    },
-  ],
-};
+export function useDashboardData(): {
+  data: DashboardData | null;
+  loading: boolean;
+  error: Error | null;
+} {
+  const fetchDashboard = useDashboardStore((s: DashboardState & DashboardActions) => s.fetchDashboard);
+  const stats = useDashboardStore(selectStats);
+  const revenueTrend = useDashboardStore(selectRevenueTrend);
+  const recentProjects = useDashboardStore(selectRecentProjects);
+  const { loading, error } = useDashboardStore(selectDashboardMeta);
 
-export function useDashboardData() {
-  const [data, setData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
+  // Trigger fetch on first mount (store deduplicates concurrent calls)
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setLoading(true);
-        // Simulate API delay
-        await new Promise((resolve) => setTimeout(resolve, 1500));
-        setData(MOCK_DATA);
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error("Failed to fetch dashboard data"));
-      } finally {
-        setLoading(false);
-      }
-    };
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-    fetchData();
-  }, []);
+  const data: DashboardData | null =
+    stats !== null
+      ? { stats, revenueTrend, recentProjects }
+      : null;
 
-  return { data, loading, error };
+  return {
+    data,
+    loading,
+    error: error ? new Error(error) : null,
+  };
 }
