@@ -33,6 +33,7 @@ export {
   selectProcess,
   selectProcessStatus,
   selectProcessProgress,
+  selectHasHydrated,
   defaultProcessState,
 } from "./processStore";
 

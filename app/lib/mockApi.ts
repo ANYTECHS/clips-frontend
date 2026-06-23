@@ -214,10 +214,10 @@ export const saveOnboarding = rateLimiter(async (userId: string, step: number, d
   return { success: true, user };
 }, 10, 10000);
 
-export const getEarningsReport = rateLimiter(async (userId: string) => {
+export const getEarningsReport = rateLimiter(async (userId: string, { page = 1, pageSize = 20 }: { page?: number; pageSize?: number } = {}) => {
   await delay(1000 + Math.random() * 500);
 
-  const transactions: Transaction[] = [];
+  const allTransactions: Transaction[] = [];
   const platforms = ['YouTube', 'TikTok', 'Instagram', 'Twitch'] as const;
   const types = ['payout', 'royalty', 'mint', 'referral'] as const;
   const cryptoCurrencies = ['ETH', 'SOL', 'USDC'] as const;
@@ -246,17 +246,24 @@ export const getEarningsReport = rateLimiter(async (userId: string) => {
       taxId: `TAX-${String(i + 1).padStart(3, '0')}`,
     };
 
-    transactions.push(tx);
+    allTransactions.push(tx);
     totalAmount += tx.amount;
   }
+
+  const total = allTransactions.length;
+  const totalPages = Math.ceil(total / pageSize);
+  const safePage = Math.max(1, Math.min(page, totalPages || 1));
+  const start = (safePage - 1) * pageSize;
+  const transactions = allTransactions.slice(start, start + pageSize);
 
   return {
     transactions,
     summary: {
       total: totalAmount.toFixed(2),
-      completed: transactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0).toFixed(2),
-      pending: transactions.filter(t => t.status === 'pending').reduce((sum, t) => sum + t.amount, 0).toFixed(2),
-    }
+      completed: allTransactions.filter(t => t.status === 'completed').reduce((sum, t) => sum + t.amount, 0).toFixed(2),
+      pending: allTransactions.filter(t => t.status === 'pending').reduce((sum, t) => sum + t.amount, 0).toFixed(2),
+    },
+    pagination: { page: safePage, pageSize, total, totalPages },
   };
 }, 10, 10000);
 

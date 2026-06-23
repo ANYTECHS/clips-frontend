@@ -17,6 +17,7 @@ import {
 import { MockApi, type Summary, type Transaction } from "@/app/lib/mockApi";
 import { useAuth } from "@/components/AuthProvider";
 import analytics from "@/lib/analytics";
+import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 
 type ExportFormat = "csv" | "json" | "pdf";
 
@@ -83,18 +84,23 @@ export default function EarningsPage() {
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [filteredTransactions, setFilteredTransactions] = useState<Transaction[]>([]);
+  const [pagination, setPagination] = useState<{ page: number; pageSize: number; total: number; totalPages: number } | undefined>();
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const { user } = useAuth();
+
+  const { filters, updateFilters } = useFilterQueryState({ page: 1, pageSize: 20 });
+  const { page, pageSize } = filters;
 
   useEffect(() => {
     async function loadData() {
       if (!user?.id) return;
       try {
         setLoading(true);
-        const data = await MockApi.getEarningsReport(user.id);
+        const data = await MockApi.getEarningsReport(user.id, { page, pageSize });
         setSummary(data.summary);
         setTransactions(data.transactions);
+        setPagination(data.pagination);
       } catch (error) {
         console.error("Failed to load earnings summary:", error);
       } finally {
@@ -102,7 +108,7 @@ export default function EarningsPage() {
       }
     }
     loadData();
-  }, [user?.id]);
+  }, [user?.id, page, pageSize]);
 
   const exportCSV = async (format: "csv" | "json" | "pdf") => {
     const exportData = filteredTransactions.length > 0 ? filteredTransactions : transactions;
@@ -294,6 +300,8 @@ export default function EarningsPage() {
           summary={summary}
           loading={loading}
           onFilteredTransactionsChange={setFilteredTransactions}
+          pagination={pagination}
+          onPageChange={(p) => updateFilters({ page: p })}
         />
       </div>
     </EarningsLayout>

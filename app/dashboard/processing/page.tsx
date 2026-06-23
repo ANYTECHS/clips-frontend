@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import ProcessingHeader from "@/components/dashboard/ProcessingHeader";
 import { Sparkles, Clock, Zap, RefreshCw, X, CheckCircle, AlertCircle, RotateCcw } from "lucide-react";
-import { useProcessStore, selectProcess } from "@/app/store/processStore";
+import { useProcessStore, selectProcess, selectHasHydrated } from "@/app/store/processStore";
 import { useProcessingStatus } from "@/app/hooks/useProcessingStatus";
 import { ProcessStatus } from "@/app/store/types";
 
@@ -24,6 +24,7 @@ export default function ProcessingPage() {
   const [notificationSent, setNotificationSent] = useState(false);
 
   const process = useProcessStore(selectProcess);
+  const hasHydrated = useProcessStore(selectHasHydrated);
   const { progress, momentsFound, estimatedSecondsRemaining, status, id } = process;
   const resetProcess = useProcessStore((s) => s.resetProcess);
 
@@ -62,6 +63,15 @@ export default function ProcessingPage() {
     setNotificationSent(false);
     router.push("/dashboard");
   };
+
+  // Loading — wait for async secureStorage rehydration
+  if (!hasHydrated) {
+    return (
+      <div className="min-h-screen bg-background text-white flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-brand border-t-transparent animate-spin" />
+      </div>
+    );
+  }
 
   // Success state
   if (status === "complete") {

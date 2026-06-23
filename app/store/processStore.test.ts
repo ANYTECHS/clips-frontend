@@ -1,9 +1,20 @@
 import { act, renderHook } from '@testing-library/react';
-import { useProcessStore, defaultProcessState, selectProcess, selectProcessStatus, selectProcessProgress } from './processStore';
+import { useProcessStore, defaultProcessState, selectProcess, selectProcessStatus, selectProcessProgress, selectHasHydrated } from './processStore';
+
+// Mock secureStorage so tests run without real crypto
+jest.mock('@/app/lib/secureStorage', () => ({
+  secureStorage: {
+    getItem: jest.fn().mockResolvedValue(null),
+    setItem: jest.fn().mockResolvedValue(undefined),
+    removeItem: jest.fn().mockResolvedValue(undefined),
+  },
+}));
 
 describe('processStore', () => {
   beforeEach(() => {
-    useProcessStore.setState(defaultProcessState);
+    // Reset to default state (but preserve persist API by patching only state fields)
+    useProcessStore.setState({ ...defaultProcessState });
+    jest.clearAllMocks();
   });
 
   it('has correct initial state', () => {
@@ -41,7 +52,7 @@ describe('processStore', () => {
 
   it('update works with function patch', () => {
     const { result } = renderHook(() => useProcessStore());
-    
+
     useProcessStore.setState({ momentsFound: 2 });
 
     act(() => {
@@ -51,13 +62,15 @@ describe('processStore', () => {
     expect(result.current.momentsFound).toBe(3);
   });
 
-  it('resetProcess restores default state', () => {
+  it('resetProcess restores default state and keeps hasHydrated=true', () => {
     const { result } = renderHook(() => useProcessStore());
+
+    useProcessStore.setState({ hasHydrated: true });
 
     act(() => {
       result.current.startProcess('test', 'test label');
     });
-    
+
     expect(result.current.id).toBe('test');
 
     act(() => {
@@ -67,6 +80,8 @@ describe('processStore', () => {
     expect(result.current.id).toBe(defaultProcessState.id);
     expect(result.current.label).toBe(defaultProcessState.label);
     expect(result.current.status).toBe(defaultProcessState.status);
+    // After reset hasHydrated stays true — store is already hydrated
+    expect(result.current.hasHydrated).toBe(true);
   });
 
   it('selectors return correct values', () => {
@@ -79,6 +94,7 @@ describe('processStore', () => {
       completedAt: null,
       momentsFound: 5,
       estimatedSecondsRemaining: 10,
+      hasHydrated: true,
     });
 
     const state = useProcessStore.getState();
@@ -92,9 +108,81 @@ describe('processStore', () => {
       completedAt: null,
       momentsFound: 5,
       estimatedSecondsRemaining: 10,
+      hasHydrated: true,
     });
 
     expect(selectProcessStatus(state)).toBe('processing');
     expect(selectProcessProgress(state)).toBe(75);
+    expect(selectHasHydrated(state)).toBe(true);
+  });
+});
+
+// ─── hasHydrated lifecycle ────────────────────────────────────────────────────
+
+describe('processStore — hasHydrated lifecycle (issue #520)', () => {
+  const { secureStorage } = require('@/app/lib/secureStorage');
+
+  beforeEach(() => {
+    useProcessStore.setState({ ...defaultProcessState });
+    jest.clearAllMocks();
+  });
+
+  it('starts with hasHydrated = false', () => {
+    // defaultProcessState has hasHydrated: false
+    expect(useProcessStore.getState().hasHydrated).toBe(false);
+    expect(selectHasHydrated(useProcessStore.getState())).toBe(false);
+  });
+
+  it('becomes true after async rehydration resolves', async () => {
+    const storedState = {
+      state: { id: 'restored', label: 'Restored', progress: 42, status: 'processing',
+                startedAt: 1000, completedAt: null, momentsFound: 3, estimatedSecondsRemaining: 60 },
+      version: 0,
+    };
+    secureStorage.getItem.mockResolvedValue(JSON.stringify(storedState));
+
+    // Reset hasHydrated to false before rehydrating
+    useProcessStore.setState({ hasHydrated: false });
+    expect(useProcessStore.getState().hasHydrated).toBe(false);
+
+    // Trigger rehydration and wait for the async getItem to resolve
+    await act(async () => {
+      await useProcessStore.persist.rehydrate();
+    });
+
+    expect(useProcessStore.getState().hasHydrated).toBe(true);
+  });
+
+  it('becomes true even when storage returns null (no persisted data)', async () => {
+    secureStorage.getItem.mockResolvedValue(null);
+
+    useProcessStore.setState({ hasHydrated: false });
+
+    await act(async () => {
+      await useProcessStore.persist.rehydrate();
+    });
+
+    expect(useProcessStore.getState().hasHydrated).toBe(true);
+  });
+
+  it('restores persisted state alongside setting hasHydrated', async () => {
+    const storedState = {
+      state: { id: 'job_abc', label: 'My Video', progress: 55, status: 'processing',
+                startedAt: 500, completedAt: null, momentsFound: 7, estimatedSecondsRemaining: 30 },
+      version: 0,
+    };
+    secureStorage.getItem.mockResolvedValue(JSON.stringify(storedState));
+
+    useProcessStore.setState({ ...defaultProcessState });
+
+    await act(async () => {
+      await useProcessStore.persist.rehydrate();
+    });
+
+    const state = useProcessStore.getState();
+    expect(state.hasHydrated).toBe(true);
+    expect(state.id).toBe('job_abc');
+    expect(state.progress).toBe(55);
+    expect(state.momentsFound).toBe(7);
   });
 });

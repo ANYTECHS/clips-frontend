@@ -73,6 +73,8 @@ export interface ProcessState {
   completedAt: number | null;
   momentsFound: number;
   estimatedSecondsRemaining: number | null;
+  /** True once the async secureStorage rehydration has resolved */
+  hasHydrated: boolean;
 }
 
 export interface ProcessActions {

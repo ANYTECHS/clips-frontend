@@ -2,56 +2,109 @@
  * useMultiWalletConnection.ts
  *
  * Hook that integrates the existing WalletProvider with the new MultiWalletProvider.
- * 
- * This hook provides a unified interface for:
- * - Connecting to external wallets (MetaMask, Phantom, etc.)
- * - Managing multiple wallets per user
- * - Switching between wallets
- * - Maintaining the primary embedded wallet
+ *
+ * Race-condition fix (issue #514):
+ *   connectMetaMask() / connectPhantom() / connectStellar() / importStellarKey()
+ *   on WalletProvider now return the connected address directly as part of their
+ *   promise result.  This hook reads the returned address instead of reading
+ *   wallet.address from React context (which may still be null at the point of
+ *   reading because the context re-render hasn't happened yet).
+ *
+ *   If — for any reason — the provider returns null/undefined (older provider
+ *   build, edge-case error path) the hook falls back to a short poll of the
+ *   context state, retrying up to MAX_POLL_ATTEMPTS times with POLL_INTERVAL_MS
+ *   between each attempt.
  */
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useWallet } from "@/components/WalletProvider";
 import { useMultiWallet } from "@/components/MultiWalletProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { MultiWalletRecord, WalletProviderType } from "@/app/lib/multiWalletStorage";
 import { migrateToMultiWallet } from "@/components/MultiWalletProvider";
 
+const POLL_INTERVAL_MS = 50;
+const MAX_POLL_ATTEMPTS = 20; // 1 second total
+
+/**
+ * Poll wallet.address from context until it is non-null or we time out.
+ * Used as a fallback when the connect method doesn't return the address.
+ */
+function pollAddress(
+  getAddress: () => string | null,
+  intervalMs: number,
+  maxAttempts: number
+): Promise<string | null> {
+  return new Promise((resolve) => {
+    let attempts = 0;
+    const id = setInterval(() => {
+      const address = getAddress();
+      if (address) {
+        clearInterval(id);
+        resolve(address);
+        return;
+      }
+      attempts++;
+      if (attempts >= maxAttempts) {
+        clearInterval(id);
+        resolve(null);
+      }
+    }, intervalMs);
+  });
+}
+
 export function useMultiWalletConnection() {
   const { user } = useAuth();
   const wallet = useWallet();
   const multiWallet = useMultiWallet();
 
+  // Keep a ref to wallet.address so pollAddress can read the latest value
+  // without capturing a stale closure.
+  const addressRef = useRef<string | null>(wallet.address);
+  useEffect(() => {
+    addressRef.current = wallet.address;
+  }, [wallet.address]);
+
+  /**
+   * Resolve the address from a connect call.
+   * Prefers the value returned by the connect promise; falls back to polling.
+   */
+  const resolveAddress = useCallback(
+    async (returnedAddress: string | null | undefined): Promise<string | null> => {
+      if (returnedAddress) return returnedAddress;
+      // Fallback: poll context state
+      return pollAddress(() => addressRef.current, POLL_INTERVAL_MS, MAX_POLL_ATTEMPTS);
+    },
+    []
+  );
+
   // Migrate existing single-wallet to multi-wallet on first load
   useEffect(() => {
     if (user?.id && wallet.isConnected && wallet.address && wallet.walletType) {
       const existingWallets = multiWallet.wallets;
-      
-      // Only migrate if no wallets exist yet
       if (existingWallets.length === 0) {
         migrateToMultiWallet(user.id, {
           publicKey: wallet.address,
-          secretKey: wallet.stellarSecret || undefined,
+          secretKey: wallet.stellarSecret ?? undefined,
           walletType: wallet.walletType as WalletProviderType,
           network: wallet.chainId === "stellar" ? "testnet" : undefined,
-          chainId: wallet.chainId || undefined,
+          chainId: wallet.chainId ?? undefined,
         });
       }
     }
   }, [user?.id, wallet.isConnected, wallet.address, wallet.walletType, multiWallet.wallets]);
 
-  /**
-   * Connect to MetaMask and add to multi-wallet list
-   */
+  /** Connect to MetaMask and add to multi-wallet list */
   const connectMetaMask = useCallback(async () => {
-    await wallet.connectMetaMask();
-    
-    if (user?.id && wallet.address) {
+    const returned = await wallet.connectMetaMask();
+    const address = await resolveAddress(returned);
+
+    if (user?.id && address) {
       try {
         await multiWallet.addWallet({
-          publicKey: wallet.address,
+          publicKey: address,
           walletType: "metamask",
-          chainId: wallet.chainId || undefined,
+          chainId: wallet.chainId ?? undefined,
           isPrimary: false,
           isActive: true,
           label: "MetaMask",
@@ -60,18 +113,17 @@ export function useMultiWalletConnection() {
         console.error("Failed to add MetaMask to multi-wallet list:", err);
       }
     }
-  }, [wallet, user?.id, multiWallet]);
+  }, [wallet, user?.id, multiWallet, resolveAddress]);
 
-  /**
-   * Connect to Phantom and add to multi-wallet list
-   */
+  /** Connect to Phantom and add to multi-wallet list */
   const connectPhantom = useCallback(async () => {
-    await wallet.connectPhantom();
-    
-    if (user?.id && wallet.address) {
+    const returned = await wallet.connectPhantom();
+    const address = await resolveAddress(returned);
+
+    if (user?.id && address) {
       try {
         await multiWallet.addWallet({
-          publicKey: wallet.address,
+          publicKey: address,
           walletType: "phantom",
           chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h",
           isPrimary: false,
@@ -82,18 +134,17 @@ export function useMultiWalletConnection() {
         console.error("Failed to add Phantom to multi-wallet list:", err);
       }
     }
-  }, [wallet, user?.id, multiWallet]);
+  }, [wallet, user?.id, multiWallet, resolveAddress]);
 
-  /**
-   * Connect to Stellar and add to multi-wallet list
-   */
+  /** Connect to Stellar and add to multi-wallet list */
   const connectStellar = useCallback(async () => {
-    await wallet.connectStellar();
-    
-    if (user?.id && wallet.address) {
+    const returned = await wallet.connectStellar();
+    const address = await resolveAddress(returned);
+
+    if (user?.id && address) {
       try {
         await multiWallet.addWallet({
-          publicKey: wallet.address,
+          publicKey: address,
           walletType: "stellar",
           network: "testnet",
           isPrimary: false,
@@ -105,18 +156,17 @@ export function useMultiWalletConnection() {
         console.error("Failed to add Stellar to multi-wallet list:", err);
       }
     }
-  }, [wallet, user?.id, multiWallet]);
+  }, [wallet, user?.id, multiWallet, resolveAddress]);
 
-  /**
-   * Import existing Stellar key and add to multi-wallet list
-   */
+  /** Import existing Stellar key and add to multi-wallet list */
   const importStellarKey = useCallback(async (secret: string) => {
-    await wallet.importStellarKey(secret);
-    
-    if (user?.id && wallet.address) {
+    const returned = await wallet.importStellarKey(secret);
+    const address = await resolveAddress(returned);
+
+    if (user?.id && address) {
       try {
         await multiWallet.addWallet({
-          publicKey: wallet.address,
+          publicKey: address,
           walletType: "imported",
           network: "testnet",
           isPrimary: false,
@@ -128,22 +178,16 @@ export function useMultiWalletConnection() {
         console.error("Failed to add imported wallet to multi-wallet list:", err);
       }
     }
-  }, [wallet, user?.id, multiWallet]);
+  }, [wallet, user?.id, multiWallet, resolveAddress]);
 
-  /**
-   * Switch to a different wallet from the multi-wallet list
-   */
+  /** Switch to a different wallet from the multi-wallet list */
   const switchWallet = useCallback(
     async (walletId: string) => {
       const targetWallet = multiWallet.wallets.find((w) => w.id === walletId);
-      if (!targetWallet) {
-        throw new Error("Wallet not found");
-      }
+      if (!targetWallet) throw new Error("Wallet not found");
 
-      // Update multi-wallet active state
       multiWallet.switchWallet(walletId);
 
-      // Reconnect to the wallet using the appropriate method
       switch (targetWallet.walletType) {
         case "metamask":
           await wallet.connectMetaMask();
@@ -155,8 +199,7 @@ export function useMultiWalletConnection() {
         case "embedded":
         case "imported":
           if (targetWallet._encodedSecret) {
-            const secret = atob(targetWallet._encodedSecret);
-            await wallet.importStellarKey(secret);
+            await wallet.importStellarKey(atob(targetWallet._encodedSecret));
           } else {
             await wallet.connectStellar();
           }
@@ -168,25 +211,18 @@ export function useMultiWalletConnection() {
     [multiWallet, wallet]
   );
 
-  /**
-   * Disconnect the current wallet
-   */
+  /** Disconnect the current wallet */
   const disconnect = useCallback(() => {
     wallet.disconnect();
   }, [wallet]);
 
-  /**
-   * Remove a wallet from the multi-wallet list
-   */
+  /** Remove a wallet from the multi-wallet list */
   const removeWallet = useCallback(
     (walletId: string) => {
       const targetWallet = multiWallet.wallets.find((w) => w.id === walletId);
-      
-      // If removing the currently connected wallet, disconnect it
       if (targetWallet?.publicKey === wallet.address) {
         wallet.disconnect();
       }
-      
       multiWallet.removeWallet(walletId);
     },
     [multiWallet, wallet]
@@ -195,12 +231,12 @@ export function useMultiWalletConnection() {
   return {
     // Existing wallet state
     ...wallet,
-    
+
     // Multi-wallet state
     wallets: multiWallet.wallets,
     activeWallet: multiWallet.activeWallet,
     primaryWallet: multiWallet.primaryWallet,
-    
+
     // Multi-wallet operations
     connectMetaMask,
     connectPhantom,
@@ -210,7 +246,7 @@ export function useMultiWalletConnection() {
     removeWallet,
     setPrimaryWallet: multiWallet.setPrimaryWallet,
     updateWallet: multiWallet.updateWallet,
-    
+
     // Error handling
     isOperating: multiWallet.isOperating,
     multiWalletError: multiWallet.error,

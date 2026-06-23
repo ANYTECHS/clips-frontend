@@ -1,14 +1,11 @@
 "use client";
 
 /**
- * Process Zustand store (with localStorage persistence)
+ * Process Zustand store (with secureStorage persistence)
  *
- * Replaces the manual localStorage read/write in the old useProcessStore hook.
- * Zustand's `persist` middleware handles hydration and serialisation automatically,
- * so components no longer need to worry about SSR/hydration mismatches.
- *
- * Public API is intentionally identical to the old hook so existing call-sites
- * (ProcessDashboard, create/page.tsx) need zero changes.
+ * secureStorage is fully async (AES-GCM), so we use skipHydration: true and
+ * manually call rehydrate() after the async getItem resolves. A hasHydrated
+ * flag lets components show a loading state until the store is ready.
  */
 
 import { create } from "zustand";
@@ -27,6 +24,7 @@ export const defaultProcessState: ProcessState = {
   completedAt: null,
   momentsFound: 0,
   estimatedSecondsRemaining: null,
+  hasHydrated: false,
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -62,21 +60,20 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
       },
 
       resetProcess: () => {
-        set(defaultProcessState);
+        set({ ...defaultProcessState, hasHydrated: true });
       },
     }),
     {
-      name: "clips_process_state", // same localStorage key as before
+      name: "clips_process_state",
       storage: createJSONStorage(() =>
         typeof window !== "undefined"
           ? secureStorage
           : {
-              getItem: async (name: string) => null,
-              setItem: async (name: string, value: string) => {},
-              removeItem: async (name: string) => {},
+              getItem: async (_name: string) => null,
+              setItem: async (_name: string, _value: string) => {},
+              removeItem: async (_name: string) => {},
             }
       ),
-      // Only persist the state fields, not the action functions
       partialize: (state) => ({
         id: state.id,
         label: state.label,
@@ -86,14 +83,30 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
         completedAt: state.completedAt,
         momentsFound: state.momentsFound,
         estimatedSecondsRemaining: state.estimatedSecondsRemaining,
+        // hasHydrated is runtime-only — never persisted
       }),
+      // Skip automatic synchronous hydration; we drive it manually below
+      // so the async decrypt has time to resolve before state is applied.
+      skipHydration: true,
+      onRehydrateStorage: () => (_state, error) => {
+        if (!error) {
+          useProcessStore.setState({ hasHydrated: true });
+        }
+      },
     }
   )
 );
 
+// Trigger rehydration on the client. This is called once the module is
+// imported in a browser context; the persist middleware will await
+// secureStorage.getItem and then apply the stored state, after which
+// onRehydrateStorage fires and sets hasHydrated = true.
+if (typeof window !== "undefined") {
+  useProcessStore.persist.rehydrate();
+}
+
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-/** Select the process state object (matches old hook's `process` return value) */
 export const selectProcess = (
   s: ProcessState & ProcessActions
 ): ProcessState => ({
@@ -105,12 +118,14 @@ export const selectProcess = (
   completedAt: s.completedAt,
   momentsFound: s.momentsFound,
   estimatedSecondsRemaining: s.estimatedSecondsRemaining,
+  hasHydrated: s.hasHydrated,
 });
 
-/** Select only the status — cheap subscription for status-only consumers */
 export const selectProcessStatus = (s: ProcessState & ProcessActions) =>
   s.status;
 
-/** Select only the progress value */
 export const selectProcessProgress = (s: ProcessState & ProcessActions) =>
   s.progress;
+
+export const selectHasHydrated = (s: ProcessState & ProcessActions) =>
+  s.hasHydrated;

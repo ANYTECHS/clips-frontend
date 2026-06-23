@@ -13,7 +13,7 @@ import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap" });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://clipcash.ai"),
