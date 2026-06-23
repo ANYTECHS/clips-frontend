@@ -24,6 +24,8 @@ import {
   UploadPartCommand,
   CompleteMultipartUploadCommand,
   AbortMultipartUploadCommand,
+  CopyObjectCommand,
+  DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 
@@ -49,6 +51,7 @@ function buildS3Client(): S3Client {
 
 const BUCKET = () => requireEnv("CLOUD_STORAGE_BUCKET");
 const KEY_PREFIX = process.env.CLOUD_STORAGE_KEY_PREFIX ?? "uploads/";
+const QUARANTINE_PREFIX = process.env.VIRUS_SCAN_QUARANTINE_PREFIX ?? "uploads/quarantine/";
 
 // Multipart threshold: files larger than 50 MB use multipart upload.
 const MULTIPART_THRESHOLD = 50 * 1024 * 1024; // 50 MB
@@ -183,4 +186,101 @@ export async function uploadFile(
     : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
 
   return { jobId, objectKey, url, filename, size: buffer.length, contentType };
+}
+
+/**
+ * Upload a file buffer to the quarantine prefix (for scanning).
+ *
+ * Similar to uploadFile but stores in VIRUS_SCAN_QUARANTINE_PREFIX instead.
+ * Returns the quarantine object key and jobId.
+ */
+export async function uploadToQuarantine(
+  buffer: Buffer,
+  filename: string,
+  contentType: string,
+): Promise<{ jobId: string; quarantineKey: string; filename: string }> {
+  const client = buildS3Client();
+  const bucket = BUCKET();
+
+  const jobId = `job_${randomUUID().replace(/-/g, "")}`;
+  const ext = filename.split(".").pop() ?? "bin";
+  const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
+
+  if (buffer.length > MULTIPART_THRESHOLD) {
+    await uploadMultipart(client, bucket, quarantineKey, buffer, contentType);
+  } else {
+    await uploadSinglePart(client, bucket, quarantineKey, buffer, contentType);
+  }
+
+  return { jobId, quarantineKey, filename };
+}
+
+/**
+ * Move a file from quarantine to the final uploads location.
+ *
+ * After a file passes the virus scan, it should be moved from the quarantine
+ * prefix to the regular uploads prefix. This is implemented as a copy + delete
+ * since S3 doesn't have a true move operation.
+ *
+ * @param jobId Job ID of the file to move
+ * @param filename Original filename (used to determine extension)
+ * @returns UploadResult with the final object key and URL
+ */
+export async function moveFromQuarantine(jobId: string, filename: string): Promise<UploadResult> {
+  const client = buildS3Client();
+  const bucket = BUCKET();
+
+  const ext = filename.split(".").pop() ?? "bin";
+  const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
+  const finalKey = `${KEY_PREFIX}${jobId}.${ext}`;
+
+  // Copy from quarantine to final location
+  await client.send(
+    new CopyObjectCommand({
+      Bucket: bucket,
+      CopySource: `${bucket}/${quarantineKey}`,
+      Key: finalKey,
+    }),
+  );
+
+  // Delete from quarantine
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: quarantineKey,
+    }),
+  );
+
+  // Build the final URL
+  const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
+  const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
+  const url = endpoint
+    ? `${endpoint.replace(/\/$/, "")}/${bucket}/${finalKey}`
+    : `https://${bucket}.s3.${region}.amazonaws.com/${finalKey}`;
+
+  return {
+    jobId,
+    objectKey: finalKey,
+    url,
+    filename,
+    size: 0, // Size unknown after move (could fetch via HeadObject if needed)
+    contentType: "application/octet-stream",
+  };
+}
+
+/**
+ * Delete a file from S3 (used for infected files).
+ *
+ * @param objectKey Full object key to delete (including prefix)
+ */
+export async function deleteFile(objectKey: string): Promise<void> {
+  const client = buildS3Client();
+  const bucket = BUCKET();
+
+  await client.send(
+    new DeleteObjectCommand({
+      Bucket: bucket,
+      Key: objectKey,
+    }),
+  );
 }

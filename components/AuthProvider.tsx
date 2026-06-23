@@ -2,8 +2,6 @@
 
 import React, { createContext, useContext, useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter, usePathname } from "next/navigation";
-import { getAuthRedirectTarget } from "@/app/lib/authRedirect";
 import { mapSessionToUser, persistClipcashUser, clearClipcashUser } from "@/app/lib/authUser";
 import type { User } from "@/app/lib/mockApi";
 
@@ -17,12 +15,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
-  const router = useRouter();
-  const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   // Initialize user from localStorage and NextAuth session
+  // Note: Route protection is now handled by middleware.ts at the edge.
+  // This component is responsible for auth state management only.
   useEffect(() => {
     const initializeAuth = () => {
       // First check if we have a persisted user in localStorage
@@ -56,22 +54,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initializeAuth();
   }, [session, status]);
 
-  // Handle redirects based on auth state
-  useEffect(() => {
-    if (status === "loading") return; // Don't redirect while loading
-
-    const redirectTarget = getAuthRedirectTarget({
-      pathname,
-      user,
-      isAuthReady: true,
-    });
-
-    if (redirectTarget) {
-      router.push(redirectTarget);
-    }
-  }, [pathname, user, status, router]);
-
-  // Handle session expiration
+  // Handle session expiration and cleanup
+  // Keep this as a fallback safety layer, though middleware should catch most cases
   useEffect(() => {
     if (status === "unauthenticated" && user) {
       clearClipcashUser();
