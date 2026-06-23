@@ -1,10 +1,51 @@
+const CRYPTO_SALT_KEY = 'clipcash_crypto_salt';
+
+let pendingDecryptionWarning: string | null = null;
+
+export function getSecureStorageWarning(): string | null {
+  const warning = pendingDecryptionWarning;
+  pendingDecryptionWarning = null;
+  return warning;
+}
+
+export function migrateCryptoSalt(): boolean {
+  if (typeof window === 'undefined') return false;
+  const sessionSalt = sessionStorage.getItem(CRYPTO_SALT_KEY);
+  const localSalt = localStorage.getItem(CRYPTO_SALT_KEY);
+  if (sessionSalt && !localSalt) {
+    localStorage.setItem(CRYPTO_SALT_KEY, sessionSalt);
+    sessionStorage.removeItem(CRYPTO_SALT_KEY);
+    return true;
+  }
+  if (sessionSalt && localSalt) {
+    sessionStorage.removeItem(CRYPTO_SALT_KEY);
+  }
+  return false;
+}
+
+function hasEncryptedWalletEntries(): boolean {
+  if (typeof window === 'undefined') return false;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (!key || key === CRYPTO_SALT_KEY) continue;
+    const value = localStorage.getItem(key);
+    if (value && value.length > 0) return true;
+  }
+  return false;
+}
+
 const getCryptoKey = async (): Promise<CryptoKey> => {
   if (typeof window === 'undefined') throw new Error('Crypto not available');
-  let salt = sessionStorage.getItem('clipcash_crypto_salt');
+  migrateCryptoSalt();
+  let salt = localStorage.getItem(CRYPTO_SALT_KEY);
   if (!salt) {
     const saltBuffer = crypto.getRandomValues(new Uint8Array(16));
     salt = btoa(String.fromCharCode(...saltBuffer));
-    sessionStorage.setItem('clipcash_crypto_salt', salt);
+    localStorage.setItem(CRYPTO_SALT_KEY, salt);
+    if (hasEncryptedWalletEntries()) {
+      pendingDecryptionWarning =
+        'Unable to decrypt stored wallet data. Close this tab and reopen the app in the same browser session, or restore your wallet from backup.';
+    }
   }
   const appId = 'clipcash-secure-storage-v1';
   const passwordMaterial = await crypto.subtle.importKey(
@@ -60,7 +101,8 @@ export const secureStorage = {
     try {
       return await decrypt(encrypted);
     } catch {
-      localStorage.removeItem(name);
+      pendingDecryptionWarning =
+        'Unable to decrypt stored wallet data. Your encryption key may have changed; restore from backup if you have one.';
       return null;
     }
   },
@@ -73,4 +115,10 @@ export const secureStorage = {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(name);
   },
+};
+
+export const __testing__ = {
+  CRYPTO_SALT_KEY,
+  migrateCryptoSalt,
+  getSecureStorageWarning,
 };
