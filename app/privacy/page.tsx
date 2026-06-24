@@ -1,11 +1,23 @@
-import React from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Privacy Policy — ClipCash AI",
   description: "How ClipCash AI collects, uses, and protects your data.",
+  openGraph: {
+    type: "website",
+    title: "Privacy Policy — ClipCash AI",
+    description: "How ClipCash AI collects, uses, and protects your data.",
+    images: ["/og-image.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Privacy Policy — ClipCash AI",
+    description: "How ClipCash AI collects, uses, and protects your data.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function PrivacyPage() {

@@ -1,11 +1,23 @@
-import React from "react";
+import type { Metadata } from "next";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 
-export const metadata = {
+export const metadata: Metadata = {
   title: "Terms of Service — ClipCash AI",
   description: "The terms and conditions governing your use of ClipCash AI.",
+  openGraph: {
+    type: "website",
+    title: "Terms of Service — ClipCash AI",
+    description: "The terms and conditions governing your use of ClipCash AI.",
+    images: ["/og-image.png"],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Terms of Service — ClipCash AI",
+    description: "The terms and conditions governing your use of ClipCash AI.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function TermsPage() {
