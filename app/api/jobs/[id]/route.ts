@@ -1,60 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jobStore } from "../shared/jobStore";
-
-/**
- * Mock API endpoint for job status
- * In production, this would fetch from a real backend/database
- */
+import { requireJobOwner } from "../shared/authGuard";
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
   const { id: jobId } = await context.params;
+  const result = await requireJobOwner(jobId);
+  if (result instanceof NextResponse) return result;
 
-  // Check if job exists in store
-  let job = jobStore.get(jobId);
-
-  // For demo: simulate job progress if not exists
-  if (!job) {
-    job = {
-      id: jobId,
-      progress: 0,
-      status: "processing",
-      momentsFound: 0,
-      estimatedSecondsRemaining: 300,
-      createdAt: Date.now(),
-    };
-    jobStore.set(jobId, job);
-  }
+  let { job } = result;
 
   // Simulate progress updates for demo
   if (job.status === "processing") {
     const elapsed = (Date.now() - job.createdAt) / 1000;
-    
-    // Simulate progress: ~30% per minute
     const newProgress = Math.min(95, Math.floor(elapsed * 0.5));
-    
+
     if (newProgress !== job.progress) {
       job.progress = newProgress;
       job.estimatedSecondsRemaining = Math.max(0, 300 - elapsed);
-      
-      // Randomly find moments
+
       if (newProgress > 20 && job.momentsFound === 0) {
         job.momentsFound = Math.floor(Math.random() * 5) + 1;
       }
       if (newProgress > 60 && job.momentsFound < 3) {
         job.momentsFound = Math.floor(Math.random() * 8) + 3;
       }
-      
+
       jobStore.set(jobId, job);
     }
 
-    // Complete at 95% after a delay (simulated)
     if (newProgress >= 95 && elapsed > 180) {
-      job.status = "complete";
-      job.progress = 100;
-      job.estimatedSecondsRemaining = 0;
+      job = { ...job, status: "complete", progress: 100, estimatedSecondsRemaining: 0 };
       jobStore.set(jobId, job);
     }
   }
@@ -72,20 +50,18 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   const { id: jobId } = await context.params;
-  const body = await request.json();
+  const result = await requireJobOwner(jobId);
+  if (result instanceof NextResponse) return result;
 
-  // Update job status (for retry functionality)
-  const job = jobStore.get(jobId) || {
-    id: jobId,
-    createdAt: Date.now(),
-  };
+  const { job } = result;
 
-  job.status = "processing";
-  job.progress = 0;
-  job.momentsFound = 0;
-  job.estimatedSecondsRemaining = 300;
-  
-  jobStore.set(jobId, job);
+  jobStore.set(jobId, {
+    ...job,
+    status: "processing",
+    progress: 0,
+    momentsFound: 0,
+    estimatedSecondsRemaining: 300,
+  });
 
   return NextResponse.json({ success: true, message: "Job restarted" });
 }

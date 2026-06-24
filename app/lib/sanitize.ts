@@ -1,24 +1,13 @@
+import DOMPurify from "dompurify";
+
 /**
- * Sanitizes a string to prevent XSS attacks by stripping HTML tags 
- * and script content. This should be used before rendering any
- * user-supplied or API-supplied content into the DOM.
+ * Sanitizes a string to prevent XSS attacks using DOMPurify.
+ * On the server (no DOM), returns the input unchanged — output is
+ * never rendered as raw HTML server-side, so this is safe.
+ * Call-sites that render user content must be client components.
  */
 export function sanitize(input: string): string {
-  if (!input) return '';
-
-  // Basic HTML stripping
-  // In a more complex scenario, we would use DOMPurify
-  return input
-    .replace(/<[^>]*>?/gm, '') // Strip HTML tags
-    .replace(/[&<>"']/g, (m) => { // Escape special characters
-      const map: Record<string, string> = {
-        '&': '&amp;',
-        '<': '&lt;',
-        '>': '&gt;',
-        '"': '&quot;',
-        "'": '&#039;'
-      };
-      return map[m];
-    })
-    .trim();
+  if (!input) return "";
+  if (typeof window === "undefined") return input;
+  return DOMPurify.sanitize(input, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
 }
