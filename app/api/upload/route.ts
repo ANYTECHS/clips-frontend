@@ -53,6 +53,12 @@ function validateFile(file: File): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions);
+    const userId = (session?.user as { id?: string } | undefined)?.id;
+    if (!userId) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const formData = await request.formData();
     const files = formData.getAll("files") as File[];
 
@@ -136,6 +142,19 @@ export async function POST(request: NextRequest) {
 
     // Return the first jobId as the primary reference (for single-file flows)
     const primaryJobId = results[0].jobId;
+
+    // Tag jobs with userId for ownership checks
+    for (const result of results) {
+      jobStore.set(result.jobId, {
+        id: result.jobId,
+        userId,
+        progress: 0,
+        status: "processing",
+        momentsFound: 0,
+        estimatedSecondsRemaining: 300,
+        createdAt: Date.now(),
+      });
+    }
 
     return NextResponse.json({
       success: true,

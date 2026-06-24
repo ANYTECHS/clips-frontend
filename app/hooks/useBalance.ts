@@ -158,7 +158,9 @@ export async function getBalance(
 }
 
 const DEFAULT_PRICE_CACHE_TTL_MS = 5 * 60 * 1000;
-const FALLBACK_XLM_PRICE_USD = 0.12;
+const FALLBACK_XLM_PRICE_USD = parseFloat(
+  process.env.NEXT_PUBLIC_XLM_FALLBACK_PRICE_USD ?? "0.12"
+);
 
 interface XlmPriceCacheEntry {
   price: number;
@@ -193,27 +195,18 @@ export async function fetchXLMPrice(): Promise<XlmPriceResult> {
 
   _xlmPriceFetch = (async (): Promise<XlmPriceResult> => {
     try {
-      const response = await fetch(
-        "https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd"
-      );
-
-      if (response.status === 429) {
-        if (_xlmPriceCache) {
-          return { price: _xlmPriceCache.price, isStale: true };
-        }
-        return { price: FALLBACK_XLM_PRICE_USD, isStale: true };
-      }
-
+      const response = await fetch("/api/prices/xlm");
       if (response.ok) {
-        const data = await response.json();
-        const price = data.stellar?.usd;
-        if (price && typeof price === "number") {
-          _xlmPriceCache = { price, expiresAt: Date.now() + _priceCacheTtlMs };
-          return { price, isStale: false };
+        const data: { price: number; stale: boolean } = await response.json();
+        if (typeof data.price === "number") {
+          if (!data.stale) {
+            _xlmPriceCache = { price: data.price, expiresAt: Date.now() + _priceCacheTtlMs };
+          }
+          return { price: data.price, isStale: data.stale };
         }
       }
     } catch (err) {
-      console.warn("Failed to fetch XLM price from CoinGecko:", err);
+      console.warn("Failed to fetch XLM price:", err);
     } finally {
       _xlmPriceFetch = null;
     }

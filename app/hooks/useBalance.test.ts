@@ -26,7 +26,8 @@ describe("getBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.12 },
+      price: 0.12,
+      stale: false,
     };
 
     (global.fetch as jest.Mock)
@@ -63,7 +64,8 @@ describe("getBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.15 },
+      price: 0.15,
+      stale: false,
     };
 
     (global.fetch as jest.Mock)
@@ -167,7 +169,7 @@ describe("fetchXLMPrice caching", () => {
   it("shares cached price across concurrent callers", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ stellar: { usd: 0.25 } }),
+      json: async () => ({ price: 0.25, stale: false }),
     });
 
     const [first, second] = await Promise.all([fetchXLMPrice(), fetchXLMPrice()]);
@@ -182,7 +184,7 @@ describe("fetchXLMPrice caching", () => {
 
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,
-      json: async () => ({ stellar: { usd: 0.18 } }),
+      json: async () => ({ price: 0.18, stale: false }),
     });
 
     await fetchXLMPrice();
@@ -199,7 +201,7 @@ describe("fetchXLMPrice caching", () => {
     (global.fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ stellar: { usd: 0.14 } }),
+        json: async () => ({ price: 0.14, stale: false }),
       })
       .mockResolvedValueOnce({
         ok: false,
@@ -245,7 +247,7 @@ describe("useBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.12 },
+      price: 0.12, stale: false,
     };
 
     (global.fetch as jest.Mock)
@@ -312,7 +314,7 @@ describe("useBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.12 },
+      price: 0.12, stale: false,
     };
 
     (global.fetch as jest.Mock)
@@ -353,7 +355,7 @@ describe("useBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.12 },
+      price: 0.12, stale: false,
     };
 
     (global.fetch as jest.Mock)
@@ -401,7 +403,7 @@ describe("useBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.12 },
+      price: 0.12, stale: false,
     };
 
     (global.fetch as jest.Mock)
@@ -477,7 +479,7 @@ describe("useBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.12 },
+      price: 0.12, stale: false,
     };
 
     (global.fetch as jest.Mock)
@@ -519,7 +521,7 @@ describe("useBalance", () => {
     };
 
     const mockPriceData = {
-      stellar: { usd: 0.12 },
+      price: 0.12, stale: false,
     };
 
     (global.fetch as jest.Mock)

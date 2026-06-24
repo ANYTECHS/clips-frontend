@@ -38,6 +38,9 @@ export async function sessionCallback({
   token: JWT;
 }): Promise<Session> {
   if (session.user) {
+    if (token.sub) {
+      (session.user as { id?: string }).id = token.sub;
+    }
     const onboardingStep =
       typeof token.onboardingStep === "number"
         ? token.onboardingStep
