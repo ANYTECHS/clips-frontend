@@ -43,6 +43,16 @@ function isValidRedisUrl(value: string | undefined): boolean {
   }
 }
 
+function isValidHttpUrl(value: string | undefined): boolean {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 function formatError(missing: string[], invalid: string[]): string {
   const messages: string[] = [];
 
@@ -51,10 +61,15 @@ function formatError(missing: string[], invalid: string[]): string {
   }
 
   if (invalid.length > 0) {
-    messages.push(
-      `Invalid environment variable${invalid.length > 1 ? 's' : ''}: ${invalid.join(', ')}. ` +
-        `REDIS_URL must be a valid redis:// or rediss:// URL.`
-    );
+    messages.push(`Invalid environment variable${invalid.length > 1 ? 's' : ''}: ${invalid.join(', ')}.`);
+
+    if (invalid.includes('REDIS_URL')) {
+      messages.push(`REDIS_URL must be a valid redis:// or rediss:// URL.`);
+    }
+
+    if (invalid.includes('NEXT_PUBLIC_API_URL')) {
+      messages.push(`NEXT_PUBLIC_API_URL must be a valid http:// or https:// URL.`);
+    }
   }
 
   return (
@@ -88,6 +103,13 @@ export function validateRequiredEnv(): void {
         ? ['REDIS_URL']
         : []
       : [];
+
+  // Validate NEXT_PUBLIC_API_URL when running in production/CI
+  if (isProduction || isCI) {
+    if (process.env.NEXT_PUBLIC_API_URL && !isValidHttpUrl(process.env.NEXT_PUBLIC_API_URL)) {
+      invalid.push('NEXT_PUBLIC_API_URL');
+    }
+  }
 
   if (missing.length === 0 && invalid.length === 0) return;
 
