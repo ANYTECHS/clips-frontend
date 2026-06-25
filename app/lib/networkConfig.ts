@@ -19,22 +19,27 @@ const _envNetwork: StellarNetwork =
   process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
 
 /**
- * Runtime network — reads a localStorage override first (set by NetworkSwitcher),
- * then falls back to the NEXT_PUBLIC_STELLAR_NETWORK env var.
+ * Return the active Stellar network. Reads `localStorage.clipcash_network_override`
+ * on every invocation so callers always get the current runtime override.
+ * Safe for SSR: returns the env-derived default when `window` is undefined.
  */
-export const STELLAR_NETWORK: StellarNetwork = (() => {
+export function getStellarNetwork(): StellarNetwork {
   if (typeof window !== "undefined") {
     const stored = localStorage.getItem("clipcash_network_override");
     if (stored === "testnet" || stored === "mainnet") return stored;
   }
   return _envNetwork;
-})();
+}
 
-/** Whether the app is currently running against mainnet. */
-export const IS_MAINNET = STELLAR_NETWORK === "mainnet";
+/** Whether the app is currently running against mainnet. Evaluated on demand. */
+export function isMainnet(): boolean {
+  return getStellarNetwork() === "mainnet";
+}
 
-/** Whether the app is currently running against testnet. */
-export const IS_TESTNET = STELLAR_NETWORK === "testnet";
+/** Whether the app is currently running against testnet. Evaluated on demand. */
+export function isTestnet(): boolean {
+  return getStellarNetwork() === "testnet";
+}
 
 export interface StellarNetworkConfig {
   /** Human-readable label */
@@ -78,29 +83,34 @@ export const NETWORK_CONFIGS: Record<StellarNetwork, StellarNetworkConfig> = {
 };
 
 /** Active network configuration derived from the environment. */
-export const ACTIVE_NETWORK_CONFIG: StellarNetworkConfig =
-  NETWORK_CONFIGS[STELLAR_NETWORK];
+/**
+ * Returns the active network configuration (horizon/rpc/passphrase, etc.)
+ * computed at call time based on the current `getStellarNetwork()` value.
+ */
+export function getActiveNetworkConfig(): StellarNetworkConfig {
+  return NETWORK_CONFIGS[getStellarNetwork()];
+}
 
 /**
  * Returns the Horizon URL for the active network.
  * Convenience helper so callers don't need to import the full config object.
  */
 export function getHorizonUrl(network?: StellarNetwork): string {
-  return NETWORK_CONFIGS[network ?? STELLAR_NETWORK].horizonUrl;
+  return NETWORK_CONFIGS[network ?? getStellarNetwork()].horizonUrl;
 }
 
 /**
  * Returns the Soroban RPC URL for the active network.
  */
 export function getRpcUrl(network?: StellarNetwork): string {
-  return NETWORK_CONFIGS[network ?? STELLAR_NETWORK].rpcUrl;
+  return NETWORK_CONFIGS[network ?? getStellarNetwork()].rpcUrl;
 }
 
 /**
  * Returns the network passphrase for the active network.
  */
 export function getNetworkPassphrase(network?: StellarNetwork): string {
-  return NETWORK_CONFIGS[network ?? STELLAR_NETWORK].networkPassphrase;
+  return NETWORK_CONFIGS[network ?? getStellarNetwork()].networkPassphrase;
 }
 
 /**
@@ -108,7 +118,7 @@ export function getNetworkPassphrase(network?: StellarNetwork): string {
  * Throws if called with mainnet to prevent accidental usage.
  */
 export function getFriendbotUrl(network?: StellarNetwork): string {
-  const cfg = NETWORK_CONFIGS[network ?? STELLAR_NETWORK];
+  const cfg = NETWORK_CONFIGS[network ?? getStellarNetwork()];
   if (!cfg.friendbotUrl) {
     throw new Error(
       `Friendbot is not available on ${cfg.label}. ` +
@@ -122,7 +132,7 @@ export function getFriendbotUrl(network?: StellarNetwork): string {
  * Returns the Freighter-compatible network identifier ("PUBLIC" | "TESTNET").
  */
 export function getFreighterNetwork(network?: StellarNetwork): "PUBLIC" | "TESTNET" {
-  return NETWORK_CONFIGS[network ?? STELLAR_NETWORK].freighterNetwork;
+  return NETWORK_CONFIGS[network ?? getStellarNetwork()].freighterNetwork;
 }
 
 /**
@@ -141,7 +151,7 @@ export function getStellarLabUrl(txHash: string, network?: StellarNetwork): stri
  * @param network Optional network override
  */
 export function getNftContractId(network?: StellarNetwork): string | undefined {
-  return NETWORK_CONFIGS[network ?? STELLAR_NETWORK].nftContractId;
+  return NETWORK_CONFIGS[network ?? getStellarNetwork()].nftContractId;
 }
 
 function getStellarExpertBaseUrl(network?: StellarNetwork) {

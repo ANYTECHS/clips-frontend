@@ -34,11 +34,7 @@
  */
 
 import { WalletStorage, WalletStorageError } from "./walletStorage";
-import {
-  STELLAR_NETWORK,
-  NETWORK_CONFIGS,
-  StellarNetwork,
-} from "./networkConfig";
+import { getStellarNetwork, NETWORK_CONFIGS, StellarNetwork } from "./networkConfig";
 import { withRetry, withFallback } from "./retryUtils";
 
 // ─── Network config ────────────────────────────────────────────────────────────
@@ -276,7 +272,7 @@ export async function fundTestnetAccount(publicKey: string): Promise<boolean> {
  */
 export async function createEmbeddedWallet(
   userId: string,
-  network: StellarNetwork = STELLAR_NETWORK,
+  network: StellarNetwork = getStellarNetwork(),
   fund = true
 ): Promise<WalletCreationResult> {
   // Return existing wallet if already created

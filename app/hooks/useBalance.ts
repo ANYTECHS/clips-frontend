@@ -82,7 +82,7 @@ export interface UseBalanceState {
  */
 export async function getBalance(
   publicKey: string,
-  network: "PUBLIC" | "TESTNET" = "TESTNET"
+  network: "PUBLIC" | "TESTNET" = getFreighterNetwork()
 ): Promise<Balance> {
   const horizonUrl =
     network === "PUBLIC"

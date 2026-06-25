@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/AuthProvider";
 import { WalletProvider } from "@/components/WalletProvider";
 import { StellarWalletProvider } from "@/components/StellarWalletProvider";
+import { NetworkProvider } from "@/app/context/NetworkContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { I18nProvider } from "@/app/lib/i18n/I18nProvider";
@@ -54,14 +55,16 @@ export default function RootLayout({
             <I18nProvider>
               <AuthProvider>
                 <ToastProvider>
-                  <WalletProvider>
-                    <StellarWalletProvider>
+                  <NetworkProvider>
+                    <WalletProvider>
+                      <StellarWalletProvider>
                       <AnalyticsProvider />
                       <KeyboardShortcuts />
                       {children}
                       <RateLimitToast />
-                    </StellarWalletProvider>
-                  </WalletProvider>
+                      </StellarWalletProvider>
+                    </WalletProvider>
+                  </NetworkProvider>
                 </ToastProvider>
               </AuthProvider>
             </I18nProvider>

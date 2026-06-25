@@ -8,6 +8,7 @@ import {
   INVOKE_CONTRACT_USER_MESSAGE,
   isInvokeContractBuildError,
 } from "@/app/lib/stellarOperations";
+import { getStellarNetwork } from "@/app/lib/networkConfig";
 import { captureSorobanNotSupportedWarning } from "@/app/lib/sentry";
 import { TRANSACTION_TIMEOUT_MS } from "@/app/lib/constants";
 

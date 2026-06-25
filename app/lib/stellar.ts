@@ -1,7 +1,7 @@
 import * as StellarSdk from "@stellar/stellar-sdk";
 import * as bip39 from "bip39";
 import {
-  STELLAR_NETWORK,
+  getStellarNetwork as _getStellarNetwork,
   getHorizonUrl,
   getNetworkPassphrase,
   getFriendbotUrl,
@@ -15,15 +15,15 @@ import {
   type InvokeContractBuildError,
 } from "./stellarOperations";
 
-// Re-export so existing callers that import these from stellar.ts keep working.
-export { STELLAR_NETWORK };
-
-export const HORIZON_URL = getHorizonUrl();
-
-export const NETWORK_PASSPHRASE = getNetworkPassphrase();
+// Expose a runtime getter for the active Stellar network so callers can
+// evaluate the current override on demand.
+export function getStellarNetwork(): ReturnType<typeof _getStellarNetwork> {
+  return _getStellarNetwork();
+}
 
 export const getStellarServer = () => {
-  return new StellarSdk.Horizon.Server(HORIZON_URL);
+  const horizon = getHorizonUrl();
+  return new StellarSdk.Horizon.Server(horizon);
 };
 
 export const BIP39_WORDLIST = bip39.wordlists.english;
@@ -130,7 +130,7 @@ export const buildPaymentTransaction = async (
   // 3. Build the transaction
   const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
     fee: fee.toString(),
-    networkPassphrase: NETWORK_PASSPHRASE,
+    networkPassphrase: getNetworkPassphrase(),
   })
     .addOperation(
       StellarSdk.Operation.payment({
@@ -354,7 +354,7 @@ export const buildBatchTransaction = async (
   // Build the transaction with all operations
   const builder = new StellarSdk.TransactionBuilder(sourceAccount, {
     fee: totalFee.toString(),
-    networkPassphrase: NETWORK_PASSPHRASE,
+    networkPassphrase: getNetworkPassphrase(),
   });
 
   for (let i = 0; i < operations.length; i++) {
@@ -429,7 +429,7 @@ export async function buildSorobanTransaction(
   // Build transaction builder
   const builder = new StellarSdk.TransactionBuilder(sourceAccount, {
     fee: totalFee.toString(),
-    networkPassphrase: NETWORK_PASSPHRASE,
+    networkPassphrase: getNetworkPassphrase(),
   });
 
   // Add operations
