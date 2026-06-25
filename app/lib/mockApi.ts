@@ -2,6 +2,9 @@
 
 import { rateLimiter } from './rateLimiter';
 import { combineShares, splitSecret } from "./shamirRecovery";
+import { createApiClient, ApiResponseError } from './api/ApiClient';
+
+const apiClient = createApiClient();
 
 // Standardized API error class with code field
 class ApiError extends Error {
@@ -107,12 +110,18 @@ export type Transaction = {
 
 // Wrapped API methods with rate limiting
 export const checkEmail = rateLimiter(async (email: string) => {
+  if (apiClient) {
+    return apiClient.post<{ exists: boolean }>('/auth/check-email', { email });
+  }
   await delay(600);
   const user = users.find(u => u.email === email);
   return { exists: !!user };
 }, 10, 10000);
 
 export const login = rateLimiter(async (email: string, password?: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/login', { email, password });
+  }
   await delay(800);
   const user = users.find(u => u.email === email);
 
@@ -125,6 +134,9 @@ export const login = rateLimiter(async (email: string, password?: string) => {
 }, 10, 10000);
 
 export const signup = rateLimiter(async (email: string, password?: string, name?: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/signup', { email, password, name });
+  }
   await delay(800);
 
   if (users.find(u => u.email === email)) {
@@ -147,6 +159,9 @@ export const signup = rateLimiter(async (email: string, password?: string, name?
 }, 10, 10000);
 
 export const requestPasswordReset = rateLimiter(async (email: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/password-reset/request', { email });
+  }
   await delay(600);
   const user = users.find(u => u.email === email);
   if (user) {
@@ -157,6 +172,9 @@ export const requestPasswordReset = rateLimiter(async (email: string) => {
 }, 5, 10000);
 
 export const resetPassword = rateLimiter(async (token: string, newPassword: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/password-reset/reset', { token, newPassword });
+  }
   await delay(800);
   const email = Object.keys(resetTokens).find(e =>
     resetTokens[e].token === token && resetTokens[e].expiresAt > Date.now()
@@ -170,6 +188,14 @@ export const resetPassword = rateLimiter(async (token: string, newPassword: stri
 }, 5, 10000);
 
 export const mintCollection = rateLimiter(async (data: { collectionName: string; description: string; creatorRoyalty: string; listingPrice: string }) => {
+  if (apiClient) {
+    try {
+      return await apiClient.post('/mint', data);
+    } catch (err) {
+      if (err instanceof ApiResponseError) throw err.shape;
+      throw err;
+    }
+  }
   await delay(1800);
 
   const roll = Math.random();
@@ -181,6 +207,9 @@ export const mintCollection = rateLimiter(async (data: { collectionName: string;
 }, 10, 10000);
 
 export const postClips = rateLimiter(async (clipIds: string[]) => {
+  if (apiClient) {
+    return apiClient.post('/clips/post', { clipIds });
+  }
   await delay(1400);
 
   const roll = Math.random();
@@ -191,6 +220,9 @@ export const postClips = rateLimiter(async (clipIds: string[]) => {
 }, 10, 10000);
 
 export const saveOnboarding = rateLimiter(async (userId: string, step: number, data: OnboardingData) => {
+  if (apiClient) {
+    return apiClient.post(`/users/${userId}/onboarding`, { step, data });
+  }
   await delay(500);
 
   let user: User | undefined = users.find(u => u.id === userId);
