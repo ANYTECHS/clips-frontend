@@ -39,34 +39,12 @@ export type AiErrorCode =
   | "INTERNAL_ERROR";
 
 export interface JobStore {
-  get(id: string): Job | undefined;
-  set(id: string, job: Job): void;
-  delete(id: string): void;
-  clear(): void;
+  get(id: string): Promise<Job | null>;
+  set(id: string, job: Job): Promise<void>;
+  delete(id: string): Promise<boolean>;
+  clear(): Promise<void>;
 }
 
-// ─── In-process Map implementation (dev / single-instance) ───────────────────
-// Replace this with a Redis/DB adapter in production by exporting a different
-// object that satisfies the JobStore interface above.
+import { JobRepository, createJobRepository } from "./jobRepository";
 
-class MapJobStore implements JobStore {
-  private readonly map = new Map<string, Job>();
-
-  get(id: string): Job | undefined {
-    return this.map.get(id);
-  }
-
-  set(id: string, job: Job): void {
-    this.map.set(id, job);
-  }
-
-  delete(id: string): void {
-    this.map.delete(id);
-  }
-
-  clear(): void {
-    this.map.clear();
-  }
-}
-
-export const jobStore: JobStore = new MapJobStore();
+export const jobStore: JobStore = createJobRepository();

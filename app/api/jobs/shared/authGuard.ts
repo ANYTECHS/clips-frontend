@@ -14,7 +14,7 @@ export async function requireJobOwner(jobId: string) {
   const authRes = await requireAuth();
   if (authRes instanceof NextResponse) return authRes;
 
-  const job = jobStore.get(jobId);
+  const job = await jobStore.get(jobId);
   if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (job.userId !== authRes.userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 

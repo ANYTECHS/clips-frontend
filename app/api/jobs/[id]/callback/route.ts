@@ -56,7 +56,7 @@ export async function POST(
 
   // ── Params / store lookup ──────────────────────────────────────────────────
   const { id: jobId } = await context.params;
-  const job = jobStore.get(jobId);
+  const job = await jobStore.get(jobId);
   if (!job) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
@@ -92,7 +92,7 @@ export async function POST(
   }
 
   // ── Apply the update ───────────────────────────────────────────────────────
-  jobStore.set(jobId, {
+  await jobStore.set(jobId, {
     ...job,
     status: (update.status ?? job.status) as JobStatus,
     progress: update.progress ?? job.progress,
