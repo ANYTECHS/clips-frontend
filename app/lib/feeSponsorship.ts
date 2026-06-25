@@ -29,11 +29,7 @@
  */
 
 import * as StellarSdk from "@stellar/stellar-sdk";
-import {
-  STELLAR_NETWORK,
-  getHorizonUrl,
-  getNetworkPassphrase,
-} from "./networkConfig";
+import { getStellarNetwork, getHorizonUrl, getNetworkPassphrase } from "./networkConfig";
 import type { StellarNetwork } from "./networkConfig";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -80,7 +76,7 @@ function getServer(network: StellarNetwork) {
  */
 export async function getSponsorBalance(
   sponsorPublicKey: string,
-  network: StellarNetwork = STELLAR_NETWORK
+  network: StellarNetwork = getStellarNetwork()
 ): Promise<string> {
   const server = getServer(network);
   try {
@@ -108,7 +104,7 @@ export async function getSponsorBalance(
  */
 export async function hasSufficientSponsorBalance(
   sponsorPublicKey: string,
-  network: StellarNetwork = STELLAR_NETWORK,
+  network: StellarNetwork = getStellarNetwork(),
   minRequired: number = 5
 ): Promise<boolean> {
   try {
@@ -149,8 +145,9 @@ export async function buildSponsoredTransaction(
   } = {}
 ): Promise<{ xdr: string; sponsorSignature: string }> {
   const { memo, timeoutSeconds = 30 } = options;
-  const server = getServer(STELLAR_NETWORK);
-  const networkPassphrase = getNetworkPassphrase();
+  const network = getStellarNetwork();
+  const server = getServer(network);
+  const networkPassphrase = getNetworkPassphrase(network);
   const sponsorPublicKey = sponsorKeypair.publicKey();
 
   // Load sponsor account to get sequence number
@@ -229,10 +226,10 @@ export async function buildSponsoredTransaction(
  */
 export async function submitSponsoredTransaction(
   signedByUserXdr: string,
-  network: StellarNetwork = STELLAR_NETWORK
+  network: StellarNetwork = getStellarNetwork()
 ): Promise<SponsoredTransactionResult> {
   const server = getServer(network);
-  const networkPassphrase = getNetworkPassphrase();
+  const networkPassphrase = getNetworkPassphrase(network);
 
   // Parse the signed transaction from XDR
   const transaction = StellarSdk.TransactionBuilder.fromXDR(
@@ -331,8 +328,9 @@ export async function buildRevokeSponsorshipTransaction(
   sponsoredId: string,
   entriesToRevoke: StellarSdk.xdr.LedgerKey[]
 ): Promise<string> {
-  const server = getServer(STELLAR_NETWORK);
-  const networkPassphrase = getNetworkPassphrase();
+  const network = getStellarNetwork();
+  const server = getServer(network);
+  const networkPassphrase = getNetworkPassphrase(network);
   const sponsorPublicKey = sponsorKeypair.publicKey();
 
   const sponsorAccount = await server.loadAccount(sponsorPublicKey);

@@ -2,9 +2,9 @@
 
 import { useState, useCallback } from "react";
 import * as StellarSdk from "@stellar/stellar-sdk";
-import { buildBatchTransaction, NETWORK_PASSPHRASE, getStellarServer } from "@/app/lib/stellar";
+import { buildBatchTransaction, getStellarServer } from "@/app/lib/stellar";
+import { getNetworkPassphrase, getStellarNetwork } from "@/app/lib/networkConfig";
 import { createChangeTrustOp } from "@/app/lib/stellarOperations";
-import { STELLAR_NETWORK } from "@/app/lib/networkConfig";
 import analytics from "@/lib/analytics";
 
 export type TrustlineStatus = "idle" | "building" | "submitting" | "success" | "error";
@@ -97,7 +97,10 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
         if (secretKey) {
           // Embedded wallet: sign locally with the secret key
           const keypair = StellarSdk.Keypair.fromSecret(secretKey);
-          const tx = StellarSdk.TransactionBuilder.fromXDR(xdr, NETWORK_PASSPHRASE);
+          const tx = StellarSdk.TransactionBuilder.fromXDR(
+            xdr,
+            getNetworkPassphrase()
+          );
           tx.sign(keypair);
           signedXdr = tx.toEnvelope().toXDR("base64");
         } else {
@@ -110,7 +113,7 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
               message: "Freighter wallet is not installed. Please install the Freighter browser extension.",
             } as TrustlineError;
           }
-          const freighterNetwork = STELLAR_NETWORK === "mainnet" ? "PUBLIC" : "TESTNET";
+          const freighterNetwork = getStellarNetwork() === "mainnet" ? "PUBLIC" : "TESTNET";
           signedXdr = await freighter.signTransaction(xdr, {
             network: freighterNetwork,
             accountToSign: publicKey,
@@ -126,7 +129,7 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
         // Submit to Horizon
         setStatus("submitting");
         const server = getStellarServer();
-        const signedTx = StellarSdk.TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+        const signedTx = StellarSdk.TransactionBuilder.fromXDR(signedXdr, getNetworkPassphrase());
         const horizonResult = await server.submitTransaction(signedTx as StellarSdk.Transaction);
 
         const trustlineResult: TrustlineResult = {
@@ -142,7 +145,7 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
           action,
           assetCode,
           walletType: secretKey ? "stellar_embedded" : "freighter",
-          network: STELLAR_NETWORK,
+          network: getStellarNetwork(),
         });
         onSuccess?.(trustlineResult);
         return trustlineResult;

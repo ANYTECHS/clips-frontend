@@ -8,6 +8,7 @@ import {
   INVOKE_CONTRACT_USER_MESSAGE,
   isInvokeContractBuildError,
 } from "@/app/lib/stellarOperations";
+import { getStellarNetwork } from "@/app/lib/networkConfig";
 import { captureSorobanNotSupportedWarning } from "@/app/lib/sentry";
 
 /**
@@ -114,7 +115,7 @@ export interface QueuedOperation {
  */
 export function useStellarTransaction(options: StellarTransactionOptions = {}) {
   const {
-    network = "testnet",
+    network = getStellarNetwork(),
     timeout = 30000,
     maxRetries = 3,
     onSuccess,

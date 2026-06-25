@@ -3,11 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { getBalance, Balance } from "./useBalance";
-import {
-  STELLAR_NETWORK,
-  getFreighterNetwork,
-  ACTIVE_NETWORK_CONFIG,
-} from "@/app/lib/networkConfig";
+import { getStellarNetwork, getFreighterNetwork, getActiveNetworkConfig } from "@/app/lib/networkConfig";
 
 export type WalletStatus = "idle" | "ready" | "loading" | "error";
 
@@ -42,7 +38,7 @@ export function useAutoStellarWallet(): AutoStellarWallet {
     (user?.profile?.stellarPublicKey as string) ?? null;
 
   // Resolve the Horizon-compatible network identifier from the env config
-  const horizonNetwork = getFreighterNetwork(STELLAR_NETWORK);
+  const horizonNetwork = getFreighterNetwork(getStellarNetwork());
 
   useEffect(() => {
     if (!publicKey) {
@@ -81,8 +77,8 @@ export function useAutoStellarWallet(): AutoStellarWallet {
 
   return {
     publicKey,
-    network: STELLAR_NETWORK,
-    networkLabel: ACTIVE_NETWORK_CONFIG.label,
+    network: getStellarNetwork(),
+    networkLabel: getActiveNetworkConfig().label,
     status,
     balance,
     error,

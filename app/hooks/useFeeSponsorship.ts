@@ -1,9 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import {
-  STELLAR_NETWORK,
-} from "@/app/lib/networkConfig";
+import { getStellarNetwork } from "@/app/lib/networkConfig";
 import {
   getSponsorBalance,
   hasSufficientSponsorBalance,
@@ -70,13 +68,10 @@ export function useFeeSponsorship(operationCount: number = 1) {
     setState((prev) => ({ ...prev, status: "checking", error: null }));
 
     try {
+      const network = getStellarNetwork();
       const [balance, sufficient] = await Promise.all([
-        getSponsorBalance(DEFAULT_SPONSOR_PUBLIC_KEY, STELLAR_NETWORK),
-        hasSufficientSponsorBalance(
-          DEFAULT_SPONSOR_PUBLIC_KEY,
-          STELLAR_NETWORK,
-          5
-        ),
+        getSponsorBalance(DEFAULT_SPONSOR_PUBLIC_KEY, network),
+        hasSufficientSponsorBalance(DEFAULT_SPONSOR_PUBLIC_KEY, network, 5),
       ]);
 
       const feeEstimate = estimateSponsoredFee(operationCount);
@@ -108,6 +103,6 @@ export function useFeeSponsorship(operationCount: number = 1) {
     sponsorPublicKey: DEFAULT_SPONSOR_PUBLIC_KEY,
     refresh: checkSponsorship,
     isSponsored: state.status === "available",
-    isTestnet: STELLAR_NETWORK === "testnet",
+      isTestnet: getStellarNetwork() === "testnet",
   };
 }

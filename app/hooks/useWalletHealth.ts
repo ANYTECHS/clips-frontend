@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ACTIVE_NETWORK_CONFIG, STELLAR_NETWORK } from "@/app/lib/networkConfig";
+import { getActiveNetworkConfig, getHorizonUrl } from "@/app/lib/networkConfig";
 
 export type ConnectionQuality = "excellent" | "good" | "degraded" | "offline";
 
@@ -58,8 +58,8 @@ const INITIAL_STATE: WalletHealthData = {
   offerCount: 0,
   currentLedger: null,
   horizonVersion: null,
-  networkLabel: ACTIVE_NETWORK_CONFIG.label,
-  horizonUrl: ACTIVE_NETWORK_CONFIG.horizonUrl,
+  networkLabel: getActiveNetworkConfig().label,
+  horizonUrl: getHorizonUrl(),
   lastCheckedAt: null,
   isChecking: false,
   error: null,
@@ -87,7 +87,7 @@ export function useWalletHealth(
 
     setData((prev: WalletHealthData) => ({ ...prev, isChecking: true, error: null }));
 
-    const { horizonUrl } = ACTIVE_NETWORK_CONFIG;
+    const horizonUrl = getHorizonUrl();
 
     // ── 1. Ping Horizon root for latency + ledger info ──────────────────────
     let horizonReachable = false;
@@ -153,7 +153,7 @@ export function useWalletHealth(
       offerCount,
       currentLedger,
       horizonVersion,
-      networkLabel: ACTIVE_NETWORK_CONFIG.label,
+      networkLabel: getActiveNetworkConfig().label,
       horizonUrl,
       lastCheckedAt: new Date(),
       isChecking: false,
