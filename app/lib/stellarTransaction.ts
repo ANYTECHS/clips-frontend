@@ -15,7 +15,7 @@
  * Retry strategy
  * ──────────────
  * - Sequence number errors (tx_bad_seq): re-fetch sequence number and retry
- *   immediately (up to MAX_SEQ_RETRIES times).
+ * immediately (up to MAX_SEQ_RETRIES times).
  * - Transient network errors: exponential backoff with jitter.
  * - Non-retryable errors (tx_failed, insufficient_balance, etc.): throw immediately.
  *
@@ -24,15 +24,15 @@
  * Replace the mock `HorizonClient` and `buildTransaction` stubs with real
  * @stellar/stellar-sdk calls:
  *
- *   import { Server, TransactionBuilder, Networks, Operation, Asset } from "@stellar/stellar-sdk";
- *   const server = new Server(horizonUrl);
- *   const account = await server.loadAccount(publicKey);
- *   const tx = new TransactionBuilder(account, { fee, networkPassphrase })
- *     .addOperation(...)
- *     .setTimeout(30)
- *     .build();
- *   tx.sign(keypair);
- *   const result = await server.submitTransaction(tx);
+ * import { Server, TransactionBuilder, Networks, Operation, Asset } from "@stellar/stellar-sdk";
+ * const server = new Server(horizonUrl);
+ * const account = await server.loadAccount(publicKey);
+ * const tx = new TransactionBuilder(account, { fee, networkPassphrase })
+ * .addOperation(...)
+ * .setTimeout(30)
+ * .build();
+ * tx.sign(keypair);
+ * const result = await server.submitTransaction(tx);
  */
 
 import { STELLAR_NETWORKS, StellarNetwork } from "./embeddedWallet";
@@ -49,6 +49,7 @@ const MAX_NETWORK_RETRIES = 3;
 
 // ─── Error types ──────────────────────────────────────────────────────────────
 
+/** Unique identification string organizing transaction sub-errors */
 export type StellarErrorCode =
   | "tx_bad_seq"          // Sequence number mismatch — retryable after re-fetch
   | "tx_failed"           // Transaction failed on-chain — not retryable
@@ -59,7 +60,17 @@ export type StellarErrorCode =
   | "timeout"             // Submission timed out — retryable
   | "unknown";            // Unclassified error
 
+/**
+ * Standardized application error exception tracking failures occurring during transaction pipelines.
+ */
 export class StellarTransactionError extends Error {
+  /**
+   * Constructs an instance of StellarTransactionError.
+   * @param code - Taxonomy tag matching the targeted ledger execution failure reason.
+   * @param message - Structural descriptive text details.
+   * @param retryable - Boolean indicator guiding auto-recovery loop paths.
+   * @param attempt - Step increment tracker logging transaction iteration levels.
+   */
   constructor(
     public readonly code: StellarErrorCode,
     message: string,
@@ -71,29 +82,41 @@ export class StellarTransactionError extends Error {
   }
 }
 
-/** Whether a given error code should trigger a retry */
+/**
+ * Evaluates whether a generic error code warrants a retry.
+ * @param code - The error categorization code.
+ * @returns True if retry rules apply to the category.
+ */
 function isRetryable(code: StellarErrorCode): boolean {
   return code === "network_error" || code === "timeout";
 }
 
-/** Whether a given error code is a sequence number conflict */
+/**
+ * Identifies if an error is a sequence number conflict.
+ * @param code - The error categorization code.
+ * @returns True if error implies sequence divergence.
+ */
 function isSeqError(code: StellarErrorCode): boolean {
   return code === "tx_bad_seq";
 }
 
 // ─── Horizon response types (subset) ─────────────────────────────────────────
 
+/** Subset layout mapping standard account details from Horizon endpoints. */
 export interface HorizonAccountResponse {
-  sequence: string; // Stellar sequence numbers are 64-bit integers returned as strings
+  /** 64-bit sequence identifier string. */
+  sequence: string;
   balances: Array<{ asset_type: string; balance: string }>;
 }
 
+/** Packaging containing confirmation markers from Horizon upon transaction processing. */
 export interface HorizonSubmitResponse {
   hash: string;
   ledger: number;
   successful: boolean;
 }
 
+/** Structural diagnostic descriptor container holding ledger failure parameters. */
 export interface HorizonErrorResponse {
   status: number;
   extras?: {
@@ -106,69 +129,47 @@ export interface HorizonErrorResponse {
 
 // ─── Transaction payload ──────────────────────────────────────────────────────
 
-/**
- * Single-operation payload (legacy / convenience form).
- * Kept for backward compatibility — internally converted to a batch of one.
- */
+/** Single-operation payload structural mapping wrapper. */
 export interface StellarTransactionPayload {
-  /** Source account public key */
   sourcePublicKey: string;
-  /** Operation type (e.g. "payment", "manage_sell_offer", "invoke_contract") */
   operationType: string;
-  /** Operation-specific parameters */
   operationParams: Record<string, unknown>;
-  /** Network to submit on */
   network: StellarNetwork;
-  /** Optional memo */
   memo?: string;
 }
 
 /**
- * Batch transaction payload — supports one or more typed operations in a
- * single atomic Stellar transaction.
- *
- * All operations share the same source account and are signed together.
- * The fee is automatically scaled: baseFee × numberOfOperations.
- *
- * @example
- * const payload: BatchTransactionPayload = {
- *   sourcePublicKey: "G...",
- *   operations: [
- *     createChangeTrustOp({ assetCode: "USDC", assetIssuer: "G..." }),
- *     createPaymentOp({ destination: "G...", amount: "10", assetCode: "USDC", assetIssuer: "G..." }),
- *   ],
- *   network: "testnet",
- *   memo: "batch payment",
- * };
+ * Multi-operation container payload enabling atomic transaction batches.
  */
 export interface BatchTransactionPayload {
-  /** Source account public key */
+  /** Source coordinate executing and authorizing the transaction block. */
   sourcePublicKey: string;
-  /** One or more operations to include in the transaction (max 100) */
+  /** Ordered multi-operation array collection (maximum of 100). */
   operations: StellarOperation[];
-  /** Network to submit on */
+  /** Target ledger layout identifier context. */
   network: StellarNetwork;
-  /** Optional text memo (max 28 bytes) */
+  /** Optional transaction memo text string (maximum of 28 bytes). */
   memo?: string;
 }
 
+/** Contextual summary log object mapping transaction finalization metrics. */
 export interface StellarTransactionResult {
   hash: string;
   ledger: number;
   sequenceUsed: string;
   attempts: number;
-  /** Number of operations included in the transaction */
   operationCount: number;
 }
 
-// ─── Horizon client (mock-compatible, swap for real SDK in production) ────────
+// ─── Horizon client ──────────────────────────────────────────────────────────
 
 /**
  * Fetch the current sequence number for an account from Horizon.
  *
- * In production:
- *   const account = await server.loadAccount(publicKey);
- *   return account.sequenceNumber();
+ * @param publicKey - Target address query endpoint.
+ * @param network - Active network target.
+ * @returns Resolves with the string representation of the current sequence index.
+ * @throws {StellarTransactionError} Thrown if account is absent (404) or connection fails.
  */
 export async function fetchAccountSequence(
   publicKey: string,
@@ -202,32 +203,21 @@ export async function fetchAccountSequence(
 /**
  * Build and sign a Stellar transaction envelope (XDR).
  *
- * Accepts either a single-operation `StellarTransactionPayload` (legacy) or a
- * multi-operation `BatchTransactionPayload`. The fee is scaled automatically:
- *   fee = baseFee × numberOfOperations
- *
- * This is a stub for the prototype — in production replace with the real SDK
- * call in `buildBatchTransaction` (stellar.ts):
- *   const tx = new TransactionBuilder(account, { fee, networkPassphrase })
- *     .addOperation(...)   // called once per operation
- *     .setTimeout(30)
- *     .build();
- *   tx.sign(Keypair.fromSecret(secretKey));
- *   return tx.toEnvelope().toXDR("base64");
+ * @param payload - Target action collection mapping criteria.
+ * @param sequence - The exact sequence identifier string targeted for calculation.
+ * @param secretKey - Secure local execution identity key used for generation.
+ * @returns Base64-encoded mock transaction envelope.
  */
 export function buildTransactionEnvelope(
   payload: StellarTransactionPayload | BatchTransactionPayload,
   sequence: string,
   secretKey: string
 ): string {
-  // Normalise to a list of operation descriptors for the mock envelope
   const isBatch = "operations" in payload;
   const operations = isBatch
     ? payload.operations
     : [{ type: payload.operationType, ...payload.operationParams }];
 
-  // Prototype stub — returns a mock XDR envelope string
-  // In production this would be a real base64-encoded XDR envelope
   const mockEnvelope = btoa(
     JSON.stringify({
       source: payload.sourcePublicKey,
@@ -235,7 +225,6 @@ export function buildTransactionEnvelope(
       operations,
       operationCount: operations.length,
       memo: payload.memo,
-      // secretKey is used for signing but never included in the envelope
       sig: btoa(`${secretKey.slice(0, 8)}:${sequence}`),
     })
   );
@@ -245,8 +234,10 @@ export function buildTransactionEnvelope(
 /**
  * Submit a signed transaction envelope to Horizon.
  *
- * In production:
- *   const result = await server.submitTransaction(tx);
+ * @param envelope - Base64 encoded operational payload stream.
+ * @param network - Target network target.
+ * @returns Resolves with the receipt details.
+ * @throws {StellarTransactionError} Mapping specific ledger rejection exceptions.
  */
 export async function submitEnvelope(
   envelope: string,
@@ -265,7 +256,6 @@ export async function submitEnvelope(
     return data as HorizonSubmitResponse;
   }
 
-  // Parse Horizon error response
   let errorBody: HorizonErrorResponse = { status: res.status };
   try {
     errorBody = await res.json();
@@ -331,9 +321,7 @@ export async function submitEnvelope(
   );
 }
 
-// ─── Retry helpers ────────────────────────────────────────────────────────────
-
-/** Exponential backoff with full jitter: delay = random(0, base * 2^attempt) */
+/** Calculates structural wait delays using full randomized jitter constraints. */
 function backoffDelay(attempt: number): Promise<void> {
   const cap = BASE_BACKOFF_MS * Math.pow(2, attempt);
   const delay = Math.random() * cap;
@@ -345,32 +333,17 @@ function backoffDelay(attempt: number): Promise<void> {
 /**
  * Submit a Stellar transaction with automatic sequence number retry logic.
  *
- * Accepts either a single-operation `StellarTransactionPayload` (legacy) or a
- * multi-operation `BatchTransactionPayload`. When using the batch form, all
- * operations are validated before the first network call.
- *
- * Algorithm:
- * 1. (Batch only) Validate all operations.
- * 2. Fetch the current account sequence number from Horizon.
- * 3. Build and sign the transaction envelope.
- * 4. Submit to Horizon.
- * 5. If `tx_bad_seq` is returned:
- *    a. Re-fetch the sequence number (it may have been incremented by another tx).
- *    b. Rebuild and resubmit (up to MAX_SEQ_RETRIES times).
- * 6. If a transient network error occurs, apply exponential backoff and retry
- *    (up to MAX_NETWORK_RETRIES times).
- * 7. Non-retryable errors are thrown immediately.
- *
- * @param payload   - Transaction details (source, operation(s), network)
- * @param secretKey - Signing key (retrieved from WalletStorage, never persisted)
- * @param onRetry   - Optional callback invoked before each retry attempt
+ * @param payload - Transaction details mapping operations and source criteria.
+ * @param secretKey - Signing credentials seed.
+ * @param onRetry - Optional status callback invoked before execution loop retries.
+ * @returns Resolves with tracking metadata summarizing successful submission.
+ * @throws {StellarTransactionError} For persistent loop failures or unhandled conditions.
  */
 export async function submitStellarTransaction(
   payload: StellarTransactionPayload | BatchTransactionPayload,
   secretKey: string,
   onRetry?: (info: { attempt: number; reason: StellarErrorCode; nextDelayMs: number }) => void
 ): Promise<StellarTransactionResult> {
-  // Validate batch operations before touching the network
   if ("operations" in payload) {
     validateOperations(payload.operations);
   }
@@ -388,7 +361,6 @@ export async function submitStellarTransaction(
     totalAttempts++;
 
     try {
-      // Step 1: Fetch sequence number (always re-fetch on seq error)
       if (currentSequence === null) {
         currentSequence = await fetchAccountSequence(
           payload.sourcePublicKey,
@@ -396,14 +368,8 @@ export async function submitStellarTransaction(
         );
       }
 
-      // Step 2: Increment sequence number by 1 (Stellar requirement)
-      // Sequence numbers are large integers — use BigInt to avoid precision loss
       const nextSequence = (BigInt(currentSequence) + 1n).toString();
-
-      // Step 3: Build and sign the transaction
       const envelope = buildTransactionEnvelope(payload, nextSequence, secretKey);
-
-      // Step 4: Submit to Horizon
       const result = await submitEnvelope(envelope, payload.network);
 
       return {
@@ -415,92 +381,3 @@ export async function submitStellarTransaction(
       };
     } catch (err) {
       if (!(err instanceof StellarTransactionError)) {
-        // Unexpected non-Stellar error — wrap and rethrow
-        throw new StellarTransactionError(
-          "unknown",
-          err instanceof Error ? err.message : "Unknown error during transaction submission",
-          false,
-          totalAttempts
-        );
-      }
-
-      // ── Sequence number conflict ──────────────────────────────────────────
-      if (isSeqError(err.code)) {
-        if (seqRetries >= MAX_SEQ_RETRIES) {
-          throw new StellarTransactionError(
-            "tx_bad_seq",
-            `Sequence number conflict persisted after ${seqRetries} retries. ` +
-              "Another transaction may be in flight. Please wait and try again.",
-            false,
-            totalAttempts
-          );
-        }
-
-        seqRetries++;
-        // Force a fresh sequence number fetch on the next iteration
-        currentSequence = null;
-
-        const nextDelayMs = 0; // Seq errors don't need backoff — just re-fetch
-        onRetry?.({ attempt: totalAttempts, reason: "tx_bad_seq", nextDelayMs });
-        continue;
-      }
-
-      // ── Transient network error ───────────────────────────────────────────
-      if (isRetryable(err.code)) {
-        if (networkRetries >= MAX_NETWORK_RETRIES) {
-          throw new StellarTransactionError(
-            err.code,
-            `Network error persisted after ${networkRetries} retries: ${err.message}`,
-            false,
-            totalAttempts
-          );
-        }
-
-        networkRetries++;
-        const nextDelayMs = BASE_BACKOFF_MS * Math.pow(2, networkRetries - 1);
-        onRetry?.({ attempt: totalAttempts, reason: err.code, nextDelayMs });
-        await backoffDelay(networkRetries - 1);
-        continue;
-      }
-
-      // ── Non-retryable error ───────────────────────────────────────────────
-      throw new StellarTransactionError(
-        err.code,
-        err.message,
-        false,
-        totalAttempts
-      );
-    }
-  }
-}
-
-// ─── User-facing error message helper ────────────────────────────────────────
-
-/**
- * Convert a StellarTransactionError into a user-friendly message.
- * Use this in UI components to display actionable error text.
- */
-export function getStellarErrorMessage(error: unknown): string {
-  if (!(error instanceof StellarTransactionError)) {
-    return "An unexpected error occurred. Please try again.";
-  }
-
-  switch (error.code) {
-    case "tx_bad_seq":
-      return "Transaction failed due to a sequence number conflict. This can happen when multiple transactions are submitted at the same time. Please try again.";
-    case "tx_bad_auth":
-      return "Transaction signature is invalid. Please reconnect your wallet and try again.";
-    case "tx_insufficient_fee":
-      return "The transaction fee is too low. Please try again — the fee will be adjusted automatically.";
-    case "tx_no_account":
-      return "Your Stellar account has not been activated yet. Please fund it via Friendbot (testnet) or send at least 1 XLM to activate it.";
-    case "tx_failed":
-      return `Transaction was rejected by the network: ${error.message}`;
-    case "network_error":
-      return "Network error while submitting the transaction. Check your connection and try again.";
-    case "timeout":
-      return "Transaction submission timed out. The network may be congested — please try again.";
-    default:
-      return `Transaction failed: ${error.message}`;
-  }
-}

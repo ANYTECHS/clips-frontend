@@ -16,6 +16,12 @@ import type { ProcessState, ProcessActions } from "@/app/store";
 
 export type { ProcessStatus, ProcessState } from "@/app/store";
 
+/**
+ * Compatibility wrapper hook providing access to the global, persistent process execution store.
+ * Connects the component lifecycle directly to Zustand slices for process tracking and state hydration status.
+ *
+ * @returns An object containing the current process state metrics, hydration flags, and modification actions.
+ */
 export function useProcessStore() {
   const process = _useProcessStore(selectProcess);
   const hasHydrated = _useProcessStore(selectHasHydrated);

@@ -15,6 +15,9 @@ import { secureStorage } from "@/app/lib/secureStorage";
 
 // ─── Default state ────────────────────────────────────────────────────────────
 
+/**
+ * Default fallback structural blueprint values for tracking asynchronous processing lifecycles.
+ */
 export const defaultProcessState: ProcessState = {
   id: "",
   label: "",
@@ -29,6 +32,9 @@ export const defaultProcessState: ProcessState = {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
+/**
+ * Reactive state store container managing media compilation steps and encrypted persistence hydration.
+ */
 export const useProcessStore = create<ProcessState & ProcessActions>()(
   persist(
     (set, get) => ({
@@ -75,10 +81,7 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
         completedAt: state.completedAt,
         momentsFound: state.momentsFound,
         estimatedSecondsRemaining: state.estimatedSecondsRemaining,
-        // hasHydrated is runtime-only — never persisted
       }),
-      // Skip automatic synchronous hydration; we drive it manually below
-      // so the async decrypt has time to resolve before state is applied.
       skipHydration: true,
       onRehydrateStorage: () => (_state, error) => {
         if (!error) {
@@ -89,16 +92,18 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
   )
 );
 
-// Trigger rehydration on the client. This is called once the module is
-// imported in a browser context; the persist middleware will await
-// secureStorage.getItem and then apply the stored state, after which
-// onRehydrateStorage fires and sets hasHydrated = true.
 if (typeof window !== "undefined") {
   useProcessStore.persist.rehydrate();
 }
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
+/**
+ * Selects the entire transactional lifecycle process state block configuration profile.
+ *
+ * @param s - Combined global process store data slice object.
+ * @returns Consolidated status structure parameters tracking in-flight pipelines.
+ */
 export const selectProcess = (
   s: ProcessState & ProcessActions
 ): ProcessState => ({
@@ -113,11 +118,29 @@ export const selectProcess = (
   hasHydrated: s.hasHydrated,
 });
 
+/**
+ * Extract operational lifecycle status descriptors from the process engine.
+ *
+ * @param s - Combined global process store data slice object.
+ * @returns Current state phase token ("idle" | "processing" | "success" | "error").
+ */
 export const selectProcessStatus = (s: ProcessState & ProcessActions) =>
   s.status;
 
+/**
+ * Track current numerical completion progress indices inside processing pipelines.
+ *
+ * @param s - Combined global process store data slice object.
+ * @returns Quantified progress magnitude ratio ranging from 0 up to 100.
+ */
 export const selectProcessProgress = (s: ProcessState & ProcessActions) =>
   s.progress;
 
+/**
+ * Evaluates whether state restoration routines from async storage nodes completed.
+ *
+ * @param s - Combined global process store data slice object.
+ * @returns True if underlying storage engine has resolved historical cached records.
+ */
 export const selectHasHydrated = (s: ProcessState & ProcessActions) =>
   s.hasHydrated;

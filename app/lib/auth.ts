@@ -13,12 +13,15 @@ import { jwtCallback, sessionCallback } from "./authCallbacks";
  * callbacks (jwt, session) are preserved from the original implementation.
  *
  * Breaking changes handled:
- *  - `NextAuthOptions` → `NextAuthConfig`
- *  - Named default imports updated (e.g. `GoogleProvider` → `Google`)
- *  - `getServerSession(authOptions)` callers should use `auth()` from next-auth
- *    (handled in route.ts)
+ * - `NextAuthOptions` → `NextAuthConfig`
+ * - Named default imports updated (e.g. `GoogleProvider` → `Google`)
+ * - `getServerSession(authOptions)` callers should use `auth()` from next-auth
+ * (handled in route.ts)
+ *
+ * @type {NextAuthConfig}
  */
 export const authOptions: NextAuthConfig = {
+  /** High-level array configuring OAuth and multi-platform media identity provider interfaces. */
   providers: [
     Google({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -61,6 +64,11 @@ export const authOptions: NextAuthConfig = {
       },
       token: "https://open.tiktokapis.com/v2/oauth/token/",
       userinfo: "https://open.tiktokapis.com/v2/user/info/",
+      /**
+       * Maps incoming TikTok userinfo profile shapes into standard NextAuth user payloads.
+       * @param profile - Raw endpoint object mapping data containing nested account payload fields.
+       * @returns Normed profile container parameters.
+       */
       profile(profile: any) {
         return {
           id: profile.data.user.open_id,
@@ -72,10 +80,12 @@ export const authOptions: NextAuthConfig = {
       clientSecret: process.env.TIKTOK_CLIENT_SECRET,
     },
   ],
+  /** Action intercept hooks controlling lifecycle transitions during identity confirmation stages. */
   callbacks: {
     jwt: jwtCallback,
     session: sessionCallback,
   },
+  /** Custom route mappings overriding core fallback display interface links. */
   pages: {
     signIn: "/login",
     error: "/login",
@@ -83,4 +93,5 @@ export const authOptions: NextAuthConfig = {
 };
 
 import NextAuth from "next-auth";
+
 export const { handlers, auth, signIn, signOut } = NextAuth(authOptions);

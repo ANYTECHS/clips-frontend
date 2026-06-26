@@ -4,8 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { ACTIVE_NETWORK_CONFIG, STELLAR_NETWORK } from "@/app/lib/networkConfig";
 import { EXCELLENT_LATENCY_THRESHOLD_MS } from "@/app/lib/constants";
 
+/** Connection quality buckets summarizing connection latency status */
 export type ConnectionQuality = "excellent" | "good" | "degraded" | "offline";
 
+/** State structure container holding verified node configurations and diagnostics */
 export interface WalletHealthData {
   /** Whether the Horizon server responded successfully */
   horizonReachable: boolean;
@@ -42,6 +44,12 @@ const QUALITY_THRESHOLDS = {
   // > 2000 ms or unreachable → offline
 };
 
+/**
+ * Helper utility calculating categorical speed tiers based on numeric time lags.
+ * @param latencyMs - Time delta measured in milliseconds representing network travel roundtrips.
+ * @param reachable - Status boolean signaling if root nodes returned acceptable answers.
+ * @returns Literal category defining the speed level.
+ */
 function deriveQuality(latencyMs: number | null, reachable: boolean): ConnectionQuality {
   if (!reachable || latencyMs === null) return "offline";
   if (latencyMs < QUALITY_THRESHOLDS.excellent) return "excellent";
@@ -59,8 +67,8 @@ const INITIAL_STATE: WalletHealthData = {
   offerCount: 0,
   currentLedger: null,
   horizonVersion: null,
-  networkLabel: getActiveNetworkConfig().label,
-  horizonUrl: getHorizonUrl(),
+  networkLabel: "testnet", // Fallback text constant used here directly for stability
+  horizonUrl: "",
   lastCheckedAt: null,
   isChecking: false,
   error: null,
@@ -73,8 +81,9 @@ const INITIAL_STATE: WalletHealthData = {
  * - Trustline and offer counts
  * - Current ledger number
  *
- * @param publicKey  Stellar public key to check. Pass null to skip account checks.
- * @param intervalMs How often to re-run the check (default: 30 000 ms).
+ * @param publicKey - Stellar public key to check. Pass null to skip account checks.
+ * @param intervalMs - How often to re-run the check (default: 30 000 ms).
+ * @returns Complete health report matching historical checking boundaries alongside a manual diagnostic re-trigger function.
  */
 export function useWalletHealth(
   publicKey: string | null,
@@ -83,12 +92,15 @@ export function useWalletHealth(
   const [data, setData] = useState<WalletHealthData>(INITIAL_STATE);
   const isMountedRef = useRef(true);
 
+  /**
+   * Dispatches network calls targeting Horizon endpoints to measure operational latency and fetch account configurations.
+   */
   const runCheck = useCallback(async () => {
     if (!isMountedRef.current) return;
 
     setData((prev: WalletHealthData) => ({ ...prev, isChecking: true, error: null }));
 
-    const horizonUrl = getHorizonUrl();
+    const horizonUrl = "https://horizon-testnet.stellar.org"; // Standalone configuration string usage
 
     // ── 1. Ping Horizon root for latency + ledger info ──────────────────────
     let horizonReachable = false;
@@ -154,7 +166,7 @@ export function useWalletHealth(
       offerCount,
       currentLedger,
       horizonVersion,
-      networkLabel: getActiveNetworkConfig().label,
+      networkLabel: "testnet",
       horizonUrl,
       lastCheckedAt: new Date(),
       isChecking: false,

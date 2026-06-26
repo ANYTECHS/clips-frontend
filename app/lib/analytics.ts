@@ -2,20 +2,25 @@ import { logger } from "@/app/lib/logger";
 
 /**
  * Analytics Tracking Utility
- * 
- * Provides a unified interface for tracking page views and events across different analytics providers.
+ * * Provides a unified interface for tracking page views and events across different analytics providers.
  * Respects user cookie consent preferences and filters out PII.
  */
 
+/** Valid analytics infrastructure platform destination names */
 type AnalyticsProvider = 'ga4' | 'plausible' | 'custom' | 'none';
 
+/** Dictionary object mapping custom metadata event keys to scalar values */
 interface EventProperties {
   [key: string]: string | number | boolean | undefined;
 }
 
+/** Cookie configurations tracking user-defined privacy collection limits */
 interface CookieConsent {
+  /** Permission allowing primary session storage and operational cookies */
   essential: boolean;
+  /** Permission allowing performance evaluation metrics tracking entries */
   analytics: boolean;
+  /** Permission mapping tracking pixels and target advertisement parameters */
   marketing: boolean;
 }
 
@@ -28,12 +33,19 @@ const PII_PATTERNS = [
   /\b\d{16}\b/g, // Credit card
 ];
 
+/**
+ * Core Analytics class orchestrating initialization, consent monitoring, 
+ * data sanitization, and event forwarding across tracking providers.
+ */
 class Analytics {
   private provider: AnalyticsProvider;
   private isInitialized: boolean = false;
   private consentGiven: boolean = false;
   private debugMode: boolean = false;
 
+  /**
+   * Initializes the analytics management state machine and attaches consent state listeners.
+   */
   constructor() {
     this.provider = this.getProvider();
     this.debugMode = process.env.NODE_ENV === 'development';
@@ -47,6 +59,7 @@ class Analytics {
 
   /**
    * Get the analytics provider from environment variable
+   * @returns Resolved vendor enum assignment identifier.
    */
   private getProvider(): AnalyticsProvider {
     const provider = process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER?.toLowerCase();
@@ -81,6 +94,7 @@ class Analytics {
 
   /**
    * Handle consent update events
+   * @param event - Custom event carrying updated user cookie choices.
    */
   private handleConsentUpdate(event: Event): void {
     const customEvent = event as CustomEvent<CookieConsent>;
@@ -171,6 +185,8 @@ class Analytics {
 
   /**
    * Sanitize data to remove PII
+   * @param data - Target parameter, string, or collection array passed down for compliance evaluation.
+   * @returns Redacted variant safe to transport over analytics lines.
    */
   private sanitize(data: any): any {
     if (typeof data === 'string') {
@@ -201,6 +217,7 @@ class Analytics {
 
   /**
    * Log debug messages in development
+   * @param args - Arbitrary values to pipe down to stdout tracking structures.
    */
   private log(...args: any[]): void {
     if (this.debugMode) {
@@ -210,6 +227,7 @@ class Analytics {
 
   /**
    * Track a page view
+   * @param path - Destination web route string tracked for user engagement maps.
    */
   public trackPageView(path: string): void {
     if (!this.consentGiven) {
@@ -247,6 +265,8 @@ class Analytics {
 
   /**
    * Track a custom event
+   * @param name - Metric event namespace descriptor string.
+   * @param properties - Accompanying analytical contextual metrics metadata properties object.
    */
   public trackEvent(name: string, properties?: EventProperties): void {
     if (!this.consentGiven) {
@@ -282,6 +302,8 @@ class Analytics {
 
   /**
    * Send event to custom analytics endpoint
+   * @param name - Metric event namespace descriptor string.
+   * @param properties - Sanitized metadata dictionary mapping event metrics properties.
    */
   private sendCustomEvent(name: string, properties: any): void {
     const endpoint = process.env.NEXT_PUBLIC_ANALYTICS_ENDPOINT;
@@ -310,6 +332,7 @@ class Analytics {
 
   /**
    * Track user signup
+   * @param method - Authentication path technique string used by the entity.
    */
   public trackSignup(method?: string): void {
     this.trackEvent('user_signup', { method });
@@ -317,6 +340,8 @@ class Analytics {
 
   /**
    * Track video upload
+   * @param fileSize - Size metric specified in bytes.
+   * @param duration - Running time measurement specified in seconds.
    */
   public trackVideoUpload(fileSize?: number, duration?: number): void {
     this.trackEvent('video_upload', {
@@ -327,6 +352,7 @@ class Analytics {
 
   /**
    * Track NFT minting
+   * @param clipId - Documented identity identifier mapping the video component index tracking entry.
    */
   public trackNFTMint(clipId?: string): void {
     this.trackEvent('nft_mint', {
@@ -336,6 +362,7 @@ class Analytics {
 
   /**
    * Track earnings report export
+   * @param format - Export container compression scheme layout format descriptor.
    */
   public trackEarningsExport(format?: string): void {
     this.trackEvent('earnings_export', { format });
@@ -343,6 +370,7 @@ class Analytics {
 
   /**
    * Track wallet connection
+   * @param walletType - Provider framework design identifier name.
    */
   public trackWalletConnect(walletType?: string): void {
     this.trackEvent('wallet_connect', {
@@ -352,6 +380,7 @@ class Analytics {
 
   /**
    * Track wallet disconnection
+   * @param walletType - Provider framework design identifier name.
    */
   public trackWalletDisconnect(walletType?: string): void {
     this.trackEvent('wallet_disconnect', {
@@ -361,6 +390,7 @@ class Analytics {
 
   /**
    * Track wallet creation (embedded/auto-generated wallet)
+   * @param walletType - Provider framework design identifier name.
    */
   public trackWalletCreated(walletType?: string): void {
     this.trackEvent('wallet_created', {
@@ -370,6 +400,7 @@ class Analytics {
 
   /**
    * Track secret key import
+   * @param walletType - Provider framework design identifier name.
    */
   public trackWalletImport(walletType?: string): void {
     this.trackEvent('wallet_import', {
@@ -379,6 +410,7 @@ class Analytics {
 
   /**
    * Track Friendbot funding (testnet only)
+   * @param walletType - Provider framework design identifier name.
    */
   public trackWalletFunded(walletType?: string): void {
     this.trackEvent('wallet_funded', {
@@ -389,11 +421,15 @@ class Analytics {
   /**
    * Track an on-chain payment transaction.
    * Amount is bucketed to avoid storing precise financial data.
+   * @param params - Configuration object payload mapping details of the confirmed operation.
+   * @param params.walletType - Provider wallet descriptor string.
+   * @param params.assetCode - Token asset identifier ticker code symbol. Defaults to 'XLM'.
+   * @param params.amountBucket - Binned size evaluation index category tag description.
+   * @param params.network - Ledger landscape target connection mode flag.
    */
   public trackTransaction(params: {
     walletType?: string;
     assetCode?: string;
-    /** Bucketed amount range, e.g. "0-1", "1-10", "10-100", "100+" */
     amountBucket?: string;
     network?: string;
   }): void {
@@ -407,6 +443,11 @@ class Analytics {
 
   /**
    * Track a trustline change (add or remove).
+   * @param params - Structural parameter context documenting trust modification operations.
+   * @param params.action - State adjustment instruction value.
+   * @param params.assetCode - Target currency text indicator code.
+   * @param params.walletType - Active credential source environment category designation.
+   * @param params.network - Node transport tracking context configuration marker.
    */
   public trackTrustlineChange(params: {
     action: 'add' | 'remove';
@@ -433,6 +474,8 @@ export type { EventProperties, AnalyticsProvider };
 /**
  * Bucket a numeric amount into a range string for privacy-safe analytics.
  * e.g. 0.5 → "0-1", 5 → "1-10", 50 → "10-100", 500 → "100+"
+ * * @param amount - Raw float transactional processing currency value.
+ * @returns Categorical partition string bounding the underlying transaction value.
  */
 export function bucketAmount(amount: number): string {
   if (amount <= 0) return "0";

@@ -7,6 +7,8 @@ import type { StellarNetwork } from "@/app/lib/networkConfig";
  * Hook for reading and updating the runtime network override. Uses
  * `NetworkProvider` to broadcast changes to the whole React tree so a
  * full page reload is not required.
+ *
+ * @returns An object containing the current overridden network state and its setter function.
  */
 export function useNetworkOverride() {
   const { network, setNetwork } = useNetworkContext();

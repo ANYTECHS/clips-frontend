@@ -3,6 +3,17 @@ import type { JWT } from "next-auth/jwt";
 import { DEFAULT_ONBOARDING_STEP } from "./types";
 import { fetchOnboardingStep } from "./userApi";
 
+/**
+ * Intercepts JSON Web Token mutations during authentication flows to populate access tokens,
+ * identity provider designations, profile details, and synchronized registration wizard tiers.
+ *
+ * @param context - The context object payload containing authorization state changes.
+ * @param context.token - Mutatable current storage representation of the underlying session container.
+ * @param context.account - Incoming credential configuration payload available strictly on early login occurrences.
+ * @param context.profile - Vendor specific user resource metadata returned by authorization providers.
+ * @param context.user - Baseline identity reference metrics tracking active entity parameters.
+ * @returns Updated state matrix mapping persisted credential metrics.
+ */
 export async function jwtCallback({
   token,
   account,
@@ -37,6 +48,15 @@ export async function jwtCallback({
   return token;
 }
 
+/**
+ * Constructs user-facing session models out of underlying token states, exposing tracking indicators 
+ * like application access tokens and active setup steps safely onto client-side hooks.
+ *
+ * @param context - Structural synchronization state details.
+ * @param context.session - Client-accessible storage object frame detailing current application authorization parameters.
+ * @param context.token - Cryptographically secured internal state context payload driving user authorizations.
+ * @returns Session parameters formatted with platform-wide onboarding identifiers and tracking tokens.
+ */
 export async function sessionCallback({
   session,
   token,

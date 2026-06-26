@@ -8,20 +8,31 @@
 
 import { useState, useCallback, useRef } from "react";
 
+/** Tracking container object representing progress metrics for individual files */
 export type FileProgress = {
-  /** 0–100 */
+  /** 0–100 completion percentage indicator */
   percent: number;
-  /** "idle" | "uploading" | "done" | "error" | "cancelled" */
+  /** State machine status string tracking execution phases */
   status: "idle" | "uploading" | "done" | "error" | "cancelled";
+  /** Optional failure details populating on errors */
   error?: string;
 };
 
+/** Metadata payload mapping information returned on successful ingest */
 export type UploadResult = {
+  /** The server-side async tracking ID associated with processing the artifact */
   jobId: string;
+  /** The baseline name string matching the origin payload */
   name: string;
+  /** The remote asset destination access endpoint URL */
   url: string;
 };
 
+/**
+ * Custom hook handling safe parallel multi-file file streaming contexts using underlying XHR event channels.
+ *
+ * @returns State properties, status maps, and asynchronous invocation tools for batch execution and manual abort overrides.
+ */
 export function useUploadProgress() {
   const [progresses, setProgresses] = useState<Record<string, FileProgress>>({});
   const [results, setResults] = useState<UploadResult[]>([]);
@@ -30,6 +41,9 @@ export function useUploadProgress() {
   // Keep a ref to all active XHRs so we can abort them
   const xhrRefs = useRef<XMLHttpRequest[]>([]);
 
+  /**
+   * Dispatches micro-mutations matching granular progress shifts per file index.
+   */
   const setFileProgress = useCallback(
     (fileName: string, update: Partial<FileProgress>) => {
       setProgresses((prev) => ({
@@ -40,6 +54,11 @@ export function useUploadProgress() {
     []
   );
 
+  /**
+   * Handles low-level XHR transport initialization, header bundling, and streaming callbacks for an explicit payload.
+   * * @param file - The distinct binary file target instance requested for transmission.
+   * @returns Resolves to a structural report object containing tracking metadata upon ingest completion.
+   */
   const uploadFile = useCallback(
     (file: File): Promise<UploadResult> => {
       return new Promise((resolve, reject) => {
@@ -96,6 +115,11 @@ export function useUploadProgress() {
     [setFileProgress]
   );
 
+  /**
+   * Orchestrates parallel batch processing pipelines across variable file array configurations.
+   * * @param files - List of File targets slated for transit dispatching.
+   * @returns Structured collection summarizing successfully loaded files and their active job associations.
+   */
   const upload = useCallback(
     async (files: File[]) => {
       if (files.length === 0) return;
@@ -124,6 +148,9 @@ export function useUploadProgress() {
     [uploadFile]
   );
 
+  /**
+   * Iterates through active XHR connections to force instant abort events.
+   */
   const cancelAll = useCallback(() => {
     xhrRefs.current.forEach((xhr) => xhr.abort());
     xhrRefs.current = [];

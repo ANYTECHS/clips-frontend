@@ -4,9 +4,9 @@
  * Dashboard Zustand store
  *
  * Responsibilities:
- *  - Hold earnings, clips, platforms stats, revenue trend, and recent projects
- *  - Cache API responses for CACHE_TTL_MS to avoid redundant fetches
- *  - Expose a single `fetchDashboard` action consumed by the thin hook layer
+ * - Hold earnings, clips, platforms stats, revenue trend, and recent projects
+ * - Cache API responses for CACHE_TTL_MS to avoid redundant fetches
+ * - Expose a single `fetchDashboard` action consumed by the thin hook layer
  *
  * Components should NOT import this store directly — use the
  * `useDashboardData` hook in app/hooks/useDashboardData.ts instead.
@@ -25,8 +25,8 @@ import { useUserStore } from "./userStore";
 
 // ─── Cache TTL ────────────────────────────────────────────────────────────────
 
-/** Re-use cached data for 5 minutes before hitting the API again */
 import { DASHBOARD_CACHE_TTL_MS } from "@/app/lib/constants";
+/** Re-use cached data for a fixed lifespan before hitting the API again */
 const CACHE_TTL_MS = DASHBOARD_CACHE_TTL_MS;
 export { DASHBOARD_CACHE_TTL_MS };
 
@@ -34,6 +34,9 @@ import { fetchDashboardFromAPI } from "./api";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
+/**
+ * Initial standard fallback values for the dashboard state slice.
+ */
 const initialState: DashboardState = {
   stats: null,
   revenueTrend: [],
@@ -45,6 +48,9 @@ const initialState: DashboardState = {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
+/**
+ * Reactive state store container managing user analytics metrics and tracking trends.
+ */
 export const useDashboardStore = create<DashboardState & DashboardActions>(
   (set, get) => ({
     ...initialState,
@@ -52,10 +58,8 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
     fetchDashboard: async () => {
       const { loading, lastFetchedAt } = get();
 
-      // Bail out if a fetch is already in-flight
       if (loading) return;
 
-      // Serve from cache if data is still fresh
       if (lastFetchedAt !== null && Date.now() - lastFetchedAt < CACHE_TTL_MS) {
         return;
       }
@@ -91,18 +95,38 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
 
 // ─── Selectors (memoised slices — prevent unnecessary re-renders) ─────────────
 
-/** Select only the stats slice */
+/**
+ * Selects analytics aggregate values from the dashboard store instance.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns Parsed statistics metrics context or null.
+ */
 export const selectStats = (s: DashboardState & DashboardActions) => s.stats;
 
-/** Select only the revenue trend */
+/**
+ * Selects the timeline progression points plotting transaction metrics.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns Array collection tracking historical revenue trends.
+ */
 export const selectRevenueTrend = (s: DashboardState & DashboardActions) =>
   s.revenueTrend;
 
-/** Select only recent projects */
+/**
+ * Selects the historical project elements saved across localized domains.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns Array tracking structural context payloads representing recent items.
+ */
 export const selectRecentProjects = (s: DashboardState & DashboardActions) =>
   s.recentProjects;
 
-/** Select loading + error meta */
+/**
+ * Extracts operation lifecycle timestamps and pending validation flags.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns Consolidated lifecycle tracking states.
+ */
 export const selectDashboardMeta = (s: DashboardState & DashboardActions) => ({
   loading: s.loading,
   error: s.error,
@@ -111,7 +135,6 @@ export const selectDashboardMeta = (s: DashboardState & DashboardActions) => ({
 
 // ─── Subscribe to plan changes ─────────────────────────────────────────────────
 
-// Invalidate dashboard cache when user's plan changes
 if (typeof window !== "undefined") {
   useUserStore.getState().onPlanChange(() => {
     useDashboardStore.getState().invalidateCache();
