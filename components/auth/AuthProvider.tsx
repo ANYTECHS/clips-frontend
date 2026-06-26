@@ -3,8 +3,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
-
-const STORAGE_KEY = "clipcash_user";
+import { persistClipcashUser, loadClipcashUser, clearClipcashUser } from "@/app/lib/authUser";
 
 const PUBLIC_ROUTES = ["/", "/login", "/privacy", "/terms", "/status", "/cookies"];
 
@@ -30,57 +29,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
 
-  const [user, setUserState] = useState<AuthUser | null>(() => {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? (JSON.parse(raw) as AuthUser) : null;
-    } catch {
-      return null;
-    }
-  });
+  const [user, setUserState] = useState<AuthUser | null>(null);
+  const [storageLoaded, setStorageLoaded] = useState(false);
 
-  const isLoading = status === "loading";
+  // Load persisted user on mount (async secureStorage, checks TTL)
+  useEffect(() => {
+    loadClipcashUser().then((stored) => {
+      if (stored) setUserState(stored as AuthUser);
+      setStorageLoaded(true);
+    });
+  }, []);
+
+  const isLoading = status === "loading" || !storageLoaded;
 
   // Sync NextAuth session -> local state
   useEffect(() => {
     if (status === "loading") return;
 
     if (status === "authenticated" && session?.user) {
-      const { email, name } = session.user as { email?: string; name?: string; onboardingStep?: number };
+      const { email, name } = session.user as { email?: string; name?: string };
       const sessionUser: AuthUser = {
         id: email ?? "oauth_user",
         email: email ?? "",
         name: name ?? undefined,
-        onboardingStep: (session.user as any).onboardingStep,
+        onboardingStep: (session.user as { onboardingStep?: number }).onboardingStep,
       };
       setUserState(sessionUser);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sessionUser));
+      persistClipcashUser(sessionUser);
     } else if (status === "unauthenticated") {
-      // Only clear if we were previously synced from a session (not a manual mock login)
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        try {
-          const stored = JSON.parse(raw) as AuthUser;
-          // If the stored user looks like it came from oauth (no explicit setUser call),
-          // treat session expiry as a logout.
-          if (!stored.id.startsWith("mock")) {
-            localStorage.removeItem(STORAGE_KEY);
-            setUserState(null);
-            signOut({ redirect: false });
-          }
-        } catch {
-          localStorage.removeItem(STORAGE_KEY);
+      loadClipcashUser().then((stored) => {
+        if (stored && !stored.id.startsWith("mock")) {
+          clearClipcashUser();
           setUserState(null);
+          signOut({ redirect: false });
         }
-      }
+      });
     }
   }, [status, session]);
 
-  // Route guard — only redirect when we know for certain the user is not authenticated
+  // Route guard
   useEffect(() => {
     if (isLoading) return;
-    if (status === "authenticated") return; // session sync hasn't flushed to user state yet
+    if (status === "authenticated") return;
     const isPublic = PUBLIC_ROUTES.some(
       (r) => pathname === r || pathname.startsWith(r + "/")
     );
@@ -91,12 +81,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const setUser = useCallback((newUser: AuthUser) => {
     setUserState(newUser);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser));
+    persistClipcashUser(newUser);
   }, []);
 
   const logout = useCallback(async () => {
     setUserState(null);
-    localStorage.removeItem(STORAGE_KEY);
+    await clearClipcashUser();
     await signOut({ redirect: false });
   }, []);
 

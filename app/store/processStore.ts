@@ -40,7 +40,13 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
     (set, get) => ({
       ...defaultProcessState,
 
-      startProcess: (id: string, label: string) => {
+      startProcess: (id: string, label: string): string => {
+        if (!id) {
+          if (process.env.NODE_ENV === "development") {
+            console.warn("useProcessStore.startProcess: no id provided, auto-generating one.");
+          }
+          id = crypto.randomUUID();
+        }
         set({
           id,
           label,
@@ -51,6 +57,7 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
           momentsFound: 0,
           estimatedSecondsRemaining: null,
         });
+        return id;
       },
 
       update: (

@@ -3,7 +3,7 @@
 import { CloudUpload } from "lucide-react";
 import { useUserStore, selectUserName } from "@/app/store";
 
-export default function DashboardHeader() {
+export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const userName = useUserStore(selectUserName);
 
   return (
