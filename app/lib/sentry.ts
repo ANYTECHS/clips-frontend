@@ -6,7 +6,7 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   redactAddress,
   redactEmail,

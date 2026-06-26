@@ -3,8 +3,8 @@
 import React, { ReactNode } from "react";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import AuthForm from "@/components/AuthForm";
-import { useAuth } from "@/components/AuthProvider";
+import AuthForm from "@/components/auth/AuthForm";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { useState, useEffect } from "react";
 
 interface LandingLayoutProps {

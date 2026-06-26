@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { MockApi } from "@/app/lib/mockApi";
 import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, CheckCircle2, Wallet, Info } from "lucide-react";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import Navbar from "@/components/Navbar";
 import { useRouter } from "next/navigation";
 import { useEmbeddedWallet } from "@/components/EmbeddedWalletProvider";

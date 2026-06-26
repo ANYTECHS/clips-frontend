@@ -17,11 +17,11 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { useWallet } from "@/components/WalletProvider";
-import { useMultiWallet } from "@/components/MultiWalletProvider";
-import { useAuth } from "@/components/AuthProvider";
+import { useWallet } from "@/components/wallet/WalletProvider";
+import { useMultiWallet } from "@/components/wallet/MultiWalletProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { MultiWalletRecord, WalletProviderType } from "@/app/lib/multiWalletStorage";
-import { migrateToMultiWallet } from "@/components/MultiWalletProvider";
+import { migrateToMultiWallet } from "@/components/wallet/MultiWalletProvider";
 
 const POLL_INTERVAL_MS = 50;
 const MAX_POLL_ATTEMPTS = 20; // 1 second total

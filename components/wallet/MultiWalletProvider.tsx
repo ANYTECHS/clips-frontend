@@ -6,7 +6,7 @@ import {
   MultiWalletStorage,
   WalletProviderType,
 } from "@/app/lib/multiWalletStorage";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 // Analytics is optional — import lazily to avoid breaking tests that don't mock it
 let analytics: { trackEvent: (name: string, props?: Record<string, unknown>) => void } | null = null;

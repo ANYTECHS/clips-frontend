@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { getBalance, Balance } from "./useBalance";
 import { getStellarNetwork, getFreighterNetwork, getActiveNetworkConfig } from "@/app/lib/networkConfig";
 

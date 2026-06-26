@@ -9,7 +9,7 @@ import WalletConnectButton from "@/components/WalletConnectButton";
 import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import {
   getStoredPermission,

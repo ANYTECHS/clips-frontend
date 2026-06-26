@@ -16,8 +16,8 @@ import {
   AlertCircle,
   X,
 } from "lucide-react";
-import { useAuth } from "@/components/AuthProvider";
-import { useWallet, truncateAddress } from "@/components/WalletProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useWallet, truncateAddress } from "@/components/wallet/WalletProvider";
 import Skeleton from "@/components/ui/Skeleton";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useToast } from "@/hooks/useToast";

@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/AuthProvider";
-import { WalletProvider } from "@/components/WalletProvider";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { WalletProvider } from "@/components/wallet/WalletProvider";
 import { StellarWalletProvider } from "@/components/StellarWalletProvider";
 import { NetworkProvider } from "@/app/context/NetworkContext";
 import { ThemeProvider } from "@/components/theme-provider";

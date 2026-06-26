@@ -3,8 +3,8 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
-import { useWallet } from "@/components/WalletProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useWallet } from "@/components/wallet/WalletProvider";
 import { MockApi } from "@/app/lib/mockApi";
 import { restoreWalletFromMnemonic } from "@/app/lib/stellar";
 import { decryptWithPassword } from "@/components/SocialRecoveryConfig";
