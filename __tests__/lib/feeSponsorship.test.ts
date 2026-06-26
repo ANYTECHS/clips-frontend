@@ -2,7 +2,7 @@ import {
   estimateSponsoredFee,
   wrapWithSponsorship,
   createSponsoredAccountOps,
-} from "@/app/lib/feeSponsorship";
+} from "@/app/api/lib/feeSponsorship";
 
 describe("feeSponsorship", () => {
   describe("estimateSponsoredFee", () => {

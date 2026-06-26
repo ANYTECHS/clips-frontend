@@ -21,6 +21,18 @@ import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 
 type ExportFormat = "csv" | "json" | "pdf";
 
+/**
+ * Prepend a single quote to any cell starting with characters that trigger
+ * formula execution in spreadsheet applications (=, +, -, @) or control
+ * characters (\t, \r). Also strips leading backslashes as an extra guard.
+ */
+function sanitizeCsvCell(value: string): string {
+  if (/^[=\t\r+\-@\\]/.test(value)) {
+    return "'" + value;
+  }
+  return value;
+}
+
 function ExportMenu({ onExport, exporting }: { onExport: (f: ExportFormat) => void; exporting: boolean }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -141,11 +153,11 @@ export default function EarningsPage() {
           ["Date", "Description", "Amount", "Platform", "Status", "Tax ID"],
           ...exportData.map((tx) => [
             tx.date,
-            tx.description,
+            sanitizeCsvCell(tx.description),
             tx.amount.toFixed(2),
-            tx.platform,
+            sanitizeCsvCell(tx.platform),
             tx.status,
-            tx.taxId,
+            sanitizeCsvCell(tx.taxId),
           ]),
         ]
           .map((row) =>

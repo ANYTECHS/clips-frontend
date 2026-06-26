@@ -1,37 +1,9 @@
-/**
- * feeSponsorship.ts
- *
- * Implements Stellar transaction fee sponsorship (CAP-33) using
- * @stellar/stellar-sdk. This allows the platform to sponsor (pay) transaction
- * fees and account reserves on behalf of users, enabling a gasless
- * onboarding experience.
- *
- * Architecture
- * ────────────
- * The platform maintains a "sponsor account" (a Stellar keypair with sufficient
- * XLM balance). When a user needs to perform a transaction:
- *
- * 1. Platform builds a transaction containing:
- *    a. beginSponsoringFutureReserves (sponsor → user)
- *    b. The actual operation(s) the user wants to perform
- *    c. endSponsoringFutureReserves (user)
- * 2. The sponsor account signs the transaction FIRST (as the sponsoring account)
- * 3. The user signs the transaction SECOND (for the sponsored operations)
- * 4. The transaction is submitted to the network
- *
- * On testnet, sponsorship allows creating accounts and paying fees without
- * the user needing XLM. On mainnet, the sponsor account needs real XLM.
- *
- * References
- * ──────────
- * - CAP-33: https://github.com/stellar/stellar-protocol/blob/master/core/cap-0033.md
- * - Stellar SDK: https://github.com/stellar/js-stellar-sdk
- */
+import 'server-only';
 
 import { logger } from "@/app/lib/logger";
 import * as StellarSdk from "@stellar/stellar-sdk";
-import { getStellarNetwork, getHorizonUrl, getNetworkPassphrase } from "./networkConfig";
-import type { StellarNetwork } from "./networkConfig";
+import { getStellarNetwork, getHorizonUrl, getNetworkPassphrase } from "@/app/lib/networkConfig";
+import type { StellarNetwork } from "@/app/lib/networkConfig";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -260,7 +232,7 @@ export async function submitSponsoredTransaction(
   }
 }
 
-// ─── Helper: Create a sponsored "create account + payment" batch ─────────────
+// ─── Helper: Create a sponsored "create account + payment" batch ─────────
 
 /**
  * Build the operations needed for a sponsored account creation with an

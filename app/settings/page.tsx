@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { useWallet } from "@/components/WalletProvider";
 import SocialRecoveryConfig from "@/components/SocialRecoveryConfig";
 import WalletConnectButton from "@/components/WalletConnectButton";
-import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun } from "lucide-react";
+import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun, TimerOff } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -33,13 +33,14 @@ export default function SettingsPage() {
 
   // Wallet visibility and inputs
   const [showPrivateKey, setShowPrivateKey] = useState(false);
-  const [showMnemonic, setShowMnemonic] = useState(false);
+  const [mnemonicRevealed, setMnemonicRevealed] = useState(false);
   const [advancedWalletEnabled, setAdvancedWalletEnabled] = useState(false);
   const [importKeyInput, setImportKeyInput] = useState("");
   const [importError, setImportError] = useState("");
   const [importSuccess, setImportSuccess] = useState(false);
   const [copiedKey, setCopiedKey] = useState(false);
-  const [copiedMnemonic, setCopiedMnemonic] = useState(false);
+  const [mnemonicCopied, setMnemonicCopied] = useState(false);
+  const [mnemonicClipboardCountdown, setMnemonicClipboardCountdown] = useState(0);
 
   useEffect(() => {
     if (user?.walletNetwork && user.walletNetwork !== walletNetwork) {
@@ -130,13 +131,50 @@ export default function SettingsPage() {
     setTimeout(() => setCopiedKey(false), 2000);
   };
 
+  const mnemonicTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const clipboardTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearMnemonicTimers = useCallback(() => {
+    if (mnemonicTimerRef.current) clearInterval(mnemonicTimerRef.current);
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+    mnemonicTimerRef.current = null;
+    clipboardTimerRef.current = null;
+  }, []);
+
   const handleCopyMnemonic = () => {
     if (!stellarMnemonic) return;
     navigator.clipboard.writeText(stellarMnemonic);
-    setCopiedMnemonic(true);
-    showToast("Recovery phrase copied to clipboard", "success");
-    setTimeout(() => setCopiedMnemonic(false), 2000);
+    setMnemonicCopied(true);
+    setMnemonicClipboardCountdown(30);
+    showToast("Recovery phrase copied to clipboard (auto-clearing in 30s)", "success");
+
+    if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+    clipboardTimerRef.current = setTimeout(() => {
+      navigator.clipboard.writeText("");
+      setMnemonicCopied(false);
+      setMnemonicClipboardCountdown(0);
+    }, 30_000);
   };
+
+  const handleRevealMnemonic = () => {
+    setMnemonicRevealed(true);
+    if (mnemonicTimerRef.current) clearInterval(mnemonicTimerRef.current);
+    mnemonicTimerRef.current = setInterval(() => {
+      setMnemonicRevealed(false);
+      setMnemonicClipboardCountdown(0);
+      if (clipboardTimerRef.current) clearTimeout(clipboardTimerRef.current);
+      mnemonicTimerRef.current = null;
+      clipboardTimerRef.current = null;
+    }, 30_000);
+  };
+
+  const handleHideMnemonic = () => {
+    setMnemonicRevealed(false);
+    setMnemonicClipboardCountdown(0);
+    clearMnemonicTimers();
+  };
+
+  useEffect(() => () => clearMnemonicTimers(), [clearMnemonicTimers]);
 
   return (
     <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
@@ -491,33 +529,60 @@ export default function SettingsPage() {
                           </div>
 
                           {stellarMnemonic && (
-                            <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex flex-col md:flex-row justify-between md:items-center gap-4">
+                            <div className="p-4 rounded-xl bg-black/40 border border-white/5 flex flex-col gap-4">
                               <div className="space-y-1">
-                                <p className="font-bold text-sm text-white">Recovery Mnemonic Phrase</p>
-                                <p className="text-xs text-muted-foreground leading-normal max-w-md">
+                                <div className="flex items-center justify-between">
+                                  <p className="font-bold text-sm text-white">Recovery Mnemonic Phrase</p>
+                                  {mnemonicRevealed && (
+                                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand/10 border border-brand/25 text-brand uppercase font-mono flex items-center gap-1">
+                                      <TimerOff className="w-3 h-3" /> Auto-hide in 30s
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground leading-normal max-w-2xl">
                                   This 12-word phrase restores your wallet connection. Store it offline.
+                                  Words are hidden after 30 seconds and copied text is cleared from the clipboard automatically.
                                 </p>
-                                {showMnemonic && (
-                                  <p className="text-xs font-mono text-brand bg-brand/5 border border-brand/20 p-2.5 rounded-lg mt-2 leading-relaxed select-all">
-                                    {stellarMnemonic}
-                                  </p>
-                                )}
+
+                                <div className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 mt-3 ${mnemonicRevealed ? "" : "blur-sm select-none"}`}>
+                                  {stellarMnemonic.split(/\s+/).filter(Boolean).slice(0, 12).map((word: string, idx: number) => (
+                                    <div
+                                      key={`${word}-${idx}`}
+                                      className="rounded-lg border border-white/10 bg-white/5 px-2 py-1.5 text-[11px] text-white font-mono"
+                                    >
+                                      <span className="text-muted-foreground mr-1">{idx + 1}.</span>
+                                      <span className="break-all">{mnemonicRevealed ? word : word[0] + "•••"}</span>
+                                    </div>
+                                  ))}
+                                </div>
                               </div>
-                              <div className="flex gap-2 shrink-0 items-end">
-                                <button
-                                  onClick={() => setShowMnemonic(!showMnemonic)}
-                                  className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:text-brand hover:border-brand/30 transition-all flex items-center gap-1 cursor-pointer"
-                                >
-                                  {showMnemonic ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                                  {showMnemonic ? "Hide" : "Reveal"}
-                                </button>
-                                {showMnemonic && (
+
+                              <div className="flex flex-wrap gap-2 items-center">
+                                {!mnemonicRevealed ? (
+                                  <button
+                                    onClick={handleRevealMnemonic}
+                                    className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:text-brand hover:border-brand/30 transition-all flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <Eye className="w-3.5 h-3.5" />
+                                    Reveal words
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={handleHideMnemonic}
+                                    className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:text-brand hover:border-brand/30 transition-all flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <EyeOff className="w-3.5 h-3.5" />
+                                    Hide
+                                  </button>
+                                )}
+
+                                {mnemonicRevealed && (
                                   <button
                                     onClick={handleCopyMnemonic}
                                     className="px-3 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all flex items-center gap-1 cursor-pointer"
                                   >
-                                    {copiedMnemonic ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                    Copy
+                                    <Copy className="w-3.5 h-3.5" />
+                                    {mnemonicCopied ? `Copied (${mnemonicClipboardCountdown}s)` : "Copy all words"}
                                   </button>
                                 )}
                               </div>

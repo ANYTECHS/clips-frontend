@@ -12,6 +12,7 @@ import { buildBatchTransaction } from "@/app/lib/stellar";
 import { createAddSignerOp, createMultisigThresholdsOp } from "@/app/lib/stellarOperations";
 import { getStellarLabUrl, getStellarNetwork, type StellarNetwork } from "@/app/lib/networkConfig";
 import { useToast } from "@/hooks/useToast";
+import { StrKey } from "@stellar/stellar-sdk";
 
 export default function MultisigPage() {
     const { user } = useAuth();
@@ -24,6 +25,9 @@ export default function MultisigPage() {
     const [lowThreshold, setLowThreshold] = useState(1);
     const [medThreshold, setMedThreshold] = useState(2);
     const [highThreshold, setHighThreshold] = useState(2);
+
+    const [sourcePublicKeyError, setSourcePublicKeyError] = useState("");
+    const [signerPublicKeyError, setSignerPublicKeyError] = useState("");
 
     const network: StellarNetwork = user?.walletNetwork === "mainnet" ? "mainnet" : "testnet";
     const networkLabel = useMemo(
@@ -56,11 +60,58 @@ export default function MultisigPage() {
         },
     });
 
+    const validatePublicKey = (key: string): boolean => {
+        const trimmed = key.trim();
+        if (!trimmed) return false;
+        return StrKey.isValidEd25519PublicKey(trimmed);
+    };
+
+    const handleSourceBlur = () => {
+        if (!sourcePublicKey.trim()) {
+            setSourcePublicKeyError("");
+            return;
+        }
+        setSourcePublicKeyError(validatePublicKey(sourcePublicKey) ? "" : "Invalid Stellar public key");
+    };
+
+    const handleSignerBlur = () => {
+        if (!signerPublicKey.trim()) {
+            setSignerPublicKeyError("");
+            return;
+        }
+        setSignerPublicKeyError(validatePublicKey(signerPublicKey) ? "" : "Invalid Stellar public key");
+    };
+
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
 
-        if (!sourcePublicKey || !signerPublicKey) {
+        const trimmedSource = sourcePublicKey.trim();
+        const trimmedSigner = signerPublicKey.trim();
+
+        if (!trimmedSource || !trimmedSigner) {
             showToast("Please provide both source account and signer public key.", "error");
+            return;
+        }
+
+        if (!validatePublicKey(trimmedSource)) {
+            setSourcePublicKeyError("Invalid Stellar public key");
+            return;
+        }
+        if (!validatePublicKey(trimmedSigner)) {
+            setSignerPublicKeyError("Invalid Stellar public key");
+            return;
+        }
+        if (trimmedSource === trimmedSigner) {
+            showToast("Source and signer must be different public keys.", "error");
+            return;
+        }
+
+        if (lowThreshold > medThreshold || medThreshold > highThreshold) {
+            showToast("Thresholds must follow: low ≤ med ≤ high.", "error");
+            return;
+        }
+        if ([masterWeight, lowThreshold, medThreshold, highThreshold].some((v) => v < 0 || v > 255)) {
+            showToast("Threshold values must be between 0 and 255.", "error");
             return;
         }
 
@@ -182,10 +233,14 @@ export default function MultisigPage() {
                                         type="text"
                                         value={sourcePublicKey}
                                         onChange={(event) => setSourcePublicKey(event.target.value)}
+                                        onBlur={handleSourceBlur}
                                         placeholder="G..."
-                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-brand"
+                                        className={`w-full rounded-2xl border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-brand ${sourcePublicKeyError ? "border-red-500" : "border-white/10"}`}
                                         required
                                     />
+                                    {sourcePublicKeyError && (
+                                        <p className="text-xs text-red-400 mt-1">{sourcePublicKeyError}</p>
+                                    )}
                                 </label>
                                 <label className="space-y-2 text-sm text-muted-foreground">
                                     Additional signer public key
@@ -193,10 +248,14 @@ export default function MultisigPage() {
                                         type="text"
                                         value={signerPublicKey}
                                         onChange={(event) => setSignerPublicKey(event.target.value)}
+                                        onBlur={handleSignerBlur}
                                         placeholder="G..."
-                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-brand"
+                                        className={`w-full rounded-2xl border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-brand ${signerPublicKeyError ? "border-red-500" : "border-white/10"}`}
                                         required
                                     />
+                                    {signerPublicKeyError && (
+                                        <p className="text-xs text-red-400 mt-1">{signerPublicKeyError}</p>
+                                    )}
                                 </label>
                             </div>
 
@@ -206,6 +265,7 @@ export default function MultisigPage() {
                                     <input
                                         type="number"
                                         min={0}
+                                        max={255}
                                         value={masterWeight}
                                         onChange={(event) => setMasterWeight(Number(event.target.value))}
                                         className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
@@ -216,6 +276,7 @@ export default function MultisigPage() {
                                     <input
                                         type="number"
                                         min={0}
+                                        max={255}
                                         value={lowThreshold}
                                         onChange={(event) => setLowThreshold(Number(event.target.value))}
                                         className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
@@ -229,6 +290,7 @@ export default function MultisigPage() {
                                     <input
                                         type="number"
                                         min={0}
+                                        max={255}
                                         value={medThreshold}
                                         onChange={(event) => setMedThreshold(Number(event.target.value))}
                                         className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
@@ -239,6 +301,7 @@ export default function MultisigPage() {
                                     <input
                                         type="number"
                                         min={0}
+                                        max={255}
                                         value={highThreshold}
                                         onChange={(event) => setHighThreshold(Number(event.target.value))}
                                         className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
@@ -260,7 +323,24 @@ export default function MultisigPage() {
 
                             <button
                                 type="submit"
-                                disabled={isLoading}
+                                disabled={
+                                    isLoading ||
+                                    !sourcePublicKey.trim() ||
+                                    !signerPublicKey.trim() ||
+                                    !validatePublicKey(sourcePublicKey) ||
+                                    !validatePublicKey(signerPublicKey) ||
+                                    sourcePublicKey.trim() === signerPublicKey.trim() ||
+                                    lowThreshold > medThreshold ||
+                                    medThreshold > highThreshold ||
+                                    masterWeight < 0 ||
+                                    masterWeight > 255 ||
+                                    lowThreshold < 0 ||
+                                    lowThreshold > 255 ||
+                                    medThreshold < 0 ||
+                                    medThreshold > 255 ||
+                                    highThreshold < 0 ||
+                                    highThreshold > 255
+                                }
                                 className="inline-flex items-center justify-center gap-2 rounded-2xl bg-brand px-5 py-3 text-sm font-semibold text-black transition hover:bg-brand/90 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                                 {isLoading ? (
