@@ -12,6 +12,8 @@
  * NEXT_PUBLIC_STELLAR_RPC       - Optional custom Soroban RPC URL override
  */
 
+import { NetworkPreferenceStorage } from "./userPreferences";
+
 /**
  * Valid operational ecosystem tier identifiers.
  */
@@ -22,7 +24,7 @@ const _envNetwork: StellarNetwork =
   process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet" ? "mainnet" : "testnet";
 
 /**
- * Return the active Stellar network. Reads `localStorage.clipcash_network_override`
+ * Return the active Stellar network. Reads from userPreferences
  * on every invocation so callers always get the current runtime override.
  * Safe for SSR: returns the env-derived default when `window` is undefined.
  *
@@ -30,8 +32,8 @@ const _envNetwork: StellarNetwork =
  */
 export function getStellarNetwork(): StellarNetwork {
   if (typeof window !== "undefined") {
-    const stored = localStorage.getItem("clipcash_network_override");
-    if (stored === "testnet" || stored === "mainnet") return stored;
+    const stored = NetworkPreferenceStorage.get();
+    if (stored) return stored;
   }
   return _envNetwork;
 }
