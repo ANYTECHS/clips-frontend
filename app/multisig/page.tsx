@@ -10,7 +10,7 @@ import { useWallet } from "@/components/wallet/WalletProvider";
 import { useStellarTransaction } from "@/app/hooks/useStellarTransaction";
 import { buildBatchTransaction } from "@/app/lib/stellar";
 import { createAddSignerOp, createMultisigThresholdsOp } from "@/app/lib/stellarOperations";
-import { getStellarLabUrl, getStellarNetwork } from "@/app/lib/networkConfig";
+import { getStellarLabUrl, getStellarNetwork, type StellarNetwork } from "@/app/lib/networkConfig";
 import { useToast } from "@/hooks/useToast";
 
 export default function MultisigPage() {
@@ -25,7 +25,7 @@ export default function MultisigPage() {
     const [medThreshold, setMedThreshold] = useState(2);
     const [highThreshold, setHighThreshold] = useState(2);
 
-    const network = user?.walletNetwork ?? getStellarNetwork();
+    const network: StellarNetwork = user?.walletNetwork === "mainnet" ? "mainnet" : "testnet";
     const networkLabel = useMemo(
         () => (network === "mainnet" ? "Mainnet" : "Testnet"),
         [network]

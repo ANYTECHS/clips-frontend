@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     // TODO: Replace with actual database update to save onboarding data
     logger.info(`[Onboarding] Saved step ${step} for user ${session.user.id}`, data);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, onboardingStep: step });
   } catch (error) {
     Sentry.captureException(error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

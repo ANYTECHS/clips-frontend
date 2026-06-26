@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { MockApi } from "@/app/lib/mockApi";
 import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, CheckCircle2, Wallet, Info } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import Navbar from "@/components/Navbar";
@@ -52,7 +51,6 @@ interface OnboardingStep2Data {
 
 type OnboardingErrors = Partial<Record<keyof OnboardingStep1Data | keyof OnboardingStep2Data, string>>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function validateOnboardingStep(step: number, data: any): OnboardingErrors {
   const errors: OnboardingErrors = {};
 
@@ -159,7 +157,7 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
           Your payment wallet is ready! 🎉
         </h2>
         <p className="text-muted text-[16px] leading-relaxed mb-6">
-          We&apos;ve automatically set up a Stellar wallet for you. You can use it to receive earnings, mint NFTs, and manage your creator payments — no crypto experience needed.
+          We've automatically set up a Stellar wallet for you. You can use it to receive earnings, mint NFTs, and manage your creator payments — no crypto experience needed.
         </p>
 
         {/* Testnet Funding Status */}
@@ -194,7 +192,7 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
               <div>
                 <p className="text-[14px] font-bold text-white mb-1">Fund your wallet</p>
                 <p className="text-[12px] text-muted leading-relaxed">
-                  On mainnet, you&apos;ll need to fund your wallet with XLM to get started. You can do this from your dashboard after onboarding.
+                  On mainnet, you'll need to fund your wallet with XLM to get started. You can do this from your dashboard after onboarding.
                 </p>
               </div>
             </div>
@@ -214,7 +212,7 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
             <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-72 bg-surface border border-border rounded-xl p-4 text-left shadow-xl z-10 animate-in fade-in slide-in-from-top-2 duration-200">
               <p className="text-[13px] text-white font-bold mb-2">What is a Stellar wallet?</p>
               <ul className="space-y-1.5 text-[12px] text-muted">
-                <li>• It&apos;s like a bank account on the Stellar blockchain — fast and nearly free to use.</li>
+                <li>• It's like a bank account on the Stellar blockchain — fast and nearly free to use.</li>
                 <li>• Your wallet is secured with AES-GCM encryption and stored only on your device.</li>
                 <li>• You can export your secret key anytime from Settings → Advanced Wallet.</li>
                 <li>• Earnings from your clips can be paid directly to this wallet.</li>
@@ -236,7 +234,7 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
             <div>
               <p className="text-[14px] font-bold text-amber-500 mb-1">Important: Backup your wallet!</p>
               <p className="text-[12px] text-amber-200/80 leading-relaxed">
-                Since we don&apos;t store your keys, you must backup your secret key to ensure you never lose access to your funds. You can do this in your Dashboard settings later.
+                Since we don't store your keys, you must backup your secret key to ensure you never lose access to your funds. You can do this in your Dashboard settings later.
               </p>
             </div>
           </div>
@@ -295,7 +293,6 @@ export default function OnboardingPage() {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleBlur = (e: React.FocusEvent<any>) => {
     const { name } = e.target;
     setTouched(prev => ({ ...prev, [name]: true }));
@@ -316,10 +313,16 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      await MockApi.saveOnboarding(user.id, 2, step1Form);
+      const res = await fetch("/api/user/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: 2, data: step1Form }),
+      });
+      if (!res.ok) throw new Error("Failed to save onboarding step 1");
+      const { onboardingStep } = await res.json();
       setUser({ 
         ...user, 
-        onboardingStep: 2, 
+        onboardingStep: onboardingStep ?? 2, 
         name: step1Form.name,
         profile: { ...user.profile, ...step1Form } 
       });
@@ -343,10 +346,16 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      await MockApi.saveOnboarding(user.id, 3, { ...step2Form, socialsConnected: true });
+      const res = await fetch("/api/user/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: 3, data: { ...step2Form, socialsConnected: true } }),
+      });
+      if (!res.ok) throw new Error("Failed to save onboarding step 2");
+      const { onboardingStep } = await res.json();
       setUser({ 
         ...user, 
-        onboardingStep: 3, 
+        onboardingStep: onboardingStep ?? 3, 
         profile: { ...user.profile, ...step2Form, socialsConnected: true } 
       });
     } catch (err) {
@@ -360,8 +369,14 @@ export default function OnboardingPage() {
     if (!user) return;
     setLoading(true);
     try {
-      await MockApi.saveOnboarding(user.id, 4, { walletAcknowledged: true });
-      setUser({ ...user, onboardingStep: 4, profile: { ...user.profile, walletAcknowledged: true } });
+      const res = await fetch("/api/user/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: 4, data: { walletAcknowledged: true } }),
+      });
+      if (!res.ok) throw new Error("Failed to save onboarding step 3");
+      const { onboardingStep } = await res.json();
+      setUser({ ...user, onboardingStep: onboardingStep ?? 4, profile: { ...user.profile, walletAcknowledged: true } });
       router.push("/dashboard");
     } catch (err) {
       console.error(err);
@@ -551,7 +566,7 @@ export default function OnboardingPage() {
 
             </div>
           </div>
-        ) : step === 2 ? (
+        ) : (
           /* Step 2 Full Screen Centered Flow */
           <div className="w-full flex flex-col items-center justify-center animate-in zoom-in-95 fade-in duration-500 mt-12">
             <div className="text-center mb-10">

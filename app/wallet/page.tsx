@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
@@ -122,6 +122,7 @@ function AssetRow({
   code,
   balance,
   usdValue,
+  usdDisplay,
   pct,
   color,
   issuer,
@@ -130,6 +131,7 @@ function AssetRow({
   code: string;
   balance: string;
   usdValue: number;
+  usdDisplay?: string;
   pct: number;
   color: string;
   issuer?: string;
@@ -172,23 +174,10 @@ function AssetRow({
       </div>
       <div className="text-right shrink-0">
         <p className="text-white font-bold text-[13px] font-mono">{balance}</p>
-        <p className="text-muted text-[11px]">${usdValue.toFixed(2)}</p>
+        <p className="text-muted text-[11px]">{usdDisplay ?? `$${usdValue.toFixed(2)}`}</p>
       </div>
     </div>
   );
-}
-
-// ─── Mock sparkline data (7-day balance history) ──────────────────────────────
-// In production this would come from Horizon effects/payments history.
-function useMockHistory(xlmRaw: number) {
-  return useMemo(() => {
-    if (!xlmRaw) return [];
-    const seed = xlmRaw;
-    return Array.from({ length: 14 }, (_, i) => {
-      const noise = Math.sin(i * 1.3 + seed) * 0.08 + Math.cos(i * 0.7) * 0.04;
-      return Math.max(0, seed * (1 + noise - 0.04 * (13 - i) * 0.01));
-    });
-  }, [xlmRaw]);
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -207,24 +196,50 @@ export default function WalletPortfolioPage() {
     refreshInterval: BALANCE_REFRESH_INTERVAL_MS,
   });
 
-  const history = useMockHistory(balance?.xlmRaw ?? 0);
+  // ── Real Horizon history ──────────────────────────────────────────────────
+  const [history, setHistory] = useState<number[] | null>(null);
+  useEffect(() => {
+    if (!publicKey) { setHistory(null); return; }
+    fetch(`/api/wallet/history?publicKey=${encodeURIComponent(publicKey)}&days=14&network=${network}`)
+      .then((r) => r.json())
+      .then((d) => setHistory(Array.isArray(d.history) && d.history.length > 0 ? d.history : null))
+      .catch(() => setHistory(null));
+  }, [publicKey, network]);
+
+  // ── Real asset prices ─────────────────────────────────────────────────────
+  const [assetPrices, setAssetPrices] = useState<Record<string, number>>({});
+  const otherAssets: AssetBalance[] = balance?.otherAssets ?? [];
+  useEffect(() => {
+    if (otherAssets.length === 0) return;
+    const codes = otherAssets.map((a) => a.code).join(",");
+    fetch(`/api/prices/assets?codes=${codes}`)
+      .then((r) => r.json())
+      .then((d) => setAssetPrices(d.prices ?? {}))
+      .catch(() => {/* keep previous */});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otherAssets.map((a) => a.code).join(",")]);
 
   const xlmUsd = balance?.usdRaw ?? 0;
-  const otherAssets: AssetBalance[] = balance?.otherAssets ?? [];
+
+  const getAssetUsd = (code: string, rawBalance: string): number | null => {
+    const price = assetPrices[code.toUpperCase()];
+    return typeof price === "number" ? parseFloat(rawBalance) * price : null;
+  };
 
   // Build donut slices: XLM + other assets by USD value
   const donutSlices: DonutSlice[] = useMemo(() => {
-    const otherUsd = otherAssets.reduce((s, a) => s + parseFloat(a.balance) * 0.1, 0); // rough estimate
     const slices: DonutSlice[] = [
       { label: "XLM", value: xlmUsd, color: ASSET_COLORS[0] },
-      ...otherAssets.map((a, i) => ({
-        label: a.code,
-        value: parseFloat(a.balance) * 0.1,
-        color: ASSET_COLORS[(i + 1) % ASSET_COLORS.length],
-      })),
+      ...otherAssets
+        .map((a, i) => {
+          const usd = getAssetUsd(a.code, a.balance);
+          return usd !== null ? { label: a.code, value: usd, color: ASSET_COLORS[(i + 1) % ASSET_COLORS.length] } : null;
+        })
+        .filter((s): s is DonutSlice => s !== null),
     ].filter((s) => s.value > 0);
     return slices.length ? slices : [{ label: "XLM", value: 1, color: ASSET_COLORS[0] }];
-  }, [xlmUsd, otherAssets]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [xlmUsd, otherAssets, assetPrices]);
 
   const totalUsd = donutSlices.reduce((s, d) => s + d.value, 0);
 
@@ -236,7 +251,7 @@ export default function WalletPortfolioPage() {
     });
   };
 
-  const isUp = history.length >= 2 && history[history.length - 1] >= history[0];
+  const isUp = history !== null && history.length >= 2 && history[history.length - 1] >= history[0];
 
   return (
     <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
@@ -301,12 +316,14 @@ export default function WalletPortfolioPage() {
                 <div className="lg:col-span-2 bg-surface border border-border rounded-[24px] p-6 flex flex-col gap-4">
                   <div className="flex items-center justify-between">
                     <span className="text-muted text-[11px] font-semibold uppercase tracking-wider">Total Portfolio Value</span>
-                    <span
-                      className={`flex items-center gap-1 text-[12px] font-bold ${isUp ? "text-brand" : "text-error"}`}
-                    >
-                      {isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                      14d trend
-                    </span>
+                    {history !== null && (
+                      <span
+                        className={`flex items-center gap-1 text-[12px] font-bold ${isUp ? "text-brand" : "text-error"}`}
+                      >
+                        {isUp ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                        14d trend
+                      </span>
+                    )}
                   </div>
 
                   {isLoading && !balance ? (
@@ -326,11 +343,11 @@ export default function WalletPortfolioPage() {
                     </>
                   )}
 
-                  {/* Sparkline */}
-                  {history.length > 1 && (
+                  {/* Sparkline — only shown when real history is available */}
+                  {history !== null && history.length > 1 && (
                     <div className="mt-2">
                       <Sparkline values={history} color={isUp ? "var(--color-brand, #00FF9D)" : "#EF4444"} />
-                      <p className="text-muted text-[10px] mt-1">14-day balance history (estimated)</p>
+                      <p className="text-muted text-[10px] mt-1">14-day balance history</p>
                     </div>
                   )}
 
@@ -407,14 +424,15 @@ export default function WalletPortfolioPage() {
 
                     {/* Other assets */}
                     {otherAssets.map((asset, i) => {
-                      const usd = parseFloat(asset.balance) * 0.1;
+                      const usd = getAssetUsd(asset.code, asset.balance);
                       return (
                         <AssetRow
                           key={`${asset.code}-${asset.issuer}`}
                           code={asset.code}
                           balance={`${parseFloat(asset.balance).toFixed(2)} ${asset.code}`}
-                          usdValue={usd}
-                          pct={totalUsd > 0 ? usd / totalUsd : 0}
+                          usdValue={usd ?? 0}
+                          usdDisplay={usd !== null ? `$${usd.toFixed(2)}` : "—"}
+                          pct={totalUsd > 0 && usd !== null ? usd / totalUsd : 0}
                           color={ASSET_COLORS[(i + 1) % ASSET_COLORS.length]}
                           issuer={asset.issuer}
                           network={freighterNetwork}
