@@ -77,6 +77,9 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
           error: null,
         });
       } catch (err) {
+        import("@/app/lib/logger").then(({ logger }) => {
+          logger.error("Error fetching dashboard data:", err);
+        });
         set({
           loading: false,
           error:

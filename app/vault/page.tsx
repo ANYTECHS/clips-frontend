@@ -77,7 +77,7 @@ export default function VaultPage() {
               <select 
                 value={activeFilter}
                 onChange={(e) => setActiveFilter(e.target.value as any)}
-                className="w-full px-4 py-3 bg-input border border-white/10 rounded-xl text-white text-[14px] font-bold focus:outline-none focus:border-brand/50 transition-colors"
+                className="w-full px-4 py-3 bg-input border border-white/10 rounded-xl text-white text-[14px] font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50 transition-colors"
               >
                 <option value="pending">Pending Mint</option>
                 <option value="listed">Listed</option>
