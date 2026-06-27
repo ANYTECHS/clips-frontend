@@ -11,6 +11,7 @@ import React, { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUploadProgress, type FileProgress } from "@/app/hooks/useUploadProgress";
 import { CloudUpload, X, CheckCircle, AlertCircle, Loader2, XCircle } from "lucide-react";
+import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 
 const ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv"];
 const MAX_FILE_SIZE_MB = 500;
@@ -115,8 +116,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-[#060A07] text-white font-sans">
-      {/* Ambient glow */}
-      <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-[#00E68A]/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
+      <BackgroundOrbs variant="upload" />
 
       <main className="relative z-10 max-w-2xl mx-auto px-4 py-16">
         <div className="mb-10">

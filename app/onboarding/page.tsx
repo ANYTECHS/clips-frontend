@@ -12,6 +12,7 @@ import { fundWithFriendbot } from "@/app/lib/stellar";
 import { IS_TESTNET } from "@/app/lib/networkConfig";
 import { useBalance } from "@/app/hooks/useBalance";
 import Image from "next/image";
+import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import YoutubeIcon from "@/components/icons/YoutubeIcon";
@@ -402,10 +403,8 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen text-white font-sans flex flex-col relative overflow-hidden bg-background">
-      {/* Background Orbs */}
-      <div className="fixed top-0 left-0 w-[800px] h-[800px] bg-brand/10 rounded-full blur-[150px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.07] rounded-full blur-[120px] pointer-events-none translate-x-1/3" />
-      
+      <BackgroundOrbs variant="onboarding" />
+
       <Navbar />
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 flex items-center z-10 relative">

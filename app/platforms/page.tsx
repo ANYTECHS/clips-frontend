@@ -196,13 +196,13 @@ export default function PlatformsPage() {
     return socialPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, socialPlatforms]);
 
   const filteredWallets = useMemo(() => {
     return walletPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, walletPlatforms]);
 
   const noResults =
     filteredSocial.length === 0 && filteredWallets.length === 0;
@@ -298,7 +298,7 @@ export default function PlatformsPage() {
                   <SectionHeader title="Social Platforms" icon={Share2} />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filteredSocial.map((p) => (
-                      <PlatformCard key={p.name} {...p} variant="vertical" />
+                      <PlatformCard key={p.id} {...p} variant="vertical" />
                     ))}
                   </div>
                 </section>
@@ -309,7 +309,7 @@ export default function PlatformsPage() {
                   <SectionHeader title="Web3 Wallets" icon={Wallet} />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filteredWallets.map((p) => (
-                      <PlatformCard key={p.name} {...p} variant="horizontal" />
+                      <PlatformCard key={p.id} {...p} variant="horizontal" />
                     ))}
                   </div>
                 </section>

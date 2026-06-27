@@ -1,19 +1,43 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import StatCard from "@/components/dashboard/StatCard";
-import RevenueChart from "@/components/dashboard/RevenueChart";
 import PlatformDistribution from "@/components/dashboard/PlatformDistribution";
 import AIInsightCard from "@/components/dashboard/AIInsightCard";
 import ProjectCard from "@/components/dashboard/ProjectCard";
 import EarningsSummaryCards from "@/components/dashboard/EarningsSummaryCards";
-import SendPaymentForm from "@/components/SendPaymentForm";
 import WalletInfoCard from "@/components/dashboard/WalletInfoCard";
-import WalletHealthCard from "@/components/wallet/WalletHealthCard";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { useDashboardData } from "@/app/hooks/useDashboardData";
 import { DollarSign, Video, Globe, AlertCircle } from "lucide-react";
+import DashboardPageHeader from "./DashboardPageHeader";
+
+// Lazy-load heavy client components for better performance
+const RevenueChart = dynamic(() => import("@/components/dashboard/RevenueChart"), {
+  loading: () => (
+    <div className="bg-surface border border-border rounded-[24px] p-8 h-[300px] flex items-center justify-center">
+      <Skeleton className="w-full h-full" />
+    </div>
+  ),
+});
+
+const SendPaymentForm = dynamic(() => import("@/components/SendPaymentForm"), {
+  loading: () => (
+    <div className="bg-surface border border-border rounded-[24px] p-8 h-[300px] flex items-center justify-center">
+      <Skeleton className="w-full h-full" />
+    </div>
+  ),
+});
+
+const WalletHealthCard = dynamic(() => import("@/components/wallet/WalletHealthCard"), {
+  loading: () => (
+    <div className="bg-surface border border-border rounded-[24px] p-8 h-[200px] flex items-center justify-center">
+      <Skeleton className="w-full h-full" />
+    </div>
+  ),
+});
 
 function StatCardSkeleton() {
   return (
@@ -38,6 +62,7 @@ export default function DashboardPage() {
 
   return (
     <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
+      <DashboardPageHeader />
           {error ? (
             <div className="bg-surface border border-error/50 rounded-[24px] p-8 flex flex-col items-center justify-center gap-4 text-center">
               <AlertCircle className="w-12 h-12 text-error" />

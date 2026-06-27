@@ -7,7 +7,7 @@
  * S3-compatible bucket (AWS S3, Cloudflare R2, or GCS S3 interop).
  *
  * Upload flow:
- * 1. File validation (size, type, extension)
+ * 1. File validation (size, type, extension, magic bytes)
  * 2. Upload to quarantine prefix (uploads/quarantine/)
  * 3. Virus scan (ClamAV / VirusTotal / Cloudmersive)
  * 4a. If clean: Move from quarantine to uploads/ prefix
@@ -15,6 +15,11 @@
  * 5. Return presigned URL or public URL
  *
  * File size limit: 500 MB (hard-rejected before any storage call).
+ *
+ * Magic bytes verification:
+ * - Reads first 12 bytes of file buffer to verify actual file content
+ * - Checks against known video signatures: MP4 (ftyp), MOV (ftyp/wide), AVI (RIFF), MKV (\x1A\x45\xDF\xA3)
+ * - Prevents malware masquerading as video files via extension/MIME spoofing
  *
  * Environment variables required (see app/lib/cloudStorage.ts for full list):
  *   CLOUD_STORAGE_BUCKET, CLOUD_STORAGE_REGION, AWS_ACCESS_KEY_ID,
@@ -45,6 +50,42 @@ import { logger } from "@/app/lib/logger";
 export { MAX_UPLOAD_SIZE_BYTES };
 const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"];
 const ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv"];
+
+/**
+ * Validates file magic bytes against known video signatures.
+ * Reads first 12 bytes of buffer to detect actual file type.
+ * 
+ * @param buffer - File buffer to inspect
+ * @param declaredType - Declared MIME type from upload
+ * @returns Error message if magic bytes don't match, null if valid
+ */
+function validateMagicBytes(buffer: Buffer, declaredType: string): string | null {
+  if (buffer.length < 12) {
+    return "File is too small to be a valid video file";
+  }
+
+  const header = buffer.subarray(0, 12);
+  const headerStr = header.toString('ascii', 0, Math.min(12, buffer.length));
+
+  // MP4/MOV: starts with "ftyp" at offset 4
+  // MP4: ftyp... with brand like "isom", "mp42", etc.
+  // MOV: ftyp... with brand "qt  "
+  const isFtyp = headerStr.includes('ftyp');
+  
+  // AVI: starts with "RIFF" followed by "AVI " at offset 8
+  const isAvi = headerStr.startsWith('RIFF') && headerStr.includes('AVI');
+  
+  // MKV: starts with EBML header \x1A\x45\xDF\xA3
+  const isMkv = header[0] === 0x1A && header[1] === 0x45 && header[2] === 0xDF && header[3] === 0xA3;
+
+  const isValidVideo = isFtyp || isAvi || isMkv;
+
+  if (!isValidVideo) {
+    return "File content does not match declared type";
+  }
+
+  return null;
+}
 
 function validateFile(file: File): string | null {
   if (file.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -105,6 +146,13 @@ export async function POST(request: NextRequest) {
       files.map(async (file) => {
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
+
+        // Validate magic bytes before any storage operations
+        const magicBytesError = validateMagicBytes(buffer, file.type || "application/octet-stream");
+        if (magicBytesError) {
+          logger.error(`[Upload] Magic bytes validation failed for ${file.name}: ${magicBytesError}`);
+          throw new Error(magicBytesError);
+        }
 
         // Step 1: Upload to quarantine
         const quarantine = await uploadToQuarantine(
