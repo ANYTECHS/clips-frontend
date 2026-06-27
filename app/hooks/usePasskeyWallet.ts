@@ -80,6 +80,11 @@ export function usePasskeyWallet(): PasskeyWalletState & {
       return false;
     }
 
+    if (process.env.NODE_ENV === "production") {
+      setState((p) => ({ ...p, error: "Passkey registration is currently disabled in production." }));
+      return false;
+    }
+
     setState((p) => ({ ...p, isRegistering: true, error: null }));
 
     try {
@@ -115,6 +120,18 @@ export function usePasskeyWallet(): PasskeyWalletState & {
 
       // Persist credential ID for future authentication
       localStorage.setItem("clipcash_passkey_id", credentialId);
+      
+      // Persist to server as requested by Issue #599
+      try {
+        await fetch("/api/user/passkey", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ credentialId, publicKey }),
+        });
+      } catch (e) {
+        console.warn("Failed to persist passkey to server", e);
+        // We do not fail the registration if server sync fails in this PoC
+      }
 
       setState({
         credentialId,
@@ -126,12 +143,17 @@ export function usePasskeyWallet(): PasskeyWalletState & {
 
       return true;
     } catch (err) {
-      const message =
-        err instanceof DOMException && err.name === "NotAllowedError"
-          ? "Passkey registration was cancelled."
-          : err instanceof Error
-          ? err.message
-          : "Passkey registration failed.";
+      let message = "Passkey registration failed.";
+      if (err instanceof DOMException) {
+        if (err.name === "NotAllowedError") {
+          message = "Passkey registration was cancelled by the user.";
+        } else if (err.name === "NotSupportedError") {
+          message = "Passkeys are not supported on this device or browser.";
+        }
+      } else if (err instanceof Error) {
+        message = err.message;
+      }
+
       setState((p) => ({ ...p, isRegistering: false, error: message }));
       return false;
     }
@@ -143,6 +165,11 @@ export function usePasskeyWallet(): PasskeyWalletState & {
   const authenticate = useCallback(async (): Promise<boolean> => {
     if (!window.PublicKeyCredential) {
       setState((p) => ({ ...p, error: "WebAuthn is not supported in this browser." }));
+      return false;
+    }
+
+    if (process.env.NODE_ENV === "production") {
+      setState((p) => ({ ...p, error: "Passkey authentication is currently disabled in production." }));
       return false;
     }
 

@@ -1,6 +1,7 @@
+/* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, CheckCircle2, Wallet, Info } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import Navbar from "@/components/Navbar";
@@ -12,21 +13,8 @@ import { IS_TESTNET } from "@/app/lib/networkConfig";
 import { useBalance } from "@/app/hooks/useBalance";
 import Image from "next/image";
 
-// Same inline SVGs for perfect styling
-const InstagramIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
-
-const YoutubeIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path>
-    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
-  </svg>
-);
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import YoutubeIcon from "@/components/icons/YoutubeIcon";
 
 const AlertCircle = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -51,7 +39,7 @@ interface OnboardingStep2Data {
 
 type OnboardingErrors = Partial<Record<keyof OnboardingStep1Data | keyof OnboardingStep2Data, string>>;
 
-function validateOnboardingStep(step: number, data: any): OnboardingErrors {
+function validateOnboardingStep(step: number, data: Record<string, string>): OnboardingErrors {
   const errors: OnboardingErrors = {};
 
   if (step === 1) {
@@ -108,6 +96,8 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
   const [fundingError, setFundingError] = useState<string | null>(null);
   const { wallet } = useEmbeddedWallet();
   const { success, error } = useToast();
+  const isMountedRef = useRef(true);
+  const fundedKeyRef = useRef<string | null>(null);
 
   const { refresh } = useBalance({
     publicKey: wallet?.publicKey || null,
@@ -116,34 +106,52 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     // Auto-fund on testnet when wallet is available
     const fundWallet = async () => {
-      if (!IS_TESTNET || !wallet?.publicKey || isFunding || fundingSuccess) return;
-      
+      if (!wallet?.publicKey) return;
+
+      // Only fund once per wallet public key
+      if (fundedKeyRef.current === wallet.publicKey) return;
+
+      // Check conditions inside the effect body (not in deps)
+      if (!IS_TESTNET) return;
+
+      fundedKeyRef.current = wallet.publicKey;
       setIsFunding(true);
       setFundingError(null);
       
       try {
         await fundWithFriendbot(wallet.publicKey);
+        if (!isMountedRef.current) return;
         setFundingSuccess(true);
         success("Wallet funded with 10,000 XLM!");
         
         // Refresh balance a few times to ensure it updates
         for (let i = 0; i < 5; i++) {
+          if (!isMountedRef.current) return;
           await new Promise(resolve => setTimeout(resolve, 1000));
           refresh();
         }
       } catch (err) {
+        if (!isMountedRef.current) return;
         console.error("Friendbot funding failed:", err);
         setFundingError(err instanceof Error ? err.message : "Failed to fund wallet");
         error("Wallet funding failed. Please try again later.");
       } finally {
-        setIsFunding(false);
+        if (isMountedRef.current) {
+          setIsFunding(false);
+        }
       }
     };
 
     fundWallet();
-  }, [wallet?.publicKey, IS_TESTNET, isFunding, fundingSuccess, success, refresh]);
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [wallet?.publicKey]);
 
   return (
     <div className="w-full flex flex-col items-center justify-center animate-in zoom-in-95 fade-in duration-500 mt-12">
@@ -293,7 +301,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleBlur = (e: React.FocusEvent<any>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name } = e.target;
     setTouched(prev => ({ ...prev, [name]: true }));
     setErrors(validateOnboardingStep(step, step === 1 ? step1Form : step2Form));
@@ -386,7 +394,7 @@ export default function OnboardingPage() {
   };
 
   const inputClass = (field: string) =>
-    `w-full bg-input border text-white rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none transition-all placeholder-subtle ${
+    `w-full bg-input border text-white rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-all placeholder-subtle ${
       touched[field] && errors[field as keyof OnboardingErrors]
         ? "border-red-500/50 bg-red-500/5 focus:border-red-500"
         : "border-border focus:border-brand/70 focus:bg-surface-hover"
@@ -566,7 +574,7 @@ export default function OnboardingPage() {
 
             </div>
           </div>
-        ) : (
+        ) : step === 2 ? (
           /* Step 2 Full Screen Centered Flow */
           <div className="w-full flex flex-col items-center justify-center animate-in zoom-in-95 fade-in duration-500 mt-12">
             <div className="text-center mb-10">

@@ -35,3 +35,20 @@
    - Export Tax Report feature is fully implemented and tested
 
 *Updated after each step.*
+
+## Passkeys Roadmap
+
+### Current Implementation
+- **WebAuthn PoC**: `usePasskeyWallet.ts` handles initial Passkey registration and authentication using the browser's WebAuthn API.
+- **Credential Storage**: A mock API (`/api/user/passkey`) was added to acknowledge the need for server-side storage of credential IDs, moving away from `localStorage`-only.
+- **Production Guard**: Passkey UI and endpoints are disabled when `NODE_ENV === "production"`.
+
+### Remaining Work
+- **Database Integration**: Implement true server-side persistence for the `credentialId` and associated User session in a DB schema (e.g., a `passkeys` table).
+- **Soroban Smart Wallet**: Connect the derived mock Stellar public key to a Soroban smart-contract account (SEP-43 / passkey-kit) to deploy an actual smart wallet upon registration.
+- **UI Integration**: Render Passkey connection options securely within `MultiWalletProvider` and `Onboarding`.
+
+### Production Readiness
+- Ensure complete audit of the Smart Contract passkey implementation.
+- Gracefully map multiple passkeys to a single user profile.
+- Remove the production guard (`NODE_ENV === "production"`) once backend infrastructure and smart contracts are live.

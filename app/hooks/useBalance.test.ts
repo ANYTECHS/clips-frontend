@@ -159,11 +159,18 @@ describe("getBalance", () => {
   });
 });
 
+// Every test suite that calls fetchXLMPrice() MUST call resetXlmPriceCache()
+// in beforeEach/afterEach to clear the module-level Promise deduplication guard.
+// Failure to do so will cause cross-test Promise leaks and flaky results.
 describe("fetchXLMPrice caching", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetXlmPriceCache();
     configureXlmPriceCacheTtl(300_000);
+  });
+
+  afterEach(() => {
+    resetXlmPriceCache();
   });
 
   it("shares cached price across concurrent callers", async () => {
@@ -227,6 +234,7 @@ describe("useBalance", () => {
   });
 
   afterEach(() => {
+    resetXlmPriceCache();
     jest.useRealTimers();
   });
 

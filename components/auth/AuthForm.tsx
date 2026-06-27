@@ -73,7 +73,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="your@email.com"
             required
-            className="w-full bg-input/60 border border-subtle rounded-[12px] px-4 py-3 text-white placeholder-muted focus:outline-none focus:border-brand/50 focus:bg-input transition-all"
+            className="w-full bg-input/60 border border-subtle rounded-[12px] px-4 py-3 text-white placeholder-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50 focus:bg-input transition-all"
           />
         </div>
 
@@ -88,7 +88,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
             required
-            className="w-full bg-input/60 border border-subtle rounded-[12px] px-4 py-3 text-white placeholder-muted focus:outline-none focus:border-brand/50 focus:bg-input transition-all"
+            className="w-full bg-input/60 border border-subtle rounded-[12px] px-4 py-3 text-white placeholder-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50 focus:bg-input transition-all"
           />
         </div>
 
