@@ -86,7 +86,20 @@ export default function DashboardPage() {
                   icon={Globe}
                 />
               </>
-            ) : null}
+            ) : (
+              <div className="bg-surface border border-dashed border-white/10 rounded-[24px] p-10 flex flex-col items-center justify-center gap-3 text-center">
+                <Globe className="w-10 h-10 text-muted-foreground/40" />
+                <p className="text-muted-foreground text-sm max-w-xs">
+                  No data yet &mdash; upload your first video to get started
+                </p>
+                <Link
+                  href="/upload"
+                  className="mt-1 px-5 py-2 bg-brand/10 hover:bg-brand/20 text-brand border border-brand/20 rounded-xl transition-colors text-sm font-semibold"
+                >
+                  Upload Video
+                </Link>
+              </div>
+            )}
           </div>
 
           <WalletInfoCard />

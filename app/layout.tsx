@@ -13,6 +13,7 @@ import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
+import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 
 const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap" });
 
@@ -50,6 +51,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <div className="radial-bg" />
+        <CryptoSaltInitializer />
         <ThemeProvider>
           <ErrorBoundary>
             <I18nProvider>
