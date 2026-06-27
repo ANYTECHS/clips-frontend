@@ -33,6 +33,7 @@ export default function ProcessingPage() {
   // Handle completion notification
   useEffect(() => {
     if (status === "complete" && !notificationSent) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotificationSent(true);
 
       // Send browser notification if permission granted

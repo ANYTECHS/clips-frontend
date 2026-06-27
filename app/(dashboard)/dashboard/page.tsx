@@ -1,9 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
 import Link from "next/link";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import StatCard from "@/components/dashboard/StatCard";
 import RevenueChart from "@/components/dashboard/RevenueChart";
 import PlatformDistribution from "@/components/dashboard/PlatformDistribution";
@@ -16,7 +13,7 @@ import WalletHealthCard from "@/components/wallet/WalletHealthCard";
 import Skeleton from "@/components/ui/Skeleton";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { useDashboardData } from "@/app/hooks/useDashboardData";
-import { DollarSign, Video, Globe } from "lucide-react";
+import { DollarSign, Video, Globe, AlertCircle } from "lucide-react";
 
 function StatCardSkeleton() {
   return (
@@ -34,30 +31,13 @@ function StatCardSkeleton() {
 }
 
 export default function DashboardPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { publicKey } = useAutoStellarWallet();
   const { data, loading, error, retry } = useDashboardData();
   const stats = data?.stats;
   const recentProjects = data?.recentProjects ?? [];
 
   return (
-    <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
-      <div className="glow-large fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
-
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-
-        <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
+    <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
           {error ? (
             <div className="bg-surface border border-error/50 rounded-[24px] p-8 flex flex-col items-center justify-center gap-4 text-center">
               <AlertCircle className="w-12 h-12 text-error" />
@@ -173,7 +153,5 @@ export default function DashboardPage() {
             </>
           )}
         </div>
-      </main>
-    </div>
   );
 }

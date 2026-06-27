@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { useWallet } from "@/components/WalletProvider";
 import SocialRecoveryConfig from "@/components/SocialRecoveryConfig";
 import WalletConnectButton from "@/components/WalletConnectButton";
@@ -27,7 +25,6 @@ export default function SettingsPage() {
   const [walletNetwork, setWalletNetwork] = useState<"testnet" | "mainnet">(
     user?.walletNetwork ?? "testnet"
   );
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [permission, setPermission] = useState<"granted" | "denied" | "default">("default");
   const [notificationsLoading, setNotificationsLoading] = useState(false);
 
@@ -118,8 +115,9 @@ export default function SettingsPage() {
       setImportSuccess(true);
       setImportKeyInput("");
       setTimeout(() => setImportSuccess(false), 5000);
-    } catch (err: any) {
-      setImportError(err.message || "Failed to import secret key. Make sure it starts with 'S' and is 56 characters.");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to import secret key. Make sure it starts with 'S' and is 56 characters.";
+      setImportError(message);
     }
   };
 
@@ -177,27 +175,7 @@ export default function SettingsPage() {
   useEffect(() => () => clearMnemonicTimers(), [clearMnemonicTimers]);
 
   return (
-    <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
-      {/* Radial Glows */}
-      <div className="glow-large fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
-
-      {/* Sidebar Backdrop Overlay (Mobile) */}
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Sidebar */}
-      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-
-        <div className="dashboard-main space-y-8 max-w-[900px] mx-auto w-full p-6 md:p-8">
+    <div className="dashboard-main space-y-8 max-w-[900px] mx-auto w-full p-6 md:p-8">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">Wallet Settings</h1>
             <p className="text-muted-foreground text-sm mt-1">
@@ -658,7 +636,5 @@ export default function SettingsPage() {
             </>
           )}
         </div>
-      </main>
-    </div>
   );
 }

@@ -3,8 +3,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Globe, Shield, CheckCircle2, ExternalLink, Loader2, AlertCircle } from "lucide-react";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import { useStellarTransaction } from "@/app/hooks/useStellarTransaction";
@@ -18,7 +16,6 @@ export default function MultisigPage() {
     const { user } = useAuth();
     const { address, walletType, isConnected } = useWallet();
     const { showToast } = useToast();
-    const [sidebarOpen, setSidebarOpen] = useState(false);
     const [sourcePublicKey, setSourcePublicKey] = useState("");
     const [signerPublicKey, setSignerPublicKey] = useState("");
     const [masterWeight, setMasterWeight] = useState(1);
@@ -37,6 +34,7 @@ export default function MultisigPage() {
 
     useEffect(() => {
         if (address && walletType === "stellar") {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
             setSourcePublicKey(address);
         }
     }, [address, walletType]);
@@ -146,23 +144,7 @@ export default function MultisigPage() {
         : "";
 
     return (
-        <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
-            <div className="glow-large fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-            <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
-
-            {sidebarOpen && (
-                <div
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
-                    onClick={() => setSidebarOpen(false)}
-                />
-            )}
-
-            <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-            <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-                <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-
-                <div className="dashboard-main space-y-8 max-w-[920px] mx-auto w-full p-6 md:p-8">
+        <div className="dashboard-main space-y-8 max-w-[920px] mx-auto w-full p-6 md:p-8">
                     <div className="flex flex-col gap-4">
                         <div>
                             <p className="text-sm text-muted-foreground uppercase tracking-[0.3em] mb-2">
@@ -390,7 +372,5 @@ export default function MultisigPage() {
                         </div>
                     )}
                 </div>
-            </main>
-        </div>
     );
 }

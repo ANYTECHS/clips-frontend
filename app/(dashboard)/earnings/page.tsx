@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import EarningsLayout from "@/components/dashboard/EarningsLayout";
 import EarningsTable from "@/components/dashboard/EarningsTable";
 import StatCard from "@/components/dashboard/StatCard";
 import {
@@ -16,7 +15,7 @@ import {
 } from "lucide-react";
 import { MockApi, type Summary, type Transaction } from "@/app/lib/mockApi";
 import { useAuth } from "@/components/AuthProvider";
-import analytics from "@/lib/analytics";
+import analytics from "@/app/lib/analytics";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 
 type ExportFormat = "csv" | "json" | "pdf";
@@ -266,7 +265,7 @@ export default function EarningsPage() {
 
   if (loading) {
     return (
-      <EarningsLayout>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-10">
         <div className="space-y-8">
           {/* Header skeleton */}
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -285,12 +284,12 @@ export default function EarningsPage() {
           {/* Table skeleton */}
           <div className="rounded-2xl bg-white/6 animate-pulse h-80" />
         </div>
-      </EarningsLayout>
+      </div>
     );
   }
 
   return (
-    <EarningsLayout>
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-10">
       <div className="space-y-8">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div>
@@ -345,6 +344,6 @@ export default function EarningsPage() {
           onPageChange={(p) => updateFilters({ page: p })}
         />
       </div>
-    </EarningsLayout>
+    </div>
   );
 }

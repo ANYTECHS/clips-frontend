@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useCallback } from "react";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ProjectFilters from "@/components/projects/ProjectFilters";
 import ClipGrid from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
@@ -192,11 +191,7 @@ export default function ProjectsPage() {
   }, [selectedIds]);
 
   return (
-    <div className="flex h-screen bg-background text-white font-sans overflow-hidden">
-      {/* Background Effects */}
-      <div className="fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-      <div className="fixed bottom-0 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3 translate-y-1/3" />
-
+    <>
       {/* Mobile Filter Drawer Overlay */}
       {mobileFiltersOpen && (
         <div
@@ -229,62 +224,62 @@ export default function ProjectsPage() {
         />
       </div>
 
-      {/* Desktop Sidebar */}
-      <div className="hidden lg:flex flex-col sticky top-0 h-screen py-10 pl-10 shrink-0">
-        <ProjectFilters
-          captionsStyle={captionsStyle}
-          onCaptionsStyleChange={(style) => updateFilters({ style })}
-          viralityLevels={viralityLevels}
-          onViralityLevelToggle={handleViralityToggle}
-          activeFilterCount={activeFilterCount}
-          onResetFilters={handleResetFilters}
-          vaultFilter={vaultFilter}
-          onVaultFilterChange={(vault) => updateFilters({ vault })}
-        />
-      </div>
+      {/* Desktop Sidebar + Content Area */}
+      <div className="flex flex-1 min-h-0">
+        {/* Desktop Sidebar */}
+        <div className="hidden lg:flex flex-col sticky top-0 self-start py-10 pl-10 shrink-0">
+          <ProjectFilters
+            captionsStyle={captionsStyle}
+            onCaptionsStyleChange={(style) => updateFilters({ style })}
+            viralityLevels={viralityLevels}
+            onViralityLevelToggle={handleViralityToggle}
+            activeFilterCount={activeFilterCount}
+            onResetFilters={handleResetFilters}
+            vaultFilter={vaultFilter}
+            onVaultFilterChange={(vault) => updateFilters({ vault })}
+          />
+        </div>
 
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen relative z-10 px-4 sm:px-6 lg:px-10 xl:px-16 overflow-hidden min-w-0">
-        <DashboardHeader onMenuClick={() => setMobileFiltersOpen(true)} />
-
-        <div className="flex-1 flex flex-col overflow-hidden w-full max-w-[1400px] mx-auto pt-6">
-          <div key={vaultFilter} className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500">
-            <ClipGrid
-              clips={paginatedClips}
+        {/* Main Content Area */}
+        <div className="flex-1 flex flex-col min-h-0 px-4 sm:px-6 lg:px-10 xl:px-16 min-w-0">
+          <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1400px] mx-auto pt-6">
+            <div key={vaultFilter} className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500">
+              <ClipGrid
+                clips={paginatedClips}
+                selectedIds={selectedIds}
+                onSelect={handleSelect}
+                onSelectAll={handleSelectAll}
+                onSelectNone={handleSelectNone}
+                onSelectByScore={handleSelectByScore}
+                aiRecommendations={aiRecommendations}
+                recommendedIds={recommendedIds}
+                recommendationThreshold={RECOMMENDATION_THRESHOLD}
+                onToggleRecommendations={handleToggleRecommendations}
+                onAutoSelect={handleAutoSelect}
+                onEdit={handleEdit}
+                onPreview={handlePreview}
+                loading={loading}
+                totalClips={filteredClips.length}
+                loadingNextPage={loadingNextPage}
+                onLoadMore={handleLoadMore}
+                hasMore={paginatedClips.length < filteredClips.length}
+              />
+            </div>
+            
+            {/* Docked Actions Footer - Single instance with all required props */}
+            <SelectionFooter 
+              count={selectedIds.length}
               selectedIds={selectedIds}
-              onSelect={handleSelect}
-              onSelectAll={handleSelectAll}
-              onSelectNone={handleSelectNone}
-              onSelectByScore={handleSelectByScore}
-              aiRecommendations={aiRecommendations}
-              recommendedIds={recommendedIds}
-              recommendationThreshold={RECOMMENDATION_THRESHOLD}
-              onToggleRecommendations={handleToggleRecommendations}
-              onAutoSelect={handleAutoSelect}
-              onEdit={handleEdit}
-              onPreview={handlePreview}
-              loading={loading}
-              totalClips={filteredClips.length}
-              loadingNextPage={loadingNextPage}
-              onLoadMore={handleLoadMore}
-              hasMore={paginatedClips.length < filteredClips.length}
+              onMint={handleMint}
+              isMinting={isMinting}
+              undo={undo}
+              redo={redo}
+              canUndo={canUndo}
+              canRedo={canRedo}
             />
           </div>
-          
-          {/* Docked Actions Footer - Single instance with all required props */}
-          <SelectionFooter 
-            count={selectedIds.length}
-            selectedIds={selectedIds}
-            onMint={handleMint}
-            isMinting={isMinting}
-            undo={undo}
-            redo={redo}
-            canUndo={canUndo}
-            canRedo={canRedo}
-          />
-
         </div>
-      </main>
+      </div>
       {ToastEl}
       {editingClip && (
         <ClipEditorModal
@@ -299,6 +294,6 @@ export default function ProjectsPage() {
           onClose={() => setPreviewClip(null)}
         />
       )}
-    </div>
+    </>
   );
 }

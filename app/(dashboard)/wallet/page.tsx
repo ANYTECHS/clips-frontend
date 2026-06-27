@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { useBalance, type AssetBalance } from "@/app/hooks/useBalance";
 import { BALANCE_REFRESH_INTERVAL_MS } from "@/app/lib/constants";
@@ -29,7 +27,6 @@ const ASSET_COLORS = ["#00FF9D", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#0
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function WalletPortfolioPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const { publicKey, status: walletStatus } = useAutoStellarWallet();
@@ -100,24 +97,7 @@ export default function WalletPortfolioPage() {
   const isUp = history !== null && history.length >= 2 && history[history.length - 1] >= history[0];
 
   return (
-    <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
-      {/* Glows */}
-      <div className="glow-large fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
-
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-
-        <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
+    <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
           {/* Page title */}
           <div className="flex items-center justify-between">
             <div>
@@ -297,7 +277,5 @@ export default function WalletPortfolioPage() {
             </>
           )}
         </div>
-      </main>
-    </div>
   );
 }

@@ -1,8 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import VaultSidebar from "@/components/vault/VaultSidebar";
 import NFTGrid from "@/components/vault/NFTGrid";
 import MintConfigForm from "@/components/projects/MintConfigForm";
@@ -11,7 +9,6 @@ import { ChevronRight } from "lucide-react";
 
 export default function VaultPage() {
   const [loading, setLoading] = useState(true);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeFilter, setActiveFilter] = useState<"pending" | "listed" | "history">("pending");
   const [showMintPanel, setShowMintPanel] = useState(false);
 
@@ -36,27 +33,7 @@ export default function VaultPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
-      {/* Radial Glows */}
-      <div className="glow-large fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
-      
-      {/* Sidebar Backdrop Overlay (Mobile) */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300" 
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      {/* Main Sidebar Navigation */}
-      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-
-        <div className="dashboard-main space-y-8 max-w-full mx-auto w-full">
+    <div className="dashboard-main space-y-8 max-w-full mx-auto w-full">
           {/* Page Header */}
           <div className="px-6 sm:px-8 pt-2">
             <div className="flex flex-col gap-2">
@@ -76,7 +53,7 @@ export default function VaultPage() {
             <div className="lg:hidden w-full max-w-xs">
               <select 
                 value={activeFilter}
-                onChange={(e) => setActiveFilter(e.target.value as any)}
+                onChange={(e) => setActiveFilter(e.target.value as "pending" | "listed" | "history")}
                 className="w-full px-4 py-3 bg-input border border-white/10 rounded-xl text-white text-[14px] font-bold focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50 transition-colors"
               >
                 <option value="pending">Pending Mint</option>
@@ -132,7 +109,5 @@ export default function VaultPage() {
             </div>
           </div>
         </div>
-      </main>
-    </div>
   );
 }

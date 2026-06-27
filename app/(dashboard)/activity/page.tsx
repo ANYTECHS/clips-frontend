@@ -1,37 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import ActivityFeed from "@/components/wallet/ActivityFeed";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
-import { Loader2, AlertCircle, Activity } from "lucide-react";
+import { AlertCircle, Activity } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
 
 export default function ActivityPage() {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
   const { publicKey, status, network, error } = useAutoStellarWallet();
 
   const networkUpper = network === "testnet" ? "TESTNET" : "PUBLIC";
 
   return (
-    <div className="flex min-h-screen bg-background text-white font-sans">
-      <div className="glow-large fixed top-0 left-0 w-[50vw] h-[50vw] rounded-full bg-brand/5 blur-[120px] pointer-events-none -translate-x-1/4 -translate-y-1/4" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.03] rounded-full blur-[100px] pointer-events-none translate-x-1/3" />
-
-      {sidebarOpen && (
-        <div
-          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
-        />
-      )}
-
-      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-
-      <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-        <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
-
-        <div className="dashboard-main space-y-6 max-w-[1200px] mx-auto w-full">
+    <div className="dashboard-main space-y-6 max-w-[1200px] mx-auto w-full">
           {/* Page header */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center shrink-0">
@@ -114,7 +94,5 @@ export default function ActivityPage() {
             </div>
           )}
         </div>
-      </main>
-    </div>
   );
 }
