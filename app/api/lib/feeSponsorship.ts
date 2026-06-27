@@ -210,10 +210,7 @@ export async function submitSponsoredTransaction(
     networkPassphrase
   );
 
-  // Extract the sponsor source from the first operation
-  const firstOp = transaction.operations[0];
-  const sponsorKey =
-    firstOp?.source()?.accountId()?.ed25519()?.toString() ?? "unknown";
+  const sponsorKey = (transaction.source as string) ?? "unknown";
 
   try {
     const result = await server.submitTransaction(transaction);
