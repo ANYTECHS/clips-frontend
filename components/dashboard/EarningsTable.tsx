@@ -72,7 +72,7 @@ export default function EarningsTable({
             value={search}
             onChange={(e) => updateFilters({ search: e.target.value })}
             placeholder="Search by ID, description or platform"
-            className="w-full bg-input text-white text-sm rounded-xl px-4 py-2.5 pr-8 border border-white/10 placeholder:text-muted-foreground focus:outline-none focus:border-brand/50"
+            className="w-full bg-input text-white text-sm rounded-xl px-4 py-2.5 pr-8 border border-white/10 placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
           />
           {search && (
             <button
@@ -93,7 +93,7 @@ export default function EarningsTable({
               type="date"
               value={startDate}
               onChange={(e) => updateFilters({ startDate: e.target.value })}
-              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus:border-brand/50"
+              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
             />
           </label>
           <label className="flex flex-col gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -102,7 +102,7 @@ export default function EarningsTable({
               type="date"
               value={endDate}
               onChange={(e) => updateFilters({ endDate: e.target.value })}
-              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus:border-brand/50"
+              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
             />
           </label>
           {hasDates && (

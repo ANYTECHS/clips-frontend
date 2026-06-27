@@ -5,7 +5,7 @@ import {
   MultiWalletRecord,
   MultiWalletStorage,
   WalletProviderType,
-} from "@/app/lib/multiWalletStorage";
+} from "@/app/lib/walletRepository";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 // Analytics is optional — import lazily to avoid breaking tests that don't mock it

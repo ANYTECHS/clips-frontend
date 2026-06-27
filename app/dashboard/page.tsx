@@ -36,7 +36,7 @@ function StatCardSkeleton() {
 export default function DashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { publicKey } = useAutoStellarWallet();
-  const { data, loading } = useDashboardData();
+  const { data, loading, error, retry } = useDashboardData();
   const stats = data?.stats;
   const recentProjects = data?.recentProjects ?? [];
 
@@ -58,7 +58,16 @@ export default function DashboardPage() {
         <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
 
         <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {error ? (
+            <div className="flex flex-col items-center justify-center py-20">
+              <h2 className="text-xl font-bold text-error mb-4">Failed to load dashboard data</h2>
+              <button onClick={retry} className="bg-brand text-black px-6 py-2 rounded-lg font-semibold hover:bg-brand-hover transition-colors">
+                Retry
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {loading && !stats ? (
               <>
                 <StatCardSkeleton />
@@ -154,6 +163,8 @@ export default function DashboardPage() {
                   ))}
             </div>
           </div>
+          </>
+          )}
         </div>
       </main>
     </div>

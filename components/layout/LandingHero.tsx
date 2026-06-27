@@ -105,7 +105,7 @@ export default function LandingHero({
               placeholder="Paste YouTube or Vimeo URL"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              className="w-full bg-input/60 border border-subtle rounded-[14px] py-3.5 pl-12 pr-4 text-white placeholder-muted focus:outline-none focus:border-brand/50 focus:bg-input transition-all"
+              className="w-full bg-input/60 border border-subtle rounded-[14px] py-3.5 pl-12 pr-4 text-white placeholder-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50 focus:bg-input transition-all"
             />
           </div>
           <button
