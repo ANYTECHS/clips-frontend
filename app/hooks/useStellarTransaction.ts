@@ -8,10 +8,10 @@ import {
   INVOKE_CONTRACT_USER_MESSAGE,
   isInvokeContractBuildError,
 } from "@/app/lib/stellarOperations";
-import { getStellarNetwork } from "@/app/lib/networkConfig";
 import { captureSorobanNotSupportedWarning } from "@/app/lib/sentry";
 import { TRANSACTION_TIMEOUT_MS } from "@/app/lib/constants";
 import { logger } from "@/app/lib/logger";
+import { submitTransaction } from "@/app/lib/stellar";
 
 /**
  * Stellar transaction processing lifecycle state designations.
@@ -32,18 +32,7 @@ export type StellarNetwork = "testnet" | "mainnet";
 /**
  * Transaction result from Stellar.
  */
-export interface StellarTransactionResult {
-  /** The cryptographic hash of the transaction */
-  hash: string;
-  /** The sequence number of the ledger containing the transaction */
-  ledger: number;
-  /** Base64 encoded transaction envelope XDR */
-  envelope_xdr: string;
-  /** Base64 encoded transaction result XDR */
-  result_xdr: string;
-  /** Base64 encoded transaction meta XDR */
-  result_meta_xdr: string;
-}
+export type StellarTransactionResult = Awaited<ReturnType<typeof submitTransaction>>;
 
 /**
  * Transaction error details.
@@ -253,67 +242,6 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
   );
 
   /**
-   * Submits a signed XDR transaction payload string to the underlying network Horizon instances.
-   *
-   * @param signedXdr - The final authorized signed base64 transaction XDR.
-   * @returns Resolves with structural node metrics on successful ingestion.
-   * @throws {StellarTransactionError} If network response times out or underlying node returns bad response status.
-   */
-  const submitTransaction = useCallback(
-    async (signedXdr: string): Promise<StellarTransactionResult> => {
-      const horizonUrl =
-        network === "mainnet"
-          ? "https://horizon.stellar.org"
-          : "https://horizon-testnet.stellar.org";
-
-      abortControllerRef.current = new AbortController();
-
-      try {
-        const response = await fetch(`${horizonUrl}/transactions`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded",
-          },
-          body: `tx=${encodeURIComponent(signedXdr)}`,
-          signal: abortControllerRef.current.signal,
-        });
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}));
-          const error: StellarTransactionError = {
-            code: errorData.extras?.result_codes?.transaction || "SUBMISSION_ERROR",
-            message: errorData.title || "Failed to submit transaction to Stellar network",
-            extras: errorData.extras,
-          };
-          throw error;
-        }
-
-        const result = await response.json();
-        return result as StellarTransactionResult;
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") {
-          const error: StellarTransactionError = {
-            code: "TIMEOUT",
-            message: "Transaction submission timed out",
-          };
-          throw error;
-        }
-
-        if ((err as StellarTransactionError).code) {
-          throw err;
-        }
-
-        const error: StellarTransactionError = {
-          code: "NETWORK_ERROR",
-          message: err instanceof Error ? err.message : "Network error occurred",
-        };
-        throw error;
-      }
-    },
-    [network]
-  );
-
-  /**
    * Orchestrates the full lifecycle of a transaction build, sign, and submit routine.
    *
    * @param buildTransaction - Callback returning the initial unsigned XDR string target.
@@ -350,7 +278,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
 
         while (retryCountRef.current < maxRetries) {
           try {
-            result = await submitTransaction(signedXdr);
+            result = await submitTransaction({ signedXdr, network });
             break;
           } catch (err) {
             lastError = err as StellarTransactionError;
@@ -424,7 +352,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
       checkFreighterInstalled,
       getPublicKey,
       signTransaction,
-      submitTransaction,
+      network,
       maxRetries,
       onSuccess,
       onError,

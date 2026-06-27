@@ -50,10 +50,14 @@ export function AssetRow({
             </a>
           )}
         </div>
-        <div className="w-full bg-border rounded-full h-1 mt-1.5">
+        <div className="w-full bg-border rounded-full h-1 mt-1.5" aria-label={`${code} allocation: ${(pct * 100).toFixed(1)}%`}>
           <div
             className="h-1 rounded-full transition-all duration-500"
             style={{ width: `${pct * 100}%`, backgroundColor: color }}
+            role="progressbar"
+            aria-valuenow={pct * 100}
+            aria-valuemin={0}
+            aria-valuemax={100}
           />
         </div>
       </div>

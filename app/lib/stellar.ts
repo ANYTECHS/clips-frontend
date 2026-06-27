@@ -1,4 +1,3 @@
-import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/app/lib/logger";
 import * as StellarSdk from "@stellar/stellar-sdk";
 import * as bip39 from "bip39";
@@ -28,7 +27,14 @@ export const getStellarServer = () => {
   return new StellarSdk.Horizon.Server(horizon);
 };
 
+export const getSorobanServer = () => {
+  const rpcUrl = getRpcUrl();
+  return new StellarSdk.SorobanServer(rpcUrl);
+};
+
 export const BIP39_WORDLIST = bip39.wordlists.english;
+
+export type StellarNetwork = "testnet" | "mainnet";
 
 export const deriveSeedFromMnemonic = async (
   mnemonic: string,
@@ -39,7 +45,7 @@ export const deriveSeedFromMnemonic = async (
     throw new Error("Invalid BIP39 mnemonic phrase");
   }
   const seed = await bip39.mnemonicToSeed(normalized, passphrase);
-  return seed.subarray(0, 32);
+  return Buffer.from(seed.subarray(0, 32));
 };
 
 export const generateMnemonic = (strength = 128): string => {
@@ -150,20 +156,72 @@ export const buildPaymentTransaction = async (
   };
 };
 
-export const submitTransaction = async (signedTx: StellarSdk.Transaction) => {
-  const server = getStellarServer();
+export interface SubmitTransactionOptions {
+  signedXdr: string;
+  network?: StellarNetwork;
+}
+
+export interface SubmitTransactionResult {
+  hash: string;
+  ledger: number;
+  envelope_xdr: string;
+  result_xdr: string;
+  result_meta_xdr: string;
+}
+
+export interface SubmitTransactionError {
+  code: string;
+  message: string;
+  extras?: Record<string, unknown>;
+}
+
+export const submitTransaction = async (options: SubmitTransactionOptions): Promise<SubmitTransactionResult> => {
+  const { signedXdr, network = getStellarNetwork() } = options;
+  
+  const horizonUrl =
+    network === "mainnet"
+      ? "https://horizon.stellar.org"
+      : "https://horizon-testnet.stellar.org";
+
   try {
-    const result = await server.submitTransaction(signedTx);
-    return {
-      success: true,
-      hash: result.hash,
-      ledger: result.ledger,
+    const response = await fetch(`${horizonUrl}/transactions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: `tx=${encodeURIComponent(signedXdr)}`,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error: SubmitTransactionError = {
+        code: errorData.extras?.result_codes?.transaction || "SUBMISSION_ERROR",
+        message: errorData.title || "Failed to submit transaction to Stellar network",
+        extras: errorData.extras,
+      };
+      throw error;
+    }
+
+    const result = await response.json();
+    return result as SubmitTransactionResult;
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      const error: SubmitTransactionError = {
+        code: "TIMEOUT",
+        message: "Transaction submission timed out",
+      };
+      throw error;
+    }
+
+    if ((err as SubmitTransactionError).code) {
+      throw err;
+    }
+
+    const error: SubmitTransactionError = {
+      code: "NETWORK_ERROR",
+      message: err instanceof Error ? err.message : "Network error occurred",
     };
-  } catch (error: any) {
-    logger.error("Horizon submission error details:", error?.response?.data?.extras?.result_codes || error);
-    const errorResult = error?.response?.data?.extras?.result_codes;
-    const details = errorResult ? JSON.stringify(errorResult) : error.message || "Unknown error";
-    throw new Error(`Horizon Submission Failed: ${details}`);
+    throw error;
   }
 };
 
@@ -244,7 +302,7 @@ function toSdkOperation(
       });
 
     case "set_options": {
-      const opts: StellarSdk.Operation.SetOptionsOptions = {};
+      const opts: any = {};
       if (op.inflationDest !== undefined) opts.inflationDest = op.inflationDest;
       if (op.clearFlags !== undefined) opts.clearFlags = op.clearFlags;
       if (op.setFlags !== undefined) opts.setFlags = op.setFlags;
@@ -333,7 +391,7 @@ export const buildBatchTransaction = async (
   const server = getStellarServer();
 
   // Load source account (verifies it exists and fetches sequence number)
-  let sourceAccount: StellarSdk.AccountResponse;
+  let sourceAccount: any;
   try {
     sourceAccount = await server.loadAccount(senderPublicKey);
   } catch (error: unknown) {
@@ -408,7 +466,7 @@ export async function buildSorobanTransaction(
   const horizonServer = getStellarServer();
 
   // Load source account
-  let sourceAccount: StellarSdk.AccountResponse;
+  let sourceAccount: any;
   try {
     sourceAccount = await horizonServer.loadAccount(senderPublicKey);
   } catch (error: unknown) {
@@ -439,24 +497,17 @@ export async function buildSorobanTransaction(
     builder.addOperation(toSdkOperation(op));
   }
 
-  if (memo) {
-    builder.addMemo(StellarSdk.Memo.text(memo));
-  }
-
   const unsignedTx = builder.setTimeout(timeoutSeconds).build();
 
   // Simulate the transaction to get Soroban transaction data
   const simulated = await sorobanServer.simulateTransaction(unsignedTx);
 
-  if (StellarSdk.SorobanRpc.Api.isSimulationError(simulated)) {
-    throw new Error(`Simulation failed: ${JSON.stringify(simulated.error)}`);
+  if ((simulated as any).status === "ERROR") {
+    throw new Error(`Simulation failed: ${JSON.stringify((simulated as any).error)}`);
   }
 
   // Assemble the transaction for signing
-  const assembledTx = StellarSdk.assembleTransaction(
-    unsignedTx,
-    simulated
-  ).build();
+  const assembledTx = (simulated as any).toXDR();
 
   return {
     xdr: assembledTx.toEnvelope().toXDR("base64"),

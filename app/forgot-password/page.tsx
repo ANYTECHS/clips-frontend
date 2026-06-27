@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { MockApi } from "../lib/mockApi";
 import { useRouter } from "next/navigation";
 
@@ -10,11 +10,40 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState("");
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
+      setCountdown(remaining > 0 ? `${remaining}s` : "");
+      if (remaining <= 0) setCooldownUntil(null);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownUntil]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<{ resetAt: number }>;
+      setCooldownUntil(custom.detail.resetAt);
+    };
+    window.addEventListener("rate-limit-exceeded", handler as EventListener);
+    return () => window.removeEventListener("rate-limit-exceeded", handler as EventListener);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setMessage("");
+    
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      setError(`Too many attempts. Please wait ${countdown} before trying again.`);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -22,7 +51,7 @@ export default function ForgotPasswordPage() {
       setMessage("If an account with that email exists, you will receive a password reset link.");
     } catch (err) {
       if (err instanceof Error && err.message === 'RATE_LIMIT_EXCEEDED') {
-        setError("Too many requests. Please wait a moment and try again.");
+        setError(countdown ? `Too many attempts. Please wait ${countdown} before trying again.` : "Too many requests. Please wait a moment and try again.");
       } else {
         setMessage("If an account with that email exists, you will receive a password reset link.");
       }
@@ -70,10 +99,10 @@ export default function ForgotPasswordPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || (cooldownUntil !== null && Date.now() < cooldownUntil)}
               className="w-full bg-brand hover:bg-brand-hover text-black py-[15px] rounded-[12px] font-bold text-[15px] flex justify-center items-center disabled:opacity-70"
             >
-              {loading ? "Sending..." : "Send Reset Link"}
+              {loading ? "Sending..." : countdown ? `Wait ${countdown}` : "Send Reset Link"}
             </button>
 
             <div className="text-center">

@@ -310,13 +310,13 @@ export default function EarningsPage() {
           <StatCard
             label="Total Earned"
             value={`$${summary.total}`}
-            trend="+12.5%"
+            trend={{ value: 12.5, label: "+12.5%" }}
             icon={DollarSign}
           />
           <StatCard
             label="Completed"
             value={`$${summary.completed}`}
-            trend="+8.2%"
+            trend={{ value: 8.2, label: "+8.2%" }}
             icon={TrendingUp}
           />
           <StatCard
