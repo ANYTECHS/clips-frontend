@@ -1,3 +1,5 @@
+import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/app/lib/logger";
 import * as StellarSdk from "@stellar/stellar-sdk";
 import * as bip39 from "bip39";
 import {
@@ -97,7 +99,7 @@ export const fundWithFriendbot = async (publicKey: string): Promise<boolean> => 
     }
     return true;
   } catch (error) {
-    console.error("Friendbot funding error:", error);
+    logger.error("Friendbot funding error:", error);
     throw error;
   }
 };
@@ -124,8 +126,8 @@ export const buildPaymentTransaction = async (
   try {
     fee = await server.fetchBaseFee();
   } catch (e) {
-    console.warn("Failed to fetch base fee, using default 100 stroops", e);
-  }
+      logger.warn("Failed to fetch base fee, using default 100 stroops", e);
+    }
 
   // 3. Build the transaction
   const transaction = new StellarSdk.TransactionBuilder(sourceAccount, {
@@ -158,7 +160,7 @@ export const submitTransaction = async (signedTx: StellarSdk.Transaction) => {
       ledger: result.ledger,
     };
   } catch (error: any) {
-    console.error("Horizon submission error details:", error?.response?.data?.extras?.result_codes || error);
+    logger.error("Horizon submission error details:", error?.response?.data?.extras?.result_codes || error);
     const errorResult = error?.response?.data?.extras?.result_codes;
     const details = errorResult ? JSON.stringify(errorResult) : error.message || "Unknown error";
     throw new Error(`Horizon Submission Failed: ${details}`);
@@ -347,7 +349,7 @@ export const buildBatchTransaction = async (
   try {
     baseFee = await server.fetchBaseFee();
   } catch {
-    console.warn("Failed to fetch base fee, using default 100 stroops");
+    logger.warn("Failed to fetch base fee, using default 100 stroops");
   }
   const totalFee = baseFee * operations.length;
 
@@ -422,7 +424,7 @@ export async function buildSorobanTransaction(
   try {
     baseFee = await horizonServer.fetchBaseFee();
   } catch {
-    console.warn("Failed to fetch base fee, using default 100 stroops");
+    logger.warn("Failed to fetch base fee, using default 100 stroops");
   }
   const totalFee = baseFee * operations.length;
 
@@ -509,7 +511,7 @@ export async function submitSorobanTransaction(
       ledger: 0, // Ledger not available in pending status
     };
   } catch (error: any) {
-    console.error("Soroban submission error details:", error);
+    logger.error("Soroban submission error details:", error);
     throw new Error(`Soroban Submission Failed: ${error.message}`);
   }
 }

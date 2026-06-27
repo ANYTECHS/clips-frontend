@@ -114,6 +114,15 @@ describe('formatAmount', () => {
       const result = formatAmount(1000000000, { decimals: 0 });
       expect(result).toMatch(/1[,.]000[,.]000[,.]000/);
     });
+
+    it('should fall back to toFixed when Intl.NumberFormat throws for invalid locale', () => {
+      const result = formatAmount(1234.567, {
+        locale: 'en_US',
+        decimals: 2,
+      });
+
+      expect(result).toBe('1234.57');
+    });
   });
 
   describe('minimumFractionDigits', () => {
@@ -264,6 +273,16 @@ describe('formatUSD', () => {
         currencyFormat: 'symbol',
       });
       expect(result).toBe('$1,234.500');
+    });
+
+    it('should fall back when Intl.NumberFormat throws for invalid locale', () => {
+      const result = formatUSD(1234.5, {
+        decimals: 2,
+        locale: 'en_US',
+        currencyFormat: 'symbol',
+      });
+
+      expect(result).toBe('$1234.50');
     });
   });
 });

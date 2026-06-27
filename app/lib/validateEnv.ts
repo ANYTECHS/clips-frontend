@@ -1,3 +1,5 @@
+import { logger } from "./logger";
+
 // Variables required in every environment (dev, CI, production).
 const REQUIRED_ENV_VARS = [
   'GOOGLE_CLIENT_ID',
@@ -117,7 +119,7 @@ export function validateRequiredEnv(): void {
 
   if (isDevelopment) {
     // Warn so the dev server still starts, but the problem is visible.
-    console.warn(`\n⚠️  [validateEnv] ${message}\n`);
+    logger.warn(`\n⚠️  [validateEnv] ${message}\n`);
   } else {
     // Hard fail in CI and production — a misconfigured deployment must not proceed.
     throw new Error(message);

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
+import { logger } from "@/app/lib/logger";
 
 /**
  * Wallet connection status
@@ -114,7 +115,7 @@ export function useWalletConnection() {
       try {
         network = await freighter.getNetwork();
       } catch (err) {
-        console.warn("Could not get network from Freighter, defaulting to TESTNET");
+        logger.warn("Could not get network from Freighter, defaulting to TESTNET");
       }
 
       // Set connected state
@@ -207,7 +208,7 @@ export function useWalletConnection() {
           try {
             network = await freighter.getNetwork();
           } catch (err) {
-            console.warn("Could not get network from Freighter");
+            logger.warn("Could not get network from Freighter");
           }
 
           setState({
@@ -221,7 +222,7 @@ export function useWalletConnection() {
         }
       } catch (err) {
         // Silently fail - user is not connected
-        console.debug("Wallet not connected on mount");
+        logger.debug("Wallet not connected on mount");
       }
     };
 

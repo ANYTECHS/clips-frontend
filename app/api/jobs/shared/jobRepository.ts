@@ -1,5 +1,6 @@
 import Redis from "ioredis";
 import type { Job } from "./jobStore";
+import { logger } from "@/app/lib/logger";
 
 interface StorageAdapter {
   get(key: string): Promise<string | null>;
@@ -75,7 +76,7 @@ export class JobRepository {
       return JSON.parse(raw) as Job;
     } catch (error) {
       const cause = error instanceof Error ? error : new Error(String(error));
-      console.error(`[JobRepository] failed to read job ${jobId}:`, cause);
+      logger.error(`[JobRepository] failed to read job ${jobId}:`, cause);
       throw new JobRepositoryError(`Unable to read job state for ${jobId}`, cause);
     }
   }
@@ -85,7 +86,7 @@ export class JobRepository {
       await this.adapter.set(this.key(jobId), JSON.stringify(jobData));
     } catch (error) {
       const cause = error instanceof Error ? error : new Error(String(error));
-      console.error(`[JobRepository] failed to write job ${jobId}:`, cause);
+      logger.error(`[JobRepository] failed to write job ${jobId}:`, cause);
       throw new JobRepositoryError(`Unable to persist job state for ${jobId}`, cause);
     }
   }
@@ -96,7 +97,7 @@ export class JobRepository {
       return result > 0;
     } catch (error) {
       const cause = error instanceof Error ? error : new Error(String(error));
-      console.error(`[JobRepository] failed to delete job ${jobId}:`, cause);
+      logger.error(`[JobRepository] failed to delete job ${jobId}:`, cause);
       throw new JobRepositoryError(`Unable to delete job state for ${jobId}`, cause);
     }
   }

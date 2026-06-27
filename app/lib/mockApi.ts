@@ -37,6 +37,7 @@ const users: User[] = [
     onboardingStep: 3,
     profile: { niche: "gaming", username: "testuser" },
     walletNetwork: "testnet",
+    walletAddress: "GBX63CHQ3TFWT4Z5QOPW5P37R6G3E5B5Z3N4N5B6W5Z7N7B5Z6N4Z5W", // Placeholder for test user
     socialRecoveryThreshold: 2,
     socialRecoveryGuardianCount: 3,
   }
@@ -56,6 +57,8 @@ const socialRecoverySessions: Record<string, {
   threshold: number;
   guardians: { email: string; approved: boolean; shareId: string }[];
 }> = {};
+
+export const recoveryAttempts = new Map<string, { count: number; lockUntil: number }>();
 
 // Password reset tokens storage
 const resetTokens: Record<string, { token: string; expiresAt: number }> = {};
@@ -398,6 +401,39 @@ export const checkSocialRecovery = rateLimiter(async (sessionId: string) => {
   };
 }, 20, 10000);
 
+export const verifyRecoverySignature = async (publicKey: string, signature: string) => {
+  await delay(600);
+  
+  // Here we would use stellar-sdk Keypair to actually verify the cryptographic signature
+  // For example:
+  // import { Keypair } from "@stellar/stellar-sdk";
+  // const keypair = Keypair.fromPublicKey(publicKey);
+  // const isValid = keypair.verify(Buffer.from("clipcash-recovery"), Buffer.from(signature, "base64"));
+  // if (!isValid) throw new Error("Invalid signature");
+
+  // Mock implementation: just check if the user exists in our DB
+  // For the demo, we allow the test user to recover even if we don't have their exact address, 
+  // or we just find the user with this wallet address.
+  let user = users.find((u) => u.walletAddress === publicKey);
+  
+  if (!user) {
+    // If we're using a real stellar wallet from the mnemonic but it's not saved in the DB,
+    // we return null. For demo purposes, if it's the test phrase we can return the test user.
+    // We'll trust the caller to verify.
+    // If we want to simulate successful recovery for any valid stellar key in the demo:
+    user = {
+      id: `recovered-${publicKey.slice(0, 8)}`,
+      email: `user-${publicKey.slice(0, 5)}@clipcash.ai`,
+      name: "Recovered User",
+      onboardingStep: 3,
+      walletAddress: publicKey,
+    };
+    users.push(user);
+  }
+  
+  return user;
+};
+
 // MockApi object for backward compatibility
 export const MockApi = {
   checkEmail,
@@ -414,5 +450,7 @@ export const MockApi = {
   initiateSocialRecovery,
   approveGuardian,
   checkSocialRecovery,
+  verifyRecoverySignature,
+  recoveryAttempts,
 };
 

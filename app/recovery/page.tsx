@@ -3,11 +3,11 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/AuthProvider";
-import { useWallet } from "@/components/WalletProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useWallet } from "@/components/wallet/WalletProvider";
 import { MockApi } from "@/app/lib/mockApi";
 import { restoreWalletFromMnemonic } from "@/app/lib/stellar";
-import { decryptWithPassword } from "@/components/SocialRecoveryConfig";
+import { decryptWithPassword } from "@/app/lib/cryptoUtils";
 import { secureStorage } from "@/app/lib/secureStorage";
 import {
   Shield,
@@ -45,6 +45,7 @@ export default function RecoveryPage() {
   const [isRecoverable, setIsRecoverable] = useState(false);
   const [recoveryPassword, setRecoveryPassword] = useState("");
   const [simulating, setSimulating] = useState(false);
+  const isDev = typeof process !== "undefined" && process.env.NODE_ENV !== "production";
 
   const handleMnemonicRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -328,7 +329,7 @@ export default function RecoveryPage() {
                   placeholder="Paste your 12 recovery words separated by spaces here..."
                   value={mnemonicInput}
                   onChange={(e) => setMnemonicInput(e.target.value)}
-                  className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3.5 text-xs focus:outline-none transition-colors font-mono resize-none leading-relaxed"
+                  className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors font-mono resize-none leading-relaxed"
                 />
               </div>
 
@@ -372,7 +373,7 @@ export default function RecoveryPage() {
                         placeholder="your-email@example.com"
                         value={socialEmail}
                         onChange={(e) => setSocialEmail(e.target.value)}
-                        className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl pl-10 pr-4 py-3.5 text-xs focus:outline-none transition-colors"
+                        className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl pl-10 pr-4 py-3.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
                       />
                       <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                     </div>
@@ -425,7 +426,7 @@ export default function RecoveryPage() {
                     </div>
                   </div>
 
-                  {!isRecoverable && (
+                  {isDev && !isRecoverable && (
                     <button
                       type="button"
                       onClick={handleSimulateApprovals}
@@ -452,7 +453,7 @@ export default function RecoveryPage() {
                           placeholder="Enter your recovery password"
                           value={recoveryPassword}
                           onChange={(e) => setRecoveryPassword(e.target.value)}
-                          className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3.5 text-xs focus:outline-none transition-colors"
+                          className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
                         />
                       </div>
 

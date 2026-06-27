@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { logger } from "@/app/lib/logger";
 
 export const PostOnboardingSchema = z.object({
   step: z.number().min(0),
@@ -38,9 +39,9 @@ export async function POST(request: NextRequest) {
     const { step, data } = parsed.data;
 
     // TODO: Replace with actual database update to save onboarding data
-    console.log(`[Onboarding] Saved step ${step} for user ${session.user.id}`, data);
+    logger.info(`[Onboarding] Saved step ${step} for user ${session.user.id}`, data);
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, onboardingStep: step });
   } catch (error) {
     Sentry.captureException(error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

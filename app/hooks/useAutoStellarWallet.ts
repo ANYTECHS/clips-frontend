@@ -1,20 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { getBalance, Balance } from "./useBalance";
 import { getStellarNetwork, getFreighterNetwork, getActiveNetworkConfig } from "@/app/lib/networkConfig";
 
+/** Current connection phase indicator for the managed auto-wallet context */
 export type WalletStatus = "idle" | "ready" | "loading" | "error";
 
+/** Interface defining properties returned from the automatic wallet resolution process */
 export interface AutoStellarWallet {
+  /** The derived public cryptographic address if authenticated, otherwise null */
   publicKey: string | null;
   /** Active Stellar network derived from NEXT_PUBLIC_STELLAR_NETWORK env var */
   network: "testnet" | "mainnet";
   /** Human-readable network label, e.g. "Testnet" or "Mainnet" */
   networkLabel: string;
+  /** The current execution state machine status value */
   status: WalletStatus;
+  /** Holds active balance amounts or null if not yet resolved */
   balance: Balance | null;
+  /** Context description message details present only during failures */
   error: string | null;
 }
 
@@ -24,8 +30,9 @@ export interface AutoStellarWallet {
  * is available on the authenticated user profile.
  *
  * Network is determined by the NEXT_PUBLIC_STELLAR_NETWORK environment variable:
- *   - "testnet" (default) — uses Horizon testnet, balance fetched from testnet
- *   - "mainnet"           — uses Horizon mainnet, balance fetched from mainnet
+ * - "testnet" (default) — uses Horizon testnet, balance fetched from testnet
+ * - "mainnet"           — uses Horizon mainnet, balance fetched from mainnet
+ * * @returns An updated AutoStellarWallet state block representing the active wallet condition metrics.
  */
 export function useAutoStellarWallet(): AutoStellarWallet {
   const { user } = useAuth();

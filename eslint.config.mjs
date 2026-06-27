@@ -27,6 +27,38 @@ const eslintConfig = defineConfig([
       }],
     },
   },
+  {
+    files: ["app/hooks/**/*.ts", "app/hooks/**/*.tsx", "app/lib/**/*.ts", "app/lib/**/*.tsx"],
+    rules: {
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "ExportNamedDeclaration > FunctionDeclaration[id.name=/^mock/]",
+          message: "Functions starting with 'mock' must not be exported from production source files. Move them to __tests__/mocks/ or __mocks__/.",
+        },
+        {
+          selector: "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.name=/^mock/]",
+          message: "Variables/constants starting with 'mock' must not be exported from production source files. Move them to __tests__/mocks/ or __mocks__/.",
+        },
+      ],
+    },
+  },
+  {
+    files: ["app/store/**/*.ts", "app/store/**/*.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/mockApi*", "**/mockApi/**"],
+              message: "Store files must not import from mockApi directly. Use the ./api barrel export instead.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

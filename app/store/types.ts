@@ -78,7 +78,7 @@ export interface ProcessState {
 }
 
 export interface ProcessActions {
-  startProcess: (id: string, label: string) => void;
+  startProcess: (id: string, label: string) => string;
   update: (
     patch:
       | Partial<ProcessState>

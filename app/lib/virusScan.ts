@@ -16,6 +16,7 @@
  *   VIRUS_SCAN_ENABLED           — "true" | "false" (default: "true" for prod, "false" for dev)
  */
 
+import { logger } from "@/app/lib/logger";
 import { VIRUS_SCAN_DEFAULT_TIMEOUT_MS } from "@/app/lib/constants";
 
 export type ScanProvider = "clamav" | "virustotal" | "cloudmersive" | "disabled";
@@ -318,7 +319,7 @@ export async function scanFile(buffer: Buffer): Promise<ScanResult> {
     };
   }
 
-  console.log(`[VirusScan] Scanning with ${provider} (timeout: ${timeout}ms)`);
+  logger.info(`[VirusScan] Scanning with ${provider} (timeout: ${timeout}ms)`);
 
   switch (provider) {
     case "clamav":

@@ -6,6 +6,7 @@
  * not the Edge runtime.
  */
 
+import { logger } from "@/app/lib/logger";
 import { DEFAULT_ONBOARDING_STEP } from "./types";
 
 export type UserProfile = {
@@ -44,7 +45,7 @@ export async function fetchOnboardingStep(
     const res = await fetch(url, { headers, cache: "no-store" });
 
     if (!res.ok) {
-      console.warn(
+      logger.warn(
         `[userApi] fetchOnboardingStep returned ${res.status} for ${email}; falling back to default.`
       );
       return DEFAULT_ONBOARDING_STEP;
@@ -54,7 +55,7 @@ export async function fetchOnboardingStep(
     const step = data?.onboardingStep;
     return typeof step === "number" ? step : DEFAULT_ONBOARDING_STEP;
   } catch (err) {
-    console.warn("[userApi] fetchOnboardingStep failed; falling back to default.", err);
+    logger.warn("[userApi] fetchOnboardingStep failed; falling back to default.", err);
     return DEFAULT_ONBOARDING_STEP;
   }
 }

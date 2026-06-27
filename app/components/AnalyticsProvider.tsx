@@ -1,8 +1,8 @@
 'use client'
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
-import analytics from '@/lib/analytics';
+import analytics from '@/app/lib/analytics';
 
 /**
  * AnalyticsProvider Component
@@ -13,10 +13,13 @@ import analytics from '@/lib/analytics';
 export default function AnalyticsProvider() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const initialized = useRef(false);
 
   useEffect(() => {
-    // Initialize analytics on mount
-    analytics.initialize();
+    if (!initialized.current) {
+      analytics.initialize();
+      initialized.current = true;
+    }
   }, []);
 
   useEffect(() => {

@@ -2,8 +2,9 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { getStellarNetwork, type StellarNetwork } from "@/app/lib/networkConfig";
+import { NetworkPreferenceStorage } from "@/app/lib/userPreferences";
 
-const STORAGE_KEY = "clipcash_network_override";
+const STORAGE_KEY = NetworkPreferenceStorage.getKey();
 
 type NetworkContextValue = {
   network: StellarNetwork;
@@ -18,8 +19,9 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
 
   // Sync from localStorage on mount (in case an external script changed it before React mounts)
   useEffect(() => {
-    const stored = typeof window !== "undefined" ? (localStorage.getItem(STORAGE_KEY) as StellarNetwork | null) : null;
-    if (stored === "testnet" || stored === "mainnet") {
+    const stored = NetworkPreferenceStorage.get();
+    if (stored) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setNetworkState(stored);
     }
   }, []);
@@ -44,7 +46,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const setNetwork = useCallback((n: StellarNetwork) => {
-    localStorage.setItem(STORAGE_KEY, n);
+    NetworkPreferenceStorage.set(n);
     setNetworkState(n);
     // Fire a custom event so same-tab listeners can react (storage does not fire in same tab)
     window.dispatchEvent(new Event("clipcash_network_changed"));

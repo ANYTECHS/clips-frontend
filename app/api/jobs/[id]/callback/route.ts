@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { jobStore, type JobStatus, type AiErrorCode } from "../../shared/jobStore";
 import { parseJsonRequest } from "../../shared/jsonBody";
 import { z } from "zod";
+import { logger } from "@/app/lib/logger";
 
 // ─── Validation schema ────────────────────────────────────────────────────────
 
@@ -114,14 +115,14 @@ function validateCallbackSecret(request: NextRequest): NextResponse | null {
   if (!expectedSecret) {
     if (process.env.NODE_ENV === "production") {
       // Misconfigured production deployment — reject all callbacks.
-      console.error(
+      logger.error(
         "[jobs/callback] AI_BACKEND_CALLBACK_SECRET is not set in production. " +
           "All callback requests will be rejected."
       );
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     // Dev without a secret — accept but warn.
-    console.warn(
+    logger.warn(
       "[jobs/callback] AI_BACKEND_CALLBACK_SECRET is not set; " +
         "accepting unauthenticated callback. Set this in production."
     );

@@ -8,12 +8,12 @@
  * cards; this store holds the full breakdown for a dedicated Earnings page.
  *
  * Design decisions:
- *  - 5-minute cache TTL — same policy as dashboardStore
- *  - Single in-flight guard (no duplicate requests)
- *  - Fine-grained selectors to prevent unnecessary re-renders
+ * - 5-minute cache TTL — same policy as dashboardStore
+ * - Single in-flight guard (no duplicate requests)
+ * - Fine-grained selectors to prevent unnecessary re-renders
  *
  * Usage:
- *   import { useEarningsStore, selectEarningsTotals } from "@/app/store";
+ * import { useEarningsStore, selectEarningsTotals } from "@/app/store";
  */
 
 import { create } from "zustand";
@@ -27,6 +27,7 @@ import { useUserStore } from "./userStore";
 // ─── Cache TTL ────────────────────────────────────────────────────────────────
 
 import { EARNINGS_CACHE_TTL_MS } from "@/app/lib/constants";
+/** Re-use cached data for a fixed lifespan before hitting the API again */
 const CACHE_TTL_MS = EARNINGS_CACHE_TTL_MS;
 export { EARNINGS_CACHE_TTL_MS };
 
@@ -34,6 +35,9 @@ import { fetchEarningsFromAPI } from "./api";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
+/**
+ * Initial standard fallback values for the earnings state slice.
+ */
 const initialState: EarningsState = {
   totalEarnings: "$0.00",
   totalTrend: 0,
@@ -49,6 +53,9 @@ const initialState: EarningsState = {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
+/**
+ * Reactive state store container managing aggregated totals and detailed earnings item breakdowns.
+ */
 export const useEarningsStore = create<EarningsState & EarningsActions>(
   (set, get) => ({
     ...initialState,
@@ -56,10 +63,8 @@ export const useEarningsStore = create<EarningsState & EarningsActions>(
     fetchEarnings: async () => {
       const { loading, lastFetchedAt } = get();
 
-      // Bail out if a fetch is already in-flight
       if (loading) return;
 
-      // Serve from cache if data is still fresh
       if (lastFetchedAt !== null && Date.now() - lastFetchedAt < CACHE_TTL_MS) {
         return;
       }
@@ -95,7 +100,6 @@ export const useEarningsStore = create<EarningsState & EarningsActions>(
 
 // ─── Subscribe to plan changes ─────────────────────────────────────────────────
 
-// Invalidate earnings cache when user's plan changes
 if (typeof window !== "undefined") {
   useUserStore.getState().onPlanChange(() => {
     useEarningsStore.getState().invalidateEarningsCache();
@@ -104,7 +108,12 @@ if (typeof window !== "undefined") {
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
-/** Aggregated totals only — cheap subscription for summary cards */
+/**
+ * Aggregated totals only — cheap subscription for summary cards.
+ *
+ * @param s - Combined global earnings store data slice object.
+ * @returns Filtered metrics mapping tracking fiat, crypto, and pending balances.
+ */
 export const selectEarningsTotals = (s: EarningsState & EarningsActions) => ({
   totalEarnings: s.totalEarnings,
   totalTrend: s.totalTrend,
@@ -114,11 +123,21 @@ export const selectEarningsTotals = (s: EarningsState & EarningsActions) => ({
   pendingPayouts: s.pendingPayouts,
 });
 
-/** Full breakdown list */
+/**
+ * Selects the full sequential itemization history of historical settlement events.
+ *
+ * @param s - Combined global earnings store data slice object.
+ * @returns Array collection containing explicit categorical items.
+ */
 export const selectEarningsBreakdown = (s: EarningsState & EarningsActions) =>
   s.breakdown;
 
-/** Loading + error meta */
+/**
+ * Extracts store processing states alongside validation limits.
+ *
+ * @param s - Combined global earnings store data slice object.
+ * @returns Consolidated runtime lifecycle metrics.
+ */
 export const selectEarningsMeta = (s: EarningsState & EarningsActions) => ({
   loading: s.loading,
   error: s.error,

@@ -1,7 +1,8 @@
 import { MetadataRoute } from "next";
+import { metadata } from "@/app/layout";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://clipcash.ai";
+  const baseUrl = metadata.metadataBase?.toString().replace(/\/$/, "") || "https://clipcash.ai";
 
   return [
     {
@@ -9,12 +10,6 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "weekly",
       priority: 1,
-    },
-    {
-      url: `${baseUrl}/login`,
-      lastModified: new Date(),
-      changeFrequency: "monthly",
-      priority: 0.8,
     },
     {
       url: `${baseUrl}/privacy`,
@@ -29,10 +24,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 0.3,
     },
     {
-      url: `${baseUrl}/status`,
+      url: `${baseUrl}/cookies`,
       lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 0.5,
+      changeFrequency: "yearly",
+      priority: 0.3,
     },
   ];
 }
