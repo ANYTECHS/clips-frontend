@@ -8,9 +8,10 @@ export interface DonutSlice {
 
 export interface DonutChartProps {
   slices: DonutSlice[];
+  ariaLabel?: string;
 }
 
-export function DonutChart({ slices }: DonutChartProps) {
+export function DonutChart({ slices, ariaLabel }: DonutChartProps) {
   const total = slices.reduce((s, d) => s + d.value, 0);
   if (total === 0) return null;
 
@@ -45,7 +46,7 @@ export function DonutChart({ slices }: DonutChartProps) {
   );
 
   return (
-    <svg viewBox="0 0 160 160" className="w-full max-w-[160px]" aria-hidden="true">
+    <svg viewBox="0 0 160 160" className="w-full max-w-[160px]" role="img" aria-label={ariaLabel}>
       {arcs.map((arc) => (
         <path
           key={arc.label}
@@ -57,10 +58,10 @@ export function DonutChart({ slices }: DonutChartProps) {
         />
       ))}
       <text x={cx} y={cy - 6} textAnchor="middle" fill="white" fontSize="13" fontWeight="800">
-        {slices[0] ? `${(slices[0].pct * 100).toFixed(0)}%` : ""}
+        {arcs[0] ? `${(arcs[0].pct * 100).toFixed(0)}%` : ""}
       </text>
       <text x={cx} y={cy + 10} textAnchor="middle" fill="#8d97ac" fontSize="9" fontWeight="600">
-        {slices[0]?.label ?? ""}
+        {arcs[0]?.label ?? ""}
       </text>
     </svg>
   );

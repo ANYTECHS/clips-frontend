@@ -172,7 +172,11 @@ export default function WalletPortfolioPage() {
                   {/* Sparkline — only shown when real history is available */}
                   {history !== null && history.length > 1 && (
                     <div className="mt-2">
-                      <Sparkline values={history} color={isUp ? "var(--color-brand, #00FF9D)" : "#EF4444"} />
+                      <Sparkline 
+                        values={history} 
+                        color={isUp ? "var(--color-brand, #00FF9D)" : "#EF4444"}
+                        aria-label="14-day portfolio value trend"
+                      />
                       <p className="text-muted text-[10px] mt-1">14-day balance history</p>
                     </div>
                   )}
@@ -208,7 +212,10 @@ export default function WalletPortfolioPage() {
                   <span className="text-muted text-[11px] font-semibold uppercase tracking-wider self-start">
                     Asset Allocation
                   </span>
-                  <DonutChart slices={donutSlices} />
+                  <DonutChart 
+                    slices={donutSlices} 
+                    aria-label={`Asset allocation: ${donutSlices.map(s => `${s.label} ${((s.value / totalUsd) * 100).toFixed(1)}%`).join(', ')}`}
+                  />
                   <div className="w-full space-y-2">
                     {donutSlices.map((s) => (
                       <div key={s.label} className="flex items-center justify-between text-[12px]">
