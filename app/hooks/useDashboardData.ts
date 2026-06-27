@@ -49,8 +49,10 @@ export function useDashboardData(): {
   data: DashboardData | null;
   loading: boolean;
   error: Error | null;
+  retry: () => void;
 } {
   const fetchDashboard = useDashboardStore((s: DashboardState & DashboardActions) => s.fetchDashboard);
+  const invalidateCache = useDashboardStore((s: DashboardState & DashboardActions) => s.invalidateCache);
   const stats = useDashboardStore(selectStats);
   const revenueTrend = useDashboardStore(selectRevenueTrend);
   const recentProjects = useDashboardStore(selectRecentProjects);
@@ -69,5 +71,9 @@ export function useDashboardData(): {
     data,
     loading,
     error: error ? new Error(error) : null,
+    retry: () => {
+      invalidateCache();
+      fetchDashboard();
+    },
   };
 }

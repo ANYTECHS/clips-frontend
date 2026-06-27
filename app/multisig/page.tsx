@@ -235,7 +235,7 @@ export default function MultisigPage() {
                                         onChange={(event) => setSourcePublicKey(event.target.value)}
                                         onBlur={handleSourceBlur}
                                         placeholder="G..."
-                                        className={`w-full rounded-2xl border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-brand ${sourcePublicKeyError ? "border-red-500" : "border-white/10"}`}
+                                        className={`w-full rounded-2xl border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand ${sourcePublicKeyError ? "border-red-500" : "border-white/10"}`}
                                         required
                                     />
                                     {sourcePublicKeyError && (
@@ -250,7 +250,7 @@ export default function MultisigPage() {
                                         onChange={(event) => setSignerPublicKey(event.target.value)}
                                         onBlur={handleSignerBlur}
                                         placeholder="G..."
-                                        className={`w-full rounded-2xl border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus:border-brand ${signerPublicKeyError ? "border-red-500" : "border-white/10"}`}
+                                        className={`w-full rounded-2xl border bg-white/5 px-4 py-3 text-sm text-white placeholder:text-white/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand ${signerPublicKeyError ? "border-red-500" : "border-white/10"}`}
                                         required
                                     />
                                     {signerPublicKeyError && (
@@ -268,7 +268,7 @@ export default function MultisigPage() {
                                         max={255}
                                         value={masterWeight}
                                         onChange={(event) => setMasterWeight(Number(event.target.value))}
-                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
+                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
                                     />
                                 </label>
                                 <label className="space-y-2 text-sm text-muted-foreground">
@@ -279,7 +279,7 @@ export default function MultisigPage() {
                                         max={255}
                                         value={lowThreshold}
                                         onChange={(event) => setLowThreshold(Number(event.target.value))}
-                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
+                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
                                     />
                                 </label>
                             </div>
@@ -293,7 +293,7 @@ export default function MultisigPage() {
                                         max={255}
                                         value={medThreshold}
                                         onChange={(event) => setMedThreshold(Number(event.target.value))}
-                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
+                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
                                     />
                                 </label>
                                 <label className="space-y-2 text-sm text-muted-foreground">
@@ -304,7 +304,7 @@ export default function MultisigPage() {
                                         max={255}
                                         value={highThreshold}
                                         onChange={(event) => setHighThreshold(Number(event.target.value))}
-                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus:border-brand"
+                                        className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand"
                                     />
                                 </label>
                             </div>

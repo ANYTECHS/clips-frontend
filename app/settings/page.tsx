@@ -625,7 +625,7 @@ export default function SettingsPage() {
                                 placeholder="Starts with 'S'... (56 characters)"
                                 value={importKeyInput}
                                 onChange={(e) => setImportKeyInput(e.target.value)}
-                                className="w-full bg-input border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none transition-colors"
+                                className="w-full bg-input border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
                               />
                             </div>
 

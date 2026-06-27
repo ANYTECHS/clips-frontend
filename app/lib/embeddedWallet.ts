@@ -33,7 +33,7 @@
  * The `walletType: "smart_contract"` field is reserved for this upgrade.
  */
 
-import { WalletStorage, WalletStorageError } from "./walletStorage";
+import { WalletStorage, WalletStorageError } from "./walletRepository";
 import { getStellarNetwork, NETWORK_CONFIGS, StellarNetwork } from "./networkConfig";
 import { withRetry, withFallback } from "./retryUtils";
 

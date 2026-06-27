@@ -14,6 +14,7 @@
  */
 
 import { create } from "zustand";
+import * as Sentry from "@sentry/nextjs";
 import type {
   DashboardState,
   DashboardActions,
@@ -77,6 +78,7 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
           error: null,
         });
       } catch (err) {
+        Sentry.captureException(err);
         set({
           loading: false,
           error:

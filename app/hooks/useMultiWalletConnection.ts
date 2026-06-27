@@ -20,7 +20,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useWallet } from "@/components/wallet/WalletProvider";
 import { useMultiWallet } from "@/components/wallet/MultiWalletProvider";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { MultiWalletRecord, WalletProviderType } from "@/app/lib/multiWalletStorage";
+import { MultiWalletRecord, WalletProviderType } from "@/app/lib/walletRepository";
 import { migrateToMultiWallet } from "@/components/wallet/MultiWalletProvider";
 
 const POLL_INTERVAL_MS = 50;
