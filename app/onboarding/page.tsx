@@ -394,7 +394,7 @@ export default function OnboardingPage() {
   };
 
   const inputClass = (field: string) =>
-    `w-full bg-input border text-white rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none transition-all placeholder-subtle ${
+    `w-full bg-input border text-white rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-all placeholder-subtle ${
       touched[field] && errors[field as keyof OnboardingErrors]
         ? "border-red-500/50 bg-red-500/5 focus:border-red-500"
         : "border-border focus:border-brand/70 focus:bg-surface-hover"
