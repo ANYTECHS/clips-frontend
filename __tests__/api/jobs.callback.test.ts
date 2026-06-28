@@ -260,7 +260,18 @@ describe("input validation", () => {
     expect(res.status).toBe(422);
   });
 
-  it("returns 400 for non-JSON body", async () => {
+  it("returns 400 for missing Content-Type header", async () => {
+    const req = new NextRequest("http://localhost/api/jobs/job1/callback", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${CALLBACK_SECRET}` },
+      body: JSON.stringify({ status: "processing" }),
+    });
+    const res = await callbackPOST(req, makeContext("job1"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Content-Type must be application/json" });
+  });
+
+  it("returns 400 for incorrect Content-Type header", async () => {
     const req = new NextRequest("http://localhost/api/jobs/job1/callback", {
       method: "POST",
       headers: { "Content-Type": "text/plain", Authorization: `Bearer ${CALLBACK_SECRET}` },
@@ -268,5 +279,17 @@ describe("input validation", () => {
     });
     const res = await callbackPOST(req, makeContext("job1"));
     expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Content-Type must be application/json" });
+  });
+
+  it("returns 400 for malformed JSON payload", async () => {
+    const req = new NextRequest("http://localhost/api/jobs/job1/callback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${CALLBACK_SECRET}` },
+      body: "{\"status\": \"processing\", \"progress\": 10",
+    });
+    const res = await callbackPOST(req, makeContext("job1"));
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: "Invalid or malformed JSON payload" });
   });
 });

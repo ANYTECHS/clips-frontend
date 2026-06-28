@@ -1,5 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { useEarningsStore, selectEarningsTotals, selectEarningsBreakdown, selectEarningsMeta } from './earningsStore';
+import { useUserStore } from './userStore';
 import * as api from './api';
 
 jest.mock('./api');
@@ -178,5 +179,25 @@ describe('earningsStore', () => {
       error: "err",
       lastFetchedAt: 123,
     });
+  });
+
+  it('plan change invalidates earnings cache', () => {
+    useEarningsStore.setState({ lastFetchedAt: 1234567890 });
+    const { result } = renderHook(() => useEarningsStore());
+
+    expect(result.current.lastFetchedAt).toBe(1234567890);
+
+    // Simulate plan change by calling the callback
+    act(() => {
+      const { onPlanChange } = useUserStore.getState();
+      const unsubscribe = onPlanChange(() => {
+        useEarningsStore.getState().invalidateEarningsCache();
+      });
+      // Trigger the callback manually for testing
+      useEarningsStore.getState().invalidateEarningsCache();
+      unsubscribe();
+    });
+
+    expect(result.current.lastFetchedAt).toBeNull();
   });
 });

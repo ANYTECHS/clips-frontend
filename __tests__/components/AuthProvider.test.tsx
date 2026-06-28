@@ -1,6 +1,6 @@
 import React from "react";
 import { render, waitFor, act } from "@testing-library/react";
-import { AuthProvider, useAuth } from "@/components/AuthProvider";
+import { AuthProvider, useAuth } from "@/components/auth/AuthProvider";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 

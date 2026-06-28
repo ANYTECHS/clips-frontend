@@ -6,12 +6,37 @@
  */
 
 import React from "react";
+import { useSession } from "next-auth/react";
 import ClipsNavbar from "../../components/clips/ClipsNavbar";
 import Hero from "../../components/clips/Hero";
+// @TODO(Issue #18): CreateClipsForm and ClipsStats components are pending implementation.
+// Once Issue #18 is resolved, these imports should resolve correctly.
 import CreateClipsForm from "../../components/clips/CreateClipsForm";
 import ClipsStats from "../../components/clips/ClipsStats";
+import { Loader2 } from "lucide-react";
 
 export default function ClipsPage() {
+  const { status } = useSession();
+
+  if (status === "loading") {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
+      </div>
+    );
+  }
+
+  if (status === "unauthenticated") {
+    // Return empty or loading state while middleware redirects,
+    // or an explicit fallback message if edge middleware is bypassed.
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-brand mb-4" />
+        <p className="text-muted">Redirecting to login...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background text-white font-sans selection:bg-brand/30 selection:text-brand relative overflow-x-hidden">
       {/* Background Glow Elements */}

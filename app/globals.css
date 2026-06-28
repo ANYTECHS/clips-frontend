@@ -82,6 +82,13 @@
     font-feature-settings: "rlig" 1, "calt" 1;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
+
+  /* Focus visible styles for keyboard navigation */
+  *:focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
 }
 
 /* Micro-animations and utility classes for effects */
@@ -177,6 +184,19 @@
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-spin {
+    animation-duration: 0.3s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 

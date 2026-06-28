@@ -78,7 +78,7 @@ export interface ProcessState {
 }
 
 export interface ProcessActions {
-  startProcess: (id: string, label: string) => void;
+  startProcess: (id: string, label: string) => string;
   update: (
     patch:
       | Partial<ProcessState>
@@ -143,4 +143,6 @@ export interface UserActions {
   fetchUser: () => Promise<void>;
   setProfile: (profile: UserProfile) => void;
   clearUser: () => void;
+  /** Register a callback to be invoked when the user's plan changes */
+  onPlanChange: (callback: (newPlan: UserProfile["plan"]) => void) => () => void;
 }

@@ -4,24 +4,24 @@
  * Hook that integrates the existing WalletProvider with the new MultiWalletProvider.
  *
  * Race-condition fix (issue #514):
- *   connectMetaMask() / connectPhantom() / connectStellar() / importStellarKey()
- *   on WalletProvider now return the connected address directly as part of their
- *   promise result.  This hook reads the returned address instead of reading
- *   wallet.address from React context (which may still be null at the point of
- *   reading because the context re-render hasn't happened yet).
+ * connectMetaMask() / connectPhantom() / connectStellar() / importStellarKey()
+ * on WalletProvider now return the connected address directly as part of their
+ * promise result. This hook reads the returned address instead of reading
+ * wallet.address from React context (which may still be null at the point of
+ * reading because the context re-render hasn't happened yet).
  *
- *   If — for any reason — the provider returns null/undefined (older provider
- *   build, edge-case error path) the hook falls back to a short poll of the
- *   context state, retrying up to MAX_POLL_ATTEMPTS times with POLL_INTERVAL_MS
- *   between each attempt.
+ * If — for any reason — the provider returns null/undefined (older provider
+ * build, edge-case error path) the hook falls back to a short poll of the
+ * context state, retrying up to MAX_POLL_ATTEMPTS times with POLL_INTERVAL_MS
+ * between each attempt.
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { useWallet } from "@/components/WalletProvider";
-import { useMultiWallet } from "@/components/MultiWalletProvider";
-import { useAuth } from "@/components/AuthProvider";
+import { useWallet } from "@/components/wallet/WalletProvider";
+import { useMultiWallet } from "@/components/wallet/MultiWalletProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { MultiWalletRecord, WalletProviderType } from "@/app/lib/multiWalletStorage";
-import { migrateToMultiWallet } from "@/components/MultiWalletProvider";
+import { migrateToMultiWallet } from "@/components/wallet/MultiWalletProvider";
 
 const POLL_INTERVAL_MS = 50;
 const MAX_POLL_ATTEMPTS = 20; // 1 second total
@@ -29,6 +29,10 @@ const MAX_POLL_ATTEMPTS = 20; // 1 second total
 /**
  * Poll wallet.address from context until it is non-null or we time out.
  * Used as a fallback when the connect method doesn't return the address.
+ * * @param getAddress - Synchronous resolver function extracting the current volatile context address value.
+ * @param intervalMs - Polling delay timer gap parameter measured in milliseconds.
+ * @param maxAttempts - Cap limit boundary restricting total check loops before rejecting.
+ * @returns Cryptographic destination key string or null if timeout window expires.
  */
 function pollAddress(
   getAddress: () => string | null,
@@ -53,6 +57,11 @@ function pollAddress(
   });
 }
 
+/**
+ * Custom hook managing complex aggregate multi-chain network provider integrations.
+ * Resolves context execution sync races using micro-polling fallbacks.
+ * * @returns Combined standard state data, active profile arrays, transaction configurations, and operation functions.
+ */
 export function useMultiWalletConnection() {
   const { user } = useAuth();
   const wallet = useWallet();
@@ -100,19 +109,19 @@ export function useMultiWalletConnection() {
     const address = await resolveAddress(returned);
 
     if (user?.id && address) {
-      try {
-        await multiWallet.addWallet({
-          publicKey: address,
-          walletType: "metamask",
-          chainId: wallet.chainId ?? undefined,
-          isPrimary: false,
-          isActive: true,
-          label: "MetaMask",
-        });
-      } catch (err) {
-        console.error("Failed to add MetaMask to multi-wallet list:", err);
+        try {
+          await multiWallet.addWallet({
+            publicKey: address,
+            walletType: "metamask",
+            chainId: wallet.chainId ?? undefined,
+            isPrimary: false,
+            isActive: true,
+            label: "MetaMask",
+          });
+        } catch (err) {
+          logger.error("Failed to add MetaMask to multi-wallet list:", err);
+        }
       }
-    }
   }, [wallet, user?.id, multiWallet, resolveAddress]);
 
   /** Connect to Phantom and add to multi-wallet list */
@@ -121,19 +130,19 @@ export function useMultiWalletConnection() {
     const address = await resolveAddress(returned);
 
     if (user?.id && address) {
-      try {
-        await multiWallet.addWallet({
-          publicKey: address,
-          walletType: "phantom",
-          chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h",
-          isPrimary: false,
-          isActive: true,
-          label: "Phantom",
-        });
-      } catch (err) {
-        console.error("Failed to add Phantom to multi-wallet list:", err);
+        try {
+          await multiWallet.addWallet({
+            publicKey: address,
+            walletType: "phantom",
+            chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h",
+            isPrimary: false,
+            isActive: true,
+            label: "Phantom",
+          });
+        } catch (err) {
+          logger.error("Failed to add Phantom to multi-wallet list:", err);
+        }
       }
-    }
   }, [wallet, user?.id, multiWallet, resolveAddress]);
 
   /** Connect to Stellar and add to multi-wallet list */
@@ -142,45 +151,50 @@ export function useMultiWalletConnection() {
     const address = await resolveAddress(returned);
 
     if (user?.id && address) {
-      try {
-        await multiWallet.addWallet({
-          publicKey: address,
-          walletType: "stellar",
-          network: "testnet",
-          isPrimary: false,
-          isActive: true,
-          label: "Stellar Wallet",
-          _encodedSecret: wallet.stellarSecret ? btoa(wallet.stellarSecret) : undefined,
-        });
-      } catch (err) {
-        console.error("Failed to add Stellar to multi-wallet list:", err);
+        try {
+          await multiWallet.addWallet({
+            publicKey: address,
+            walletType: "stellar",
+            network: "testnet",
+            isPrimary: false,
+            isActive: true,
+            label: "Stellar Wallet",
+            _encodedSecret: wallet.stellarSecret ? btoa(wallet.stellarSecret) : undefined,
+          });
+        } catch (err) {
+          logger.error("Failed to add Stellar to multi-wallet list:", err);
+        }
       }
-    }
   }, [wallet, user?.id, multiWallet, resolveAddress]);
 
-  /** Import existing Stellar key and add to multi-wallet list */
+  /** * Import existing Stellar key and add to multi-wallet list 
+   * * @param secret - The private plain text seed string target configuration block.
+   */
   const importStellarKey = useCallback(async (secret: string) => {
     const returned = await wallet.importStellarKey(secret);
     const address = await resolveAddress(returned);
 
     if (user?.id && address) {
-      try {
-        await multiWallet.addWallet({
-          publicKey: address,
-          walletType: "imported",
-          network: "testnet",
-          isPrimary: false,
-          isActive: true,
-          label: "Imported Wallet",
-          _encodedSecret: btoa(secret),
-        });
-      } catch (err) {
-        console.error("Failed to add imported wallet to multi-wallet list:", err);
+        try {
+          await multiWallet.addWallet({
+            publicKey: address,
+            walletType: "imported",
+            network: "testnet",
+            isPrimary: false,
+            isActive: true,
+            label: "Imported Wallet",
+            _encodedSecret: btoa(secret),
+          });
+        } catch (err) {
+          logger.error("Failed to add imported wallet to multi-wallet list:", err);
+        }
       }
-    }
   }, [wallet, user?.id, multiWallet, resolveAddress]);
 
-  /** Switch to a different wallet from the multi-wallet list */
+  /** * Switch to a different wallet from the multi-wallet list 
+   * * @param walletId - Primary identification string matching the target connection entity.
+   * @throws {Error} Throws an issue descriptor context message if matching profile mappings cannot be found.
+   */
   const switchWallet = useCallback(
     async (walletId: string) => {
       const targetWallet = multiWallet.wallets.find((w) => w.id === walletId);
@@ -205,7 +219,7 @@ export function useMultiWalletConnection() {
           }
           break;
         default:
-          console.warn(`Unknown wallet type: ${targetWallet.walletType}`);
+          logger.warn(`Unknown wallet type: ${targetWallet.walletType}`);
       }
     },
     [multiWallet, wallet]
@@ -216,7 +230,9 @@ export function useMultiWalletConnection() {
     wallet.disconnect();
   }, [wallet]);
 
-  /** Remove a wallet from the multi-wallet list */
+  /** * Remove a wallet from the multi-wallet list 
+   * * @param walletId - Tracking ID target string slated for erasure processing.
+   */
   const removeWallet = useCallback(
     (walletId: string) => {
       const targetWallet = multiWallet.wallets.find((w) => w.id === walletId);

@@ -159,11 +159,18 @@ describe("getBalance", () => {
   });
 });
 
+// Every test suite that calls fetchXLMPrice() MUST call resetXlmPriceCache()
+// in beforeEach/afterEach to clear the module-level Promise deduplication guard.
+// Failure to do so will cause cross-test Promise leaks and flaky results.
 describe("fetchXLMPrice caching", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     resetXlmPriceCache();
     configureXlmPriceCacheTtl(300_000);
+  });
+
+  afterEach(() => {
+    resetXlmPriceCache();
   });
 
   it("shares cached price across concurrent callers", async () => {
@@ -227,6 +234,7 @@ describe("useBalance", () => {
   });
 
   afterEach(() => {
+    resetXlmPriceCache();
     jest.useRealTimers();
   });
 
@@ -359,11 +367,19 @@ describe("useBalance", () => {
     };
 
     (global.fetch as jest.Mock)
-      .mockResolvedValue({
+      .mockResolvedValueOnce({
         ok: true,
         json: async () => mockAccountData,
       })
-      .mockResolvedValue({
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockPriceData,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockAccountData,
+      })
+      .mockResolvedValueOnce({
         ok: true,
         json: async () => mockPriceData,
       });
@@ -381,11 +397,6 @@ describe("useBalance", () => {
     });
 
     const firstFetchTime = result.current.lastFetchTime;
-
-    // Wait a bit
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100));
-    });
 
     // Manual refresh
     await act(async () => {
@@ -407,11 +418,19 @@ describe("useBalance", () => {
     };
 
     (global.fetch as jest.Mock)
-      .mockResolvedValue({
+      .mockResolvedValueOnce({
         ok: true,
         json: async () => mockAccountData,
       })
-      .mockResolvedValue({
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockPriceData,
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockAccountData,
+      })
+      .mockResolvedValueOnce({
         ok: true,
         json: async () => mockPriceData,
       });
@@ -448,11 +467,17 @@ describe("useBalance", () => {
   });
 
   it("should clear error", async () => {
-    (global.fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-      statusText: "Not Found",
-    });
+    (global.fetch as jest.Mock)
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: "Not Found",
+      });
 
     const { result } = renderHook(() =>
       useBalance({
@@ -493,14 +518,14 @@ describe("useBalance", () => {
       });
 
     const { result, rerender } = renderHook(
-      ({ publicKey }) =>
+      ({ publicKey }: { publicKey: string | null }) =>
         useBalance({
           publicKey,
           network: "TESTNET",
           autoRefresh: false,
         }),
       {
-        initialProps: { publicKey: "GTEST123" },
+        initialProps: { publicKey: "GTEST123" as string | null },
       }
     );
 

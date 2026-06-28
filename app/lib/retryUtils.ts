@@ -5,6 +5,9 @@
  * other async operations that may fail transiently.
  */
 
+/**
+ * Configuration options governing execution constraints for automated retry loops.
+ */
 export interface RetryOptions {
   /** Maximum number of attempts (including the first). Default: 3 */
   maxAttempts?: number;
@@ -30,6 +33,11 @@ export interface RetryOptions {
  *
  * @example
  * const result = await withRetry(() => fetchSomething(), { maxAttempts: 3 });
+ * * @template T - The resolution type of the async execution callback.
+ * @param fn - Async invocation task wrapped within the automated processing cycle.
+ * @param options - Configuration modifiers specifying intervals, limits, and interceptors.
+ * @returns Resolves with the expected functional execution result upon a clean loop finish.
+ * @throws {unknown} Re-throws the final upstream execution exception if all allocated attempts exhaust.
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -70,7 +78,11 @@ export async function withRetry<T>(
   throw lastError;
 }
 
-/** Promise-based sleep helper */
+/**
+ * Promisified timeout helper that yields execution control blocks for standard durations.
+ * * @param ms - Total timing window window duration specified in milliseconds.
+ * @returns Complete thread block resolution promise instance.
+ */
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -79,6 +91,11 @@ export function sleep(ms: number): Promise<void> {
  * Attempt `fn` and return a fallback value instead of throwing.
  * Useful for non-critical operations (e.g. Friendbot funding) where
  * failure should degrade gracefully rather than surface an error.
+ * * @template T - Underlying evaluation return type constraint.
+ * @param fn - Main operational candidate logic target execution path.
+ * @param fallback - The pre-calculated structure to yield on intercepted failures.
+ * @param onError - Optional evaluation listener notifying root code blocks of underlying rejections.
+ * @returns Resolves with either original primary target results or designated backup contexts.
  */
 export async function withFallback<T>(
   fn: () => Promise<T>,

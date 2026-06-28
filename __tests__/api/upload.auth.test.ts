@@ -49,6 +49,28 @@ function makeVideoFile(name = "video.mp4", size = 1024) {
   return new File([new Uint8Array(size)], name, { type: "video/mp4" });
 }
 
+function makeMp4FileWithMagicBytes() {
+  // Valid MP4 magic bytes: starts with ftyp at offset 4
+  const buffer = new Uint8Array(32);
+  buffer[4] = 0x66; // 'f'
+  buffer[5] = 0x74; // 't'
+  buffer[6] = 0x79; // 'y'
+  buffer[7] = 0x70; // 'p'
+  return new File([buffer], "video.mp4", { type: "video/mp4" });
+}
+
+function makeExeFileAsMp4() {
+  // Invalid magic bytes - looks like EXE (MZ header)
+  const buffer = new Uint8Array(32);
+  buffer[0] = 0x4D; // 'M'
+  buffer[1] = 0x5A; // 'Z'
+  return new File([buffer], "malware.mp4", { type: "video/mp4" });
+}
+
+function makeEmptyFile() {
+  return new File([new Uint8Array(0)], "empty.mp4", { type: "video/mp4" });
+}
+
 beforeEach(() => {
   process.env.NEXTAUTH_URL = APP_ORIGIN;
   jobStore.clear();
@@ -110,5 +132,29 @@ describe("POST /api/upload", () => {
     mockGetServerSession.mockResolvedValue({ user: { id: "user-123" } });
     const res = await POST(makeUploadRequest());
     expect(res.status).toBe(400);
+  });
+
+  describe("magic bytes validation", () => {
+    it("accepts valid MP4 file with correct magic bytes", async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: "user-123" } });
+      const res = await POST(makeUploadRequest(makeMp4FileWithMagicBytes()));
+      expect(res.status).toBe(200);
+    });
+
+    it("rejects EXE file masquerading as MP4", async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: "user-123" } });
+      const res = await POST(makeUploadRequest(makeExeFileAsMp4()));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("File content does not match declared type");
+    });
+
+    it("rejects empty file", async () => {
+      mockGetServerSession.mockResolvedValue({ user: { id: "user-123" } });
+      const res = await POST(makeUploadRequest(makeEmptyFile()));
+      expect(res.status).toBe(400);
+      const body = await res.json();
+      expect(body.error).toBe("File is too small to be a valid video file");
+    });
   });
 });
