@@ -1,6 +1,6 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react';
-import { WalletProvider, useWallet, truncateAddress } from '@/components/WalletProvider';
+import { WalletProvider, useWallet, truncateAddress } from '@/components/wallet/WalletProvider';
 import { secureStorage } from '@/app/lib/secureStorage';
 
 // Mock secureStorage

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import DashboardHeader from "@/app/components/DashboardHeader";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
 
 export default function EarningsLayout({ children }: { children: React.ReactNode }) {
   return (

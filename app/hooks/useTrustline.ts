@@ -2,27 +2,39 @@
 
 import { useState, useCallback } from "react";
 import * as StellarSdk from "@stellar/stellar-sdk";
-import { buildBatchTransaction, NETWORK_PASSPHRASE, getStellarServer } from "@/app/lib/stellar";
+import { buildBatchTransaction, getStellarServer } from "@/app/lib/stellar";
+import { getNetworkPassphrase, getStellarNetwork } from "@/app/lib/networkConfig";
 import { createChangeTrustOp } from "@/app/lib/stellarOperations";
-import { STELLAR_NETWORK } from "@/app/lib/networkConfig";
 import analytics from "@/lib/analytics";
 
+/** Processing lifecycle phases for tracking trustline transaction states */
 export type TrustlineStatus = "idle" | "building" | "submitting" | "success" | "error";
 
+/** Error boundary payload mapping context keys to localized message content */
 export interface TrustlineError {
+  /** Machine-readable error code string identifier */
   code: string;
+  /** Detailed human-readable contextual message payload */
   message: string;
 }
 
+/** Interface payload documenting a successful blockchain modification entry */
 export interface TrustlineResult {
+  /** The unique hash identifier string of the confirmed ledger transaction */
   hash: string;
+  /** The alphanumeric identifier code string for the target asset */
   assetCode: string;
+  /** The public cryptographic key address of the issuing account */
   assetIssuer: string;
+  /** Explicit descriptor string specifying the direction of the trust alteration */
   action: "add" | "remove";
 }
 
+/** Configuration callbacks executed during terminal lifecycle resolution states */
 export interface UseTrustlineOptions {
+  /** Optional handler callback fired precisely upon successful node verification confirmation */
   onSuccess?: (result: TrustlineResult) => void;
+  /** Optional handler callback executed when parsing or network transport errors arise */
   onError?: (error: TrustlineError) => void;
 }
 
@@ -30,8 +42,10 @@ export interface UseTrustlineOptions {
  * Hook for creating and removing Stellar asset trustlines.
  *
  * Supports two signing modes:
- *  - Embedded wallet: pass `secretKey` directly (Web2 flow)
- *  - Freighter: leave `secretKey` undefined — the hook signs via window.freighter
+ * - Embedded wallet: pass `secretKey` directly (Web2 flow)
+ * - Freighter: leave `secretKey` undefined — the hook signs via window.freighter
+ * * @param options - Configuration hooks setting success and failure response callbacks.
+ * @returns State metrics, flags, explicit actions, and clearing hooks.
  */
 export function useTrustline(options: UseTrustlineOptions = {}) {
   const { onSuccess, onError } = options;
@@ -40,6 +54,9 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
   const [error, setError] = useState<TrustlineError | null>(null);
   const [result, setResult] = useState<TrustlineResult | null>(null);
 
+  /**
+   * Resets the volatile runtime states to clear historical transaction artifacts.
+   */
   const reset = useCallback(() => {
     setStatus("idle");
     setError(null);
@@ -49,12 +66,14 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
   /**
    * Add or remove a trustline.
    *
-   * @param publicKey  - Source account public key
-   * @param assetCode  - Asset code, e.g. "USDC"
-   * @param assetIssuer - Issuer public key
-   * @param action     - "add" (default limit) or "remove" (limit = "0")
-   * @param secretKey  - Optional: embedded wallet secret key. If omitted, Freighter is used.
-   * @param limit      - Optional custom trust limit (only for "add")
+   * @param params - Packed parameter arguments defining the trust modifications.
+   * @param params.publicKey - Source account public key
+   * @param params.assetCode - Asset code, e.g. "USDC"
+   * @param params.assetIssuer - Issuer public key
+   * @param params.action - "add" (default limit) or "remove" (limit = "0")
+   * @param params.secretKey - Optional: embedded wallet secret key. If omitted, Freighter is used.
+   * @param params.limit - Optional custom trust limit (only for "add")
+   * @returns Resolves to a finalized TrustlineResult structural report on success, or null if errors persist.
    */
   const changeTrustline = useCallback(
     async (params: {
@@ -97,7 +116,10 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
         if (secretKey) {
           // Embedded wallet: sign locally with the secret key
           const keypair = StellarSdk.Keypair.fromSecret(secretKey);
-          const tx = StellarSdk.TransactionBuilder.fromXDR(xdr, NETWORK_PASSPHRASE);
+          const tx = StellarSdk.TransactionBuilder.fromXDR(
+            xdr,
+            getNetworkPassphrase()
+          );
           tx.sign(keypair);
           signedXdr = tx.toEnvelope().toXDR("base64");
         } else {
@@ -110,7 +132,7 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
               message: "Freighter wallet is not installed. Please install the Freighter browser extension.",
             } as TrustlineError;
           }
-          const freighterNetwork = STELLAR_NETWORK === "mainnet" ? "PUBLIC" : "TESTNET";
+          const freighterNetwork = getStellarNetwork() === "mainnet" ? "PUBLIC" : "TESTNET";
           signedXdr = await freighter.signTransaction(xdr, {
             network: freighterNetwork,
             accountToSign: publicKey,
@@ -126,7 +148,7 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
         // Submit to Horizon
         setStatus("submitting");
         const server = getStellarServer();
-        const signedTx = StellarSdk.TransactionBuilder.fromXDR(signedXdr, NETWORK_PASSPHRASE);
+        const signedTx = StellarSdk.TransactionBuilder.fromXDR(signedXdr, getNetworkPassphrase());
         const horizonResult = await server.submitTransaction(signedTx as StellarSdk.Transaction);
 
         const trustlineResult: TrustlineResult = {
@@ -142,7 +164,7 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
           action,
           assetCode,
           walletType: secretKey ? "stellar_embedded" : "freighter",
-          network: STELLAR_NETWORK,
+          network: getStellarNetwork(),
         });
         onSuccess?.(trustlineResult);
         return trustlineResult;

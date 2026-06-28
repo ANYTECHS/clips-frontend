@@ -20,6 +20,7 @@
  * trusted third-party pages (which it does not).
  */
 
+import { logger } from "@/app/lib/logger";
 import { NextRequest, NextResponse } from "next/server";
 
 export interface CsrfOptions {
@@ -57,7 +58,7 @@ export function checkCsrf(
     // NEXTAUTH_URL is not configured — warn and allow so that local dev
     // without a full .env does not hard-block. validateEnv will have already
     // warned about this at startup.
-    console.warn(
+    logger.warn(
       "[csrf] NEXTAUTH_URL is not set; skipping origin check. " +
         "Set NEXTAUTH_URL to enable CSRF protection."
     );
@@ -116,6 +117,6 @@ function extractOrigin(request: NextRequest): string | null {
 function forbidden(reason: string): NextResponse {
   // Log server-side so the reason is visible in server logs without leaking it
   // to the caller (which only receives a terse message).
-  console.warn(`[csrf] Blocked request: ${reason}`);
+  logger.warn(`[csrf] Blocked request: ${reason}`);
   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 }

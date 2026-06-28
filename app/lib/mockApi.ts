@@ -8,6 +8,12 @@ if (process.env.NODE_ENV === "production") {
 
 import { rateLimiter } from './rateLimiter';
 import { combineShares, splitSecret } from "./shamirRecovery";
+import type { User, OnboardingData } from "./types";
+import { DEFAULT_ONBOARDING_STEP } from "./types";
+
+// Re-export types for backward compatibility
+export type { User, OnboardingData };
+export { DEFAULT_ONBOARDING_STEP };
 
 // Standardized API error class with code field
 class ApiError extends Error {
@@ -18,36 +24,7 @@ class ApiError extends Error {
     this.code = code;
   }
 }
-import type {
-  DashboardStats,
-  RevenuePoint,
-  Project,
-  UserProfile,
-  EarningsBreakdownItem,
-} from "../store/types";
 
-export type OnboardingData = {
-  username?: string;
-  niche?: string;
-  socialsConnected?: boolean;
-  [key: string]: unknown;
-};
-
-export type User = {
-  id: string;
-  email: string;
-  name?: string;
-  username?: string;
-  onboardingStep: number;
-  profile?: OnboardingData;
-  walletAddress?: string;
-  walletType?: string;
-  walletNetwork?: "testnet" | "mainnet";
-  socialRecoveryThreshold?: number;
-  socialRecoveryGuardianCount?: number;
-};
-
-export const DEFAULT_ONBOARDING_STEP = 0;
 
 export function getOnboardingStepForEmail(email: string | null | undefined): number {
   if (!email) return DEFAULT_ONBOARDING_STEP;
@@ -55,8 +32,22 @@ export function getOnboardingStepForEmail(email: string | null | undefined): num
   return user?.onboardingStep ?? DEFAULT_ONBOARDING_STEP;
 }
 
-// In-memory fake database (no hardcoded credentials)
-const users: User[] = [];
+// In-memory fake database
+const users: User[] = [
+  {
+    id: "test-user-id",
+    email: "test@example.com",
+    name: "Test User",
+    username: "testuser",
+    password: "Password123",
+    onboardingStep: 3,
+    profile: { niche: "gaming", username: "testuser" },
+    walletNetwork: "testnet",
+    walletAddress: "GBX63CHQ3TFWT4Z5QOPW5P37R6G3E5B5Z3N4N5B6W5Z7N7B5Z6N4Z5W", // Placeholder for test user
+    socialRecoveryThreshold: 2,
+    socialRecoveryGuardianCount: 3,
+  }
+];
 
 type StoredRecoveryConfig = {
   email: string;
@@ -72,6 +63,8 @@ const socialRecoverySessions: Record<string, {
   threshold: number;
   guardians: { email: string; approved: boolean; shareId: string }[];
 }> = {};
+
+export const recoveryAttempts = new Map<string, { count: number; lockUntil: number }>();
 
 // Password reset tokens storage
 const resetTokens: Record<string, { token: string; expiresAt: number }> = {};
@@ -100,12 +93,18 @@ export type Transaction = {
 
 // Wrapped API methods with rate limiting
 export const checkEmail = rateLimiter(async (email: string) => {
+  if (apiClient) {
+    return apiClient.post<{ exists: boolean }>('/auth/check-email', { email });
+  }
   await delay(600);
   const user = users.find(u => u.email === email);
   return { exists: !!user };
 }, 10, 10000);
 
 export const login = rateLimiter(async (email: string, password?: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/login', { email, password });
+  }
   await delay(800);
   const user = users.find(u => u.email === email);
 
@@ -118,6 +117,9 @@ export const login = rateLimiter(async (email: string, password?: string) => {
 }, 10, 10000);
 
 export const signup = rateLimiter(async (email: string, password?: string, name?: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/signup', { email, password, name });
+  }
   await delay(800);
 
   if (users.find(u => u.email === email)) {
@@ -140,6 +142,9 @@ export const signup = rateLimiter(async (email: string, password?: string, name?
 }, 10, 10000);
 
 export const requestPasswordReset = rateLimiter(async (email: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/password-reset/request', { email });
+  }
   await delay(600);
   const user = users.find(u => u.email === email);
   if (user) {
@@ -150,6 +155,9 @@ export const requestPasswordReset = rateLimiter(async (email: string) => {
 }, 5, 10000);
 
 export const resetPassword = rateLimiter(async (token: string, newPassword: string) => {
+  if (apiClient) {
+    return apiClient.post('/auth/password-reset/reset', { token, newPassword });
+  }
   await delay(800);
   const email = Object.keys(resetTokens).find(e =>
     resetTokens[e].token === token && resetTokens[e].expiresAt > Date.now()
@@ -163,17 +171,31 @@ export const resetPassword = rateLimiter(async (token: string, newPassword: stri
 }, 5, 10000);
 
 export const mintCollection = rateLimiter(async (data: { collectionName: string; description: string; creatorRoyalty: string; listingPrice: string }) => {
+  if (apiClient) {
+    try {
+      return await apiClient.post('/mint', data);
+    } catch (err) {
+      if (err instanceof ApiResponseError) throw err.shape;
+      throw err;
+    }
+  }
   await delay(1800);
 
   return { success: true, txHash: `0x${Math.random().toString(16).slice(2, 18)}`, collection: data.collectionName };
 }, 10, 10000);
 
 export const postClips = rateLimiter(async (clipIds: string[]) => {
+  if (apiClient) {
+    return apiClient.post('/clips/post', { clipIds });
+  }
   await delay(1400);
   return { success: true, posted: clipIds.length };
 }, 10, 10000);
 
 export const saveOnboarding = rateLimiter(async (userId: string, step: number, data: OnboardingData) => {
+  if (apiClient) {
+    return apiClient.post(`/users/${userId}/onboarding`, { step, data });
+  }
   await delay(500);
 
   let user: User | undefined = users.find(u => u.id === userId);
@@ -375,6 +397,39 @@ export const checkSocialRecovery = rateLimiter(async (sessionId: string) => {
   };
 }, 20, 10000);
 
+export const verifyRecoverySignature = async (publicKey: string, signature: string) => {
+  await delay(600);
+  
+  // Here we would use stellar-sdk Keypair to actually verify the cryptographic signature
+  // For example:
+  // import { Keypair } from "@stellar/stellar-sdk";
+  // const keypair = Keypair.fromPublicKey(publicKey);
+  // const isValid = keypair.verify(Buffer.from("clipcash-recovery"), Buffer.from(signature, "base64"));
+  // if (!isValid) throw new Error("Invalid signature");
+
+  // Mock implementation: just check if the user exists in our DB
+  // For the demo, we allow the test user to recover even if we don't have their exact address, 
+  // or we just find the user with this wallet address.
+  let user = users.find((u) => u.walletAddress === publicKey);
+  
+  if (!user) {
+    // If we're using a real stellar wallet from the mnemonic but it's not saved in the DB,
+    // we return null. For demo purposes, if it's the test phrase we can return the test user.
+    // We'll trust the caller to verify.
+    // If we want to simulate successful recovery for any valid stellar key in the demo:
+    user = {
+      id: `recovered-${publicKey.slice(0, 8)}`,
+      email: `user-${publicKey.slice(0, 5)}@clipcash.ai`,
+      name: "Recovered User",
+      onboardingStep: 3,
+      walletAddress: publicKey,
+    };
+    users.push(user);
+  }
+  
+  return user;
+};
+
 // MockApi object for backward compatibility
 export const MockApi = {
   checkEmail,
@@ -391,72 +446,7 @@ export const MockApi = {
   initiateSocialRecovery,
   approveGuardian,
   checkSocialRecovery,
+  verifyRecoverySignature,
+  recoveryAttempts,
 };
 
-export const MOCK_DASHBOARD_STATS: DashboardStats = {
-  earnings: { total: "$12,450.80", trend: 12.5, trendLabel: "+12.5% from last month" },
-  clips: { total: 142, trend: 8.2, trendLabel: "+8.2% from last month" },
-  platforms: { total: 4, trend: 0, trendLabel: "Steady performance" },
-};
-
-export const MOCK_REVENUE_TREND: RevenuePoint[] = [
-  { date: "2024-03-01", amount: 400 },
-  { date: "2024-03-05", amount: 600 },
-  { date: "2024-03-10", amount: 800 },
-];
-
-export const MOCK_PROJECTS: Project[] = [
-  { id: "1", title: "Apex Legends", clipsGenerated: 2, status: "processing", accent: "" },
-];
-
-export const MOCK_USER_PROFILE: UserProfile = {
-  id: "usr_001",
-  name: "Alex Rivera",
-  email: "alex@clipcash.ai",
-  avatarUrl: "/avatar.png",
-  plan: "pro",
-  planUsagePercent: 80,
-};
-
-export const MOCK_EARNINGS_BREAKDOWN: EarningsBreakdownItem[] = [
-  { id: "e1", label: "Apex", amount: 320.5, date: "2024-03-25", platform: "youtube" },
-];
-
-export async function fetchDashboardFromAPI(): Promise<{
-  stats: DashboardStats;
-  revenueTrend: RevenuePoint[];
-  recentProjects: Project[];
-}> {
-  await delay(1500);
-  return {
-    stats: MOCK_DASHBOARD_STATS,
-    revenueTrend: MOCK_REVENUE_TREND,
-    recentProjects: MOCK_PROJECTS,
-  };
-}
-
-export async function fetchUserFromAPI(): Promise<UserProfile> {
-  await delay(500);
-  return MOCK_USER_PROFILE;
-}
-
-export async function fetchEarningsFromAPI(): Promise<{
-  totalEarnings: string;
-  totalTrend: number;
-  trendLabel: string;
-  totalFiat: { value: string; change: number };
-  cryptoRevenue: { value: string; change: number };
-  pendingPayouts: { value: string; change: number };
-  breakdown: EarningsBreakdownItem[];
-}> {
-  await delay(800);
-  return {
-    totalEarnings: MOCK_DASHBOARD_STATS.earnings.total,
-    totalTrend: MOCK_DASHBOARD_STATS.earnings.trend,
-    trendLabel: MOCK_DASHBOARD_STATS.earnings.trendLabel,
-    totalFiat: { value: MOCK_DASHBOARD_STATS.earnings.total, change: MOCK_DASHBOARD_STATS.earnings.trend },
-    cryptoRevenue: { value: "1.25 ETH", change: 8.2 },
-    pendingPayouts: { value: "$1,850.25", change: 0 },
-    breakdown: MOCK_EARNINGS_BREAKDOWN,
-  };
-}

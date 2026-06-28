@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
+import { PRICE_CACHE_TTL_MS } from "@/app/lib/constants";
 
 const COINGECKO_URL =
   "https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd";
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = PRICE_CACHE_TTL_MS;
+export { CACHE_TTL_MS };
 const FALLBACK_PRICE =
   parseFloat(process.env.NEXT_PUBLIC_XLM_FALLBACK_PRICE_USD ?? "0.12");
 

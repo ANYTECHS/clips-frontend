@@ -15,6 +15,29 @@ export default function ResetPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [cooldownUntil, setCooldownUntil] = useState<number | null>(null);
+  const [countdown, setCountdown] = useState("");
+
+  useEffect(() => {
+    if (!cooldownUntil) return;
+    const tick = () => {
+      const remaining = Math.max(0, Math.ceil((cooldownUntil - Date.now()) / 1000));
+      setCountdown(remaining > 0 ? `${remaining}s` : "");
+      if (remaining <= 0) setCooldownUntil(null);
+    };
+    tick();
+    const interval = setInterval(tick, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownUntil]);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const custom = e as CustomEvent<{ resetAt: number }>;
+      setCooldownUntil(custom.detail.resetAt);
+    };
+    window.addEventListener("rate-limit-exceeded", handler as EventListener);
+    return () => window.removeEventListener("rate-limit-exceeded", handler as EventListener);
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -33,6 +56,11 @@ export default function ResetPasswordPage() {
     e.preventDefault();
     setError("");
     setMessage("");
+
+    if (cooldownUntil && Date.now() < cooldownUntil) {
+      setError(`Too many attempts. Please wait ${countdown} before trying again.`);
+      return;
+    }
 
     const validationError = validatePassword(password);
     if (validationError) {
@@ -56,7 +84,7 @@ export default function ResetPasswordPage() {
     } catch (err) {
       if (err instanceof Error) {
         if (err.message === 'RATE_LIMIT_EXCEEDED') {
-          setError("Too many requests. Please wait a moment and try again.");
+          setError(countdown ? `Too many attempts. Please wait ${countdown} before trying again.` : "Too many requests. Please wait a moment and try again.");
         } else if (err.message === 'Invalid or expired token') {
           setError("This reset link is invalid or has expired. Please request a new one.");
         } else {
@@ -95,7 +123,7 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-input border border-border text-white focus:border-brand/70 rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none focus:bg-surface-hover transition-colors"
+                className="w-full bg-input border border-border text-white focus:border-brand/70 rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:bg-surface-hover transition-colors"
               />
             </div>
 
@@ -110,7 +138,7 @@ export default function ResetPasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-input border border-border text-white focus:border-brand/70 rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none focus:bg-surface-hover transition-colors"
+                className="w-full bg-input border border-border text-white focus:border-brand/70 rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:bg-surface-hover transition-colors"
               />
             </div>
 
@@ -118,10 +146,10 @@ export default function ResetPasswordPage() {
 
             <button
               type="submit"
-              disabled={loading || !token}
+              disabled={loading || !token || (cooldownUntil !== null && Date.now() < cooldownUntil)}
               className="w-full bg-brand hover:bg-brand-hover text-black py-[15px] rounded-[12px] font-bold text-[15px] flex justify-center items-center disabled:opacity-70"
             >
-              {loading ? "Resetting..." : "Reset Password"}
+              {loading ? "Resetting..." : countdown ? `Wait ${countdown}` : "Reset Password"}
             </button>
 
             <div className="text-center">

@@ -22,14 +22,14 @@ import {
   MultiWalletProvider,
   useMultiWallet,
   migrateToMultiWallet,
-} from "@/components/MultiWalletProvider";
+} from "@/components/wallet/MultiWalletProvider";
 import { MultiWalletStorage } from "@/app/lib/multiWalletStorage";
 
 // ─── Module mocks ─────────────────────────────────────────────────────────────
 
 const mockUser = { id: "user_test_123", email: "test@clips.app" };
 
-jest.mock("@/components/AuthProvider", () => ({
+jest.mock("@/components/auth/AuthProvider", () => ({
   useAuth: jest.fn(() => ({ user: mockUser })),
 }));
 
@@ -97,7 +97,7 @@ describe("MultiWalletProvider — initial state", () => {
   });
 
   it("clears state when user is null", async () => {
-    const { useAuth } = require("@/components/AuthProvider");
+    const { useAuth } = require("@/components/auth/AuthProvider");
     useAuth.mockReturnValue({ user: null });
 
     const { result } = renderHook(() => useMultiWallet(), { wrapper });

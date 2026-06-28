@@ -1,5 +1,7 @@
 "use client";
 
+import { logger } from "@/app/lib/logger";
+
 /**
  * Notification utility for handling browser push notifications
  * with permission persistence to localStorage
@@ -106,10 +108,10 @@ export async function registerNotificationServiceWorker() {
 
   try {
     const registration = await navigator.serviceWorker.register("/sw.js");
-    console.log("Service Worker registered:", registration);
+    logger.info("Service Worker registered:", registration);
     return registration;
   } catch (error) {
-    console.error("Service Worker registration failed:", error);
+    logger.error("Service Worker registration failed:", error);
     return null;
   }
 }

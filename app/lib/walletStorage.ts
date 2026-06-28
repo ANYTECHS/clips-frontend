@@ -7,27 +7,21 @@
  * (NOT cryptographically secure — suitable for demo/prototype only).
  *
  * Phase 2 upgrade path:
- *   - Replace `encodeKey` / `decodeKey` with AES-GCM via Web Crypto API
- *   - Replace localStorage calls with server-side encrypted vault API calls
- *   - Add HSM / KMS integration for production key custody
+ * - Replace `encodeKey` / `decodeKey` with AES-GCM via Web Crypto API
+ * - Replace localStorage calls with server-side encrypted vault API calls
+ * - Add HSM / KMS integration for production key custody
  */
 
+import { secureStorage } from "./secureStorage";
+
 const WALLET_STORE_PREFIX = "clipcash_ew_";
-
-/** Lightweight obfuscation — swap for Web Crypto AES-GCM in production */
-function encodeKey(raw: string): string {
-  return btoa(raw);
-}
-
-function decodeKey(encoded: string): string {
-  return atob(encoded);
-}
 
 export interface StoredWalletRecord {
   userId: string;
   publicKey: string;
-  /** Obfuscated secret key — never log or expose this value */
-  _encodedSecret: string;
+  /** Secret key — now encrypted via secureStorage, so we don't need _encodedSecret but we'll keep the type compatible or just use secretKey */
+  secretKey?: string;
+  _encodedSecret?: string;
   network: "testnet" | "mainnet";
   createdAt: string;
   walletType: "embedded" | "freighter" | "external";
@@ -40,10 +34,19 @@ export type StorageErrorCode =
   | "SERIALIZATION_ERROR"  // JSON parse/stringify failure
   | "DECODE_ERROR";        // base64 decode failure
 
+/**
+ * Custom error class managing data lifecycle and runtime exceptions across browser cache bounds.
+ */
 export class WalletStorageError extends Error {
+  /**
+   * Constructs an instance of WalletStorageError.
+   * @param code - Identified classification tag.
+   * @param message - Contextual message detailing the internal issue.
+   * @param cause - Optional structural tracking object mapping native errors.
+   */
   constructor(
     public readonly code: StorageErrorCode,
-    message: string,
+    public override readonly message: string,
     public readonly cause?: unknown
   ) {
     super(message);
@@ -66,13 +69,20 @@ function isStorageAvailable(): boolean {
   }
 }
 
+/**
+ * Main application interface managing localized client encryption profiles for wallets.
+ */
 export const WalletStorage = {
   /**
    * Persist a new wallet record for a user.
    * Throws `WalletStorageError` if storage is unavailable or full.
    * In production this should be a POST to an encrypted backend vault.
+   *
+   * @param userId - Target reference owner key descriptor.
+   * @param record - Data payload structure minus initial base64 encoded parameters.
+   * @throws {WalletStorageError} Thrown if environment restrictions disrupt write permissions or if parsing errors occur.
    */
-  save(userId: string, record: Omit<StoredWalletRecord, "_encodedSecret"> & { secretKey: string }): void {
+  async save(userId: string, record: Omit<StoredWalletRecord, "_encodedSecret" | "secretKey"> & { secretKey: string }): Promise<void> {
     if (!isStorageAvailable()) {
       throw new WalletStorageError(
         "STORAGE_UNAVAILABLE",
@@ -80,14 +90,9 @@ export const WalletStorage = {
       );
     }
 
-    const { secretKey, ...rest } = record;
     let serialized: string;
     try {
-      const stored: StoredWalletRecord = {
-        ...rest,
-        _encodedSecret: encodeKey(secretKey),
-      };
-      serialized = JSON.stringify(stored);
+      serialized = JSON.stringify(record);
     } catch (err) {
       throw new WalletStorageError(
         "SERIALIZATION_ERROR",
@@ -97,9 +102,8 @@ export const WalletStorage = {
     }
 
     try {
-      localStorage.setItem(`${WALLET_STORE_PREFIX}${userId}`, serialized);
+      await secureStorage.setItem(`${WALLET_STORE_PREFIX}${userId}`, serialized);
     } catch (err) {
-      // DOMException: QuotaExceededError
       throw new WalletStorageError(
         "STORAGE_FULL",
         "Storage quota exceeded. Please clear some browser data and try again.",
@@ -111,13 +115,37 @@ export const WalletStorage = {
   /**
    * Retrieve a wallet record for a user.
    * Returns null if no wallet has been created yet or storage is unavailable.
+   *
+   * @param userId - Unique platform identifier key.
+   * @returns Unpacked configuration metadata map, or null if key does not exist.
    */
-  get(userId: string): StoredWalletRecord | null {
+  async get(userId: string): Promise<StoredWalletRecord | null> {
     if (!isStorageAvailable()) return null;
     try {
-      const raw = localStorage.getItem(`${WALLET_STORE_PREFIX}${userId}`);
+      const key = `${WALLET_STORE_PREFIX}${userId}`;
+      const raw = localStorage.getItem(key);
       if (!raw) return null;
-      return JSON.parse(raw) as StoredWalletRecord;
+
+      // Migration: Check if it's plaintext JSON with `_encodedSecret`
+      let record: StoredWalletRecord;
+      try {
+        record = JSON.parse(raw);
+        if (record && typeof record === "object" && record._encodedSecret) {
+          // It's the old format!
+          const decodedSecret = atob(record._encodedSecret);
+          const { _encodedSecret, ...rest } = record;
+          const newRecord = { ...rest, secretKey: decodedSecret };
+          // Save using new format and await
+          await this.save(userId, newRecord as any);
+          return newRecord as StoredWalletRecord;
+        }
+      } catch (e) {
+        // Not a JSON string (or invalid), so it must be encrypted via secureStorage
+      }
+
+      const decrypted = await secureStorage.getItem(key);
+      if (!decrypted) return null;
+      return JSON.parse(decrypted) as StoredWalletRecord;
     } catch {
       return null;
     }
@@ -126,23 +154,26 @@ export const WalletStorage = {
   /**
    * Retrieve the decoded secret key for signing transactions.
    * Only call this immediately before signing — never store the result.
+   *
+   * @param userId - Unique platform identifier key.
+   * @returns Clean decoded secret string material, or null if evaluation matches errors.
    */
-  getSecretKey(userId: string): string | null {
-    const record = WalletStorage.get(userId);
+  async getSecretKey(userId: string): Promise<string | null> {
+    const record = await this.get(userId);
     if (!record) return null;
-    try {
-      return decodeKey(record._encodedSecret);
-    } catch {
-      return null;
-    }
+    return record.secretKey || null;
   },
 
   /**
    * Remove a wallet record (e.g. on account deletion or key rotation).
+   *
+   * @param userId - Unique platform identifier key.
    */
-  remove(userId: string): void {
+  async remove(userId: string): Promise<void> {
     if (!isStorageAvailable()) return;
     try {
+      await secureStorage.removeItem(`${WALLET_STORE_PREFIX}${userId}`);
+      // Also remove from localStorage in case it's the old format
       localStorage.removeItem(`${WALLET_STORE_PREFIX}${userId}`);
     } catch {
       // Silently ignore — removal failures are non-critical
@@ -151,11 +182,16 @@ export const WalletStorage = {
 
   /**
    * Check whether a wallet record exists for a user.
+   *
+   * @param userId - Unique platform identifier key.
+   * @returns True if specific profile references evaluate positive.
    */
-  exists(userId: string): boolean {
+  async exists(userId: string): Promise<boolean> {
     if (!isStorageAvailable()) return false;
     try {
-      return localStorage.getItem(`${WALLET_STORE_PREFIX}${userId}`) !== null;
+      const key = `${WALLET_STORE_PREFIX}${userId}`;
+      const raw = localStorage.getItem(key);
+      return raw !== null;
     } catch {
       return false;
     }

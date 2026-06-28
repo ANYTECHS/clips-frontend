@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import LandingLayout from "@/components/LandingLayout";
-import LandingHero from "@/components/LandingHero";
+import LandingLayout from "@/components/layout/LandingLayout";
+import LandingHero from "@/components/layout/LandingHero";
 
 const meta = {
   title: "Components/LandingLayout",

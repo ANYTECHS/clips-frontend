@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getEarningsReport } from "@/app/lib/mockApi";
+import type { ApiResponse } from "../types";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
@@ -11,9 +12,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const data = await getEarningsReport(userId, { page, pageSize });
-    return NextResponse.json(data);
+    const body: ApiResponse<typeof data> = { data, error: null };
+    return NextResponse.json(body);
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const body: ApiResponse<null> = { data: null, error: message, code: "EARNINGS_INTERNAL_ERROR" };
+    return NextResponse.json(body, { status: 500 });
   }
 }

@@ -72,7 +72,7 @@ export default function EarningsTable({
             value={search}
             onChange={(e) => updateFilters({ search: e.target.value })}
             placeholder="Search by ID, description or platform"
-            className="w-full bg-input text-white text-sm rounded-xl px-4 py-2.5 pr-8 border border-white/10 placeholder:text-muted-foreground focus:outline-none focus:border-brand/50"
+            className="w-full bg-input text-white text-sm rounded-xl px-4 py-2.5 pr-8 border border-white/10 placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
           />
           {search && (
             <button
@@ -80,7 +80,7 @@ export default function EarningsTable({
               className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white"
               aria-label="Clear search"
             >
-              <X className="w-3.5 h-3.5" />
+              <X className="w-3.5 h-3.5" aria-hidden="true" />
             </button>
           )}
         </div>
@@ -93,7 +93,7 @@ export default function EarningsTable({
               type="date"
               value={startDate}
               onChange={(e) => updateFilters({ startDate: e.target.value })}
-              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus:border-brand/50"
+              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
             />
           </label>
           <label className="flex flex-col gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -102,7 +102,7 @@ export default function EarningsTable({
               type="date"
               value={endDate}
               onChange={(e) => updateFilters({ endDate: e.target.value })}
-              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus:border-brand/50"
+              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
             />
           </label>
           {hasDates && (
@@ -184,7 +184,7 @@ export default function EarningsTable({
             disabled={pagination.page <= 1}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border border-white/10 bg-surface hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-4 h-4" aria-hidden="true" />
             Prev
           </button>
 
@@ -202,7 +202,7 @@ export default function EarningsTable({
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold border border-white/10 bg-surface hover:bg-input disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             Next
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
       )}

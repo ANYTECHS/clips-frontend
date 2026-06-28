@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/AuthProvider";
-import { WalletProvider } from "@/components/WalletProvider";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { WalletProvider } from "@/components/wallet/WalletProvider";
 import { StellarWalletProvider } from "@/components/StellarWalletProvider";
+import { NetworkProvider } from "@/app/context/NetworkContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { I18nProvider } from "@/app/lib/i18n/I18nProvider";
@@ -12,6 +13,7 @@ import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
+import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 
 const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap" });
 
@@ -49,19 +51,22 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <div className="radial-bg" />
+        <CryptoSaltInitializer />
         <ThemeProvider>
           <ErrorBoundary>
             <I18nProvider>
               <AuthProvider>
                 <ToastProvider>
-                  <WalletProvider>
-                    <StellarWalletProvider>
+                  <NetworkProvider>
+                    <WalletProvider>
+                      <StellarWalletProvider>
                       <AnalyticsProvider />
                       <KeyboardShortcuts />
                       {children}
                       <RateLimitToast />
-                    </StellarWalletProvider>
-                  </WalletProvider>
+                      </StellarWalletProvider>
+                    </WalletProvider>
+                  </NetworkProvider>
                 </ToastProvider>
               </AuthProvider>
             </I18nProvider>
