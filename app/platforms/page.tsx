@@ -16,8 +16,8 @@ import {
   AlertCircle,
   X,
 } from "lucide-react";
-import { useAuth } from "@/components/AuthProvider";
-import { useWallet, truncateAddress } from "@/components/WalletProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useWallet, truncateAddress } from "@/components/wallet/WalletProvider";
 import Skeleton from "@/components/ui/Skeleton";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { useToast } from "@/hooks/useToast";
@@ -40,32 +40,10 @@ type PlatformItem = {
 
 /* ================= ICONS ================= */
 
-const InstagramIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
-
-const TikTokIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 12a4 4 0 1 0 4 4V4a5 5 0 0 0 5 5"></path>
-  </svg>
-);
-
-const YoutubeIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"></path>
-    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
-  </svg>
-);
-
-const TwitterIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22 4s-1 1-2 1.5C19 4.5 18 4 17 4c-2 0-3 2-3 4v1C10 9 7 7 5 5c0 0-3 5 2 7-1 0-2 0-3-.5 0 2 2 4 4 4-1 .5-2 .5-3 .5 1 2 3 3 5 3 6 0 9-5 9-9v-1c1-.5 2-1.5 2-1.5z"></path>
-  </svg>
-);
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import TikTokIcon from "@/components/icons/TikTokIcon";
+import YoutubeIcon from "@/components/icons/YoutubeIcon";
+import TwitterIcon from "@/components/icons/TwitterIcon";
 
 const PhantomIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -135,11 +113,11 @@ export default function PlatformsPage() {
     {
       id: "tiktok",
       name: "TikTok",
-      username: (session?.user as any)?.provider === "tiktok" ? (session?.user as any)?.name : undefined,
+      username: (session?.user as { provider?: string; name?: string })?.provider === "tiktok" ? (session?.user as { provider?: string; name?: string })?.name : undefined,
       description: "Manage your main TikTok video feed",
       icon: TikTokIcon,
-      status: (session?.user as any)?.provider === "tiktok" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "tiktok" ? "Manage" : "Connect Account",
+      status: (session?.user as { provider?: string; name?: string })?.provider === "tiktok" ? "ACTIVE" : "NOT LINKED",
+      ctaText: (session?.user as { provider?: string; name?: string })?.provider === "tiktok" ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("tiktok"),
       onDisconnect: () => handleDisconnect("tiktok"),
       isLoading: connectingId === "tiktok",
@@ -147,11 +125,11 @@ export default function PlatformsPage() {
     {
       id: "instagram",
       name: "Instagram",
-      username: (session?.user as any)?.provider === "instagram" ? (session?.user as any)?.name : undefined,
+      username: (session?.user as { provider?: string; name?: string })?.provider === "instagram" ? (session?.user as { provider?: string; name?: string })?.name : undefined,
       description: "Connect to sync Reels",
       icon: InstagramIcon,
-      status: (session?.user as any)?.provider === "instagram" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "instagram" ? "Manage" : "Connect Account",
+      status: (session?.user as { provider?: string; name?: string })?.provider === "instagram" ? "ACTIVE" : "NOT LINKED",
+      ctaText: (session?.user as { provider?: string; name?: string })?.provider === "instagram" ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("instagram"),
       onDisconnect: () => handleDisconnect("instagram"),
       isLoading: connectingId === "instagram",
@@ -159,11 +137,11 @@ export default function PlatformsPage() {
     {
       id: "google",
       name: "YouTube",
-      username: (session?.user as any)?.provider === "google" ? (session?.user as any)?.name : undefined,
+      username: (session?.user as { provider?: string; name?: string })?.provider === "google" ? (session?.user as { provider?: string; name?: string })?.name : undefined,
       description: "Import and sync your YouTube content",
       icon: YoutubeIcon,
-      status: (session?.user as any)?.provider === "google" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "google" ? "Manage" : "Connect Account",
+      status: (session?.user as { provider?: string; name?: string })?.provider === "google" ? "ACTIVE" : "NOT LINKED",
+      ctaText: (session?.user as { provider?: string; name?: string })?.provider === "google" ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("google"),
       onDisconnect: () => handleDisconnect("google"),
       isLoading: connectingId === "google",
@@ -171,11 +149,11 @@ export default function PlatformsPage() {
     {
       id: "twitter",
       name: "X / Twitter",
-      username: (session?.user as any)?.provider === "twitter" ? (session?.user as any)?.name : undefined,
+      username: (session?.user as { provider?: string; name?: string })?.provider === "twitter" ? (session?.user as { provider?: string; name?: string })?.name : undefined,
       description: "Auto-post clips to X",
       icon: TwitterIcon,
-      status: (session?.user as any)?.provider === "twitter" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "twitter" ? "Manage" : "Connect Account",
+      status: (session?.user as { provider?: string; name?: string })?.provider === "twitter" ? "ACTIVE" : "NOT LINKED",
+      ctaText: (session?.user as { provider?: string; name?: string })?.provider === "twitter" ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("twitter"),
       onDisconnect: () => handleDisconnect("twitter"),
       isLoading: connectingId === "twitter",
@@ -218,13 +196,13 @@ export default function PlatformsPage() {
     return socialPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, socialPlatforms]);
 
   const filteredWallets = useMemo(() => {
     return walletPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, walletPlatforms]);
 
   const noResults =
     filteredSocial.length === 0 && filteredWallets.length === 0;
@@ -320,7 +298,7 @@ export default function PlatformsPage() {
                   <SectionHeader title="Social Platforms" icon={Share2} />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filteredSocial.map((p) => (
-                      <PlatformCard key={p.name} {...p} variant="vertical" />
+                      <PlatformCard key={p.id} {...p} variant="vertical" />
                     ))}
                   </div>
                 </section>
@@ -331,7 +309,7 @@ export default function PlatformsPage() {
                   <SectionHeader title="Web3 Wallets" icon={Wallet} />
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {filteredWallets.map((p) => (
-                      <PlatformCard key={p.name} {...p} variant="horizontal" />
+                      <PlatformCard key={p.id} {...p} variant="horizontal" />
                     ))}
                   </div>
                 </section>

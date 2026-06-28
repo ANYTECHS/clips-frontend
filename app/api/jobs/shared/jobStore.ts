@@ -43,11 +43,10 @@ export interface JobStore {
   set(id: string, job: Job): void;
   delete(id: string): void;
   clear(): void;
+  getAll(): Job[];
 }
 
-// ─── In-process Map implementation (dev / single-instance) ───────────────────
-// Replace this with a Redis/DB adapter in production by exporting a different
-// object that satisfies the JobStore interface above.
+import { JobRepository, createJobRepository } from "./jobRepository";
 
 class MapJobStore implements JobStore {
   private readonly map = new Map<string, Job>();
@@ -66,6 +65,10 @@ class MapJobStore implements JobStore {
 
   clear(): void {
     this.map.clear();
+  }
+
+  getAll(): Job[] {
+    return Array.from(this.map.values());
   }
 }
 

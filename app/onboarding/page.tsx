@@ -1,9 +1,9 @@
+/* eslint-disable react/no-unescaped-entities */
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { MockApi } from "@/app/lib/mockApi";
+import React, { useState, useEffect, useRef } from "react";
 import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, CheckCircle2, Wallet, Info } from "lucide-react";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import Navbar from "@/components/Navbar";
 import { useRouter } from "next/navigation";
 import { useEmbeddedWallet } from "@/components/EmbeddedWalletProvider";
@@ -11,22 +11,11 @@ import { useToast } from "@/hooks/useToast";
 import { fundWithFriendbot } from "@/app/lib/stellar";
 import { IS_TESTNET } from "@/app/lib/networkConfig";
 import { useBalance } from "@/app/hooks/useBalance";
+import Image from "next/image";
+import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 
-// Same inline SVGs for perfect styling
-const InstagramIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="2" y="2" width="20" height="20" rx="5" ry="5"></rect>
-    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path>
-    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5"></line>
-  </svg>
-);
-
-const YoutubeIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33 2.78 2.78 0 0 0 1.94 2c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.33 29 29 0 0 0-.46-5.33z"></path>
-    <polygon points="9.75 15.02 15.5 11.75 9.75 8.48 9.75 15.02"></polygon>
-  </svg>
-);
+import InstagramIcon from "@/components/icons/InstagramIcon";
+import YoutubeIcon from "@/components/icons/YoutubeIcon";
 
 const AlertCircle = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -51,7 +40,7 @@ interface OnboardingStep2Data {
 
 type OnboardingErrors = Partial<Record<keyof OnboardingStep1Data | keyof OnboardingStep2Data, string>>;
 
-function validateOnboardingStep(step: number, data: any): OnboardingErrors {
+function validateOnboardingStep(step: number, data: Record<string, string>): OnboardingErrors {
   const errors: OnboardingErrors = {};
 
   if (step === 1) {
@@ -108,7 +97,9 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
   const [fundingError, setFundingError] = useState<string | null>(null);
   const { wallet } = useEmbeddedWallet();
   const { success, error } = useToast();
-  
+  const isMountedRef = useRef(true);
+  const fundedKeyRef = useRef<string | null>(null);
+
   const { refresh } = useBalance({
     publicKey: wallet?.publicKey || null,
     network: IS_TESTNET ? "TESTNET" : "PUBLIC",
@@ -116,34 +107,52 @@ function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; 
   });
 
   useEffect(() => {
+    isMountedRef.current = true;
+
     // Auto-fund on testnet when wallet is available
     const fundWallet = async () => {
-      if (!IS_TESTNET || !wallet?.publicKey || isFunding || fundingSuccess) return;
-      
+      if (!wallet?.publicKey) return;
+
+      // Only fund once per wallet public key
+      if (fundedKeyRef.current === wallet.publicKey) return;
+
+      // Check conditions inside the effect body (not in deps)
+      if (!IS_TESTNET) return;
+
+      fundedKeyRef.current = wallet.publicKey;
       setIsFunding(true);
       setFundingError(null);
       
       try {
         await fundWithFriendbot(wallet.publicKey);
+        if (!isMountedRef.current) return;
         setFundingSuccess(true);
         success("Wallet funded with 10,000 XLM!");
         
         // Refresh balance a few times to ensure it updates
         for (let i = 0; i < 5; i++) {
+          if (!isMountedRef.current) return;
           await new Promise(resolve => setTimeout(resolve, 1000));
           refresh();
         }
       } catch (err) {
+        if (!isMountedRef.current) return;
         console.error("Friendbot funding failed:", err);
         setFundingError(err instanceof Error ? err.message : "Failed to fund wallet");
         error("Wallet funding failed. Please try again later.");
       } finally {
-        setIsFunding(false);
+        if (isMountedRef.current) {
+          setIsFunding(false);
+        }
       }
     };
 
     fundWallet();
-  }, [wallet?.publicKey, IS_TESTNET, isFunding, fundingSuccess, success, refresh]);
+
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, [wallet?.publicKey]);
 
   return (
     <div className="w-full flex flex-col items-center justify-center animate-in zoom-in-95 fade-in duration-500 mt-12">
@@ -293,7 +302,7 @@ export default function OnboardingPage() {
     }
   };
 
-  const handleBlur = (e: React.FocusEvent<any>) => {
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name } = e.target;
     setTouched(prev => ({ ...prev, [name]: true }));
     setErrors(validateOnboardingStep(step, step === 1 ? step1Form : step2Form));
@@ -313,10 +322,16 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      await MockApi.saveOnboarding(user.id, 2, step1Form);
+      const res = await fetch("/api/user/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: 2, data: step1Form }),
+      });
+      if (!res.ok) throw new Error("Failed to save onboarding step 1");
+      const { onboardingStep } = await res.json();
       setUser({ 
         ...user, 
-        onboardingStep: 2, 
+        onboardingStep: onboardingStep ?? 2, 
         name: step1Form.name,
         profile: { ...user.profile, ...step1Form } 
       });
@@ -340,10 +355,16 @@ export default function OnboardingPage() {
 
     setLoading(true);
     try {
-      await MockApi.saveOnboarding(user.id, 3, { ...step2Form, socialsConnected: true });
+      const res = await fetch("/api/user/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: 3, data: { ...step2Form, socialsConnected: true } }),
+      });
+      if (!res.ok) throw new Error("Failed to save onboarding step 2");
+      const { onboardingStep } = await res.json();
       setUser({ 
         ...user, 
-        onboardingStep: 3, 
+        onboardingStep: onboardingStep ?? 3, 
         profile: { ...user.profile, ...step2Form, socialsConnected: true } 
       });
     } catch (err) {
@@ -357,8 +378,14 @@ export default function OnboardingPage() {
     if (!user) return;
     setLoading(true);
     try {
-      await MockApi.saveOnboarding(user.id, 4, { walletAcknowledged: true });
-      setUser({ ...user, onboardingStep: 4, profile: { ...user.profile, walletAcknowledged: true } });
+      const res = await fetch("/api/user/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ step: 4, data: { walletAcknowledged: true } }),
+      });
+      if (!res.ok) throw new Error("Failed to save onboarding step 3");
+      const { onboardingStep } = await res.json();
+      setUser({ ...user, onboardingStep: onboardingStep ?? 4, profile: { ...user.profile, walletAcknowledged: true } });
       router.push("/dashboard");
     } catch (err) {
       console.error(err);
@@ -368,7 +395,7 @@ export default function OnboardingPage() {
   };
 
   const inputClass = (field: string) =>
-    `w-full bg-input border text-white rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none transition-all placeholder-subtle ${
+    `w-full bg-input border text-white rounded-[12px] px-4 py-3.5 text-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-all placeholder-subtle ${
       touched[field] && errors[field as keyof OnboardingErrors]
         ? "border-red-500/50 bg-red-500/5 focus:border-red-500"
         : "border-border focus:border-brand/70 focus:bg-surface-hover"
@@ -376,10 +403,8 @@ export default function OnboardingPage() {
 
   return (
     <div className="min-h-screen text-white font-sans flex flex-col relative overflow-hidden bg-background">
-      {/* Background Orbs */}
-      <div className="fixed top-0 left-0 w-[800px] h-[800px] bg-brand/10 rounded-full blur-[150px] pointer-events-none -translate-x-1/2 -translate-y-1/2" />
-      <div className="fixed top-1/4 right-0 w-[600px] h-[600px] bg-brand/[0.07] rounded-full blur-[120px] pointer-events-none translate-x-1/3" />
-      
+      <BackgroundOrbs variant="onboarding" />
+
       <Navbar />
 
       <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-12 flex items-center z-10 relative">
@@ -417,9 +442,9 @@ export default function OnboardingPage() {
 
               <div className="flex items-center gap-4 text-[13px] text-muted-foreground pt-4">
                 <div className="flex -space-x-2.5">
-                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-800 flex items-center justify-center overflow-hidden"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nico&backgroundColor=c0aede" alt="" className="w-full h-full object-cover"/></div>
-                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-700 flex items-center justify-center overflow-hidden"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jane&backgroundColor=b6e3f4" alt="" className="w-full h-full object-cover"/></div>
-                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-600 flex items-center justify-center overflow-hidden"><img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&backgroundColor=c0aede" alt="" className="w-full h-full object-cover"/></div>
+                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-800 flex items-center justify-center overflow-hidden"><Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nico&backgroundColor=c0aede" alt="" width={36} height={36} className="w-full h-full object-cover"/></div>
+                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-700 flex items-center justify-center overflow-hidden"><Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jane&backgroundColor=b6e3f4" alt="" width={36} height={36} className="w-full h-full object-cover"/></div>
+                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-600 flex items-center justify-center overflow-hidden"><Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&backgroundColor=c0aede" alt="" width={36} height={36} className="w-full h-full object-cover"/></div>
                 </div>
                 <div>Joined by <span className="font-bold text-white">2,500+</span> top creators this month.</div>
               </div>
@@ -548,7 +573,7 @@ export default function OnboardingPage() {
 
             </div>
           </div>
-        ) : (
+        ) : step === 2 ? (
           /* Step 2 Full Screen Centered Flow */
           <div className="w-full flex flex-col items-center justify-center animate-in zoom-in-95 fade-in duration-500 mt-12">
             <div className="text-center mb-10">

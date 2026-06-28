@@ -6,15 +6,15 @@
  * environment variables so no code changes are needed to switch providers.
  *
  * Required env vars:
- *   CLOUD_STORAGE_PROVIDER   — "s3" | "r2" | "gcs"  (default: "s3")
- *   CLOUD_STORAGE_BUCKET     — bucket name
- *   CLOUD_STORAGE_REGION     — region (e.g. "us-east-1"; R2 uses "auto")
- *   CLOUD_STORAGE_ENDPOINT   — custom endpoint URL (required for R2 / GCS S3)
- *   AWS_ACCESS_KEY_ID        — access key / account ID
- *   AWS_SECRET_ACCESS_KEY    — secret key / API token
+ * CLOUD_STORAGE_PROVIDER   — "s3" | "r2" | "gcs"  (default: "s3")
+ * CLOUD_STORAGE_BUCKET     — bucket name
+ * CLOUD_STORAGE_REGION     — region (e.g. "us-east-1"; R2 uses "auto")
+ * CLOUD_STORAGE_ENDPOINT   — custom endpoint URL (required for R2 / GCS S3)
+ * AWS_ACCESS_KEY_ID        — access key / account ID
+ * AWS_SECRET_ACCESS_KEY    — secret key / API token
  *
  * Optional:
- *   CLOUD_STORAGE_KEY_PREFIX — prefix prepended to all object keys (default: "uploads/")
+ * CLOUD_STORAGE_KEY_PREFIX — prefix prepended to all object keys (default: "uploads/")
  */
 
 import {
@@ -28,15 +28,56 @@ import {
   DeleteObjectCommand,
 } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
+import { withRetry } from "./retryUtils";
+
+// ─── Concurrency Limited Execution Utility ───────────────────────────────────
+
+/**
+ * Execute tasks in parallel with a maximum concurrency limit.
+ *
+ * @template T - The resolution type of the task promises.
+ * @param tasks - Array of functions that return promises.
+ * @param concurrency - Maximum number of concurrent tasks to execute.
+ * @returns Array of results in order of tasks.
+ */
+async function parallelWithLimit<T>(tasks: (() => Promise<T>)[], concurrency: number): Promise<T[]> {
+  const results: T[] = [];
+  let index = 0;
+
+  const worker = async () => {
+    while (index < tasks.length) {
+      const currentIndex = index++;
+      const task = tasks[currentIndex];
+      results[currentIndex] = await task();
+    }
+  };
+
+  const workers = Array.from({ length: concurrency }, worker);
+  await Promise.all(workers);
+
+  return results;
+}
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
+/**
+ * Ensures an environment variable exists, throwing an error if it is missing.
+ *
+ * @param name - The name of the target environment variable.
+ * @returns The retrieved environment variable value string.
+ * @throws {Error} Thrown if the target environment variable is empty or undefined.
+ */
 function requireEnv(name: string): string {
   const val = process.env[name];
   if (!val) throw new Error(`Missing required environment variable: ${name}`);
   return val;
 }
 
+/**
+ * Initializes and builds an S3Client instance configured via active environment variables.
+ *
+ * @returns An authenticated S3Client service instance.
+ */
 function buildS3Client(): S3Client {
   const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
   return new S3Client({
@@ -60,6 +101,9 @@ const PART_SIZE = 10 * 1024 * 1024; // 10 MB
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+/**
+ * Data metadata mapping standard attributes describing a finalized storage object entry.
+ */
 export interface UploadResult {
   /** Stable job ID tied to this specific upload */
   jobId: string;
@@ -77,6 +121,16 @@ export interface UploadResult {
 
 // ─── Single-part upload (<= MULTIPART_THRESHOLD) ─────────────────────────────
 
+/**
+ * Performs an atomic single-part PutObject upload directly into an S3 target.
+ *
+ * @param client - The active authenticated S3Client service instances instance.
+ * @param bucket - Target destination storage bucket path name.
+ * @param key - The calculated path filename key destination identifier.
+ * @param buffer - File data memory payload array.
+ * @param contentType - Standard application/mime target descriptor mapping.
+ * @returns Resolves when the upload command processes cleanly.
+ */
 async function uploadSinglePart(
   client: S3Client,
   bucket: string,
@@ -97,6 +151,19 @@ async function uploadSinglePart(
 
 // ─── Multipart upload (> MULTIPART_THRESHOLD) ─────────────────────────────────
 
+const MAX_CONCURRENT_PARTS = 5;
+
+/**
+ * Performs a chunked concurrent multipart file streaming configuration upload sequence.
+ *
+ * @param client - The active authenticated S3Client service instances instance.
+ * @param bucket - Target destination storage bucket path name.
+ * @param key - The calculated path filename key destination identifier.
+ * @param buffer - Large file data memory payload array.
+ * @param contentType - Standard application/mime target descriptor mapping.
+ * @returns Resolves upon compiling and verifying full block signatures cleanly.
+ * @throws {Error} If multipart creation returns invalid tracking IDs or part uploads fail.
+ */
 async function uploadMultipart(
   client: S3Client,
   bucket: string,
@@ -114,26 +181,40 @@ async function uploadMultipart(
 
   if (!UploadId) throw new Error("Failed to create multipart upload");
 
-  const parts: { ETag: string; PartNumber: number }[] = [];
+  let parts: { ETag: string; PartNumber: number }[] = [];
 
   try {
-    let partNumber = 1;
-    for (let offset = 0; offset < buffer.length; offset += PART_SIZE) {
+    const partCount = Math.ceil(buffer.length / PART_SIZE);
+
+    const uploadTasks: Array<() => Promise<{ ETag: string; PartNumber: number }>> = [];
+    for (let i = 0; i < partCount; i++) {
+      const partNumber = i + 1;
+      const offset = i * PART_SIZE;
       const chunk = buffer.slice(offset, offset + PART_SIZE);
-      const { ETag } = await client.send(
-        new UploadPartCommand({
-          Bucket: bucket,
-          Key: key,
-          UploadId,
-          PartNumber: partNumber,
-          Body: chunk,
-          ContentLength: chunk.length,
-        }),
-      );
-      if (!ETag) throw new Error(`Missing ETag for part ${partNumber}`);
-      parts.push({ ETag, PartNumber: partNumber });
-      partNumber++;
+      
+      uploadTasks.push(async () => {
+        const { ETag } = await withRetry(
+          () =>
+            client.send(
+              new UploadPartCommand({
+                Bucket: bucket,
+                Key: key,
+                UploadId,
+                PartNumber: partNumber,
+                Body: chunk,
+                ContentLength: chunk.length,
+              }),
+            ),
+          { maxAttempts: 3 },
+        );
+        if (!ETag) throw new Error(`Missing ETag for part ${partNumber}`);
+        return { ETag, PartNumber: partNumber };
+      });
     }
+
+    parts = await parallelWithLimit(uploadTasks, MAX_CONCURRENT_PARTS);
+
+    parts.sort((a, b) => a.PartNumber - b.PartNumber);
 
     await client.send(
       new CompleteMultipartUploadCommand({
@@ -144,7 +225,6 @@ async function uploadMultipart(
       }),
     );
   } catch (err) {
-    // Abort the incomplete multipart upload to avoid orphaned storage costs.
     await client
       .send(new AbortMultipartUploadCommand({ Bucket: bucket, Key: key, UploadId }))
       .catch(() => {});
@@ -160,6 +240,11 @@ async function uploadMultipart(
  * - Files ≤ 50 MB use a single PutObject request.
  * - Files > 50 MB use multipart upload (10 MB parts).
  * - Returns an UploadResult with a stable jobId.
+ *
+ * @param buffer - File data memory payload array.
+ * @param filename - String representation naming context.
+ * @param contentType - Standard application/mime target descriptor mapping.
+ * @returns Resolves with metadata mapping summarizing successful submission.
  */
 export async function uploadFile(
   buffer: Buffer,
@@ -193,6 +278,11 @@ export async function uploadFile(
  *
  * Similar to uploadFile but stores in VIRUS_SCAN_QUARANTINE_PREFIX instead.
  * Returns the quarantine object key and jobId.
+ *
+ * @param buffer - File data memory payload array.
+ * @param filename - String representation naming context.
+ * @param contentType - Standard application/mime target descriptor mapping.
+ * @returns Metadata object holding job records and specific safety references.
  */
 export async function uploadToQuarantine(
   buffer: Buffer,
@@ -222,9 +312,9 @@ export async function uploadToQuarantine(
  * prefix to the regular uploads prefix. This is implemented as a copy + delete
  * since S3 doesn't have a true move operation.
  *
- * @param jobId Job ID of the file to move
- * @param filename Original filename (used to determine extension)
- * @returns UploadResult with the final object key and URL
+ * @param jobId - Job ID of the file to move.
+ * @param filename - Original filename (used to determine extension).
+ * @returns UploadResult with the final object key and URL.
  */
 export async function moveFromQuarantine(jobId: string, filename: string): Promise<UploadResult> {
   const client = buildS3Client();
@@ -234,7 +324,6 @@ export async function moveFromQuarantine(jobId: string, filename: string): Promi
   const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
   const finalKey = `${KEY_PREFIX}${jobId}.${ext}`;
 
-  // Copy from quarantine to final location
   await client.send(
     new CopyObjectCommand({
       Bucket: bucket,
@@ -243,7 +332,6 @@ export async function moveFromQuarantine(jobId: string, filename: string): Promi
     }),
   );
 
-  // Delete from quarantine
   await client.send(
     new DeleteObjectCommand({
       Bucket: bucket,
@@ -251,7 +339,6 @@ export async function moveFromQuarantine(jobId: string, filename: string): Promi
     }),
   );
 
-  // Build the final URL
   const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
   const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
   const url = endpoint
@@ -263,7 +350,7 @@ export async function moveFromQuarantine(jobId: string, filename: string): Promi
     objectKey: finalKey,
     url,
     filename,
-    size: 0, // Size unknown after move (could fetch via HeadObject if needed)
+    size: 0,
     contentType: "application/octet-stream",
   };
 }
@@ -271,7 +358,8 @@ export async function moveFromQuarantine(jobId: string, filename: string): Promi
 /**
  * Delete a file from S3 (used for infected files).
  *
- * @param objectKey Full object key to delete (including prefix)
+ * @param objectKey - Full object key to delete (including prefix).
+ * @returns Resolves when the file deletion confirmation completes.
  */
 export async function deleteFile(objectKey: string): Promise<void> {
   const client = buildS3Client();

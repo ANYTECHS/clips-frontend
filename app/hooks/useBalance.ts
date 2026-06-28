@@ -1,15 +1,22 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { BALANCE_REFRESH_INTERVAL_MS, PRICE_CACHE_TTL_MS } from "@/app/lib/constants";
+import { logger } from "@/app/lib/logger";
 
 /**
  * Balance data structure
  */
 export interface Balance {
+  /** The formatted base-10 native asset balance representation string */
   xlm: string;
+  /** Numeric representation of native asset units */
   xlmRaw: number;
+  /** Calculated valuation value string mapped directly to USD */
   usd: string;
+  /** Raw dynamic numeric scaling factor for calculated USD value */
   usdRaw: number;
+  /** Timestamp reference noting completion of sync lifecycle tracking */
   lastUpdated: Date;
   /** All non-native Stellar asset balances */
   otherAssets: AssetBalance[];
@@ -19,9 +26,13 @@ export interface Balance {
 
 /** A non-native Stellar asset balance */
 export interface AssetBalance {
+  /** Dynamic alphanumeric asset tag specifier */
   code: string;
+  /** Public address identity string linking back to the origin root mint */
   issuer: string;
+  /** Formatted text block showing available balance quantity */
   balance: string;
+  /** Numerical variable notation representing the floating token capacity */
   balanceRaw: number;
 }
 
@@ -29,7 +40,9 @@ export interface AssetBalance {
  * Balance error structure
  */
 export interface BalanceError {
+  /** Programmatic error identification string context */
   code: string;
+  /** Description parsing exception failure metrics for tracking */
   message: string;
 }
 
@@ -47,7 +60,7 @@ export interface UseBalanceOptions {
   autoRefresh?: boolean;
   /**
    * Use Horizon's live SSE stream (server.payments / server.effects) to
-   * push balance updates instantly when funds arrive.  Falls back to the
+   * push balance updates instantly when funds arrive. Falls back to the
    * polling interval if the browser does not support EventSource.
    * (default: true)
    */
@@ -64,9 +77,13 @@ export interface UseBalanceOptions {
  * Hook state
  */
 export interface UseBalanceState {
+  /** Complete structure context mapping native and trustline holdings data */
   balance: Balance | null;
+  /** Structural visibility identifier for async resolution states */
   isLoading: boolean;
+  /** Captured runtime exception code references */
   error: BalanceError | null;
+  /** Time parameter recording final resolution confirmation */
   lastFetchTime: Date | null;
   /** True when the displayed USD value uses a stale cached XLM price */
   isPriceStale: boolean;
@@ -74,10 +91,11 @@ export interface UseBalanceState {
 
 /**
  * Get balance from Horizon server
- * 
- * @param publicKey - Stellar public key
- * @param network - Network to use (PUBLIC or TESTNET)
- * @returns Balance data
+ *
+ * @param publicKey - Stellar public key.
+ * @param network - Network to use (PUBLIC or TESTNET).
+ * @returns Balance data structured payload containing raw and string values.
+ * @throws {BalanceError} Rethrows structured network codes, 404 targets, or unknown wrapper states.
  */
 export async function getBalance(
   publicKey: string,
@@ -89,7 +107,6 @@ export async function getBalance(
       : "https://horizon-testnet.stellar.org";
 
   try {
-    // Fetch account data from Horizon
     const response = await fetch(`${horizonUrl}/accounts/${publicKey}`);
 
     if (!response.ok) {
@@ -107,7 +124,6 @@ export async function getBalance(
 
     const accountData = await response.json();
 
-    // Find native XLM balance
     const xlmBalance = accountData.balances.find(
       (b: any) => b.asset_type === "native"
     );
@@ -121,7 +137,6 @@ export async function getBalance(
 
     const xlmAmount = parseFloat(xlmBalance.balance);
 
-    // Collect other (non-native) asset balances
     const otherAssets: AssetBalance[] = accountData.balances
       .filter((b: any) => b.asset_type !== "native")
       .map((b: any) => ({
@@ -135,7 +150,7 @@ export async function getBalance(
     const usdValue = xlmAmount * xlmPriceResult.price;
 
     return {
-      xlm: xlmAmount.toFixed(7), // Stellar uses 7 decimal places
+      xlm: xlmAmount.toFixed(7),
       xlmRaw: xlmAmount,
       usd: usdValue.toFixed(2),
       usdRaw: usdValue,
@@ -144,12 +159,10 @@ export async function getBalance(
       isPriceStale: xlmPriceResult.isStale,
     };
   } catch (err: any) {
-    // If error already has code and message, throw it as is
     if (err.code && err.message) {
       throw err;
     }
 
-    // Otherwise, wrap it
     throw {
       code: "UNKNOWN_ERROR",
       message: err instanceof Error ? err.message : "Failed to fetch balance",
@@ -157,7 +170,7 @@ export async function getBalance(
   }
 }
 
-const DEFAULT_PRICE_CACHE_TTL_MS = 5 * 60 * 1000;
+const DEFAULT_PRICE_CACHE_TTL_MS = PRICE_CACHE_TTL_MS;
 const FALLBACK_XLM_PRICE_USD = parseFloat(
   process.env.NEXT_PUBLIC_XLM_FALLBACK_PRICE_USD ?? "0.12"
 );
@@ -176,16 +189,29 @@ let _xlmPriceCache: XlmPriceCacheEntry | null = null;
 let _xlmPriceFetch: Promise<XlmPriceResult> | null = null;
 let _priceCacheTtlMs = DEFAULT_PRICE_CACHE_TTL_MS;
 
+/**
+ * Updates the local configuration lifetime mapping for pricing caches.
+ *
+ * @param ttlMs - Expiry mapping time limits measured in milliseconds.
+ */
 export function configureXlmPriceCacheTtl(ttlMs: number): void {
   _priceCacheTtlMs = ttlMs;
 }
 
+/**
+ * Clears volatile pricing registers, wiping historical rates, references, and caches.
+ */
 export function resetXlmPriceCache(): void {
   _xlmPriceCache = null;
   _xlmPriceFetch = null;
   _priceCacheTtlMs = DEFAULT_PRICE_CACHE_TTL_MS;
 }
 
+/**
+ * Evaluates pricing conditions, resolving via active routes or falling back safely to historical cache boundaries.
+ *
+ * @returns Object context resolving ticker pricing parameters along with status indicators.
+ */
 export async function fetchXLMPrice(): Promise<XlmPriceResult> {
   const now = Date.now();
   if (_xlmPriceCache && now < _xlmPriceCache.expiresAt) {
@@ -206,7 +232,7 @@ export async function fetchXLMPrice(): Promise<XlmPriceResult> {
         }
       }
     } catch (err) {
-      console.warn("Failed to fetch XLM price:", err);
+      logger.warn("Failed to fetch XLM price:", err);
     } finally {
       _xlmPriceFetch = null;
     }
@@ -221,34 +247,16 @@ export async function fetchXLMPrice(): Promise<XlmPriceResult> {
 }
 
 /**
- * Custom hook for fetching and managing Stellar account balance
- * 
- * Features:
- * - Automatic balance fetching when publicKey is provided
- * - Auto-refresh at configurable intervals (default: 30 seconds)
- * - Manual refresh capability
- * - Loading and error states
- * - Success/error callbacks
- * 
- * @example
- * ```tsx
- * const { balance, isLoading, error, refresh } = useBalance({
- *   publicKey: "GTEST123...",
- *   network: "TESTNET",
- *   refreshInterval: 30000, // 30 seconds
- *   autoRefresh: true,
- * });
- * 
- * if (isLoading) return <Spinner />;
- * if (error) return <Error message={error.message} />;
- * if (balance) return <div>{balance.xlm} XLM</div>;
- * ```
+ * Custom hook for fetching and managing Stellar account balance.
+ *
+ * @param options - Instantiation hooks managing interval, configurations, targets, and routes.
+ * @returns Compiled state indicators, interaction wrappers, and streaming references.
  */
 export function useBalance(options: UseBalanceOptions) {
   const {
     publicKey,
     network = "TESTNET",
-    refreshInterval = 30000,
+    refreshInterval = BALANCE_REFRESH_INTERVAL_MS,
     autoRefresh = true,
     enableStreaming = true,
     priceCacheTtlMs = DEFAULT_PRICE_CACHE_TTL_MS,
@@ -269,14 +277,13 @@ export function useBalance(options: UseBalanceOptions) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
   const streamRef = useRef<EventSource | null>(null);
-  // Stable refs for callbacks so fetchBalance doesn't change identity on every render
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
   useEffect(() => { onErrorRef.current = onError; }, [onError]);
 
   /**
-   * Fetch balance
+   * Internal mechanism orchestrating live connection fetching routines.
    */
   const fetchBalance = useCallback(async () => {
     if (!publicKey) {
@@ -319,41 +326,34 @@ export function useBalance(options: UseBalanceOptions) {
   }, [publicKey, network]);
 
   /**
-   * Manual refresh
+   * Action trigger context forcing a manual retrieval call bypassing core loops.
    */
   const refresh = useCallback(() => {
     fetchBalance();
   }, [fetchBalance]);
 
   /**
-   * Clear error
+   * Resets active validation error contexts inside regional hook loops.
    */
   const clearError = useCallback(() => {
     setError(null);
   }, []);
 
-  /**
-   * Initial fetch and auto-refresh setup
-   */
   useEffect(() => {
-    // Clear any existing interval
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
 
-    // Fetch immediately if we have a public key
     if (publicKey) {
       fetchBalance();
 
-      // Set up auto-refresh if enabled
       if (autoRefresh && refreshInterval > 0) {
         intervalRef.current = setInterval(() => {
           fetchBalance();
         }, refreshInterval);
       }
     } else {
-      // Clear state if no public key
       setBalance(null);
       setIsLoading(false);
       setError(null);
@@ -361,7 +361,6 @@ export function useBalance(options: UseBalanceOptions) {
       setIsPriceStale(false);
     }
 
-    // Cleanup
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
@@ -370,11 +369,6 @@ export function useBalance(options: UseBalanceOptions) {
     };
   }, [publicKey, network, autoRefresh, refreshInterval, fetchBalance]);
 
-  /**
-   * Horizon live streaming — open an SSE connection for payments so the
-   * balance updates instantly when funds arrive instead of waiting for the
-   * next poll interval.
-   */
   useEffect(() => {
     if (!publicKey || !enableStreaming || typeof EventSource === "undefined") return;
 
@@ -383,7 +377,6 @@ export function useBalance(options: UseBalanceOptions) {
         ? "https://horizon.stellar.org"
         : "https://horizon-testnet.stellar.org";
 
-    // Close any existing stream before opening a new one
     if (streamRef.current) {
       streamRef.current.close();
       streamRef.current = null;
@@ -394,13 +387,10 @@ export function useBalance(options: UseBalanceOptions) {
     );
 
     es.addEventListener("message", () => {
-      // A new payment arrived — refresh the balance immediately
       fetchBalance();
     });
 
     es.addEventListener("error", () => {
-      // SSE error (network drop, etc.) — the browser will attempt to
-      // reconnect automatically; no explicit action needed here.
     });
 
     streamRef.current = es;
@@ -411,9 +401,6 @@ export function useBalance(options: UseBalanceOptions) {
     };
   }, [publicKey, network, enableStreaming, fetchBalance]);
 
-  /**
-   * Cleanup on unmount
-   */
   useEffect(() => {
     return () => {
       isMountedRef.current = false;

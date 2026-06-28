@@ -22,7 +22,9 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { jobStore, type JobStatus, type AiErrorCode } from "../../shared/jobStore";
+import { parseJsonRequest } from "../../shared/jsonBody";
 import { z } from "zod";
+import { logger } from "@/app/lib/logger";
 
 // ─── Validation schema ────────────────────────────────────────────────────────
 
@@ -55,20 +57,16 @@ export async function POST(
 
   // ── Params / store lookup ──────────────────────────────────────────────────
   const { id: jobId } = await context.params;
-  const job = jobStore.get(jobId);
+  const job = await jobStore.get(jobId);
   if (!job) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
 
   // ── Body parsing ───────────────────────────────────────────────────────────
-  let rawBody: unknown;
-  try {
-    rawBody = await request.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-  }
+  const parsedBody = await parseJsonRequest<unknown>(request);
+  if (!parsedBody.ok) return parsedBody.response;
 
-  const parsed = CallbackBodySchema.safeParse(rawBody);
+  const parsed = CallbackBodySchema.safeParse(parsedBody.body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: parsed.error.issues },
@@ -95,7 +93,7 @@ export async function POST(
   }
 
   // ── Apply the update ───────────────────────────────────────────────────────
-  jobStore.set(jobId, {
+  await jobStore.set(jobId, {
     ...job,
     status: (update.status ?? job.status) as JobStatus,
     progress: update.progress ?? job.progress,
@@ -117,14 +115,14 @@ function validateCallbackSecret(request: NextRequest): NextResponse | null {
   if (!expectedSecret) {
     if (process.env.NODE_ENV === "production") {
       // Misconfigured production deployment — reject all callbacks.
-      console.error(
+      logger.error(
         "[jobs/callback] AI_BACKEND_CALLBACK_SECRET is not set in production. " +
           "All callback requests will be rejected."
       );
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     // Dev without a secret — accept but warn.
-    console.warn(
+    logger.warn(
       "[jobs/callback] AI_BACKEND_CALLBACK_SECRET is not set; " +
         "accepting unauthenticated callback. Set this in production."
     );

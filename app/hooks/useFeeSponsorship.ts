@@ -1,15 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import {
-  STELLAR_NETWORK,
-} from "@/app/lib/networkConfig";
-import {
-  getSponsorBalance,
-  hasSufficientSponsorBalance,
-  estimateSponsoredFee,
-} from "@/app/lib/feeSponsorship";
+import { getStellarNetwork } from "@/app/lib/networkConfig";
 
+/** Core literal indicators tracking the platform's sponsorship eligibility states */
 export type SponsorshipStatus =
   | "checking"
   | "available"
@@ -17,15 +11,24 @@ export type SponsorshipStatus =
   | "unavailable"
   | "error";
 
+/** State container managing real-time metrics tracking funding and verification errors */
 export interface FeeSponsorshipState {
+  /** Current verification lifecycle status descriptor tag */
   status: SponsorshipStatus;
+  /** Evaluated liquid token quantity string held by the sponsor account or null */
   sponsorBalance: string | null;
+  /** Structured estimations detailing operation dimensions and gas costs mapped to native tokens */
   estimatedFee: {
+    /** The aggregate transaction operation index count */
     totalOps: number;
+    /** Standard base network operation metric parameter calculated in Stroops */
     baseFeeStroops: number;
+    /** Scaled atomic fee cost boundary total evaluated in Stroops */
     totalFeeStroops: number;
+    /** Human readable string asset representation displaying the equivalent total value in standard XLM */
     totalFeeXLM: string;
   } | null;
+  /** Detailed string error context message populated when validation failures trigger */
   error: string | null;
 }
 
@@ -43,9 +46,11 @@ const DEFAULT_SPONSOR_PUBLIC_KEY =
  * const { status, sponsorBalance, estimatedFee } = useFeeSponsorship();
  *
  * if (status === "available") {
- *   // Show "Fee sponsored by platform" badge
+ * // Show "Fee sponsored by platform" badge
  * }
  * ```
+ * * @param operationCount - The amount of operations inside the incoming transaction envelope used for fee scaling calculations.
+ * @returns State metrics, fallback indicator bounds, and an execution trigger enabling manual state updates.
  */
 export function useFeeSponsorship(operationCount: number = 1) {
   const [state, setState] = useState<FeeSponsorshipState>({
@@ -55,6 +60,9 @@ export function useFeeSponsorship(operationCount: number = 1) {
     error: null,
   });
 
+  /**
+   * Evaluates network configurations and account parameters to determine if gas costs can be covered by the platform.
+   */
   const checkSponsorship = useCallback(async () => {
     // If no sponsor key is configured, sponsorship is unavailable
     if (!DEFAULT_SPONSOR_PUBLIC_KEY) {
@@ -70,22 +78,19 @@ export function useFeeSponsorship(operationCount: number = 1) {
     setState((prev) => ({ ...prev, status: "checking", error: null }));
 
     try {
-      const [balance, sufficient] = await Promise.all([
-        getSponsorBalance(DEFAULT_SPONSOR_PUBLIC_KEY, STELLAR_NETWORK),
-        hasSufficientSponsorBalance(
-          DEFAULT_SPONSOR_PUBLIC_KEY,
-          STELLAR_NETWORK,
-          5
-        ),
-      ]);
-
-      const feeEstimate = estimateSponsoredFee(operationCount);
+      const network = getStellarNetwork();
+      const res = await fetch(`/api/sponsorship?publicKey=${encodeURIComponent(DEFAULT_SPONSOR_PUBLIC_KEY)}&operationCount=${operationCount}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
 
       setState({
-        status: sufficient ? "available" : "insufficient_balance",
-        sponsorBalance: balance,
-        estimatedFee: feeEstimate,
-        error: sufficient
+        status: data.isAvailable ? "available" : "insufficient_balance",
+        sponsorBalance: data.sponsorBalance ?? null,
+        estimatedFee: data.feeEstimate ?? null,
+        error: data.isAvailable
           ? null
           : "Sponsor account balance is too low to cover fees.",
       });
@@ -108,6 +113,6 @@ export function useFeeSponsorship(operationCount: number = 1) {
     sponsorPublicKey: DEFAULT_SPONSOR_PUBLIC_KEY,
     refresh: checkSponsorship,
     isSponsored: state.status === "available",
-    isTestnet: STELLAR_NETWORK === "testnet",
+    isTestnet: getStellarNetwork() === "testnet",
   };
 }

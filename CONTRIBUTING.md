@@ -57,6 +57,39 @@ Required variables (OAuth, NextAuth, Sentry) and optional variables (Stellar con
 
 CI may run linters, tests and Storybook builds — ensure these pass locally before opening a PR.
 
+## Changesets workflow
+This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs. Every PR should include a changeset describing the change and its semver impact.
+
+### Adding a changeset
+When working on a PR, run the changeset command to document your changes:
+
+```bash
+npm run changeset
+```
+
+You'll be prompted to:
+1. Select the package (this is a single-package project, so select the only option)
+2. Choose the version bump type:
+   - `major` for breaking changes
+   - `minor` for new features
+   - `patch` for bug fixes
+3. Write a summary of your changes
+
+This creates a `.changeset/*.md` file that should be committed with your PR.
+
+### CI enforcement
+The CI workflow checks that feature PRs include a changeset. If your PR is missing a changeset, the CI will fail. For documentation-only changes or internal refactors that don't affect the published package, you can add an empty changeset with the `--empty` flag:
+
+```bash
+npm run changeset -- --empty
+```
+
+### Versioning and releases
+When you're ready to release a new version:
+1. Run `npm run changeset version` to consume changesets and update `package.json`
+2. Run `npm run changeset publish` to publish to npm (if applicable)
+3. The changelog is automatically generated from the consumed changesets
+
 ## Code standards & security
 - Follow the existing code style (TypeScript + Next.js + Tailwind). Run `npm run lint` to catch lint issues.
 - For security & sanitization guidance see [AGENTS.md](clips-frontend/AGENTS.md) — apply the sanitization rules, input validation, and secrets handling described there.

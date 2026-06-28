@@ -6,7 +6,7 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
-import { useAuth } from "@/components/AuthProvider";
+import { useAuth } from "@/components/auth/AuthProvider";
 import {
   redactAddress,
   redactEmail,
@@ -28,7 +28,7 @@ const SENTRY_RELEASE = process.env.NEXT_PUBLIC_SENTRY_RELEASE || process.env.VER
  */
 export function initSentry() {
   if (!SENTRY_DSN) {
-    console.warn("Sentry DSN not configured - error monitoring disabled");
+    logger.warn("Sentry DSN not configured - error monitoring disabled");
     return;
   }
 
@@ -248,7 +248,7 @@ export function logWalletOperation(
     logData.publicKey = redactAddress(data.publicKey);
   }
 
-  console.log(`[Wallet ${status.toUpperCase()}]`, operation, logData);
+  logger.info(`[Wallet ${status.toUpperCase()}]`, operation, logData);
 
   // Also add as breadcrumb for Sentry
   addWalletBreadcrumb(`${operation} - ${status}`, "wallet", logData);

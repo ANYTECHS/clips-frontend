@@ -76,7 +76,7 @@ export async function POST(
     errorCode: undefined,
     errorMessage: undefined,
   };
-  jobStore.set(jobId, restartedJob);
+  await jobStore.set(jobId, restartedJob);
 
   // Re-dispatch to the AI backend. The job must have an objectKey stored;
   // if it does not (legacy jobs from before this change) we still reset state
@@ -94,7 +94,12 @@ export async function POST(
     });
   }
 
-  return NextResponse.json({ success: true, message: "Job restarted" });
+  const body: ApiResponse<{ success: true; message: string }> = {
+    data: { success: true, message: "Job restarted" },
+    error: null,
+  };
+
+  return NextResponse.json(body);
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

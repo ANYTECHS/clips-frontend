@@ -38,5 +38,19 @@ jobs:
         run: npm install
       - name: Unit tests
         run: npm run test -- --passWithNoTests
+      - name: Check for changeset
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ $(git diff --name-only origin/main...HEAD | grep -c '^\.changeset/.*\.md$') -eq 0 ]; then
+            echo "::error::No changeset found in this PR. Please run 'npm run changeset' to add one."
+            exit 1
+          fi
       - name: Production build
         run: npm run build
+      - name: Bundle analysis
+        run: npm run analyze
+      - name: Upload bundle analysis
+        uses: actions/upload-artifact@v4
+        with:
+          name: bundle-analysis
+          path: .next/analyze/

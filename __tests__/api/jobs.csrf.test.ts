@@ -7,6 +7,8 @@ import { NextRequest } from "next/server";
 import { POST as jobPOST } from "@/app/api/jobs/[id]/route";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 
+import { JOB_ESTIMATED_SECONDS } from "@/app/lib/constants";
+
 jest.mock("next-auth", () => ({ default: jest.fn(), getServerSession: jest.fn() }));
 jest.mock("@/app/lib/aiBackend", () => ({
   dispatchJob: jest.fn().mockResolvedValue({ dispatched: true }),
@@ -23,7 +25,7 @@ const ownerJob = {
   progress: 0,
   status: "processing" as const,
   momentsFound: 0,
-  estimatedSecondsRemaining: 300,
+  estimatedSecondsRemaining: JOB_ESTIMATED_SECONDS,
   createdAt: Date.now(),
 };
 

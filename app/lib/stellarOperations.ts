@@ -12,8 +12,8 @@
  * import { createPaymentOp, createChangeTrustOp } from "@/app/lib/stellarOperations";
  *
  * const ops = [
- *   createChangeTrustOp({ assetCode: "USDC", assetIssuer: "G...", limit: "1000" }),
- *   createPaymentOp({ destination: "G...", amount: "10", assetCode: "USDC", assetIssuer: "G..." }),
+ * createChangeTrustOp({ assetCode: "USDC", assetIssuer: "G...", limit: "1000" }),
+ * createPaymentOp({ destination: "G...", amount: "10", assetCode: "USDC", assetIssuer: "G..." }),
  * ];
  *
  * // Pass to useStellarTransaction.executeBatchTransaction or buildBatchTransaction
@@ -24,6 +24,7 @@
 /** Send a native XLM or asset payment */
 export interface PaymentOperation {
   type: "payment";
+  /** The target public key address receiving the payment. */
   destination: string;
   /** Amount as a string (e.g. "10.5") */
   amount: string;
@@ -41,7 +42,9 @@ export interface PaymentOperation {
  */
 export interface ChangeTrustOperation {
   type: "change_trust";
+  /** Alphanumeric identifier of the target asset. */
   assetCode: string;
+  /** Public address of the entity issuing the asset. */
   assetIssuer: string;
   /** Maximum amount to hold. Defaults to max (922337203685.4775807). Set "0" to remove. */
   limit?: string;
@@ -82,6 +85,7 @@ export interface ManageBuyOfferOperation {
 /** Merge source account into destination, transferring all XLM */
 export interface AccountMergeOperation {
   type: "account_merge";
+  /** The target master address receiving the remaining native balances. */
   destination: string;
   source?: string;
 }
@@ -107,6 +111,7 @@ export interface SetOptionsOperation {
 /** Begin sponsoring future reserves for another account */
 export interface BeginSponsoringFutureReservesOperation {
   type: "begin_sponsoring_future_reserves";
+  /** Account coordinate targeted to receive state sponsorship structures. */
   sponsoredId: string;
   source?: string;
 }
@@ -138,6 +143,10 @@ export type InvokeContractBuildError = {
   message: typeof INVOKE_CONTRACT_USER_MESSAGE;
 };
 
+/**
+ * Instantiates an error representation template for unmapped Soroban invocations.
+ * @returns Pre-formatted system error object.
+ */
 export function invokeContractBuildError(): InvokeContractBuildError {
   return {
     code: INVOKE_CONTRACT_NOT_SUPPORTED_CODE,
@@ -145,6 +154,11 @@ export function invokeContractBuildError(): InvokeContractBuildError {
   };
 }
 
+/**
+ * Type-guard validating if an execution outcome block represents a contract compatibility blocker.
+ * @param value - Dynamic type check target.
+ * @returns True if payload signature explicitly matches target error codes.
+ */
 export function isInvokeContractBuildError(
   value: unknown
 ): value is InvokeContractBuildError {
@@ -169,8 +183,6 @@ export type StellarOperation =
   | InvokeContractOperation;
 
 // ─── Builder helpers ──────────────────────────────────────────────────────────
-// These are thin constructors that add the `type` discriminant so callers
-// don't have to type it manually and get full TypeScript inference.
 
 export function createPaymentOp(
   params: Omit<PaymentOperation, "type">
@@ -262,13 +274,8 @@ export function createInvokeContractOp(
  * Returns the two operations needed to establish a trustline and immediately
  * receive a payment in that asset — the most common batch pattern.
  *
- * @example
- * const ops = trustlineAndPayment({
- *   assetCode: "USDC",
- *   assetIssuer: "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN",
- *   destination: userPublicKey,
- *   amount: "100",
- * });
+ * @param params - Setup criteria configuration.
+ * @returns Ordered composite tuple holding the setup trustline operation followed by the payout operation.
  */
 export function trustlineAndPayment(params: {
   assetCode: string;
@@ -295,6 +302,9 @@ export function trustlineAndPayment(params: {
 /**
  * Returns the operations needed to place a DEX sell offer after establishing
  * a trustline for the buying asset.
+ *
+ * @param params - Market exchange placement metrics.
+ * @returns Paired operations ensuring trust allocations match placement.
  */
 export function trustlineAndSellOffer(params: {
   buyingAssetCode: string;
@@ -323,14 +333,12 @@ export function trustlineAndSellOffer(params: {
 }
 
 /**
- * Wraps a set of operations in sponsorship.
- * The sponsor will pay the reserve requirements for any entries created
- * (e.g. trustlines, offers, data entries) within the wrapped operations.
+ * Wraps a set of operations in sponsorship boundaries to offload baseline reserve fees.
  *
- * @example
- * const ops = sponsoredOperations(sponsorPublicKey, sponsoredPublicKey, [
- *   createChangeTrustOp({ assetCode: "USDC", assetIssuer: "G..." })
- * ]);
+ * @param sponsorId - The public key funding transaction storage deposits.
+ * @param sponsoredId - Account receiving balance-free state changes.
+ * @param operations - The child execution block to wrap.
+ * @returns Unified array bounded by start and stop sponsorship instructions.
  */
 export function sponsoredOperations(
   sponsorId: string,
@@ -346,10 +354,18 @@ export function sponsoredOperations(
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
+/**
+ * Specific validation tracking structure highlighting parsing failure coordinates in a transaction collection.
+ */
 export class BatchValidationError extends Error {
+  /**
+   * Constructs an instance of BatchValidationError.
+   * @param operationIndex - Array position location where schema rules failed evaluation.
+   * @param message - Rule conflict description details.
+   */
   constructor(
     public readonly operationIndex: number,
-    message: string
+    public override readonly message: string
   ) {
     super(`Operation[${operationIndex}]: ${message}`);
     this.name = "BatchValidationError";
@@ -359,15 +375,18 @@ export class BatchValidationError extends Error {
 /**
  * Validate a list of operations before building a transaction.
  * Throws `BatchValidationError` on the first invalid operation found.
+ *
+ * @param operations - Array collection of transaction structures slated for packaging.
+ * @throws {Error} Thrown if block counts violate maximum boundaries or are empty.
+ * @throws {BatchValidationError} Thrown if single operation parameter states are malformed.
  */
 export function validateOperations(operations: StellarOperation[]): void {
   if (operations.length === 0) {
     throw new Error("Batch must contain at least one operation.");
   }
 
-  // Stellar allows a maximum of 100 operations per transaction
   if (operations.length > 100) {
-    throw new Error(
+    throw new Error
       `Batch contains ${operations.length} operations. Stellar allows a maximum of 100 per transaction.`
     );
   }
@@ -423,7 +442,6 @@ export function validateOperations(operations: StellarOperation[]): void {
         break;
 
       case "set_options":
-        // set_options has no required fields — all are optional
         break;
 
       case "begin_sponsoring_future_reserves":
@@ -433,11 +451,9 @@ export function validateOperations(operations: StellarOperation[]): void {
         break;
 
       case "end_sponsoring_future_reserves":
-        // end_sponsoring_future_reserves has no required fields
         break;
 
       default: {
-        // Exhaustiveness check
         const _exhaustive: never = op;
         throw new Error(`Unknown operation type: ${(_exhaustive as StellarOperation).type}`);
       }

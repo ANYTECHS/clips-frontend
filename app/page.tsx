@@ -1,8 +1,8 @@
 "use client";
 
 import React from "react";
-import LandingLayout from "@/components/LandingLayout";
-import LandingHero from "@/components/LandingHero";
+import LandingLayout from "@/components/layout/LandingLayout";
+import LandingHero from "@/components/layout/LandingHero";
 
 export default function Home() {
   return (

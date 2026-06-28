@@ -1,12 +1,10 @@
 /**
  * @jest-environment node
  */
-import { GET, _resetCache } from "@/app/api/prices/xlm/route";
+import { GET, _resetCache, CACHE_TTL_MS } from "@/app/api/prices/xlm/route";
 
 global.fetch = jest.fn();
 const mockFetch = global.fetch as jest.Mock;
-
-const FIVE_MIN_MS = 5 * 60 * 1000;
 
 beforeEach(() => {
   _resetCache();
@@ -55,7 +53,7 @@ describe("GET /api/prices/xlm", () => {
     });
 
     await GET();
-    jest.advanceTimersByTime(FIVE_MIN_MS + 1);
+    jest.advanceTimersByTime(CACHE_TTL_MS + 1);
 
     await GET();
     expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -68,7 +66,7 @@ describe("GET /api/prices/xlm", () => {
     });
     await GET(); // populate cache
 
-    jest.advanceTimersByTime(FIVE_MIN_MS + 1); // expire cache
+    jest.advanceTimersByTime(CACHE_TTL_MS + 1); // expire cache
 
     mockFetch.mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) });
 

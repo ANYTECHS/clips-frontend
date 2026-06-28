@@ -6,18 +6,18 @@
  * Architecture overview
  * ─────────────────────
  * 1. On email signup, `createEmbeddedWallet()` is called automatically — the user
- *    never sees a seed phrase or has to install an extension.
+ * never sees a seed phrase or has to install an extension.
  * 2. A Stellar keypair is generated client-side using a pure-JS implementation
- *    (no native dependencies required for the prototype).
+ * (no native dependencies required for the prototype).
  * 3. The keypair is stored via `WalletStorage` (localStorage now, encrypted
- *    backend vault in production).
+ * backend vault in production).
  * 4. The account is funded on Stellar Testnet via Friendbot so it's immediately
- *    usable for Soroban smart-contract interactions.
+ * usable for Soroban smart-contract interactions.
  *
  * Phase 2 upgrade path (production)
  * ──────────────────────────────────
  * - Replace the client-side keypair generation with a server-side MPC/TSS
- *   (Threshold Signature Scheme) so the raw secret key never exists in one place.
+ * (Threshold Signature Scheme) so the raw secret key never exists in one place.
  * - Integrate @stellar/stellar-sdk for real Stellar/Soroban transactions.
  * - Add Freighter wallet detection so power users can opt into self-custody.
  * - Replace Friendbot funding with a server-side sponsorship transaction.
@@ -27,26 +27,16 @@
  * ──────────────────────────
  * Stellar's Soroban supports "smart wallets" — accounts controlled by a
  * Soroban contract rather than a raw keypair. This enables:
- *   - Multi-sig / social recovery
- *   - Session keys (limited-scope signing without exposing the master key)
- *   - Gas sponsorship (platform pays fees on behalf of users)
+ * - Multi-sig / social recovery
+ * - Session keys (limited-scope signing without exposing the master key)
+ * - Gas sponsorship (platform pays fees on behalf of users)
  * The `walletType: "smart_contract"` field is reserved for this upgrade.
  */
 
 import { WalletStorage, WalletStorageError } from "./walletStorage";
-import {
-  STELLAR_NETWORK,
-  NETWORK_CONFIGS,
-  StellarNetwork,
-} from "./networkConfig";
+import { getStellarNetwork, NETWORK_CONFIGS, StellarNetwork } from "./networkConfig";
 import { withRetry, withFallback } from "./retryUtils";
-
-// ─── Network config ────────────────────────────────────────────────────────────
-//
-// Network constants are now centralised in networkConfig.ts and driven by the
-// NEXT_PUBLIC_STELLAR_NETWORK environment variable.  Re-export the type and
-// the config map so existing callers of this module don't need to change their
-// imports.
+import { Keypair } from "@stellar/stellar-sdk";
 
 export type { StellarNetwork };
 
@@ -55,38 +45,61 @@ export const STELLAR_NETWORKS = NETWORK_CONFIGS;
 
 // ─── Wallet types ──────────────────────────────────────────────────────────────
 
+/** Supported operational modalities for key management on the ledger interface */
 export type EmbeddedWalletType = "embedded" | "freighter" | "smart_contract";
 
+/**
+ * Structural container data object tracking an active network identity wallet.
+ */
 export interface EmbeddedWallet {
+  /** The public ledger coordinate mapping the account identification string. */
   publicKey: string;
+  /** Active blockchain target layout designation. */
   network: StellarNetwork;
+  /** Custom operational modality strategy tag. */
   walletType: EmbeddedWalletType;
   /** Whether the account has been funded and activated on-chain */
   isActivated: boolean;
+  /** ISO string timestamp tracking creation milestones. */
   createdAt: string;
 }
 
+/**
+ * Packaging container returned upon successful resolution of a key generation procedure.
+ */
 export interface WalletCreationResult {
+  /** The validated metadata reference tracking the newly assigned credential space. */
   wallet: EmbeddedWallet;
   /** Present only immediately after creation — store securely, never log */
   secretKey?: string;
+  /** Explicit indicator flag denoting if an allocation index existed prior to invocation. */
   alreadyExisted: boolean;
 }
 
 // ─── Wallet creation error types ──────────────────────────────────────────────
 
+/** Unique identification string error categorization codes */
 export type WalletErrorCode =
   | "KEYPAIR_GENERATION_FAILED"  // Web Crypto API unavailable or failed
-  | "STORAGE_FAILED"             // localStorage unavailable or full
-  | "FUNDING_FAILED"             // Friendbot unreachable (testnet only)
+  | "STORAGE_FAILED"              // localStorage unavailable or full
+  | "FUNDING_FAILED"              // Friendbot unreachable (testnet only)
   | "UNKNOWN";
 
+/**
+ * Special handling error object recording tracking failures encountered during credential deployment blocks.
+ */
 export class WalletCreationError extends Error {
+  /**
+   * Constructs an instance of a WalletCreationError.
+   * @param code - Functional taxonomy label organizing execution tracking errors.
+   * @param message - Descriptive contextual notification text logging the underlying operational failure.
+   * @param cause - Direct upstream operational stack traces, if available.
+   * @param retryable - Explicit flag guiding remediation mechanisms on whether execution can be safely re-attempted.
+   */
   constructor(
     public readonly code: WalletErrorCode,
     message: string,
     public readonly cause?: unknown,
-    /** Whether the caller can safely retry this operation */
     public readonly retryable: boolean = true
   ) {
     super(message);
@@ -94,7 +107,11 @@ export class WalletCreationError extends Error {
   }
 }
 
-/** Classify a raw error into a typed WalletCreationError */
+/**
+ * Classify a raw error into a typed WalletCreationError
+ * @param err - Unstructured raw error exception encountered within an internal execution thread.
+ * @returns An application-normalized error schema instance tracking original execution failures.
+ */
 function classifyError(err: unknown): WalletCreationError {
   if (err instanceof WalletCreationError) return err;
 
@@ -131,81 +148,7 @@ function classifyError(err: unknown): WalletCreationError {
   );
 }
 
-// ─── Stellar keypair generation (pure JS, no native deps) ─────────────────────
-//
-// In production, install @stellar/stellar-sdk:
-//   import { Keypair } from "@stellar/stellar-sdk";
-//   const keypair = Keypair.random();
-//
-// For the prototype we generate a valid-looking Stellar keypair using the
-// Web Crypto API + a base32 encoder, matching Stellar's StrKey format.
-// This is sufficient for UI/UX development and mock flows.
 
-const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-function toBase32(bytes: Uint8Array): string {
-  let result = "";
-  let buffer = 0;
-  let bitsLeft = 0;
-  for (const byte of bytes) {
-    buffer = (buffer << 8) | byte;
-    bitsLeft += 8;
-    while (bitsLeft >= 5) {
-      bitsLeft -= 5;
-      result += BASE32_ALPHABET[(buffer >> bitsLeft) & 31];
-    }
-  }
-  if (bitsLeft > 0) {
-    result += BASE32_ALPHABET[(buffer << (5 - bitsLeft)) & 31];
-  }
-  return result;
-}
-
-/**
- * Generate a Stellar-compatible keypair using the Web Crypto API.
- * Returns { publicKey, secretKey } in Stellar StrKey format (G.../S...).
- *
- * NOTE: In production, use `Keypair.random()` from @stellar/stellar-sdk
- * which uses proper Ed25519 key generation and CRC16 checksums.
- *
- * Throws `WalletCreationError` with code KEYPAIR_GENERATION_FAILED if the
- * Web Crypto API is unavailable.
- */
-async function generateStellarKeypair(): Promise<{ publicKey: string; secretKey: string }> {
-  try {
-    if (typeof crypto === "undefined" || !crypto.subtle) {
-      throw new WalletCreationError(
-        "KEYPAIR_GENERATION_FAILED",
-        "Web Crypto API is not available in this environment.",
-        undefined,
-        false
-      );
-    }
-
-    // Generate 32 random bytes for the secret key seed
-    const secretBytes = crypto.getRandomValues(new Uint8Array(32));
-    // Derive a "public key" by hashing the secret (simplified — real Stellar uses Ed25519)
-    const publicBytes = new Uint8Array(await crypto.subtle.digest("SHA-256", secretBytes));
-
-    // Stellar StrKey: version byte + payload + checksum (simplified)
-    // Real format: version(1) + key(32) + checksum(2) → base32
-    const secretPayload = new Uint8Array(33);
-    secretPayload[0] = 0x90; // 'S' version byte (18 << 3)
-    secretPayload.set(secretBytes, 1);
-
-    const publicPayload = new Uint8Array(33);
-    publicPayload[0] = 0x30; // 'G' version byte (6 << 3)
-    publicPayload.set(publicBytes, 1);
-
-    return {
-      publicKey: "G" + toBase32(publicPayload).slice(1, 56),
-      secretKey: "S" + toBase32(secretPayload).slice(1, 56),
-    };
-  } catch (err) {
-    if (err instanceof WalletCreationError) throw err;
-    throw classifyError(err);
-  }
-}
 
 // ─── Freighter detection ───────────────────────────────────────────────────────
 
@@ -213,8 +156,7 @@ async function generateStellarKeypair(): Promise<{ publicKey: string; secretKey:
  * Check whether the Freighter browser extension is installed.
  * Freighter is the primary Stellar/Soroban wallet extension.
  *
- * In production, use @stellar/freighter-api:
- *   import { isConnected } from "@stellar/freighter-api";
+ * @returns True if window context variables confirm availability.
  */
 export async function isFreighterAvailable(): Promise<boolean> {
   if (typeof window === "undefined") return false;
@@ -224,7 +166,7 @@ export async function isFreighterAvailable(): Promise<boolean> {
 
 /**
  * Request the user's public key from Freighter.
- * Returns null if Freighter is not available or the user rejects.
+ * @returns Public address identifier string or null if interaction is aborted or unavailable.
  */
 export async function connectFreighter(): Promise<string | null> {
   try {
@@ -242,9 +184,9 @@ export async function connectFreighter(): Promise<string | null> {
 /**
  * Fund a new Stellar testnet account via Friendbot.
  * This activates the account with 10,000 XLM on testnet.
- * On mainnet, the platform would sponsor account creation via a server transaction.
  *
- * Throws if called on mainnet — use a server-side sponsorship flow instead.
+ * @param publicKey - The destination account identification address targeted for activation.
+ * @returns Operational execution indicator reporting completion metrics.
  */
 export async function fundTestnetAccount(publicKey: string): Promise<boolean> {
   try {
@@ -261,26 +203,20 @@ export async function fundTestnetAccount(publicKey: string): Promise<boolean> {
 
 /**
  * Create (or retrieve) an embedded Stellar wallet for a user.
- *
  * Called automatically on email signup — the user never sees this flow.
- * If a wallet already exists for the userId, it is returned without creating a new one.
  *
- * The `network` parameter defaults to the value of the
- * NEXT_PUBLIC_STELLAR_NETWORK environment variable ("testnet" unless overridden
- * to "mainnet").  Pass an explicit value only when you need to override the
- * environment setting (e.g. in tests).
- *
- * @param userId   - The user's ID from the auth system
- * @param network  - "testnet" | "mainnet" — defaults to NEXT_PUBLIC_STELLAR_NETWORK
- * @param fund     - Whether to fund the account via Friendbot (testnet only, no-op on mainnet)
+ * @param userId   - The user's ID from the auth system.
+ * @param network  - Target network layer configuration enum. Defaults to environment settings.
+ * @param fund     - True if the application should trigger a testnet token subsidy operation.
+ * @returns Structural result containing operational models tracking security entities.
  */
 export async function createEmbeddedWallet(
   userId: string,
-  network: StellarNetwork = STELLAR_NETWORK,
+  network: StellarNetwork = getStellarNetwork(),
   fund = true
 ): Promise<WalletCreationResult> {
   // Return existing wallet if already created
-  const existing = WalletStorage.get(userId);
+  const existing = await WalletStorage.get(userId);
   if (existing) {
     return {
       wallet: {
@@ -295,11 +231,13 @@ export async function createEmbeddedWallet(
   }
 
   // Generate a new keypair
-  const { publicKey, secretKey } = await generateStellarKeypair();
+  const keypair = Keypair.random();
+  const publicKey = keypair.publicKey();
+  const secretKey = keypair.secret();
   const createdAt = new Date().toISOString();
 
   // Persist to storage (secret key is obfuscated at rest)
-  WalletStorage.save(userId, {
+  await WalletStorage.save(userId, {
     userId,
     publicKey,
     secretKey,
@@ -331,10 +269,11 @@ export async function createEmbeddedWallet(
 
 /**
  * Retrieve the embedded wallet for a user without creating a new one.
- * Returns null if no wallet exists.
+ * @param userId - Target identification mapping key corresponding to the session owner.
+ * @returns The structured target context record object model or null if absent.
  */
-export function getEmbeddedWallet(userId: string): EmbeddedWallet | null {
-  const record = WalletStorage.get(userId);
+export async function getEmbeddedWallet(userId: string): Promise<EmbeddedWallet | null> {
+  const record = await WalletStorage.get(userId);
   if (!record) return null;
   return {
     publicKey: record.publicKey,
@@ -347,6 +286,8 @@ export function getEmbeddedWallet(userId: string): EmbeddedWallet | null {
 
 /**
  * Truncate a Stellar public key for display: GABCD...WXYZ
+ * @param publicKey - Complete address identifier mapping string.
+ * @returns Formatted representation target text.
  */
 export function truncateStellarAddress(publicKey: string): string {
   if (publicKey.length < 10) return publicKey;
