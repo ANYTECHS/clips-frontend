@@ -38,5 +38,11 @@ jobs:
         run: npm install
       - name: Unit tests
         run: npm run test -- --passWithNoTests
+      - name: Check no hardcoded test credentials in source
+        run: |
+          if grep -r --include="*.ts" --include="*.tsx" --exclude-dir="__tests__" --exclude-dir="tests" -l "Password123" .; then
+            echo "ERROR: 'Password123' literal found in non-test source files" >&2
+            exit 1
+          fi
       - name: Production build
         run: npm run build
