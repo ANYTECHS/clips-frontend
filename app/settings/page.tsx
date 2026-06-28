@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import { useWallet } from "@/components/WalletProvider";
 import SocialRecoveryConfig from "@/components/SocialRecoveryConfig";
 import WalletConnectButton from "@/components/WalletConnectButton";
-import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun } from "lucide-react";
+import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/components/AuthProvider";
@@ -19,6 +19,7 @@ import {
 import Skeleton from "@/components/ui/Skeleton";
 import TrustlineManager from "@/components/wallet/TrustlineManager";
 import { useTheme } from "@/components/theme-provider";
+import * as Sentry from "@sentry/nextjs";
 
 export default function SettingsPage() {
   const { showToast } = useToast();
@@ -32,14 +33,21 @@ export default function SettingsPage() {
   const [notificationsLoading, setNotificationsLoading] = useState(false);
 
   // Wallet visibility and inputs
-  const [showPrivateKey, setShowPrivateKey] = useState(false);
   const [showMnemonic, setShowMnemonic] = useState(false);
   const [advancedWalletEnabled, setAdvancedWalletEnabled] = useState(false);
   const [importKeyInput, setImportKeyInput] = useState("");
   const [importError, setImportError] = useState("");
   const [importSuccess, setImportSuccess] = useState(false);
-  const [copiedKey, setCopiedKey] = useState(false);
   const [copiedMnemonic, setCopiedMnemonic] = useState(false);
+
+  // Secret key export modal state
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportStep, setExportStep] = useState<"confirm" | "reauth" | "ready">("confirm");
+  const [exportConfirmPhrase, setExportConfirmPhrase] = useState("");
+  const [exportPassword, setExportPassword] = useState("");
+  const [exportPasswordError, setExportPasswordError] = useState("");
+  const [exportRevealed, setExportRevealed] = useState(false);
+  const exportHideTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (user?.walletNetwork && user.walletNetwork !== walletNetwork) {
@@ -122,20 +130,81 @@ export default function SettingsPage() {
     }
   };
 
-  const handleCopyKey = () => {
-    if (!stellarSecret) return;
-    navigator.clipboard.writeText(stellarSecret);
-    setCopiedKey(true);
-    showToast("Secret key copied to clipboard", "success");
-    setTimeout(() => setCopiedKey(false), 2000);
-  };
-
   const handleCopyMnemonic = () => {
     if (!stellarMnemonic) return;
     navigator.clipboard.writeText(stellarMnemonic);
     setCopiedMnemonic(true);
     showToast("Recovery phrase copied to clipboard", "success");
     setTimeout(() => setCopiedMnemonic(false), 2000);
+  };
+
+  const openExportModal = () => {
+    setExportModalOpen(true);
+    setExportStep("confirm");
+    setExportConfirmPhrase("");
+    setExportPassword("");
+    setExportPasswordError("");
+    setExportRevealed(false);
+  };
+
+  const closeExportModal = () => {
+    setExportModalOpen(false);
+    setExportConfirmPhrase("");
+    setExportPassword("");
+    setExportPasswordError("");
+    setExportRevealed(false);
+    if (exportHideTimerRef.current) clearTimeout(exportHideTimerRef.current);
+  };
+
+  const handleExportConfirm = () => {
+    if (exportConfirmPhrase.trim().toLowerCase() !== "i understand") return;
+    setExportStep("reauth");
+  };
+
+  const handleExportReauth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setExportPasswordError("");
+    if (!exportPassword) {
+      setExportPasswordError("Password is required.");
+      return;
+    }
+    try {
+      const res = await fetch("/api/auth/verify-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: exportPassword }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setExportPasswordError(body.error ?? "Verification failed. Please try again.");
+        return;
+      }
+    } catch {
+      setExportPasswordError("Network error. Please try again.");
+      return;
+    }
+    Sentry.addBreadcrumb({
+      category: "wallet",
+      message: "User initiated secret key export",
+      level: "warning",
+      data: { userId: user?.id },
+    });
+    setExportStep("ready");
+    setExportRevealed(false);
+  };
+
+  const handleRevealExportKey = () => {
+    setExportRevealed(true);
+    if (exportHideTimerRef.current) clearTimeout(exportHideTimerRef.current);
+    exportHideTimerRef.current = setTimeout(() => {
+      setExportRevealed(false);
+    }, 15000);
+  };
+
+  const handleCopyExportKey = () => {
+    if (!stellarSecret) return;
+    navigator.clipboard.writeText(stellarSecret);
+    showToast("Secret key copied to clipboard", "success");
   };
 
   return (
@@ -443,50 +512,18 @@ export default function SettingsPage() {
                             <div className="space-y-1">
                               <p className="font-bold text-sm text-white">Secret Key Export (Secure)</p>
                               <p className="text-xs text-muted-foreground leading-normal max-w-md">
-                                Never share your Stellar Secret Key. Export requires multiple confirmations and supports encrypted download.
+                                Never share your Stellar Secret Key. Requires confirmation and re-authentication.
                               </p>
-                              {showPrivateKey && (
-                                <p className="text-xs font-mono text-brand break-all bg-brand/5 border border-brand/20 p-2 rounded-lg mt-2 select-all">
-                                  {stellarSecret}
-                                </p>
-                              )}
                             </div>
                             <div className="flex gap-2 shrink-0 items-end flex-wrap md:flex-nowrap">
                               <button
-                                onClick={() => setShowPrivateKey(!showPrivateKey)}
-                                className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:text-brand hover:border-brand/30 transition-all flex items-center gap-1 cursor-pointer"
-                              >
-                                {showPrivateKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                                {showPrivateKey ? "Hide" : "Reveal"}
-                              </button>
-
-                              <button
-                                onClick={() => {
-                                  // minimal client-side enforcement; full flow implemented in a modal in follow-up PR if needed
-                                  if (!stellarSecret) return;
-                                  const ok1 = window.confirm("Warning: This is your raw Stellar Secret Key. Anyone with it controls your funds. Continue?");
-                                  if (!ok1) return;
-                                  const ok2 = window.confirm("Last chance: Click OK to download an encrypted backup. Your password is required.");
-                                  if (!ok2) return;
-                                  // encrypted download is handled by a future secure modal; for now, we block raw copy via this button
-                                  showToast("Encrypted export will be available in the next step.", "success");
-                                }}
+                                onClick={openExportModal}
                                 className="px-3 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all flex items-center gap-1 cursor-pointer"
                                 disabled={!stellarSecret}
                               >
                                 <Key className="w-3.5 h-3.5" aria-hidden="true" />
-                                Export (Encrypted)
+                                Export Key
                               </button>
-
-                              {showPrivateKey && (
-                                <button
-                                  onClick={handleCopyKey}
-                                  className="px-3 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all flex items-center gap-1 cursor-pointer"
-                                >
-                                  {copiedKey ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                                  Copy
-                                </button>
-                              )}
                             </div>
                           </div>
 
@@ -594,6 +631,117 @@ export default function SettingsPage() {
           )}
         </div>
       </main>
+
+      {/* Secret Key Export Modal */}
+      {exportModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-modal-title"
+        >
+          <div className="w-full max-w-sm bg-[#080B0A] border border-white/10 rounded-2xl p-6 shadow-2xl">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-2 text-yellow-400">
+                <AlertTriangle className="w-5 h-5" />
+                <h2 id="export-modal-title" className="text-sm font-extrabold">Export Secret Key</h2>
+              </div>
+              <button onClick={closeExportModal} className="text-muted-foreground hover:text-white cursor-pointer" aria-label="Close">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {exportStep === "confirm" && (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Your Stellar secret key grants full control of your funds. Anyone with it can drain your wallet permanently.
+                </p>
+                <p className="text-xs text-white font-semibold">
+                  Type <span className="font-mono text-brand">I understand</span> to continue:
+                </p>
+                <input
+                  type="text"
+                  value={exportConfirmPhrase}
+                  onChange={(e) => setExportConfirmPhrase(e.target.value)}
+                  placeholder="I understand"
+                  className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none transition-colors"
+                  autoFocus
+                />
+                <button
+                  onClick={handleExportConfirm}
+                  disabled={exportConfirmPhrase.trim().toLowerCase() !== "i understand"}
+                  className="w-full py-3 rounded-xl bg-yellow-500 text-black text-xs font-extrabold disabled:opacity-40 cursor-pointer hover:bg-yellow-400 transition-colors"
+                >
+                  Continue
+                </button>
+              </div>
+            )}
+
+            {exportStep === "reauth" && (
+              <form onSubmit={handleExportReauth} className="space-y-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Re-enter your account password to verify your identity before the key is revealed.
+                </p>
+                <input
+                  type="password"
+                  value={exportPassword}
+                  onChange={(e) => setExportPassword(e.target.value)}
+                  placeholder="Account password"
+                  className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none transition-colors"
+                  autoFocus
+                />
+                {exportPasswordError && (
+                  <p className="text-xs text-red-400">{exportPasswordError}</p>
+                )}
+                <button
+                  type="submit"
+                  disabled={!exportPassword}
+                  className="w-full py-3 rounded-xl bg-brand text-black text-xs font-extrabold disabled:opacity-40 cursor-pointer hover:bg-brand-hover transition-colors"
+                >
+                  Verify &amp; Proceed
+                </button>
+              </form>
+            )}
+
+            {exportStep === "ready" && (
+              <div className="space-y-4">
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Your secret key is available for clipboard copy only. It will auto-hide after 15 seconds.
+                </p>
+                {exportRevealed ? (
+                  <div className="space-y-2">
+                    <div className="bg-brand/5 border border-brand/20 rounded-xl p-3">
+                      <p className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Secret Key</p>
+                      <p className="text-xs text-muted-foreground">Key is not displayed — use Copy to retrieve it.</p>
+                    </div>
+                    <button
+                      onClick={handleCopyExportKey}
+                      className="w-full py-3 rounded-xl bg-brand text-black text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer hover:bg-brand-hover transition-colors"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                      Copy to Clipboard
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRevealExportKey}
+                    className="w-full py-3 rounded-xl bg-white/5 border border-white/10 text-white text-xs font-extrabold flex items-center justify-center gap-2 cursor-pointer hover:border-brand/30 transition-colors"
+                  >
+                    <Eye className="w-3.5 h-3.5" />
+                    Reveal (copy only, 15s)
+                  </button>
+                )}
+                <button
+                  onClick={closeExportModal}
+                  className="w-full py-2 text-xs text-muted-foreground hover:text-white transition-colors cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
