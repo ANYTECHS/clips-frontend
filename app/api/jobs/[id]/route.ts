@@ -3,16 +3,30 @@ import { jobStore } from "../shared/jobStore";
 import { requireJobOwner } from "../shared/authGuard";
 import { checkCsrf } from "@/app/lib/csrf";
 import { dispatchJob } from "@/app/lib/aiBackend";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
+
+/** Accepts UUID (with or without hyphens) or alphanumeric slugs up to 64 chars. */
+const JOB_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+
+function validateJobId(id: string): NextResponse | null {
+  if (!JOB_ID_RE.test(id)) {
+    return NextResponse.json({ error: "Invalid job id format" }, { status: 400 });
+  }
+  return null;
+}
 
 // ─── GET /api/jobs/[id] ───────────────────────────────────────────────────────
-// Returns real job status from the store. No simulation — the AI backend is
-// the sole writer of progress/status via the callback route.
 
 export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
+  const rateLimited = applyRateLimit(request, { limit: 120, windowMs: 60_000 });
+  if (rateLimited) return rateLimited;
+
   const { id: jobId } = await context.params;
+  const idError = validateJobId(jobId);
+  if (idError) return idError;
   const result = await requireJobOwner(jobId);
   if (result instanceof NextResponse) return result;
 
@@ -40,6 +54,9 @@ export async function POST(
   if (csrfError) return csrfError;
 
   const { id: jobId } = await context.params;
+  const idError = validateJobId(jobId);
+  if (idError) return idError;
+
   const result = await requireJobOwner(jobId);
   if (result instanceof NextResponse) return result;
 
