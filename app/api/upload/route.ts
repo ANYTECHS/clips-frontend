@@ -40,8 +40,10 @@ import { scanFile, VirusScanError, getScanConfig } from "@/app/lib/virusScan";
 import { checkCsrf } from "@/app/lib/csrf";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500 MB
+const MAX_FILES_PER_REQUEST = 10;
 const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"];
 const ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv"];
 
@@ -58,6 +60,9 @@ function validateFile(file: File): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = applyRateLimit(request, { limit: 20, windowMs: 60_000 });
+    if (rateLimited) return rateLimited;
+
     const csrfError = checkCsrf(request);
     if (csrfError) return csrfError;
 
@@ -72,6 +77,13 @@ export async function POST(request: NextRequest) {
 
     if (!files || files.length === 0) {
       return NextResponse.json({ error: "No files provided" }, { status: 400 });
+    }
+
+    if (files.length > MAX_FILES_PER_REQUEST) {
+      return NextResponse.json(
+        { error: `Too many files. Maximum ${MAX_FILES_PER_REQUEST} files per request.` },
+        { status: 400 }
+      );
     }
 
     // Validate every file before touching storage
