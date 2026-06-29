@@ -100,6 +100,9 @@ function validateFile(file: File): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = applyRateLimit(request, { limit: 20, windowMs: 60_000 });
+    if (rateLimited) return rateLimited;
+
     const csrfError = checkCsrf(request);
     if (csrfError) return csrfError;
 
@@ -120,6 +123,13 @@ export async function POST(request: NextRequest) {
         code: "NO_FILES",
       };
       return NextResponse.json(body, { status: 400 });
+    }
+
+    if (files.length > MAX_FILES_PER_REQUEST) {
+      return NextResponse.json(
+        { error: `Too many files. Maximum ${MAX_FILES_PER_REQUEST} files per request.` },
+        { status: 400 }
+      );
     }
 
     // Validate every file before touching storage
