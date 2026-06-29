@@ -5,6 +5,7 @@ import type { Locale, I18nContextType } from "./types";
 import { translate } from "./translations";
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
+I18nContext.displayName = "I18nContext";
 
 const STORAGE_KEY = "clipcash_locale";
 
