@@ -27,6 +27,7 @@ interface WalletContextValue extends WalletState {
 }
 
 const WalletContext = createContext<WalletContextValue | null>(null);
+WalletContext.displayName = "WalletContext";
 
 const DEFAULT_STATE: WalletState = {
   address: null,

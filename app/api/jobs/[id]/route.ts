@@ -27,6 +27,7 @@ export async function GET(
   const { id: jobId } = await context.params;
   const idError = validateJobId(jobId);
   if (idError) return idError;
+
   const result = await requireJobOwner(jobId);
   if (result instanceof NextResponse) return result;
 
