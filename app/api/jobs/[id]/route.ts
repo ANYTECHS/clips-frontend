@@ -16,8 +16,6 @@ function validateJobId(id: string): NextResponse | null {
 }
 
 // ─── GET /api/jobs/[id] ───────────────────────────────────────────────────────
-// Returns real job status from the store. No simulation — the AI backend is
-// the sole writer of progress/status via the callback route.
 
 export async function GET(
   request: NextRequest,
