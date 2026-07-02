@@ -76,25 +76,14 @@ export default function RecoveryPage() {
         await secureStorage.setItem("clipcash_wallet", JSON.stringify(parsed));
       }
 
-      // 3. Authenticate user: Check if test user email or matching mock account
-      // For demo, if they use the test mnemonic, log them in as test user, otherwise create a mock recovered user
-      let loggedInUser = {
+      // 3. Authenticate user as a recovered account
+      const loggedInUser = {
         id: "recovered-user-id",
         email: "recovered@clipcash.ai",
         username: "recovered_user",
         onboardingStep: 3,
         name: "Recovered User",
       };
-
-      if (phrase.includes("abandon ability able about above absent")) {
-        loggedInUser = {
-          id: "test-user-id",
-          email: "test@example.com",
-          username: "testuser",
-          onboardingStep: 3,
-          name: "Test User",
-        };
-      }
 
       setUser(loggedInUser);
       setSuccess("Wallet recovered successfully! Redirecting...");
@@ -120,7 +109,13 @@ export default function RecoveryPage() {
 
     setLoading(true);
     try {
-      const res = await MockApi.initiateSocialRecovery(socialEmail);
+      const r = await fetch("/api/recovery/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: socialEmail }),
+      });
+      if (!r.ok) throw new Error((await r.json()).error ?? "Failed to initiate recovery");
+      const res = await r.json();
       setSessionId(res.sessionId);
       setGuardians(res.guardians.map((g: string) => ({ email: g, approved: false })));
       setRecoveryThreshold(res.threshold);
@@ -141,7 +136,12 @@ export default function RecoveryPage() {
     try {
       // Simulate Guardian 1 approving
       await new Promise((r) => setTimeout(r, 1000));
-      let res = await MockApi.approveGuardian(sessionId, guardians[0].email);
+      let r = await fetch("/api/recovery/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, guardianEmail: guardians[0].email }),
+      });
+      let res = await r.json();
       setGuardians(
         res.guardians.map((g: { email: string; approved: boolean }) => ({
           email: g.email,
@@ -150,7 +150,12 @@ export default function RecoveryPage() {
       );
 
       await new Promise((r) => setTimeout(r, 1200));
-      res = await MockApi.approveGuardian(sessionId, guardians[1].email);
+      r = await fetch("/api/recovery/approve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, guardianEmail: guardians[1].email }),
+      });
+      res = await r.json();
       setGuardians(
         res.guardians.map((g: { email: string; approved: boolean }) => ({
           email: g.email,
@@ -159,7 +164,8 @@ export default function RecoveryPage() {
       );
 
       // Verify recovery capability
-      const status = await MockApi.checkSocialRecovery(sessionId);
+      const statusR = await fetch(`/api/recovery/check?sessionId=${encodeURIComponent(sessionId)}`);
+      const status = await statusR.json();
       setIsRecoverable(status.isRecoverable);
       setSuccess("Threshold reached! Guardians have approved your request.");
     } catch (err: any) {
@@ -182,7 +188,9 @@ export default function RecoveryPage() {
     setLoading(true);
     try {
       // 1. Fetch encrypted backup from session
-      const status = await MockApi.checkSocialRecovery(sessionId);
+      const r = await fetch(`/api/recovery/check?sessionId=${encodeURIComponent(sessionId)}`);
+      if (!r.ok) throw new Error((await r.json()).error ?? "Recovery check failed");
+      const status = await r.json();
       if (!status.isRecoverable || !status.encryptedBackup) {
         throw new Error("Social recovery is not approved yet.");
       }
@@ -210,23 +218,13 @@ export default function RecoveryPage() {
       }
 
       // 4. Log user in
-      let loggedInUser = {
+      const loggedInUser = {
         id: "recovered-user-id",
         email: socialEmail,
         username: "recovered_user",
         onboardingStep: 3,
         name: "Recovered User",
       };
-
-      if (socialEmail === "test@example.com") {
-        loggedInUser = {
-          id: "test-user-id",
-          email: "test@example.com",
-          username: "testuser",
-          onboardingStep: 3,
-          name: "Test User",
-        };
-      }
 
       setUser(loggedInUser);
       setSuccess("Wallet decrypted and restored! Redirecting to Dashboard...");

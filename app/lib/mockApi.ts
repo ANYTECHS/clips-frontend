@@ -1,4 +1,10 @@
 // This file replaces the backend server by mocking the needed endpoints client-side with simulated latency.
+// It must NOT be used in production — real API calls must be used instead.
+if (process.env.NODE_ENV === "production") {
+  throw new Error(
+    "mockApi must not be imported in production. Replace with real API calls."
+  );
+}
 
 import { rateLimiter } from './rateLimiter';
 import { combineShares, splitSecret } from "./shamirRecovery";
@@ -175,11 +181,6 @@ export const mintCollection = rateLimiter(async (data: { collectionName: string;
   }
   await delay(1800);
 
-  const roll = Math.random();
-  if (roll < 0.25) throw new ApiError("WALLET_REJECTED", "WALLET_REJECTED");
-  if (roll < 0.4) throw new ApiError("NETWORK_ERROR", "NETWORK_ERROR");
-  if (roll < 0.5) throw new ApiError("UPLOAD_FAILED", "UPLOAD_FAILED");
-
   return { success: true, txHash: `0x${Math.random().toString(16).slice(2, 18)}`, collection: data.collectionName };
 }, 10, 10000);
 
@@ -188,11 +189,6 @@ export const postClips = rateLimiter(async (clipIds: string[]) => {
     return apiClient.post('/clips/post', { clipIds });
   }
   await delay(1400);
-
-  const roll = Math.random();
-  if (roll < 0.2) throw new ApiError("NETWORK_ERROR", "NETWORK_ERROR");
-  if (roll < 0.3) throw new ApiError("PLATFORM_AUTH_EXPIRED", "PLATFORM_AUTH_EXPIRED");
-
   return { success: true, posted: clipIds.length };
 }, 10, 10000);
 
