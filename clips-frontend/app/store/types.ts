@@ -129,6 +129,16 @@ export interface UserProfile {
   avatarUrl: string | null;
   plan: "free" | "pro" | "enterprise";
   planUsagePercent: number;
+  /**
+   * How many AI transforms remain in the current billing period.
+   * `null` means unlimited (enterprise plan).
+   */
+  transformQuotaRemaining: number | null;
+  /**
+   * ISO-8601 date when the quota resets (1st of next month, 00:00 UTC).
+   * `null` for enterprise (no reset needed).
+   */
+  transformQuotaResetAt: string | null;
 }
 
 export interface UserState {

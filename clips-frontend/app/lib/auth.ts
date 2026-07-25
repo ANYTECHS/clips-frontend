@@ -3,6 +3,21 @@ import GoogleProvider from "next-auth/providers/google";
 import AppleProvider from "next-auth/providers/apple";
 import TwitterProvider from "next-auth/providers/twitter";
 import InstagramProvider from "next-auth/providers/instagram";
+import { upsertConnection, type SocialPlatform } from "@/app/lib/platformConnections";
+
+/**
+ * Map a NextAuth provider ID to our internal SocialPlatform type.
+ */
+function toSocialPlatform(providerId: string): SocialPlatform | null {
+  const map: Record<string, SocialPlatform> = {
+    google: "google",
+    apple: "apple",
+    tiktok: "tiktok",
+    twitter: "twitter",
+    instagram: "instagram",
+  };
+  return map[providerId] ?? null;
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -33,6 +48,7 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.INSTAGRAM_CLIENT_ID!,
       clientSecret: process.env.INSTAGRAM_CLIENT_SECRET!,
     }),
+    // TikTok uses a custom provider (not in next-auth built-ins)
     {
       id: "tiktok",
       name: "TikTok",
@@ -58,17 +74,43 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.TIKTOK_CLIENT_SECRET,
     },
   ],
+
   callbacks: {
+    /**
+     * Persist OAuth tokens in the JWT and upsert the platform_connections
+     * record on every actual sign-in (account is only present then).
+     */
     async jwt({ token, account, profile }) {
       if (account) {
         token.accessToken = account.access_token;
+        token.refreshToken = account.refresh_token ?? null;
         token.provider = account.provider;
         if (profile) {
           token.profile = profile;
         }
+
+        // Upsert platform connection whenever a user signs in via OAuth.
+        const platform = toSocialPlatform(account.provider);
+        if (platform && token.email) {
+          const username =
+            (profile as any)?.name ??
+            (profile as any)?.display_name ??
+            (profile as any)?.login ??
+            null;
+
+          upsertConnection({
+            userId: token.email as string,
+            platform,
+            accessToken: account.access_token ?? null,
+            refreshToken: account.refresh_token ?? null,
+            username,
+            connectedAt: new Date().toISOString(),
+          });
+        }
       }
       return token;
     },
+
     async session({ session, token }) {
       if (session.user) {
         (session.user as any).onboardingStep = session.user.email?.includes("new") ? 1 : 3;
@@ -79,6 +121,7 @@ export const authOptions: NextAuthOptions = {
       return session;
     },
   },
+
   pages: {
     signIn: "/login",
     error: "/login",

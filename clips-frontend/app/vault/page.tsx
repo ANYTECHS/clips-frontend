@@ -5,9 +5,16 @@ import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import VaultSidebar from "@/components/vault/VaultSidebar";
 import NFTGrid from "@/components/vault/NFTGrid";
-import MintConfigForm from "@/components/projects/MintConfigForm";
+import MintConfigForm, {
+  type SelectedClipVersion,
+} from "@/components/projects/MintConfigForm";
 import { MockApi } from "@/app/lib/mockApi";
 import { ChevronRight } from "lucide-react";
+import type { Clip } from "@/app/lib/types/clip";
+
+type SelectedClipWithTransforms = SelectedClipVersion & {
+  transformations?: Clip["transformations"];
+};
 
 export default function VaultPage() {
   const [loading, setLoading] = useState(true);
@@ -15,11 +22,40 @@ export default function VaultPage() {
   const [activeFilter, setActiveFilter] = useState<"pending" | "listed" | "history">("pending");
   const [showMintPanel, setShowMintPanel] = useState(false);
 
+  /**
+   * Tracks which clip (and which version) is queued for minting.
+   * Set when the user clicks "Mint Now" on an NFTCard or picks a version
+   * in the VersionPicker inside MintConfigForm.
+   */
+  const [pendingMint, setPendingMint] =
+    useState<SelectedClipWithTransforms | null>(null);
+
   // Simulate loading delay
   useEffect(() => {
     const timer = setTimeout(() => setLoading(false), 1500);
     return () => clearTimeout(timer);
   }, []);
+
+  const handleMintSelect = (clip: {
+    id: string;
+    title: string;
+    versionUrl: string;
+    isTransformed: boolean;
+    style?: string;
+    styleLabel?: string;
+    transformations?: Clip["transformations"];
+  }) => {
+    setPendingMint({
+      clipId: clip.id,
+      title: clip.title,
+      versionUrl: clip.versionUrl,
+      isTransformed: clip.isTransformed,
+      style: clip.style,
+      styleLabel: clip.styleLabel,
+      transformations: clip.transformations,
+    });
+    setShowMintPanel(true);
+  };
 
   const handleMintSubmit = async (data: {
     collectionName: string;
@@ -30,8 +66,6 @@ export default function VaultPage() {
     // Call the actual minting API
     const result = await MockApi.mintCollection(data);
     console.log("Minting successful:", result);
-    // You could add additional logic here like showing a toast notification
-    // or updating the NFT grid with the new collection
     return result;
   };
 
@@ -87,9 +121,13 @@ export default function VaultPage() {
 
             {/* Grid + Right Panel */}
             <div className="flex-1 min-w-0 flex flex-col lg:flex-row gap-6">
-              {/* NFT Grid */}
+              {/* NFT Grid — fetches from /api/clips and passes transformations */}
               <div className="flex-1 min-w-0">
-                <NFTGrid filter={activeFilter} loading={loading} />
+                <NFTGrid
+                  filter={activeFilter}
+                  loading={loading}
+                  onMintSelect={handleMintSelect}
+                />
               </div>
 
               {/* Mint Configuration Panel (Desktop) */}
@@ -107,7 +145,15 @@ export default function VaultPage() {
 
                   {showMintPanel && (
                     <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                      <MintConfigForm onSubmit={handleMintSubmit} />
+                      <MintConfigForm
+                        onSubmit={handleMintSubmit}
+                        selectedClip={pendingMint ?? undefined}
+                        onVersionChange={(v) =>
+                          setPendingMint((prev) =>
+                            prev ? { ...prev, ...v } : null
+                          )
+                        }
+                      />
                     </div>
                   )}
                 </div>
@@ -125,7 +171,15 @@ export default function VaultPage() {
                 {showMintPanel && (
                   <div className="mt-6 bg-input border border-white/10 rounded-[20px] p-6 animate-in fade-in slide-in-from-top-2 duration-300">
                     <h3 className="text-[18px] font-extrabold text-white mb-6">Mint Configuration</h3>
-                    <MintConfigForm onSubmit={handleMintSubmit} />
+                    <MintConfigForm
+                      onSubmit={handleMintSubmit}
+                      selectedClip={pendingMint ?? undefined}
+                      onVersionChange={(v) =>
+                        setPendingMint((prev) =>
+                          prev ? { ...prev, ...v } : null
+                        )
+                      }
+                    />
                   </div>
                 )}
               </div>

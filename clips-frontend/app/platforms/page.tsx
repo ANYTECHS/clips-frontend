@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import SectionHeader from "@/components/platforms/SectionHeader";
@@ -13,8 +13,6 @@ import {
   Share2,
   Wallet,
   Menu,
-  AlertCircle,
-  X,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useWallet, truncateAddress } from "@/components/WalletProvider";
@@ -37,6 +35,14 @@ type PlatformItem = {
   isLoading?: boolean;
   isComingSoon?: boolean;
 };
+
+/** Shape returned by GET /api/platforms/connections */
+interface StoredConnection {
+  userId: string;
+  platform: string;
+  username: string | null;
+  connectedAt: string;
+}
 
 /* ================= ICONS ================= */
 
@@ -91,6 +97,11 @@ export default function PlatformsPage() {
   const [search, setSearch] = useState("");
   const [connectingId, setConnectingId] = useState<string | null>(null);
 
+  // ── Platform connections from /api/platforms/connections ──────────────────
+  const [connections, setConnections] = useState<StoredConnection[]>([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(true);
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+
   const {
     isConnected: walletConnected,
     isConnecting: walletConnecting,
@@ -103,14 +114,45 @@ export default function PlatformsPage() {
     isRestoringSession,
   } = useWallet();
 
-  const pageLoading = authLoading || isRestoringSession || sessionStatus === "loading";
+  const pageLoading = authLoading || isRestoringSession || sessionStatus === "loading" || connectionsLoading;
 
-  /* ================= HANDLERS ================= */
+  // ── Fetch persisted connections ────────────────────────────────────────────
+  const fetchConnections = useCallback(async () => {
+    try {
+      const res = await fetch("/api/platforms/connections");
+      if (res.ok) {
+        const data = await res.json();
+        setConnections(data.connections ?? []);
+      }
+    } catch {
+      // Non-fatal — falls back to "NOT LINKED" for all social platforms
+    } finally {
+      setConnectionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConnections();
+  }, [fetchConnections]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function getConnection(platform: string): StoredConnection | undefined {
+    return connections.find((c) => c.platform === platform);
+  }
+
+  function isConnected(providerId: string): boolean {
+    return !!getConnection(providerId);
+  }
+
+  function getUsername(providerId: string): string | undefined {
+    return getConnection(providerId)?.username ?? undefined;
+  }
 
   const handleConnect = async (platformId: string) => {
     setConnectingId(platformId);
     try {
       await signIn(platformId, { callbackUrl: "/platforms" });
+      await fetchConnections();
     } catch (error) {
       console.error(`Failed to connect to ${platformId}:`, error);
       showToast(`Failed to connect to ${platformId}`, "error");
@@ -120,12 +162,18 @@ export default function PlatformsPage() {
   };
 
   const handleDisconnect = async (platformId: string) => {
+    setDisconnectingId(platformId);
     try {
-      await signOut({ redirect: false });
+      await fetch(`/api/platforms/connections?platform=${platformId}`, {
+        method: "DELETE",
+      });
+      setConnections((prev) => prev.filter((c) => c.platform !== platformId));
       showToast(`Disconnected from ${platformId}`, "success");
     } catch (error) {
       console.error(`Failed to disconnect from ${platformId}:`, error);
       showToast(`Failed to disconnect from ${platformId}`, "error");
+    } finally {
+      setDisconnectingId(null);
     }
   };
 
@@ -135,50 +183,50 @@ export default function PlatformsPage() {
     {
       id: "tiktok",
       name: "TikTok",
-      username: (session?.user as any)?.provider === "tiktok" ? (session?.user as any)?.name : undefined,
+      username: getUsername("tiktok"),
       description: "Manage your main TikTok video feed",
       icon: TikTokIcon,
-      status: (session?.user as any)?.provider === "tiktok" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "tiktok" ? "Manage" : "Connect Account",
+      status: isConnected("tiktok") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "tiktok" ? "Connecting..." : isConnected("tiktok") ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("tiktok"),
       onDisconnect: () => handleDisconnect("tiktok"),
-      isLoading: connectingId === "tiktok",
+      isLoading: connectingId === "tiktok" || disconnectingId === "tiktok",
     },
     {
       id: "instagram",
       name: "Instagram",
-      username: (session?.user as any)?.provider === "instagram" ? (session?.user as any)?.name : undefined,
+      username: getUsername("instagram"),
       description: "Connect to sync Reels",
       icon: InstagramIcon,
-      status: (session?.user as any)?.provider === "instagram" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "instagram" ? "Manage" : "Connect Account",
+      status: isConnected("instagram") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "instagram" ? "Connecting..." : isConnected("instagram") ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("instagram"),
       onDisconnect: () => handleDisconnect("instagram"),
-      isLoading: connectingId === "instagram",
+      isLoading: connectingId === "instagram" || disconnectingId === "instagram",
     },
     {
       id: "google",
       name: "YouTube",
-      username: (session?.user as any)?.provider === "google" ? (session?.user as any)?.name : undefined,
+      username: getUsername("google"),
       description: "Import and sync your YouTube content",
       icon: YoutubeIcon,
-      status: (session?.user as any)?.provider === "google" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "google" ? "Manage" : "Connect Account",
+      status: isConnected("google") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "google" ? "Connecting..." : isConnected("google") ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("google"),
       onDisconnect: () => handleDisconnect("google"),
-      isLoading: connectingId === "google",
+      isLoading: connectingId === "google" || disconnectingId === "google",
     },
     {
       id: "twitter",
       name: "X / Twitter",
-      username: (session?.user as any)?.provider === "twitter" ? (session?.user as any)?.name : undefined,
+      username: getUsername("twitter"),
       description: "Auto-post clips to X",
       icon: TwitterIcon,
-      status: (session?.user as any)?.provider === "twitter" ? "ACTIVE" : "NOT LINKED",
-      ctaText: (session?.user as any)?.provider === "twitter" ? "Manage" : "Connect Account",
+      status: isConnected("twitter") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "twitter" ? "Connecting..." : isConnected("twitter") ? "Manage" : "Connect Account",
       onConnect: () => handleConnect("twitter"),
       onDisconnect: () => handleDisconnect("twitter"),
-      isLoading: connectingId === "twitter",
+      isLoading: connectingId === "twitter" || disconnectingId === "twitter",
     },
   ];
 
@@ -218,13 +266,15 @@ export default function PlatformsPage() {
     return socialPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, connections, connectingId, disconnectingId]);
 
   const filteredWallets = useMemo(() => {
     return walletPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, walletConnected, walletConnecting, walletAddress]);
 
   const noResults =
     filteredSocial.length === 0 && filteredWallets.length === 0;
