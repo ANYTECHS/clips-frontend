@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useCallback } from "react";
-import Link from "next/link";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import SectionHeader from "@/components/platforms/SectionHeader";
 import PlatformCard from "@/components/platforms/PlatformCard";
@@ -17,7 +16,7 @@ import {
 import { useAuth } from "@/components/AuthProvider";
 import { useWallet, truncateAddress } from "@/components/WalletProvider";
 import Skeleton from "@/components/ui/Skeleton";
-import { useSession, signIn, signOut } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useToast } from "@/hooks/useToast";
 
 /* ================= TYPES ================= */
@@ -131,9 +130,21 @@ export default function PlatformsPage() {
     }
   }, []);
 
+  // Fetch connections on mount. When the user returns from an OAuth redirect
+  // (Next.js re-mounts the page), this picks up the newly upserted connection
+  // that was written by the NextAuth jwt callback during sign-in.
   useEffect(() => {
     fetchConnections();
   }, [fetchConnections]);
+
+  // Also refetch when the session changes — covers the case where NextAuth
+  // updates the session client-side after the OAuth flow completes.
+  useEffect(() => {
+    if (sessionStatus === "authenticated") {
+      fetchConnections();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStatus]);
 
   // ── Helpers ────────────────────────────────────────────────────────────────
   function getConnection(platform: string): StoredConnection | undefined {
@@ -151,14 +162,19 @@ export default function PlatformsPage() {
   const handleConnect = async (platformId: string) => {
     setConnectingId(platformId);
     try {
+      // signIn with an OAuth provider triggers a full-page redirect.
+      // The callbackUrl brings the user back to /platforms where the
+      // mount-time fetchConnections() will pick up the new connection.
       await signIn(platformId, { callbackUrl: "/platforms" });
-      await fetchConnections();
     } catch (error) {
-      console.error(`Failed to connect to ${platformId}:`, error);
+      // Only reaches here if signIn itself throws before redirecting
+      // (e.g. network error, misconfigured provider).
+      console.error(`Failed to initiate ${platformId} sign-in:`, error);
       showToast(`Failed to connect to ${platformId}`, "error");
-    } finally {
       setConnectingId(null);
     }
+    // Note: setConnectingId(null) intentionally omitted in the success path
+    // because the page will redirect/reload before it matters.
   };
 
   const handleDisconnect = async (platformId: string) => {

@@ -113,10 +113,10 @@ export const authOptions: NextAuthOptions = {
 
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).onboardingStep = session.user.email?.includes("new") ? 1 : 3;
-        (session.user as any).accessToken = token.accessToken;
-        (session.user as any).provider = token.provider;
-        (session.user as any).profile = token.profile;
+        session.user.onboardingStep = session.user.email?.includes("new") ? 1 : 3;
+        session.user.accessToken = token.accessToken;
+        session.user.provider = token.provider;
+        session.user.profile = token.profile;
       }
       return session;
     },

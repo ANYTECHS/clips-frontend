@@ -3,32 +3,94 @@ import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/app/lib/auth";
 import {
   getConnections,
+  upsertConnection,
   deleteConnection,
   type SocialPlatform,
+  type PlatformConnection,
 } from "@/app/lib/platformConnections";
+
+const VALID_PLATFORMS: SocialPlatform[] = [
+  "google",
+  "apple",
+  "tiktok",
+  "youtube",
+  "instagram",
+  "twitter",
+];
 
 /**
  * GET /api/platforms/connections
  *
  * Returns all platform connections for the authenticated user.
  * Response shape:
- *   { connections: PlatformConnection[] }
+ *   { connections: SafeConnection[] }
  */
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   const session = await getServerSession(authOptions);
 
   if (!session?.user?.email) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // Use email as the stable user identifier since no database user ID exists yet.
   const userId = session.user.email;
   const connections = getConnections(userId);
 
   // Strip sensitive token fields before sending to the client.
-  const safeConnections = connections.map(({ accessToken, refreshToken, ...rest }) => rest);
+  const safeConnections = connections.map(
+    ({ accessToken: _a, refreshToken: _r, ...rest }) => rest
+  );
 
   return NextResponse.json({ connections: safeConnections });
+}
+
+/**
+ * POST /api/platforms/connections
+ *
+ * Manually upsert a platform connection for the authenticated user.
+ * Useful for testing and for providers that complete OAuth outside the
+ * NextAuth jwt callback (e.g. mobile-initiated flows).
+ *
+ * Request body:
+ *   { platform: SocialPlatform; username?: string; accessToken?: string; refreshToken?: string }
+ *
+ * Response shape:
+ *   { success: true } | { error: string }
+ */
+export async function POST(request: NextRequest) {
+  const session = await getServerSession(authOptions);
+
+  if (!session?.user?.email) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  let body: Partial<PlatformConnection>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
+
+  const { platform, username = null, accessToken = null, refreshToken = null } = body;
+
+  if (!platform || !VALID_PLATFORMS.includes(platform)) {
+    return NextResponse.json(
+      {
+        error: `Invalid or missing platform. Must be one of: ${VALID_PLATFORMS.join(", ")}`,
+      },
+      { status: 400 }
+    );
+  }
+
+  upsertConnection({
+    userId: session.user.email,
+    platform,
+    accessToken,
+    refreshToken,
+    username: username ?? null,
+    connectedAt: new Date().toISOString(),
+  });
+
+  return NextResponse.json({ success: true }, { status: 200 });
 }
 
 /**
@@ -48,19 +110,10 @@ export async function DELETE(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const platform = searchParams.get("platform") as SocialPlatform | null;
 
-  const validPlatforms: SocialPlatform[] = [
-    "google",
-    "apple",
-    "tiktok",
-    "youtube",
-    "instagram",
-    "twitter",
-  ];
-
-  if (!platform || !validPlatforms.includes(platform)) {
+  if (!platform || !VALID_PLATFORMS.includes(platform)) {
     return NextResponse.json(
       {
-        error: `Invalid or missing platform. Must be one of: ${validPlatforms.join(", ")}`,
+        error: `Invalid or missing platform. Must be one of: ${VALID_PLATFORMS.join(", ")}`,
       },
       { status: 400 }
     );
