@@ -1,4 +1,5 @@
 import type { DashboardStats, RevenuePoint, Project, UserProfile, EarningsBreakdownItem } from "./types";
+import { getRemainingQuota, nextResetDate } from "@/app/lib/transformQuota";
 
 const MOCK_STATS: DashboardStats = {
   earnings: { total: "$12,450.80", trend: 12.5, trendLabel: "+12.5% from last month" },
@@ -29,18 +30,23 @@ export async function fetchDashboardFromAPI(): Promise<{
   };
 }
 
-const MOCK_PROFILE: UserProfile = {
+const MOCK_PROFILE_BASE = {
   id: "usr_001",
   name: "Alex Rivera",
   email: "alex@clipcash.ai",
   avatarUrl: "/avatar.png",
-  plan: "pro",
+  plan: "pro" as const,
   planUsagePercent: 80,
 };
 
 export async function fetchUserFromAPI(): Promise<UserProfile> {
   await new Promise((resolve) => setTimeout(resolve, 500));
-  return MOCK_PROFILE;
+  // Refresh quota fields on every fetch so they stay in sync with the server store.
+  return {
+    ...MOCK_PROFILE_BASE,
+    transformQuotaRemaining: getRemainingQuota(MOCK_PROFILE_BASE.id, MOCK_PROFILE_BASE.plan),
+    transformQuotaResetAt: nextResetDate(),
+  };
 }
 
 const MOCK_BREAKDOWN: EarningsBreakdownItem[] = [

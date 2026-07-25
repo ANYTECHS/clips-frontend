@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import Link from "next/link";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import SectionHeader from "@/components/platforms/SectionHeader";
@@ -13,12 +13,11 @@ import {
   Share2,
   Wallet,
   Menu,
-  AlertCircle,
-  X,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import { useWallet, truncateAddress } from "@/components/WalletProvider";
 import Skeleton from "@/components/ui/Skeleton";
+import { signIn, signOut } from "next-auth/react";
 
 /* ================= TYPES ================= */
 
@@ -34,6 +33,14 @@ type PlatformItem = {
   isLoading?: boolean;
   isComingSoon?: boolean;
 };
+
+/** Shape returned by GET /api/platforms/connections */
+interface StoredConnection {
+  userId: string;
+  platform: string;
+  username: string | null;
+  connectedAt: string;
+}
 
 /* ================= ICONS ================= */
 
@@ -81,6 +88,12 @@ export default function PlatformsPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [search, setSearch] = useState("");
 
+  // ── Platform connections from /api/platforms/connections ──────────────────
+  const [connections, setConnections] = useState<StoredConnection[]>([]);
+  const [connectionsLoading, setConnectionsLoading] = useState(true);
+  const [connectingId, setConnectingId] = useState<string | null>(null);
+  const [disconnectingId, setDisconnectingId] = useState<string | null>(null);
+
   const {
     isConnected: walletConnected,
     isConnecting: walletConnecting,
@@ -93,40 +106,112 @@ export default function PlatformsPage() {
     isRestoringSession,
   } = useWallet();
 
-  const pageLoading = authLoading || isRestoringSession;
+  const pageLoading = authLoading || isRestoringSession || connectionsLoading;
+
+  // ── Fetch persisted connections ────────────────────────────────────────────
+  const fetchConnections = useCallback(async () => {
+    try {
+      const res = await fetch("/api/platforms/connections");
+      if (res.ok) {
+        const data = await res.json();
+        setConnections(data.connections ?? []);
+      }
+    } catch {
+      // Non-fatal — falls back to "NOT LINKED" for all social platforms
+    } finally {
+      setConnectionsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchConnections();
+  }, [fetchConnections]);
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+  function getConnection(platform: string): StoredConnection | undefined {
+    return connections.find((c) => c.platform === platform);
+  }
+
+  function isConnected(providerId: string): boolean {
+    return !!getConnection(providerId);
+  }
+
+  function getUsername(providerId: string): string | undefined {
+    return getConnection(providerId)?.username ?? undefined;
+  }
+
+  async function handleConnect(platformId: string) {
+    setConnectingId(platformId);
+    try {
+      await signIn(platformId, { callbackUrl: "/platforms" });
+      await fetchConnections();
+    } catch (error) {
+      console.error(`Failed to connect to ${platformId}:`, error);
+    } finally {
+      setConnectingId(null);
+    }
+  }
+
+  async function handleDisconnect(platformId: string) {
+    setDisconnectingId(platformId);
+    try {
+      await fetch(`/api/platforms/connections?platform=${platformId}`, {
+        method: "DELETE",
+      });
+      setConnections((prev) => prev.filter((c) => c.platform !== platformId));
+    } catch (error) {
+      console.error(`Failed to disconnect from ${platformId}:`, error);
+    } finally {
+      setDisconnectingId(null);
+    }
+  }
 
   /* ================= DATA ================= */
 
   const socialPlatforms: PlatformItem[] = [
     {
       name: "TikTok",
-      username: "@clip_creator_pro",
+      username: getUsername("tiktok"),
       description: "Manage your main TikTok video feed",
       icon: TikTokIcon,
-      status: "ACTIVE",
-      ctaText: "Manage",
+      status: isConnected("tiktok") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "tiktok" ? "Connecting..." : isConnected("tiktok") ? "Manage" : "Connect Account",
+      onConnect: () => handleConnect("tiktok"),
+      onDisconnect: () => handleDisconnect("tiktok"),
+      isLoading: connectingId === "tiktok" || disconnectingId === "tiktok",
     },
     {
       name: "Instagram",
+      username: getUsername("instagram"),
       description: "Connect to sync Reels",
       icon: InstagramIcon,
-      status: "NOT LINKED",
-      ctaText: "Connect Account",
+      status: isConnected("instagram") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "instagram" ? "Connecting..." : isConnected("instagram") ? "Manage" : "Connect Account",
+      onConnect: () => handleConnect("instagram"),
+      onDisconnect: () => handleDisconnect("instagram"),
+      isLoading: connectingId === "instagram" || disconnectingId === "instagram",
     },
     {
       name: "YouTube",
-      username: "StudioX Channel",
+      username: getUsername("google"),
       description: "Import and sync your YouTube content",
       icon: YoutubeIcon,
-      status: "ACTIVE",
-      ctaText: "Manage",
+      status: isConnected("google") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "google" ? "Connecting..." : isConnected("google") ? "Manage" : "Connect Account",
+      onConnect: () => handleConnect("google"),
+      onDisconnect: () => handleDisconnect("google"),
+      isLoading: connectingId === "google" || disconnectingId === "google",
     },
     {
       name: "X / Twitter",
+      username: getUsername("twitter"),
       description: "Auto-post clips to X",
       icon: TwitterIcon,
-      status: "NOT LINKED",
-      ctaText: "Connect Account",
+      status: isConnected("twitter") ? "ACTIVE" : "NOT LINKED",
+      ctaText: connectingId === "twitter" ? "Connecting..." : isConnected("twitter") ? "Manage" : "Connect Account",
+      onConnect: () => handleConnect("twitter"),
+      onDisconnect: () => handleDisconnect("twitter"),
+      isLoading: connectingId === "twitter" || disconnectingId === "twitter",
     },
   ];
 
@@ -164,13 +249,15 @@ export default function PlatformsPage() {
     return socialPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, connections, connectingId, disconnectingId]);
 
   const filteredWallets = useMemo(() => {
     return walletPlatforms.filter((p) =>
       p.name.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, walletConnected, walletConnecting, walletAddress]);
 
   const noResults =
     filteredSocial.length === 0 && filteredWallets.length === 0;
