@@ -47,6 +47,14 @@ export {
   selectUserLoading,
 } from "./userStore";
 
+// Batch Transform
+export {
+  useBatchTransformStore,
+  selectJobs,
+  selectIsQueueOpen,
+  selectJobCounts,
+} from "./batchTransformStore";
+
 // Types (re-exported for convenience)
 export type {
   DashboardState,
@@ -66,4 +74,10 @@ export type {
   EarningsBreakdownItem,
   EarningsState,
   EarningsActions,
+  TransformJob,
+  TransformJobStatus,
+  TransformStyle,
+  TransformOptions,
+  BatchTransformState,
+  BatchTransformActions,
 } from "./types";

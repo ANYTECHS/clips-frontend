@@ -12,7 +12,8 @@ import {
   AlertCircle,
   X,
   Undo2,
-  Redo2
+  Redo2,
+  Wand2,
 } from "lucide-react";
 import { calculateMintCost, formatSol } from "@/app/lib/mintUtils";
 
@@ -21,6 +22,8 @@ interface SelectionFooterProps {
   selectedIds?: string[];
   onMint: () => void;
   isMinting?: boolean;
+  onTransform?: () => void;
+  isTransforming?: boolean;
   undo?: () => void;
   redo?: () => void;
   canUndo?: boolean;
@@ -32,6 +35,8 @@ export default function SelectionFooter({
   selectedIds,
   onMint, 
   isMinting = false,
+  onTransform,
+  isTransforming = false,
   undo,
   redo,
   canUndo = false,
@@ -135,6 +140,29 @@ export default function SelectionFooter({
               <Zap className="w-4 h-4 fill-brand" />
               <span>AUTO-SCHEDULE ON</span>
             </button>
+
+            {/* Transform button */}
+            {onTransform && (
+              <button
+                onClick={onTransform}
+                disabled={isTransforming || count === 0}
+                className={`flex items-center gap-3 px-8 py-4 rounded-3xl font-black text-[14px] transition-all border ${
+                  isTransforming
+                    ? "bg-white/5 border-white/10 text-muted-foreground cursor-not-allowed"
+                    : "bg-white/[0.06] border-white/10 text-white hover:bg-white/10 hover:border-white/20 active:scale-[0.98]"
+                }`}
+                aria-label={`Transform ${count} selected clip${count !== 1 ? "s" : ""}`}
+              >
+                {isTransforming ? (
+                  <span>Transforming…</span>
+                ) : (
+                  <>
+                    <Wand2 className="w-4 h-4 shrink-0" />
+                    <span>Transform</span>
+                  </>
+                )}
+              </button>
+            )}
             
             <button 
               onClick={onMint}

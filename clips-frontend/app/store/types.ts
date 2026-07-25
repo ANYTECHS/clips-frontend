@@ -120,6 +120,75 @@ export interface EarningsActions {
   invalidateEarningsCache: () => void;
 }
 
+// ─── Batch Transform ──────────────────────────────────────────────────────────
+
+export type TransformStyle =
+  | "Bold & Dynamic"
+  | "Minimalist"
+  | "Emoji-Rich"
+  | "Subtitles Only"
+  | string;
+
+/** Options forwarded to the AI transform pipeline (all optional) */
+export interface TransformOptions {
+  /** Target aspect ratio, e.g. "9:16" for TikTok */
+  aspectRatio?: string;
+  /** Whether to burn subtitles into the clip */
+  burnSubtitles?: boolean;
+  /** Speed multiplier, e.g. 1.25 */
+  speed?: number;
+}
+
+export type TransformJobStatus =
+  | "queued"
+  | "processing"
+  | "complete"
+  | "error"
+  | "cancelled";
+
+/** One transform job corresponds to one clip being processed */
+export interface TransformJob {
+  jobId: string;
+  clipId: string;
+  clipTitle: string;
+  style: TransformStyle;
+  options?: TransformOptions;
+  status: TransformJobStatus;
+  /** 0–100 */
+  progress: number;
+  error?: string;
+}
+
+export interface BatchTransformState {
+  /** Ordered list of transform jobs in the current batch */
+  jobs: TransformJob[];
+  /** Whether the queue panel is visible */
+  isQueueOpen: boolean;
+}
+
+export interface BatchTransformActions {
+  /**
+   * Kick off a batch — replaces any in-progress batch with a fresh one.
+   * Each clipId generates one job at status "queued".
+   */
+  startBatch: (
+    clipIds: string[],
+    clipTitles: Record<string, string>,
+    style: TransformStyle,
+    options?: TransformOptions
+  ) => void;
+  /** Simulate (or receive) a progress update for a single job */
+  updateJob: (jobId: string, patch: Partial<TransformJob>) => void;
+  /** Cancel a single job */
+  cancelJob: (jobId: string) => void;
+  /** Cancel all pending / processing jobs */
+  cancelAll: () => void;
+  /** Remove completed / errored / cancelled jobs, keeping processing ones */
+  clearFinished: () => void;
+  /** Toggle the queue panel open/closed */
+  toggleQueue: (open?: boolean) => void;
+}
+
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 export interface UserProfile {

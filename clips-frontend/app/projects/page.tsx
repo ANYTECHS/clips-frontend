@@ -7,10 +7,12 @@ import ClipGrid from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
 import ClipEditorModal, { type ClipEdits } from "@/components/projects/ClipEditorModal";
 import ClipPreviewModal from "@/components/projects/ClipPreviewModal";
+import BatchTransformQueue from "@/components/projects/BatchTransformQueue";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
+import { useBatchTransformStore, selectJobCounts } from "@/app/store/batchTransformStore";
 import { useEffect } from "react";
 
 const RECOMMENDATION_THRESHOLD = 90;
@@ -37,6 +39,10 @@ export default function ProjectsPage() {
   } = useUndoRedo<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [isMinting, setIsMinting] = useState(false);
+  const [isTransforming, setIsTransforming] = useState(false);
+
+  const startBatch = useBatchTransformStore((s) => s.startBatch);
+  const jobCounts = useBatchTransformStore(selectJobCounts);
 
   const { filters, updateFilters, resetFilters } = useFilterQueryState({
     style: "All Styles",
@@ -165,6 +171,58 @@ export default function ProjectsPage() {
     }
   }, [selectedIds]);
 
+  const handleTransform = useCallback(async () => {
+    if (selectedIds.length === 0) return;
+
+    setIsTransforming(true);
+    try {
+      // Build a title map so the queue can display human-readable names
+      const clipTitles: Record<string, string> = {};
+      selectedIds.forEach((id) => {
+        const clip = mockClips.find((c) => c.id === id);
+        if (clip) clipTitles[id] = clip.title;
+      });
+
+      // POST to the batch transform API
+      const response = await fetch("/api/transform/batch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          clipIds: selectedIds,
+          // Use the first selected clip's style as the batch style, or default
+          style:
+            mockClips.find((c) => c.id === selectedIds[0])?.style ??
+            "Bold & Dynamic",
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error((err as { error?: string }).error ?? "Transform request failed");
+      }
+
+      // Kick off the local queue simulation
+      startBatch(
+        selectedIds,
+        clipTitles,
+        mockClips.find((c) => c.id === selectedIds[0])?.style ?? "Bold & Dynamic"
+      );
+
+      showToast(
+        `Started transform for ${selectedIds.length} clip${selectedIds.length !== 1 ? "s" : ""}`,
+        "success"
+      );
+      setSelectedIds([]);
+    } catch (error) {
+      console.error("Batch transform failed", error);
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to start transforms";
+      showToast(errorMessage, "error");
+    } finally {
+      setIsTransforming(false);
+    }
+  }, [selectedIds, startBatch, showToast]);
+
   return (
     <div className="flex h-screen bg-background text-white font-sans overflow-hidden">
       {/* Background Effects */}
@@ -247,6 +305,8 @@ export default function ProjectsPage() {
             selectedIds={selectedIds}
             onMint={handleMint}
             isMinting={isMinting}
+            onTransform={handleTransform}
+            isTransforming={isTransforming}
             undo={undo}
             redo={redo}
             canUndo={canUndo}
@@ -269,6 +329,8 @@ export default function ProjectsPage() {
           onClose={() => setPreviewClip(null)}
         />
       )}
+      {/* Floating batch transform queue — renders itself when jobs exist */}
+      <BatchTransformQueue />
     </div>
   );
 }
