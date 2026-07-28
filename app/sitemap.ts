@@ -1,8 +1,7 @@
 import { MetadataRoute } from "next";
-import { metadata } from "@/app/layout";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = metadata.metadataBase?.toString().replace(/\/$/, "") || "https://clipcash.ai";
+  const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || "https://clipcash.ai").replace(/\/$/, "");
 
   return [
     {
@@ -28,6 +27,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: new Date(),
       changeFrequency: "yearly",
       priority: 0.3,
+    },
+    {
+      url: `${baseUrl}/share`,
+      lastModified: new Date(),
+      changeFrequency: "monthly",
+      priority: 0.5,
     },
   ];
 }
