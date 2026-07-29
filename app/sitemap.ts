@@ -24,6 +24,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1,
     },
     {
+      url: `${baseUrl}/explore`,
+      lastModified,
+      changeFrequency: "hourly",
+      priority: 0.8,
+    },
+    {
       url: `${baseUrl}/share`,
       lastModified,
       changeFrequency: "daily",
