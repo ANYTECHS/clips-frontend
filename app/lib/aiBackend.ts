@@ -60,6 +60,17 @@ export interface DispatchJobPayload {
    * Only populated when transformStyle === "anime".
    */
   transformOptions?: AnimeTransformOptions;
+  /** Job type discriminator for the AI backend. */
+  jobType?: "clip" | "transform" | "transcode" | "caption";
+  /** Caption generation settings when jobType === "caption". */
+  captionOptions?: {
+    language: string;
+    burnIntoExport?: boolean;
+    style?: {
+      fontStyle: "bold" | "rounded" | "shadow" | "gradient";
+      position: "top" | "center" | "bottom";
+    };
+  };
 }
 
 /**
