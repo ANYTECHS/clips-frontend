@@ -3,7 +3,8 @@ import { auth } from "@/app/lib/auth";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { earningsStore } from "@/app/api/earnings/earningsStore";
-import { jobStore } from "@/app/api/jobs/shared/jobStore";
+import { projectsStore } from "@/app/api/projects/projectsStore";
+import { clipsStore } from "@/app/api/clips/clipsStore";
 import type { ApiResponse } from "../types";
 import type {
   DashboardStats,
@@ -91,26 +92,28 @@ export async function GET(request: NextRequest) {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   // 2. Calculate Clips stats & Recent Projects
-  const userJobs = await jobStore.getUserJobs(userId);
-  const totalClipsNum = userJobs.reduce(
-    (acc, j) => acc + (j.momentsFound || (j.status === "complete" ? 1 : 0)),
-    0
+  const userProjects = projectsStore.getProjectsForUser(userId);
+  clipsStore.getClipsForUser(userId);
+  const totalClipsNum = userProjects.reduce(
+    (acc, p) => acc + clipsStore.getClipsForProject(userId, p.id).length,
+    0,
   );
 
-  const currentPeriodJobs = userJobs.filter(
-    (j) => j.createdAt >= now.getTime() - thirtyDaysMs
+  const currentPeriodProjects = userProjects.filter(
+    (p) => new Date(p.createdAt).getTime() >= now.getTime() - thirtyDaysMs,
   );
-  const priorPeriodJobs = userJobs.filter(
-    (j) => j.createdAt >= now.getTime() - 2 * thirtyDaysMs && j.createdAt < now.getTime() - thirtyDaysMs
-  );
+  const priorPeriodProjects = userProjects.filter((p) => {
+    const t = new Date(p.createdAt).getTime();
+    return t >= now.getTime() - 2 * thirtyDaysMs && t < now.getTime() - thirtyDaysMs;
+  });
 
-  const currentClipsSum = currentPeriodJobs.reduce(
-    (acc, j) => acc + (j.momentsFound || 1),
-    0
+  const currentClipsSum = currentPeriodProjects.reduce(
+    (acc, p) => acc + clipsStore.getClipsForProject(userId, p.id).length,
+    0,
   );
-  const priorClipsSum = priorPeriodJobs.reduce(
-    (acc, j) => acc + (j.momentsFound || 1),
-    0
+  const priorClipsSum = priorPeriodProjects.reduce(
+    (acc, p) => acc + clipsStore.getClipsForProject(userId, p.id).length,
+    0,
   );
 
   let clipsTrend = 0;
@@ -135,19 +138,14 @@ export async function GET(request: NextRequest) {
     trendLabel: clipsTrendLabel,
   };
 
-  const sortedJobs = [...userJobs].sort((a, b) => b.createdAt - a.createdAt);
-  const recentProjects: Project[] = sortedJobs.slice(0, 6).map((job) => {
-    const filename = (job as { filename?: string }).filename;
-    const title = filename
-      ? filename.replace(/\.[^/.]+$/, "")
-      : `Project ${job.id.slice(0, 6)}`;
-
+  const recentProjects: Project[] = userProjects.slice(0, 6).map((project) => {
+    const clipCount = clipsStore.getClipsForProject(userId, project.id).length;
     return {
-      id: job.id,
-      title,
-      clipsGenerated: job.momentsFound || 0,
-      status: job.status === "complete" ? "completed" : "processing",
-      image: "/projects/thumb1.png",
+      id: project.id,
+      title: project.name,
+      clipsGenerated: clipCount,
+      status: clipCount > 0 ? "completed" : "processing",
+      image: project.thumbnailUrl,
       accent: "",
     };
   });
