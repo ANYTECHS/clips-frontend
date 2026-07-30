@@ -29,7 +29,7 @@ type PlatformItem = {
   name: string;
   username?: string;
   description: string;
-  icon: React.ComponentType<{ className?: string }>;
+  icon: React.ComponentType<{ className?: string; size?: number }>;
   status: "ACTIVE" | "NOT LINKED" | "LINKED";
   ctaText: string;
   onConnect?: () => void;
@@ -40,23 +40,14 @@ type PlatformItem = {
 
 /* ================= ICONS ================= */
 
-import InstagramIcon from "@/components/icons/InstagramIcon";
-import TikTokIcon from "@/components/icons/TikTokIcon";
-import YoutubeIcon from "@/components/icons/YoutubeIcon";
-import TwitterIcon from "@/components/icons/TwitterIcon";
-
-const PhantomIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <circle cx="12" cy="12" r="10"></circle>
-    <path d="M12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4z"></path>
-  </svg>
-);
-
-const MetaMaskIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"></path>
-  </svg>
-);
+import {
+  InstagramIcon,
+  TikTokIcon,
+  YoutubeIcon,
+  TwitterIcon,
+  PhantomIcon,
+  MetaMaskIcon,
+} from "@/components/icons";
 
 /* ================= PAGE ================= */
 
