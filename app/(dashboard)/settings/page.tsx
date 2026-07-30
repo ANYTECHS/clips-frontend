@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
+import PrivacySettings from "@/components/settings/PrivacySettings";
 import {
   getStoredPermission,
   requestNotificationPermission,
@@ -438,6 +439,8 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              <PrivacySettings />
 
               {/* Language / Locale Settings */}
               <div className="space-y-4">

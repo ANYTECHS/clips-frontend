@@ -62,14 +62,12 @@ export interface DispatchJobPayload {
   transformOptions?: AnimeTransformOptions;
   /** Job type discriminator for the AI backend. */
   jobType?: "clip" | "transform" | "transcode" | "caption";
-  /** Caption generation settings when jobType === "caption". */
-  captionOptions?: {
-    language: string;
-    burnIntoExport?: boolean;
-    style?: {
-      fontStyle: "bold" | "rounded" | "shadow" | "gradient";
-      position: "top" | "center" | "bottom";
-    };
+  /** Transcode export settings when jobType === "transcode". */
+  transcodeOptions?: {
+    format: "mp4" | "webm";
+    aspectRatio: "9:16" | "1:1" | "16:9";
+    quality: "720p" | "1080p";
+    outputObjectKey: string;
   };
 }
 

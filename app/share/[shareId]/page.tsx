@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import { exploreStore } from "@/app/api/explore/exploreStore";
 
 /**
  * Shape of a shared clip. Sourced from a mock today; the fetch below is the
@@ -21,6 +22,16 @@ interface SharedClip {
  */
 async function getSharedClip(shareId: string): Promise<SharedClip | null> {
   if (!shareId) return null;
+
+  const exploreClip = exploreStore.getByShareId(shareId);
+  if (exploreClip) {
+    return {
+      title: exploreClip.title,
+      score: exploreClip.score,
+      thumbnail: exploreClip.thumbnail,
+      style: exploreClip.style,
+    };
+  }
 
   return {
     title: "Shared Clip",

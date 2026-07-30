@@ -13,11 +13,13 @@ import { useToast } from "@/hooks/useToast";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 import { useBatchTransform } from "@/app/hooks/useBatchTransform";
+import { useUserStore, selectUserPlan } from "@/app/store/userStore";
 
 const RECOMMENDATION_THRESHOLD = 90;
 
 export default function ProjectsPage() {
   const { showToast, ToastEl } = useToast();
+  const userPlan = useUserStore(selectUserPlan);
   const { 
     state: selectedIds, 
     set: setSelectedIds, 
@@ -415,6 +417,7 @@ export default function ProjectsPage() {
                 loadingNextPage={loadingNextPage}
                 onLoadMore={handleLoadMore}
                 hasMore={fetchedClips.length < totalClips}
+                userPlan={userPlan}
               />
             </div>
             
