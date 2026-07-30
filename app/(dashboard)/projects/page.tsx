@@ -195,8 +195,26 @@ export default function ProjectsPage() {
     if (clip) setEditingClip(clip);
   }, [fetchedClips]);
 
-  const handleSaveEdits = useCallback((id: string, edits: ClipEdits) => {
+  const handleSaveEdits = useCallback(async (id: string, edits: ClipEdits) => {
+    if (edits.captions) {
+      try {
+        await fetch(`/api/clips/${id}/captions`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            segments: edits.captions.segments,
+            style: edits.captions.style,
+            language: edits.captions.language,
+            burnIntoExport: edits.captions.burnIntoExport,
+          }),
+        });
+      } catch {
+        showToast("Failed to save captions", "error");
+        return;
+      }
+    }
     showToast(`Edits saved for clip ${id}`, "success");
+    setEditingClip(null);
   }, [showToast]);
 
   const handlePreview = useCallback((id: string) => {
