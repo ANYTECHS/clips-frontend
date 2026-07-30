@@ -10,6 +10,7 @@ export interface ScoreBreakdown {
 export interface Clip {
   id: string;
   userId: string;
+  projectId?: string;
   title: string;
   thumbnail: string;
   score: number;
@@ -45,9 +46,10 @@ class ClipsStore {
     ];
     
     // Create base pool that users will pull from 
-    this.clips = mockClips.map(clip => ({
+    this.clips = mockClips.map((clip, idx) => ({
       ...clip,
       userId: "default", // will be replaced when requested
+      projectId: `default-proj-${(idx % 3) + 1}`,
       createdAt: new Date().toISOString()
     }));
   }
@@ -66,7 +68,8 @@ class ClipsStore {
       const newClips = this.clips.filter(c => c.userId === "default").map((c, idx) => ({
         ...c,
         id: `${userId}-clip-${idx}`,
-        userId
+        userId,
+        projectId: `${userId}-proj-${(idx % 3) + 1}`,
       }));
       this.clips.push(...newClips);
       return newClips;
@@ -188,6 +191,18 @@ class ClipsStore {
       this.clips.filter(c => c.userId === userId).map(c => c.id),
     );
     return clipIds.filter(id => !owned.has(id));
+  }
+
+  getClipsForProject(userId: string, projectId: string): Clip[] {
+    return this.getClipsForUser(userId).filter((c) => c.projectId === projectId);
+  }
+
+  /** Cascade soft-delete all clips belonging to a project. */
+  softDeleteClipsByProject(userId: string, projectId: string): number {
+    const clipIds = this.clips
+      .filter((c) => c.userId === userId && c.projectId === projectId && !c.deletedAt)
+      .map((c) => c.id);
+    return this.softDeleteClips(userId, clipIds);
   }
 }
 

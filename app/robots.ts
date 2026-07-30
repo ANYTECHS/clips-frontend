@@ -43,6 +43,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: [
           "/",
+          "/explore",
           // Share links are the one authenticated-adjacent surface meant to be
           // public — they are how a clip reaches social media.
           "/share/",
