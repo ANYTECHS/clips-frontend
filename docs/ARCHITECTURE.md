@@ -14,7 +14,7 @@ This document explains the non-obvious design decisions in ClipCash. It is aimed
 
 ---
 
-## 1. Job Pipeline
+## 1. Job Pipeline 
 
 The pipeline takes a raw video upload and asynchronously produces AI-generated clip moments, streaming progress back to the browser in real time.
 
