@@ -95,6 +95,41 @@ const KEY_PREFIX = process.env.CLOUD_STORAGE_KEY_PREFIX ?? "uploads/";
 const QUARANTINE_PREFIX = process.env.VIRUS_SCAN_QUARANTINE_PREFIX ?? "uploads/quarantine/";
 /** Prefix used for AI-transformed output files, kept separate from raw uploads. */
 export const TRANSFORMS_PREFIX = "transforms/";
+/** Prefix used for transcoded clip exports (multi-format / aspect-ratio outputs). */
+export const EXPORTS_PREFIX = "exports/";
+
+/**
+ * Build the S3 object key for a transcoded export.
+ */
+export function buildExportObjectKey(
+  clipId: string,
+  format: string,
+  aspectRatio: string,
+  quality: string,
+  exportId: string,
+): string {
+  const safeRatio = aspectRatio.replace(":", "x");
+  return `${EXPORTS_PREFIX}${clipId}/${exportId}_${safeRatio}_${quality}.${format}`;
+}
+
+/**
+ * Build a public or endpoint-based URL for an object key without presigning.
+ */
+export function buildObjectUrl(objectKey: string): string {
+  const bucket = process.env.CLOUD_STORAGE_BUCKET;
+  const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
+  const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
+
+  if (!bucket) {
+    return `https://storage.example.com/${objectKey}`;
+  }
+
+  if (endpoint) {
+    return `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`;
+  }
+
+  return `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+}
 
 // Multipart threshold: files larger than 50 MB use multipart upload.
 const MULTIPART_THRESHOLD = 50 * 1024 * 1024; // 50 MB

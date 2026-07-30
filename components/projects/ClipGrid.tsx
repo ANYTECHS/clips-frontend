@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect } from "react";
 import Image from "next/image";
-import { Check, Edit2, Play, Sparkles, BarChart3, Download, Loader2 } from "lucide-react";
-import analytics from "@/app/lib/analytics";
+import { Check, Edit2, Play, Sparkles, BarChart3 } from "lucide-react";
 import ScoreBreakdownTooltip, { ScoreBreakdown } from "./ScoreBreakdownTooltip";
+import ExportDropdown from "./ExportDropdown";
 
 export interface Clip {
   id: string;
@@ -39,6 +39,7 @@ export interface ClipGridProps {
   loadingNextPage: boolean;
   onLoadMore: () => void;
   hasMore: boolean;
+  userPlan?: "free" | "pro" | "enterprise";
 }
 
 export default function ClipGrid({
@@ -60,9 +61,9 @@ export default function ClipGrid({
   loadingNextPage,
   onLoadMore,
   hasMore,
+  userPlan = "free",
 }: ClipGridProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!hasMore || loadingNextPage) return;
@@ -76,24 +77,6 @@ export default function ClipGrid({
 
   const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(id); }
-  };
-
-  const handleDownload = async (clipId: string) => {
-    setDownloadingId(clipId);
-    try {
-      const res = await fetch(`/api/clips/${clipId}/download`);
-      if (!res.ok) throw new Error("Download failed");
-      const { url } = await res.json();
-      analytics.trackEvent("clip_downloaded", { clipId });
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `clip-${clipId}.mp4`;
-      a.click();
-    } catch {
-      // silently fail
-    } finally {
-      setDownloadingId(null);
-    }
   };
 
   if (loading) {
@@ -166,10 +149,7 @@ export default function ClipGrid({
               <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/90 translate-y-full group-hover:translate-y-0 transition-transform flex items-center-stretch gap-2 backdrop-blur-md">
                 <button onClick={(e) => { e.stopPropagation(); onPreview(clip.id); }} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors" aria-label="Preview clip"><Play className="w-4 h-4" /> Preview</button>
                 <button onClick={(e) => { e.stopPropagation(); onEdit(clip.id); }} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors" aria-label="Edit clip"><Edit2 className="w-4 h-4" /> Edit</button>
-                <button onClick={(e) => { e.stopPropagation(); handleDownload(clip.id); }} disabled={downloadingId === clip.id} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50" aria-label="Download clip">
-                  {downloadingId === clip.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  {downloadingId === clip.id ? "..." : "Download"}
-                </button>
+                <ExportDropdown clipId={clip.id} userPlan={userPlan} />
                 <a href={`/analytics?clipId=${clip.id}`} onClick={(e) => e.stopPropagation()} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors" aria-label="View analytics"><BarChart3 className="w-4 h-4" /> Analytics</a>
               </div>
             </div>
