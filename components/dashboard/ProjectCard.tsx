@@ -1,5 +1,6 @@
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { sanitize } from "@/app/lib/sanitize";
 
 export interface ProjectCardProps {
@@ -11,12 +12,13 @@ export interface ProjectCardProps {
 }
 
 export default function ProjectCard({
+  id,
   title,
   clipsCount = 0,
   status = "Completed",
   thumbnail,
 }: ProjectCardProps) {
-  return (
+  const content = (
     <div className="bg-surface border border-white/10 rounded-[24px] p-5 flex items-center gap-5 hover:border-brand/50 transition-colors">
       <div className="relative w-24 h-24 rounded-[18px] overflow-hidden shrink-0 bg-input">
         <Image
@@ -37,4 +39,14 @@ export default function ProjectCard({
       </div>
     </div>
   );
+
+  if (id) {
+    return (
+      <Link href={`/projects/${id}`} className="block">
+        {content}
+      </Link>
+    );
+  }
+
+  return content;
 }

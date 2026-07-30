@@ -10,4 +10,4 @@ export * from "./clips.schema";
 export * from "./user.schema";
 export * from "./transform.schema";
 export * from "./billing.schema";
-export * from "./privacy.schema";
+export * from "./projects.schema";

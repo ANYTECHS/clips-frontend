@@ -191,6 +191,7 @@ export default function DashboardPage() {
                 : recentProjects.map((project) => (
                     <ProjectCard
                       key={project.id}
+                      id={project.id}
                       title={project.title}
                       clipsCount={project.clipsGenerated}
                       status={project.status}

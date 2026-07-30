@@ -12,6 +12,10 @@ import { captureSorobanNotSupportedWarning } from "@/app/lib/sentry";
 import { TRANSACTION_TIMEOUT_MS } from "@/app/lib/constants";
 import { logger } from "@/app/lib/logger";
 import { submitTransaction } from "@/app/lib/stellar";
+import type { StellarTransactionError } from "@/app/lib/stellar";
+
+// Re-export so consumers can import the error type from this hook's module
+export type { StellarTransactionError };
 
 /**
  * Stellar transaction processing lifecycle state designations.
@@ -33,18 +37,6 @@ export type StellarNetwork = "testnet" | "mainnet";
  * Transaction result from Stellar.
  */
 export type StellarTransactionResult = Awaited<ReturnType<typeof submitTransaction>>;
-
-/**
- * Transaction error details.
- */
-export interface StellarTransactionError {
-  /** Standard error identifier code */
-  code: string;
-  /** Human-readable explanation of the error */
-  message: string;
-  /** Optional dictionary context returned from Horizon */
-  extras?: Record<string, unknown>;
-}
 
 /**
  * Hook state layout tracking active transaction mutations.
@@ -151,7 +143,6 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
   const checkFreighterInstalled = useCallback((): boolean => {
     if (typeof window === "undefined") return false;
 
-    // @ts-expect-error - Freighter adds this to window
     const freighter = window.freighter;
 
     if (!freighter) {
@@ -179,8 +170,10 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
    * @throws {StellarTransactionError} If the public key extraction rejects or comes back empty.
    */
   const getPublicKey = useCallback(async (): Promise<string> => {
-    // @ts-expect-error - Freighter adds this to window
     const freighter = window.freighter;
+    if (!freighter) {
+      throw { code: "FREIGHTER_NOT_INSTALLED", message: "Freighter wallet is not installed." } as StellarTransactionError;
+    }
 
     try {
       const publicKey = await freighter.getPublicKey();
@@ -207,8 +200,10 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
    */
   const signTransaction = useCallback(
     async (xdr: string, publicKey: string): Promise<string> => {
-      // @ts-expect-error - Freighter adds this to window
       const freighter = window.freighter;
+      if (!freighter) {
+        throw { code: "FREIGHTER_NOT_INSTALLED", message: "Freighter wallet is not installed." } as StellarTransactionError;
+      }
       const freighterNetwork = network === "mainnet" ? "PUBLIC" : "TESTNET";
 
       try {
