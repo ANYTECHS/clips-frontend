@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import { Clock, CheckCircle2 } from "lucide-react";
 import { sanitize } from "@/app/lib/sanitize";
+import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import type { TransformStyle } from "@/app/api/transform/styles/route";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -35,6 +36,22 @@ export function StyleCard({
   isDisabled = false,
   onSelect,
 }: StyleCardProps) {
+  const { t } = useI18n();
+
+  const translateStyleText = (key: string, fallback: string) => {
+    const value = t(key);
+    return value === key ? fallback : value;
+  };
+
+  const label = translateStyleText(
+    `transform.style.${style.name}.name`,
+    style.label,
+  );
+  const description = translateStyleText(
+    `transform.style.${style.name}.description`,
+    style.description,
+  );
+
   const handleClick = () => {
     if (!isDisabled) {
       onSelect?.(style.name);
@@ -55,7 +72,7 @@ export function StyleCard({
       onKeyDown={handleKeyDown}
       disabled={isDisabled}
       aria-pressed={isSelected}
-      aria-label={`Select ${sanitize(style.label)} style`}
+      aria-label={`Select ${sanitize(label)} style`}
       className={[
         "group relative flex flex-col text-left rounded-2xl overflow-hidden border transition-all duration-200",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 focus-visible:ring-offset-background",
@@ -70,7 +87,7 @@ export function StyleCard({
       <div className="relative w-full aspect-video overflow-hidden bg-background">
         <Image
           src={style.thumbnail}
-          alt={`${sanitize(style.label)} style preview`}
+          alt={`${sanitize(label)} style preview`}
           fill
           className={[
             "object-cover transition-transform duration-300",
@@ -118,7 +135,7 @@ export function StyleCard({
               isSelected ? "text-brand" : "text-white",
             ].join(" ")}
           >
-            {sanitize(style.label)}
+            {sanitize(label)}
           </span>
 
           {/* Processing time badge */}
@@ -129,7 +146,7 @@ export function StyleCard({
         </div>
 
         <p className="text-[12px] text-muted-foreground leading-relaxed line-clamp-2">
-          {sanitize(style.description)}
+          {sanitize(description)}
         </p>
       </div>
     </button>

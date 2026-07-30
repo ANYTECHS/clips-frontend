@@ -141,7 +141,33 @@
     "failed_load": "Failed to load styles",
     "try_again": "Try again",
     "no_styles": "No styles available",
-    "no_styles_desc": "No transformation styles are configured yet."
+    "no_styles_desc": "No transformation styles are configured yet.",
+    "style": {
+      "anime": {
+        "name": "Anime",
+        "description": "Bold outlines, vivid colours, cel-shaded look"
+      },
+      "cinematic": {
+        "name": "Cinematic",
+        "description": "Film grain, colour grading, anamorphic lens flares"
+      },
+      "sketch": {
+        "name": "Sketch",
+        "description": "Pencil-drawn outlines with subtle paper texture"
+      },
+      "watercolor": {
+        "name": "Watercolour",
+        "description": "Soft washes, blurred edges, painterly brush strokes"
+      },
+      "retro-vhs": {
+        "name": "Retro VHS",
+        "description": "Scan lines, colour bleed, 80s tape-deck artefacts"
+      },
+      "neon-noir": {
+        "name": "Neon Noir",
+        "description": "High-contrast shadows with vivid neon accent lighting"
+      }
+    }
   },
   "notifications": {
     "title": "Notifications",

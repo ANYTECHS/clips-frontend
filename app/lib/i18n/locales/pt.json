@@ -141,7 +141,33 @@
     "failed_load": "Falha ao carregar estilos",
     "try_again": "Tentar novamente",
     "no_styles": "Nenhum estilo disponível",
-    "no_styles_desc": "Nenhum estilo de transformação configurado ainda."
+    "no_styles_desc": "Nenhum estilo de transformação configurado ainda.",
+    "style": {
+      "anime": {
+        "name": "Anime",
+        "description": "Contornos fortes, cores vívidas e aparência cel-shaded"
+      },
+      "cinematic": {
+        "name": "Cinematográfico",
+        "description": "Grão de filme, color grading e brilho anamórfico"
+      },
+      "sketch": {
+        "name": "Esboço",
+        "description": "Contornos desenhados à mão com textura sutil de papel"
+      },
+      "watercolor": {
+        "name": "Aquarela",
+        "description": "Lavados suaves, bordas desfocadas e traços de pincel"
+      },
+      "retro-vhs": {
+        "name": "VHS retrô",
+        "description": "Linhas de varredura, sangramento de cor e artefatos de fita dos anos 80"
+      },
+      "neon-noir": {
+        "name": "Neon noir",
+        "description": "Sombras de alto contraste com iluminação neon vibrante"
+      }
+    }
   },
   "notifications": {
     "title": "Notificações",
