@@ -21,6 +21,8 @@ export interface Clip {
   resolution: string;
   videoUrl: string;
   createdAt: string;
+  /** Tags for organizing clips by topic, campaign, or style. Max 10 tags per clip. */
+  tags?: string[];
   /** Set by a soft delete. Excluded from every read path once present. */
   deletedAt?: string | null;
   /** Set by archiving. Surfaced only under the "Archived" filter. */
@@ -37,12 +39,12 @@ class ClipsStore {
   private seed() {
     // Generate some mock clips to use as baseline
     const mockClips = [
-      { id: "1", title: "Clip #01 - The Big Reveal Hook", thumbnail: "/projects/thumb1.png", score: 94, scoreKey: "high", duration: "00:45", style: "Bold & Dynamic", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", scoreBreakdown: { hook: 96, retention: 92, emotional: 90, trending: 98 } },
-      { id: "2", title: "Clip #02 - Technical Deep Dive", thumbnail: "/projects/thumb2.png", score: 68, scoreKey: "medium", duration: "00:58", style: "Minimalist", status: "listed", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4", scoreBreakdown: { hook: 70, retention: 65, emotional: 60, trending: 75 } },
-      { id: "3", title: "Clip #03 - Audience Reaction", thumbnail: "/projects/thumb3.png", score: 82, scoreKey: "high", duration: "00:32", style: "Emoji-Rich", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4", scoreBreakdown: { hook: 85, retention: 80, emotional: 88, trending: 75 } },
-      { id: "4", title: "Clip #04 - Feature Walkthrough", thumbnail: "/projects/thumb1.png", score: 91, scoreKey: "high", duration: "00:52", style: "Subtitles Only", status: "history", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4", scoreBreakdown: { hook: 92, retention: 90, emotional: 85, trending: 95 } },
-      { id: "5", title: "Clip #05 - Closing Remarks", thumbnail: "/projects/thumb2.png", score: 42, scoreKey: "low", duration: "01:12", style: "Minimalist", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4", scoreBreakdown: { hook: 45, retention: 40, emotional: 38, trending: 45 } },
-      { id: "6", title: "Clip #06 - Product Detail B-Roll", thumbnail: "/projects/thumb3.png", score: 89, scoreKey: "high", duration: "00:44", style: "Bold & Dynamic", status: "listed", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4", scoreBreakdown: { hook: 90, retention: 88, emotional: 85, trending: 92 } },
+      { id: "1", title: "Clip #01 - The Big Reveal Hook", thumbnail: "/projects/thumb1.png", score: 94, scoreKey: "high", duration: "00:45", style: "Bold & Dynamic", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4", scoreBreakdown: { hook: 96, retention: 92, emotional: 90, trending: 98 }, tags: ["tutorial", "hook"] },
+      { id: "2", title: "Clip #02 - Technical Deep Dive", thumbnail: "/projects/thumb2.png", score: 68, scoreKey: "medium", duration: "00:58", style: "Minimalist", status: "listed", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4", scoreBreakdown: { hook: 70, retention: 65, emotional: 60, trending: 75 }, tags: ["technical", "education"] },
+      { id: "3", title: "Clip #03 - Audience Reaction", thumbnail: "/projects/thumb3.png", score: 82, scoreKey: "high", duration: "00:32", style: "Emoji-Rich", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4", scoreBreakdown: { hook: 85, retention: 80, emotional: 88, trending: 75 }, tags: ["reactions", "engagement"] },
+      { id: "4", title: "Clip #04 - Feature Walkthrough", thumbnail: "/projects/thumb1.png", score: 91, scoreKey: "high", duration: "00:52", style: "Subtitles Only", status: "history", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4", scoreBreakdown: { hook: 92, retention: 90, emotional: 85, trending: 95 }, tags: ["tutorial", "product"] },
+      { id: "5", title: "Clip #05 - Closing Remarks", thumbnail: "/projects/thumb2.png", score: 42, scoreKey: "low", duration: "01:12", style: "Minimalist", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4", scoreBreakdown: { hook: 45, retention: 40, emotional: 38, trending: 45 }, tags: ["outro"] },
+      { id: "6", title: "Clip #06 - Product Detail B-Roll", thumbnail: "/projects/thumb3.png", score: 89, scoreKey: "high", duration: "00:44", style: "Bold & Dynamic", status: "listed", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4", scoreBreakdown: { hook: 90, retention: 88, emotional: 85, trending: 92 }, tags: ["product", "broll", "campaign-q4"] },
     ];
     
     // Create base pool that users will pull from 
@@ -180,6 +182,34 @@ class ClipsStore {
     });
 
     return restoredCount;
+  }
+
+  /** Updates tags for a single clip. */
+  updateClipTags(userId: string, clipId: string, tags: string[]): boolean {
+    let updated = false;
+
+    this.clips = this.clips.map(clip => {
+      if (clip.userId === userId && clip.id === clipId && !clip.deletedAt) {
+        updated = true;
+        return { ...clip, tags };
+      }
+      return clip;
+    });
+
+    return updated;
+  }
+
+  /** Gets all unique tags across a user's clips (for autocomplete/suggestions). */
+  getAllTagsForUser(userId: string): string[] {
+    const tagSet = new Set<string>();
+    
+    this.clips
+      .filter(c => c.userId === userId && !c.deletedAt && c.tags)
+      .forEach(clip => {
+        clip.tags?.forEach(tag => tagSet.add(tag));
+      });
+
+    return Array.from(tagSet).sort();
   }
 
   /**
