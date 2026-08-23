@@ -112,11 +112,11 @@ showToast("Saved!", "success");
 ```
 
 ### `useTransformStatus`
-- **Input:** `(jobId: string | null, enabled = true)`
-- **Output:** transform job status/progress for a single (non-batch) transform
-- **Use when:** tracking a single style-transform job.
+- **Input:** `(jobId: string | null, enabled = true, maxReconnectAttempts = 3)`
+- **Output:** `{ stopPolling }` — SSE-first progress tracker that updates `transformStore.jobs[jobId]`
+- **Use when:** tracking a single style-transform job (mirrors `useProcessingStatus`: SSE → reconnect → poll `GET /api/transform/[id]` every 3s).
 ```ts
-const status = useTransformStatus(jobId);
+const { stopPolling } = useTransformStatus(jobId, enabled);
 ```
 
 ### `useTrustline`
