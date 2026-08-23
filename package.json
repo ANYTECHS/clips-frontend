@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
+    "test:integration": "jest --config jest.integration.config.js --runInBand",
     "test:visual": "npx playwright test tests/e2e/visual.spec.ts",
     "test:visual:update": "npx playwright test tests/e2e/visual.spec.ts --update-snapshots",
     "test:e2e": "npx playwright test",
@@ -79,7 +80,7 @@
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx}": [
-      "eslint --fix"
+      "eslint --fix --no-warn-ignored"
     ]
   }
 }

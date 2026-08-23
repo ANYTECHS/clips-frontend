@@ -22,6 +22,8 @@ const customJestConfig = {
   testPathIgnorePatterns: [
     '<rootDir>/node_modules/',
     '<rootDir>/tests/e2e/',
+    // Network-backed Stellar tests — run via `npm run test:integration`
+    '<rootDir>/__tests__/integration/',
   ],
   collectCoverageFrom: [
     'app/**/*.{js,jsx,ts,tsx}',
