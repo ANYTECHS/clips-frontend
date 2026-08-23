@@ -12,6 +12,7 @@ Next.js App Router API routes. Auth column values:
 | `auth/[...nextauth]` | GET/POST | None (NextAuth's own flow) | OAuth sign-in/callback handlers. |
 | `auth/passkey/register` | GET, POST | Session | WebAuthn passkey registration options + verification. |
 | `auth/passkey/authenticate` | GET, POST | Session | WebAuthn passkey authentication options + verification. |
+| `csp-report` | POST | None (rate-limited) | Browser CSP violation reports (`report-uri`); logs to structured logger. |
 | `dashboard` | GET | Session | Dashboard summary stats/revenue/recent projects. |
 | `earnings` | GET | Session | Earnings totals/breakdown. |
 | `earnings/transactions` | GET | Session | Paginated earnings transaction list. |

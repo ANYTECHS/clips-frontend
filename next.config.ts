@@ -5,9 +5,15 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 
 validateRequiredEnv();
 
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
 const ANALYTICS_ENABLED = ["ga4", "plausible"].includes(
   (process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER ?? "").toLowerCase()
 );
+
+const CSP_REPORT_URI = "/api/csp-report";
 
 function buildCsp(): string {
   const scriptSrc = ["'self'"];
@@ -44,6 +50,8 @@ function buildCsp(): string {
     ],
     "style-src": ["'self'", "'unsafe-inline'"],
     "frame-ancestors": ["'none'"],
+    // Both enforcing and report-only policies share the same report sink.
+    "report-uri": [CSP_REPORT_URI],
   };
 
   return Object.entries(directives)
@@ -51,12 +59,27 @@ function buildCsp(): string {
     .join("; ");
 }
 
+/**
+ * Staging uses Report-Only so violations are logged without breaking the UI.
+ * All other environments enforce the policy.
+ * See docs/SECURITY.md — "CSP rollout (report-only → enforce)".
+ */
+function cspHeader(): { key: string; value: string } {
+  const isStaging = process.env.NEXT_PUBLIC_ENVIRONMENT === "staging";
+  return {
+    key: isStaging
+      ? "Content-Security-Policy-Report-Only"
+      : "Content-Security-Policy",
+    value: buildCsp(),
+  };
+}
+
 async function securityHeaders() {
   return [
     {
       source: "/:path*",
       headers: [
-        { key: "Content-Security-Policy", value: buildCsp() },
+        cspHeader(),
         { key: "X-Frame-Options", value: "DENY" },
         { key: "X-Content-Type-Options", value: "nosniff" },
         { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
@@ -127,18 +150,18 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  webpack: (config: any, { isServer }: { isServer: boolean }) => {
+  webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization = {
         ...config.optimization,
         splitChunks: {
-          chunks: 'all',
+          chunks: "all",
           cacheGroups: {
             default: false,
             vendors: false,
             commons: {
-              name: 'commons',
-              chunks: 'all',
+              name: "commons",
+              chunks: "all",
               minChunks: 2,
             },
           },
@@ -149,7 +172,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withAnalyzer(nextConfig), {
   // For all available options, see:
   // https://github.com/getsentry/sentry-webpack-plugin#options
 

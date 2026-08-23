@@ -54,13 +54,21 @@ This document covers the primary attack surfaces in ClipCash: authenticated user
 | `Referrer-Policy` | `strict-origin-when-cross-origin` |
 | `Strict-Transport-Security` | `max-age=63072000; includeSubDomains; preload` |
 | `Permissions-Policy` | `camera=(), microphone=(), geolocation=()` |
-| `Content-Security-Policy` | see below |
+| `Content-Security-Policy` | Enforcing policy (non-staging). See below. |
+| `Content-Security-Policy-Report-Only` | Same policy as CSP, used when `NEXT_PUBLIC_ENVIRONMENT=staging` instead of the enforcing header. |
 
-Verified by `tests/e2e/security-headers.spec.ts`.
+Both CSP variants include `report-uri /api/csp-report`. Verified by `tests/e2e/security-headers.spec.ts`.
 
 ### Content Security Policy (CSP)
 
-The CSP is built in `next.config.ts` (`buildCsp()`). `script-src` and `connect-src` conditionally include the analytics domains below only when `NEXT_PUBLIC_ANALYTICS_PROVIDER` is `ga4` or `plausible` — without these entries, analytics providers would be silently blocked by the browser.
+The CSP is built in `next.config.ts` (`buildCsp()`). Which response header carries it depends on environment:
+
+| `NEXT_PUBLIC_ENVIRONMENT` | Header used |
+| --- | --- |
+| `"staging"` | `Content-Security-Policy-Report-Only` (violations reported, not blocked) |
+| anything else / unset | `Content-Security-Policy` (enforcing) |
+
+`script-src` and `connect-src` conditionally include the analytics domains below only when `NEXT_PUBLIC_ANALYTICS_PROVIDER` is `ga4` or `plausible` — without these entries, analytics providers would be silently blocked by the browser.
 
 #### script-src
 
@@ -88,18 +96,33 @@ The CSP is built in `next.config.ts` (`buildCsp()`). `script-src` and `connect-s
 - `default-src 'self'`
 - `style-src 'self' 'unsafe-inline'`
 - `frame-ancestors 'none'`
+- `report-uri /api/csp-report` — browser posts violations to `POST /api/csp-report`
 
 #### Live CSP value (analytics disabled, default)
 
 ```text
-default-src 'self'; script-src 'self'; connect-src 'self' https://horizon-testnet.stellar.org https://horizon.stellar.org https://api.coingecko.com; img-src 'self' data: https://api.dicebear.com https://images.unsplash.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'
+default-src 'self'; script-src 'self'; connect-src 'self' https://horizon-testnet.stellar.org https://horizon.stellar.org https://api.coingecko.com; img-src 'self' data: https://api.dicebear.com https://images.unsplash.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; report-uri /api/csp-report
 ```
 
 #### Live CSP value (`NEXT_PUBLIC_ANALYTICS_PROVIDER=ga4` or `plausible`)
 
 ```text
-default-src 'self'; script-src 'self' https://www.googletagmanager.com https://plausible.io; connect-src 'self' https://horizon-testnet.stellar.org https://horizon.stellar.org https://api.coingecko.com https://www.google-analytics.com https://plausible.io; img-src 'self' data: https://api.dicebear.com https://images.unsplash.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'
+default-src 'self'; script-src 'self' https://www.googletagmanager.com https://plausible.io; connect-src 'self' https://horizon-testnet.stellar.org https://horizon.stellar.org https://api.coingecko.com https://www.google-analytics.com https://plausible.io; img-src 'self' data: https://api.dicebear.com https://images.unsplash.com; style-src 'self' 'unsafe-inline'; frame-ancestors 'none'; report-uri /api/csp-report
 ```
+
+#### CSP violation reporting
+
+`POST /api/csp-report` accepts browser CSP reports (no auth; rate-limited). Each violation is written to the structured logger as a `warn` with fields such as `documentUri`, `violatedDirective`, and `blockedUri`.
+
+#### CSP rollout (report-only → enforce)
+
+Promote the enforcing CSP only after staging has been quiet:
+
+1. **Enable report-only in staging** — set `NEXT_PUBLIC_ENVIRONMENT=staging` on the staging deploy so responses carry `Content-Security-Policy-Report-Only` (not the enforcing header). Redeploy.
+2. **Observe for at least 1 week** — watch structured logs / log drain for `[csp-report]` warnings. Triage legitimate app needs (missing CDN domains, analytics, wallet extensions) vs true abuse.
+3. **Widen the policy if needed** — update `buildCsp()` in `next.config.ts` for any required sources discovered in staging, then redeploy staging and keep watching.
+4. **Promote to enforce** — once a full week passes with no unexpected legitimate violations, deploy production (or any non-staging env) **without** `NEXT_PUBLIC_ENVIRONMENT=staging` so `Content-Security-Policy` is enforced. Keep `report-uri /api/csp-report` so residual violations still surface in logs.
+5. **Regression check** — run `tests/e2e/security-headers.spec.ts`, smoke the main flows (auth, upload, transform, wallet connect, analytics consent), and confirm the browser console is clean.
 
 #### Testing
 
@@ -108,7 +131,8 @@ After configuring CSP headers, verify that no console violations appear when eac
 1. Set `NEXT_PUBLIC_ANALYTICS_PROVIDER=ga4` and verify GA4 events appear in the network tab with no CSP errors.
 2. Set `NEXT_PUBLIC_ANALYTICS_PROVIDER=plausible` and verify Plausible events appear in the network tab with no CSP errors.
 3. Confirm that `cookie-consent` changes trigger and revoke analytics tracking without CSP violations.
-4. Run `tests/e2e/security-headers.spec.ts` to confirm headers are present on all responses.
+4. Run `tests/e2e/security-headers.spec.ts` to confirm headers are present on all responses (enforcing vs report-only depends on `NEXT_PUBLIC_ENVIRONMENT`).
+5. `POST` a sample report to `/api/csp-report` (see `__tests__/api/csp-report.test.ts`) and confirm a structured `[csp-report]` log line.
 
 ## Subresource integrity (SRI) for analytics scripts
 
