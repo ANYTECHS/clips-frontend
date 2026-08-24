@@ -18,6 +18,7 @@ export interface Clip {
   resolution: string;
   videoUrl: string;
   scoreBreakdown?: ScoreBreakdown;
+  tags?: string[];
 }
 
 export interface ClipGridProps {
@@ -142,7 +143,17 @@ export default function ClipGrid({
 
                 <div className="absolute bottom-3 left-3 right-3">
                   <h4 className="text-white font-bold text-sm mb-1 line-clamp-2">{clip.title}</h4>
-                  <div className="flex items-center gap-2 text-xs text-white/70"><span>{clip.duration}</span><span>•</span><span>{clip.resolution}</span></div>
+                  <div className="flex items-center gap-2 text-xs text-white/70 mb-2"><span>{clip.duration}</span><span>•</span><span>{clip.resolution}</span></div>
+                  {clip.tags && clip.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1">
+                      {clip.tags.slice(0, 2).map((tag) => (
+                        <span key={tag} className="inline-block px-2 py-0.5 bg-brand/20 text-brand text-xs rounded-md font-semibold border border-brand/30 truncate max-w-[calc(50%-2px)]">
+                          {tag}
+                        </span>
+                      ))}
+                      {clip.tags.length > 2 && <span className="inline-block px-2 py-0.5 bg-white/10 text-white/60 text-xs rounded-md font-semibold border border-white/20">+{clip.tags.length - 2}</span>}
+                    </div>
+                  )}
                 </div>
               </div>
 

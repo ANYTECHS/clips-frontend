@@ -2,12 +2,16 @@
 
 import React from "react";
 import { Filter, RefreshCw } from "lucide-react";
+import TagsFilter from "./TagsFilter";
 
 export interface ProjectFiltersProps {
   captionsStyle: string;
   onCaptionsStyleChange: (style: string) => void;
   viralityLevels: string[];
   onViralityLevelToggle: (level: string) => void;
+  selectedTags: string[];
+  onTagsChange: (tags: string[]) => void;
+  availableTags: string[];
   activeFilterCount: number;
   onResetFilters: () => void;
   vaultFilter: string;
@@ -35,6 +39,9 @@ export default function ProjectFilters({
   onCaptionsStyleChange,
   viralityLevels,
   onViralityLevelToggle,
+  selectedTags,
+  onTagsChange,
+  availableTags,
   activeFilterCount,
   onResetFilters,
   vaultFilter,
@@ -131,6 +138,19 @@ export default function ProjectFilters({
           })}
         </div>
       </div>
+
+      {/* Tags Filter */}
+      {availableTags.length > 0 && (
+        <div className="space-y-3">
+          <h3 className="text-sm font-semibold text-white/70 uppercase tracking-wider">Tags</h3>
+          <TagsFilter
+            selectedTags={selectedTags}
+            onTagsChange={onTagsChange}
+            availableTags={availableTags}
+            placeholder="Search tags..."
+          />
+        </div>
+      )}
     </div>
   );
 }
