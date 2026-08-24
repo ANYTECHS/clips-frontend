@@ -15,6 +15,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // next/jest configs must use CommonJS `require`
+    "jest.config.js",
+    "jest.integration.config.js",
+    "jest.setup.js",
   ]),
   ...storybook.configs["flat/recommended"],
   {
