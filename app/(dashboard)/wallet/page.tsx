@@ -18,8 +18,25 @@ import {
   Loader2,
 } from "lucide-react";
 
-import DonutChart, { DonutSlice } from "@/components/charts/DonutChart";
-import Sparkline from "@/components/charts/Sparkline";
+import dynamic from "next/dynamic";
+import type { DonutSlice } from "@/components/charts/DonutChart";
+
+const DonutChart = dynamic(() => import("@/components/charts/DonutChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full border-4 border-white/5 animate-pulse">
+      <span className="text-muted text-[10px]">Loading...</span>
+    </div>
+  ),
+});
+
+const Sparkline = dynamic(() => import("@/components/charts/Sparkline"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[40px] bg-white/5 animate-pulse rounded mt-2"></div>
+  ),
+});
+
 import AssetRow from "@/components/wallet/AssetRow";
 
 const ASSET_COLORS = ["#00FF9D", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#06B6D4"];
