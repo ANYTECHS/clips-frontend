@@ -26,6 +26,8 @@ import {
   AbortMultipartUploadCommand,
   CopyObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
+  ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import { withRetry } from "./retryUtils";
@@ -453,4 +455,158 @@ export async function uploadTransformResult(
     size: buffer.length,
     contentType,
   };
+}
+
+// ─── Chunked upload sessions (#881) ──────────────────────────────────────────
+
+/**
+ * Prefix chunks of an in-progress upload are staged under.
+ *
+ * Chunks live in the bucket rather than in memory or a separate store, which
+ * is what makes an upload resumable across a page reload, a lost connection or
+ * a server restart: the set of objects under a session prefix *is* the
+ * progress record, so it survives anything that does not lose the bucket.
+ */
+export const CHUNK_PREFIX =
+  process.env.CLOUD_STORAGE_CHUNK_PREFIX ?? "uploads/chunks/";
+
+/** Object key for one chunk of a session. */
+function chunkKey(sessionId: string, index: number): string {
+  // Zero-padded so a lexicographic S3 listing is also numeric order.
+  return `${CHUNK_PREFIX}${sessionId}/${String(index).padStart(6, "0")}`;
+}
+
+/** Extract the chunk index from a chunk object key. */
+function chunkIndexFromKey(key: string): number | null {
+  const index = Number.parseInt(key.slice(key.lastIndexOf("/") + 1), 10);
+  return Number.isNaN(index) ? null : index;
+}
+
+/**
+ * Store one chunk of an in-progress upload.
+ *
+ * Writing the same index twice is safe and idempotent — a client that retries
+ * a chunk whose response it never saw simply overwrites identical bytes.
+ */
+export async function putUploadChunk(
+  sessionId: string,
+  index: number,
+  body: Buffer,
+): Promise<void> {
+  const client = buildS3Client();
+
+  await withRetry(() =>
+    client.send(
+      new PutObjectCommand({
+        Bucket: BUCKET(),
+        Key: chunkKey(sessionId, index),
+        Body: body,
+        ContentType: "application/octet-stream",
+      }),
+    ),
+  );
+}
+
+/**
+ * List the chunk indices already stored for a session.
+ *
+ * This is the resume handshake: the client asks what arrived and uploads only
+ * the gaps.
+ */
+export async function listUploadChunks(sessionId: string): Promise<number[]> {
+  const client = buildS3Client();
+  const bucket = BUCKET();
+  const prefix = `${CHUNK_PREFIX}${sessionId}/`;
+
+  const indices: number[] = [];
+  let continuationToken: string | undefined;
+
+  // A 500MB file at 5MB chunks is 100 objects, but paginate anyway rather than
+  // silently truncating at S3's 1000-key page limit.
+  do {
+    const page = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        Prefix: prefix,
+        ContinuationToken: continuationToken,
+      }),
+    );
+
+    for (const object of page.Contents ?? []) {
+      const index = object.Key ? chunkIndexFromKey(object.Key) : null;
+      if (index !== null) indices.push(index);
+    }
+
+    continuationToken = page.IsTruncated
+      ? page.NextContinuationToken
+      : undefined;
+  } while (continuationToken);
+
+  return indices.sort((a, b) => a - b);
+}
+
+/**
+ * Concatenate a session's chunks into a single buffer, in index order.
+ *
+ * @throws If any chunk in `0..totalChunks-1` is missing, rather than returning
+ * a silently truncated file.
+ */
+export async function assembleUploadChunks(
+  sessionId: string,
+  totalChunks: number,
+): Promise<Buffer> {
+  const client = buildS3Client();
+  const bucket = BUCKET();
+
+  const stored = new Set(await listUploadChunks(sessionId));
+  const missing = Array.from({ length: totalChunks }, (_, i) => i).filter(
+    (i) => !stored.has(i),
+  );
+  if (missing.length > 0) {
+    throw new Error(
+      `Cannot assemble upload ${sessionId}: missing chunks ${missing.join(", ")}`,
+    );
+  }
+
+  const parts: Buffer[] = [];
+  // Sequential on purpose: order matters and the parts are held in memory.
+  for (let index = 0; index < totalChunks; index += 1) {
+    const object = await client.send(
+      new GetObjectCommand({ Bucket: bucket, Key: chunkKey(sessionId, index) }),
+    );
+    const bytes = await object.Body?.transformToByteArray();
+    if (!bytes) {
+      throw new Error(`Chunk ${index} of upload ${sessionId} is empty`);
+    }
+    parts.push(Buffer.from(bytes));
+  }
+
+  return Buffer.concat(parts);
+}
+
+/**
+ * Delete every chunk of a session.
+ *
+ * Called once a session has been assembled or abandoned, so a failed upload
+ * does not leave staged bytes behind. Deletion failures are swallowed: the
+ * upload itself has already succeeded by then, and a leftover chunk is a
+ * lifecycle-rule problem rather than a user-facing one.
+ */
+export async function discardUploadChunks(sessionId: string): Promise<void> {
+  const client = buildS3Client();
+  const bucket = BUCKET();
+
+  const indices = await listUploadChunks(sessionId);
+  await Promise.all(
+    indices.map((index) =>
+      client
+        .send(
+          new DeleteObjectCommand({
+            Bucket: bucket,
+            Key: chunkKey(sessionId, index),
+          }),
+        )
+        .catch(() => undefined),
+    ),
+  );
 }
