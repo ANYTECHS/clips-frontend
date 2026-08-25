@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import { sanitize } from "@/app/lib/sanitize";
+import { DEFAULT_BLUR_PLACEHOLDER, type ImageLoadingState } from "@/app/lib/imageUtils";
 
 interface NFTCardProps {
   id: string;
@@ -12,6 +13,16 @@ interface NFTCardProps {
 }
 
 export default function NFTCard({ id, title, thumbnail, viralityScore, mintStatus, onAction }: NFTCardProps) {
+  const [imageState, setImageState] = useState<ImageLoadingState>('loading');
+
+  const handleImageLoad = () => {
+    setImageState('loaded');
+  };
+
+  const handleImageError = () => {
+    setImageState('error');
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case "pending":
@@ -50,8 +61,27 @@ export default function NFTCard({ id, title, thumbnail, viralityScore, mintStatu
           src={thumbnail}
           alt={sanitize(title)}
           fill
-          className="object-cover"
+          className={`object-cover transition-all duration-300 ${
+            imageState === 'loaded' ? 'opacity-100' : 'opacity-80 blur-sm'
+          }`}
+          placeholder="blur"
+          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
+          onLoad={handleImageLoad}
+          onError={handleImageError}
+          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
+        {imageState === 'error' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+            <div className="text-center">
+              <div className="w-8 h-8 mx-auto mb-1 rounded-full bg-white/10 flex items-center justify-center">
+                <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className="text-xs text-white/50">Failed to load</p>
+            </div>
+          </div>
+        )}
         <div className="absolute top-3 right-3">
           <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${getStatusColor(mintStatus)}`}>
             {mintStatus}

@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useState } from "react";
 import Image from "next/image";
 import { Check, Edit2, Play, Sparkles, BarChart3 } from "lucide-react";
 import ScoreBreakdownTooltip, { ScoreBreakdown } from "./ScoreBreakdownTooltip";
 import ExportDropdown from "./ExportDropdown";
+import { getBlurPlaceholder, DEFAULT_BLUR_PLACEHOLDER, type ImageLoadingState } from "@/app/lib/imageUtils";
 
 export interface Clip {
   id: string;
@@ -65,6 +66,7 @@ export default function ClipGrid({
   userPlan = "free",
 }: ClipGridProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
+  const [imageStates, setImageStates] = useState<Record<string, ImageLoadingState>>({});
 
   useEffect(() => {
     if (!hasMore || loadingNextPage) return;
@@ -78,6 +80,14 @@ export default function ClipGrid({
 
   const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(id); }
+  };
+
+  const handleImageLoad = (clipId: string) => {
+    setImageStates(prev => ({ ...prev, [clipId]: 'loaded' }));
+  };
+
+  const handleImageError = (clipId: string) => {
+    setImageStates(prev => ({ ...prev, [clipId]: 'error' }));
   };
 
   if (loading) {
@@ -131,7 +141,34 @@ export default function ClipGrid({
           return (
             <div key={clip.id} className={`group relative rounded-2xl overflow-hidden transition-all duration-300 border-2 ${isSelected ? "border-brand shadow-[0_0_20px_rgba(var(--brand),0.3)]" : "border-transparent hover:border-white/20"}`}>
               <div className="aspect-[9/16] w-full bg-black relative cursor-pointer" onClick={() => onSelect(clip.id)} role="checkbox" aria-checked={isSelected} tabIndex={0} onKeyDown={(e) => handleKeyDown(e, clip.id)}>
-                <Image src={clip.thumbnail} alt={clip.title} fill className="object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                <Image 
+                  src={clip.thumbnail} 
+                  alt={clip.title} 
+                  fill 
+                  className={`object-cover transition-all duration-300 ${
+                    imageStates[clip.id] === 'loaded' 
+                      ? 'opacity-100 group-hover:opacity-100' 
+                      : 'opacity-80 blur-sm group-hover:opacity-90'
+                  }`}
+                  placeholder="blur"
+                  blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
+                  onLoad={() => handleImageLoad(clip.id)}
+                  onError={() => handleImageError(clip.id)}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
+                  priority={false}
+                />
+                {imageStates[clip.id] === 'error' && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/80">
+                    <div className="text-center">
+                      <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-white/10 flex items-center justify-center">
+                        <svg className="w-6 h-6 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <p className="text-xs text-white/50">Image failed to load</p>
+                    </div>
+                  </div>
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
                 <div className="absolute top-3 left-3 right-3 flex justify-between items-start z-10" onClick={(e) => e.stopPropagation()}>
                   <ScoreBreakdownTooltip score={clip.score} scoreKey={clip.scoreKey} scoreBreakdown={clip.scoreBreakdown} />
