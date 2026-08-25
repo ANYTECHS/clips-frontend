@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
+import { compressResponse } from "@/app/lib/apiCompression";
 import { earningsStore } from "@/app/api/earnings/earningsStore";
 import { projectsStore } from "@/app/api/projects/projectsStore";
 import { clipsStore } from "@/app/api/clips/clipsStore";
@@ -27,7 +29,7 @@ import type {
  * Returns sensible zero-state metrics for new users without data.
  */
 export async function GET(request: NextRequest) {
-  const rateLimited = await applyRateLimit(request, { limit: 60, windowMs: 60_000 });
+  const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/dashboard"));
   if (rateLimited) return rateLimited;
 
   const authResult = await requireAuth();
@@ -189,5 +191,5 @@ export async function GET(request: NextRequest) {
     error: null,
   };
 
-  return NextResponse.json(body);
+  return compressResponse(request, NextResponse.json(body));
 }

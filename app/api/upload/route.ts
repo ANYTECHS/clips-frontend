@@ -46,6 +46,7 @@ import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
 import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST } from "@/app/lib/constants";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
 import { logger } from "@/app/lib/logger";
 
 export { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST };
@@ -101,7 +102,7 @@ function validateFile(file: File): string | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const rateLimited = await applyRateLimit(request, { limit: 20, windowMs: 60_000 });
+    const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/upload"));
     if (rateLimited) return rateLimited;
 
     const csrfError = checkCsrf(request);

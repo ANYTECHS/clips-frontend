@@ -12,6 +12,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
+import { compressResponse } from "@/app/lib/apiCompression";
 import { earningsStore } from "./earningsStore";
 import type { ApiResponse } from "../types";
 import type { EarningTransaction } from "./types";
@@ -34,7 +36,7 @@ function calcTrendLabel(current: number, previous: number): { value: number; lab
 }
 
 export async function GET(request: NextRequest) {
-  const rateLimited = applyRateLimit(request, { limit: 60, windowMs: 60_000 });
+  const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/earnings"));
   if (rateLimited) return rateLimited;
 
   const session = await auth();
@@ -95,5 +97,5 @@ export async function GET(request: NextRequest) {
   };
 
   const body: ApiResponse<typeof responseData> = { data: responseData, error: null };
-  return NextResponse.json(body);
+  return compressResponse(request, NextResponse.json(body));
 }
