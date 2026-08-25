@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, createContext, useContext } from "react";
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  createContext,
+  useContext,
+} from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
@@ -26,25 +32,32 @@ export default function DashboardLayout({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
+  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
+  const openSidebar = useCallback(() => setSidebarOpen(true), []);
+
+  // An inline object literal here would be a new value on every layout render,
+  // re-rendering every `useSidebar()` consumer even when the flag is unchanged.
+  const sidebarContext = useMemo(
+    () => ({ sidebarOpen, setSidebarOpen }),
+    [sidebarOpen],
+  );
+
   return (
-    <SidebarContext.Provider value={{ sidebarOpen, setSidebarOpen }}>
+    <SidebarContext.Provider value={sidebarContext}>
       <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
         <BackgroundOrbs variant="default" />
 
         {sidebarOpen && (
           <div
             className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
-            onClick={() => setSidebarOpen(false)}
+            onClick={closeSidebar}
           />
         )}
 
-        <DashboardSidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
+        <DashboardSidebar isOpen={sidebarOpen} onClose={closeSidebar} />
 
         <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-          <DashboardHeader onMenuClick={() => setSidebarOpen(true)} />
+          <DashboardHeader onMenuClick={openSidebar} />
           {children}
         </main>
       </div>

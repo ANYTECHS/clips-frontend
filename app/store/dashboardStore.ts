@@ -125,10 +125,44 @@ export const selectRecentProjects = (s: DashboardState & DashboardActions) =>
   s.recentProjects;
 
 /**
+ * Selects the in-flight flag for the dashboard fetch.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns True while a dashboard fetch is in flight.
+ */
+export const selectLoading = (s: DashboardState & DashboardActions) => s.loading;
+
+/**
+ * Selects the last dashboard fetch error message.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns The error message, or null when the last fetch succeeded.
+ */
+export const selectError = (s: DashboardState & DashboardActions) => s.error;
+
+/**
+ * Selects the timestamp of the last successful dashboard fetch.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns Epoch milliseconds of the last fetch, or null if never fetched.
+ */
+export const selectLastFetchedAt = (s: DashboardState & DashboardActions) =>
+  s.lastFetchedAt;
+
+/**
  * Extracts operation lifecycle timestamps and pending validation flags.
  *
  * @param s - Combined global dashboard store data slice object.
  * @returns Consolidated lifecycle tracking states.
+ *
+ * @remarks
+ * This builds a fresh object on every call, so subscribing to it through
+ * `useDashboardStore` re-renders the consumer on *every* store write — the
+ * returned object never compares equal under zustand's default `Object.is`
+ * check, even when loading, error and lastFetchedAt are all unchanged.
+ * Prefer the atomic {@link selectLoading}, {@link selectError} and
+ * {@link selectLastFetchedAt} selectors in components; this composite is kept
+ * for non-reactive reads such as `useDashboardStore.getState()`.
  */
 export const selectDashboardMeta = (s: DashboardState & DashboardActions) => ({
   loading: s.loading,

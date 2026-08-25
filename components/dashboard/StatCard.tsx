@@ -14,7 +14,7 @@ interface StatCardProps {
   hideTrendIcon?: boolean;
 }
 
-export default function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
+function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
   let trendContent: React.ReactNode = null;
   let trendColor = "text-muted-foreground";
 
@@ -52,3 +52,10 @@ export default function StatCard({ label, value, trend, icon: Icon, hideTrendIco
     </div>
   );
 }
+
+/**
+ * Purely presentational: every prop is a primitive or a module-scope icon
+ * component, so a shallow prop comparison is enough to skip re-rendering the
+ * card when an unrelated slice of dashboard state changes.
+ */
+export default React.memo(StatCard);
