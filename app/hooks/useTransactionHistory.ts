@@ -135,10 +135,17 @@ export function useTransactionHistory({
   }
 
   const filteredTxs = filterTransactions(allTxs, filter);
-  const totalPages = Math.max(1, Math.ceil(filteredTxs.length / PAGE_SIZE));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIdx = (safePage - 1) * PAGE_SIZE;
-  const displayTxs = filteredTxs.slice(startIdx, startIdx + PAGE_SIZE);
+  const displayTxs = filteredTxs;
+  let hasMore = true;
+  for (let p = 1; p <= pageCache.size; p++) {
+    const page = pageCache.get(p);
+    if (page && page.length < 50) {
+      hasMore = false;
+      break;
+    }
+  }
+  const totalPages = hasMore ? currentPage + 1 : currentPage;
+  const safePage = currentPage;
 
   // ── Core fetch logic ─────────────────────────────────────────────────────────
 
@@ -306,12 +313,8 @@ export function useTransactionHistory({
   const goToPage = useCallback(
     (page: number) => {
       setCurrentPage(page);
-      // Fetch the corresponding API page if not cached
-      const apiPage = Math.ceil((page * PAGE_SIZE) / 50);
-      if (!pageCache.has(apiPage)) {
-        fetchPage(apiPage, { isManualRefresh: false });
-      }
-      // Scroll to top of list (callers can also do this directly)
+      const nextApiPage = pageCache.size + 1;
+      fetchPage(nextApiPage, { isManualRefresh: false });
     },
     [pageCache, fetchPage],
   );

@@ -278,6 +278,61 @@ function Pagination({ currentPage, totalPages, onPrev, onNext, isLoading }: Pagi
   );
 }
 
+import { useVirtualizer } from "@tanstack/react-virtual";
+
+function VirtualTransactionList({ transactions, isLoading }: { transactions: Transaction[], isLoading: boolean }) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+    count: transactions.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 72,
+    overscan: 5,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      className={`h-[400px] overflow-auto ${isLoading ? "opacity-50 pointer-events-none" : ""}`}
+    >
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: "100%",
+          position: "relative",
+        }}
+        role="table"
+        aria-label="Transaction history"
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const tx = transactions[virtualRow.index];
+          return (
+            <div
+              key={tx.id}
+              style={{
+                position: "absolute",
+                top: 0,
+                left: 0,
+                width: "100%",
+                height: `${virtualRow.size}px`,
+                transform: `translateY(${virtualRow.start}px)`,
+                paddingBottom: "8px",
+              }}
+            >
+              <TxRow tx={tx} />
+            </div>
+          );
+        })}
+      </div>
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+          <Loader2 className="w-6 h-6 text-brand animate-spin" />
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Empty state ───────────────────────────────────────────────────────────────
 
 function EmptyState({ filter }: { filter: TxFilter }) {
@@ -353,15 +408,8 @@ export default function TransactionHistoryViewer({ className = "" }: Transaction
     chainId,
   });
 
-  // Scroll to top of the list on page change
+  // Remove scroll to top since we are doing infinite scrolling
   const listRef = useRef<HTMLDivElement>(null);
-  const prevPage = useRef(currentPage);
-  useEffect(() => {
-    if (prevPage.current !== currentPage) {
-      listRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      prevPage.current = currentPage;
-    }
-  }, [currentPage]);
 
   const handlePrev = useCallback(() => goToPage(currentPage - 1), [currentPage, goToPage]);
   const handleNext = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage]);
@@ -475,40 +523,27 @@ export default function TransactionHistoryViewer({ className = "" }: Transaction
           )}
 
           {/* ── Transaction list ────────────────────────────────────────────── */}
-          <div ref={listRef}>
+          <div ref={listRef} className="max-h-[600px] overflow-auto">
             {isInitialLoading ? (
               <SkeletonList />
-            ) : isLoading ? (
-              <div className="relative">
-                <div className="absolute inset-0 bg-background/50 rounded-xl flex items-center justify-center z-10" aria-hidden>
-                  <Loader2 className="w-6 h-6 text-brand animate-spin" />
-                </div>
-                <div className="space-y-2 opacity-40 pointer-events-none" aria-busy="true">
-                  {transactions.map((tx) => <TxRow key={tx.id} tx={tx} />)}
-                </div>
-              </div>
             ) : transactions.length === 0 ? (
               <EmptyState filter={filter} />
             ) : (
-              <div
-                role="table"
-                aria-label={`${filter === "all" ? "All" : filter === "sent" ? "Sent" : "Received"} transactions, page ${currentPage} of ${totalPages}`}
-                className="space-y-2"
-              >
-                {transactions.map((tx) => <TxRow key={tx.id} tx={tx} />)}
-              </div>
+              <VirtualTransactionList transactions={transactions} isLoading={isLoading} />
             )}
           </div>
 
-          {/* ── Pagination ──────────────────────────────────────────────────── */}
-          {!isInitialLoading && transactions.length > 0 && (
-            <Pagination
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPrev={handlePrev}
-              onNext={handleNext}
-              isLoading={isLoading}
-            />
+          {/* ── Infinite Scroll Trigger ───────────────────────────────────────── */}
+          {!isInitialLoading && transactions.length > 0 && currentPage < totalPages && (
+            <div className="py-4 flex justify-center">
+              <button
+                onClick={handleNext}
+                disabled={isLoading}
+                className="px-4 py-2 bg-surface-hover rounded-xl text-[12px] font-medium text-white hover:bg-brand/20 transition-colors"
+              >
+                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Load More"}
+              </button>
+            </div>
           )}
         </>
       )}
