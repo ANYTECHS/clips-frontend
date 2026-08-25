@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import React, { memo, useCallback } from "react";
 import {
   LayoutDashboard,
   Video,
@@ -40,11 +41,21 @@ interface DashboardSidebarProps {
   onClose: () => void;
 }
 
-export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarProps) {
+/**
+ * DashboardSidebar — main navigation sidebar.
+ *
+ * Wrapped in React.memo so it only re-renders when `isOpen` or `pathname`
+ * actually changes. The `isActive` helper is stabilised with useCallback.
+ *
+ * Issue #874 – memoization for expensive computations.
+ */
+const DashboardSidebar = memo(function DashboardSidebar({ isOpen, onClose }: DashboardSidebarProps) {
   const pathname = usePathname();
 
-  const isActive = (href: string) =>
-    pathname === href || pathname.startsWith(href + "/");
+  const isActive = useCallback(
+    (href: string) => pathname === href || pathname.startsWith(href + "/"),
+    [pathname]
+  );
 
   return (
     <>
@@ -160,4 +171,6 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
       </aside>
     </>
   );
-}
+});
+
+export default DashboardSidebar;

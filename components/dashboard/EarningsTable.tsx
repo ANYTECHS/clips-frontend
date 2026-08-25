@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
+import SkeletonTable from "@/components/ui/SkeletonTable";
 import type { EarningTransaction, EarningsSummary } from "@/app/api/earnings/types";
 
 interface EarningsTableProps {

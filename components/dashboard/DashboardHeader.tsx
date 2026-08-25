@@ -1,9 +1,18 @@
 "use client";
 
 import { CloudUpload } from "lucide-react";
+import React, { memo } from "react";
 import { useUserStore, selectUserName } from "@/app/store";
 
-export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
+/**
+ * DashboardHeader — welcome banner + quick-upload button.
+ *
+ * Memoised so re-renders of the layout wrapper (e.g. mobile-menu state
+ * changes) don't cascade into this component unless the user name changes.
+ *
+ * Issue #874 – memoization for expensive computations.
+ */
+const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const userName = useUserStore(selectUserName);
 
   return (
@@ -27,4 +36,6 @@ export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => v
       </button>
     </header>
   );
-}
+});
+
+export default DashboardHeader;

@@ -155,6 +155,12 @@
   40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 
+/* Skeleton shimmer animation — used by components/ui/Skeleton.tsx (#871) */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
