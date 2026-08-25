@@ -44,10 +44,11 @@ import { scanFile, VirusScanError, getScanConfig } from "@/app/lib/virusScan";
 import { checkCsrf } from "@/app/lib/csrf";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
-import { MAX_UPLOAD_SIZE_BYTES } from "@/app/lib/constants";
+import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST } from "@/app/lib/constants";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { logger } from "@/app/lib/logger";
 
-export { MAX_UPLOAD_SIZE_BYTES };
+export { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST };
 const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"];
 const ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv"];
 

@@ -22,6 +22,13 @@ const STATUS_STYLES: Record<string, string> = {
   failed: "text-red-400",
 };
 
+const TYPE_LABEL: Record<string, string> = {
+  payout: "Payout",
+  royalty: "Royalty",
+  mint: "Mint",
+  referral: "Referral Bonus",
+};
+
 export default function EarningsTable({
   transactions,
   summary,
@@ -130,6 +137,7 @@ export default function EarningsTable({
               <th className="px-5 py-3 text-left">Date</th>
               <th className="px-5 py-3 text-left">Description</th>
               <th className="px-5 py-3 text-left">Platform</th>
+              <th className="px-5 py-3 text-left">Type</th>
               <th className="px-5 py-3 text-right">Amount</th>
               <th className="px-5 py-3 text-left">Status</th>
               <th className="px-5 py-3 text-left">Tax ID</th>
@@ -139,7 +147,7 @@ export default function EarningsTable({
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-white/5">
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: 7 }).map((_, j) => (
                     <td key={j} className="px-5 py-3.5">
                       <div className="h-4 rounded bg-white/6 animate-pulse" />
                     </td>
@@ -148,7 +156,7 @@ export default function EarningsTable({
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">
                   No transactions match your filters.
                 </td>
               </tr>
@@ -158,6 +166,7 @@ export default function EarningsTable({
                   <td className="px-5 py-3.5 text-muted-foreground">{tx.date}</td>
                   <td className="px-5 py-3.5 text-white">{tx.description}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{tx.platform}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground">{TYPE_LABEL[tx.type] ?? tx.type}</td>
                   <td className="px-5 py-3.5 text-right font-mono font-bold text-white">
                     ${tx.amount.toFixed(2)}
                     {tx.cryptoAmount && (

@@ -92,6 +92,7 @@ function sanitizeContext(context: Partial<WalletErrorContext>): Partial<WalletEr
 
 /**
  * Check if Sentry is available
+ * Sentry is injected globally by @sentry/nextjs but types may not be available
  */
 function isSentryAvailable(): boolean {
   return typeof window !== "undefined" && (window as any).Sentry !== undefined;

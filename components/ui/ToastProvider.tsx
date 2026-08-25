@@ -31,16 +31,18 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     <ToastContext.Provider value={{ addToast }}>
       {children}
       
-      {/* Acceptance Criteria: Container element has aria-live="polite" */}
+      {/* Acceptance Criteria: Container element has aria-live="polite" and role="status" */}
       <div 
         aria-live="polite" 
+        role="status"
         className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
       >
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            // Acceptance Criteria: role="alert" for errors, role="status" for others
+            // Acceptance Criteria: role="alert" and aria-live="assertive" for errors, role="status" for others
             role={toast.type === 'error' ? 'alert' : 'status'}
+            aria-live={toast.type === 'error' ? 'assertive' : 'polite'}
             className={`p-4 rounded-md shadow-lg pointer-events-auto max-w-sm text-white ${
               toast.type === 'error' ? 'bg-red-600' : 'bg-slate-800'
             }`}

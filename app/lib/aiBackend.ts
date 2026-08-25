@@ -1,3 +1,4 @@
+import type { AnimeTransformOptions } from "@/app/lib/animeTransform";
 import { logger } from "@/app/lib/logger";
 
 /**
@@ -43,6 +44,31 @@ export interface DispatchJobPayload {
    * Format: POST <callbackUrl>  body: JobCallbackPayload
    */
   callbackUrl: string;
+  /**
+   * Optional: the visual style to apply for AI video transformation jobs
+   * (e.g. "anime", "cinematic", "sketch", "watercolor").
+   * Absent for standard clip-extraction jobs.
+   */
+  transformStyle?: string;
+  /**
+   * Optional: the source clip's object key in cloud storage, used when the
+   * job is a style-transfer transformation rather than a raw upload.
+   */
+  sourceClipKey?: string;
+  /**
+   * Optional: fine-grained tuning options for anime transformations.
+   * Only populated when transformStyle === "anime".
+   */
+  transformOptions?: AnimeTransformOptions;
+  /** Job type discriminator for the AI backend. */
+  jobType?: "clip" | "transform" | "transcode" | "caption";
+  /** Transcode export settings when jobType === "transcode". */
+  transcodeOptions?: {
+    format: "mp4" | "webm";
+    aspectRatio: "9:16" | "1:1" | "16:9";
+    quality: "720p" | "1080p";
+    outputObjectKey: string;
+  };
 }
 
 /**

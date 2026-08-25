@@ -217,6 +217,7 @@ function getClientKey(request: NextRequest): string {
 export async function __resetRateLimitStore(): Promise<void> {
   const storage = getAdapter();
   if (storage instanceof InMemoryStorageAdapter) {
+    // Test-only helper - access private property - use as any
     (storage as any).map.clear();
   } else {
     // For Redis, we'd need to flush by pattern, but for now just warn

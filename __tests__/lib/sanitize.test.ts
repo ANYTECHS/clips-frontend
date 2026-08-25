@@ -33,5 +33,13 @@ describe("sanitize", () => {
     expect(sanitize('<iframe src="data:text/html,<script>alert(1)</script>"></iframe>')).toBe("");
   });
 
+  it("strips disallowed HTML tags while keeping text content", () => {
+    expect(sanitize("<marquee>hello</marquee>")).toBe("hello");
+  });
+
+  it("strips bold tags but preserves inner text", () => {
+    expect(sanitize("<b>important</b>")).toBe("important");
+  });
+
   // SSR behaviour is tested separately in sanitize.ssr.test.ts (node environment)
 });

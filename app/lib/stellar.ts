@@ -29,7 +29,7 @@ export const getStellarServer = () => {
 
 export const getSorobanServer = () => {
   const rpcUrl = getRpcUrl();
-  return new StellarSdk.SorobanServer(rpcUrl);
+  return new StellarSdk.rpc.Server(rpcUrl);
 };
 
 export const BIP39_WORDLIST = bip39.wordlists.english;
@@ -39,7 +39,7 @@ export type StellarNetwork = "testnet" | "mainnet";
 export const deriveSeedFromMnemonic = async (
   mnemonic: string,
   passphrase = ""
-): Promise<Uint8Array> => {
+): Promise<Buffer> => {
   const normalized = mnemonic.trim().toLowerCase().replace(/\s+/g, " ");
   if (!bip39.validateMnemonic(normalized, BIP39_WORDLIST)) {
     throw new Error("Invalid BIP39 mnemonic phrase");
@@ -85,8 +85,9 @@ export const getBalance = async (publicKey: string): Promise<string> => {
     const accountInfo = await server.loadAccount(publicKey);
     const nativeAsset = accountInfo.balances.find((b) => b.asset_type === "native");
     return nativeAsset?.balance || "0.00";
-  } catch (error: any) {
-    if (error.response && error.response.status === 404) {
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number } };
+    if (err.response && err.response.status === 404) {
       // Account is not funded/created on ledger yet
       return "0.00";
     }
@@ -120,8 +121,9 @@ export const buildPaymentTransaction = async (
   let sourceAccount;
   try {
     sourceAccount = await server.loadAccount(senderPublicKey);
-  } catch (error: any) {
-    if (error.response && error.response.status === 404) {
+  } catch (error: unknown) {
+    const err = error as { response?: { status?: number } };
+    if (err.response && err.response.status === 404) {
       throw new Error("Sender account is not funded. Please fund it first.");
     }
     throw error;
@@ -174,6 +176,8 @@ export interface SubmitTransactionError {
   message: string;
   extras?: Record<string, unknown>;
 }
+
+export type { SubmitTransactionError as StellarTransactionError };
 
 export const submitTransaction = async (options: SubmitTransactionOptions): Promise<SubmitTransactionResult> => {
   const { signedXdr, network = getStellarNetwork() } = options;
@@ -302,23 +306,27 @@ function toSdkOperation(
       });
 
     case "set_options": {
-      const opts: any = {};
-      if (op.inflationDest !== undefined) opts.inflationDest = op.inflationDest;
-      if (op.clearFlags !== undefined) opts.clearFlags = op.clearFlags;
-      if (op.setFlags !== undefined) opts.setFlags = op.setFlags;
-      if (op.masterWeight !== undefined) opts.masterWeight = op.masterWeight;
-      if (op.lowThreshold !== undefined) opts.lowThreshold = op.lowThreshold;
-      if (op.medThreshold !== undefined) opts.medThreshold = op.medThreshold;
-      if (op.highThreshold !== undefined) opts.highThreshold = op.highThreshold;
-      if (op.homeDomain !== undefined) opts.homeDomain = op.homeDomain;
+      // Build base options without signer first, then conditionally add the
+      // signer so TypeScript can infer the correct SetOptions<T> generic.
+      const baseOpts = {
+        ...(op.inflationDest !== undefined ? { inflationDest: op.inflationDest } : {}),
+        ...(op.clearFlags !== undefined ? { clearFlags: op.clearFlags as StellarSdk.AuthFlag } : {}),
+        ...(op.setFlags !== undefined ? { setFlags: op.setFlags as StellarSdk.AuthFlag } : {}),
+        ...(op.masterWeight !== undefined ? { masterWeight: op.masterWeight } : {}),
+        ...(op.lowThreshold !== undefined ? { lowThreshold: op.lowThreshold } : {}),
+        ...(op.medThreshold !== undefined ? { medThreshold: op.medThreshold } : {}),
+        ...(op.highThreshold !== undefined ? { highThreshold: op.highThreshold } : {}),
+        ...(op.homeDomain !== undefined ? { homeDomain: op.homeDomain } : {}),
+        ...(op.source ? { source: op.source } : {}),
+      };
       if (op.signer?.ed25519PublicKey !== undefined) {
-        opts.signer = {
+        const signer: StellarSdk.SignerOptions.Ed25519PublicKey = {
           ed25519PublicKey: op.signer.ed25519PublicKey,
           weight: op.signer.weight,
         };
+        return StellarSdk.Operation.setOptions({ ...baseOpts, signer });
       }
-      if (op.source) opts.source = op.source;
-      return StellarSdk.Operation.setOptions(opts);
+      return StellarSdk.Operation.setOptions(baseOpts);
     }
 
     case "begin_sponsoring_future_reserves":
@@ -391,7 +399,7 @@ export const buildBatchTransaction = async (
   const server = getStellarServer();
 
   // Load source account (verifies it exists and fetches sequence number)
-  let sourceAccount: any;
+  let sourceAccount: StellarSdk.Horizon.AccountResponse;
   try {
     sourceAccount = await server.loadAccount(senderPublicKey);
   } catch (error: unknown) {
@@ -466,7 +474,7 @@ export async function buildSorobanTransaction(
   const horizonServer = getStellarServer();
 
   // Load source account
-  let sourceAccount: any;
+  let sourceAccount: StellarSdk.Horizon.AccountResponse;
   try {
     sourceAccount = await horizonServer.loadAccount(senderPublicKey);
   } catch (error: unknown) {
@@ -494,7 +502,11 @@ export async function buildSorobanTransaction(
 
   // Add operations
   for (const op of operations) {
-    builder.addOperation(toSdkOperation(op));
+    const sdkOp = toSdkOperation(op);
+    if (isInvokeContractBuildError(sdkOp)) {
+      throw new Error("invoke_contract operations are not supported in Soroban transactions built this way.");
+    }
+    builder.addOperation(sdkOp);
   }
 
   const unsignedTx = builder.setTimeout(timeoutSeconds).build();
@@ -502,12 +514,13 @@ export async function buildSorobanTransaction(
   // Simulate the transaction to get Soroban transaction data
   const simulated = await sorobanServer.simulateTransaction(unsignedTx);
 
-  if ((simulated as any).status === "ERROR") {
-    throw new Error(`Simulation failed: ${JSON.stringify((simulated as any).error)}`);
+  if (StellarSdk.rpc.Api.isSimulationError(simulated)) {
+    throw new Error(`Simulation failed: ${JSON.stringify(simulated.error)}`);
   }
 
-  // Assemble the transaction for signing
-  const assembledTx = (simulated as any).toXDR();
+  // Assemble the transaction: injects Soroban resource data and prepares it for signing
+  const assembledBuilder = StellarSdk.rpc.assembleTransaction(unsignedTx, simulated);
+  const assembledTx = assembledBuilder.build();
 
   return {
     xdr: assembledTx.toEnvelope().toXDR("base64"),
@@ -547,7 +560,7 @@ export async function submitSorobanTransaction(
       if (getTxResult.status === "SUCCESS") {
         return {
           success: true,
-          hash: getTxResult.hash,
+          hash: getTxResult.txHash,
           ledger: getTxResult.ledger,
         };
       } else if (getTxResult.status === "FAILED") {
@@ -561,8 +574,9 @@ export async function submitSorobanTransaction(
       hash: result.hash,
       ledger: 0, // Ledger not available in pending status
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger.error("Soroban submission error details:", error);
-    throw new Error(`Soroban Submission Failed: ${error.message}`);
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`Soroban Submission Failed: ${message}`);
   }
 }

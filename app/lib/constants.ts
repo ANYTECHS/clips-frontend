@@ -1,5 +1,7 @@
 // Upload limits
 export const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024;
+export const MAX_FILES_PER_REQUEST = 10;
+export const UPLOAD_CONCURRENCY = 3;
 
 // Crypto
 export const PBKDF2_ITERATIONS = 100000;

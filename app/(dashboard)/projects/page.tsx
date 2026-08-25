@@ -1,30 +1,25 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo, useCallback, useEffect } from "react";
 import ProjectFilters from "@/components/projects/ProjectFilters";
-import ClipGrid from "@/components/projects/ClipGrid";
+import ClipGrid, { type Clip } from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
 import ClipEditorModal, { type ClipEdits } from "@/components/projects/ClipEditorModal";
 import ClipPreviewModal from "@/components/projects/ClipPreviewModal";
+import { BatchTransformModal } from "@/components/transform/BatchTransformModal";
+import { BatchTransformQueue } from "@/components/transform/BatchTransformQueue";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
-import { useEffect } from "react";
+import { useBatchTransform } from "@/app/hooks/useBatchTransform";
+import { useUserStore, selectUserPlan } from "@/app/store/userStore";
 
 const RECOMMENDATION_THRESHOLD = 90;
 
-const mockClips = [
-  { id: "1", title: "Clip #01 - The Big Reveal Hook", thumbnail: "/projects/thumb1.png", score: 94, scoreKey: "high", duration: "00:45", style: "Bold & Dynamic", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" },
-  { id: "2", title: "Clip #02 - Technical Deep Dive", thumbnail: "/projects/thumb2.png", score: 68, scoreKey: "medium", duration: "00:58", style: "Minimalist", status: "listed", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4" },
-  { id: "3", title: "Clip #03 - Audience Reaction", thumbnail: "/projects/thumb3.png", score: 82, scoreKey: "high", duration: "00:32", style: "Emoji-Rich", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4" },
-  { id: "4", title: "Clip #04 - Feature Walkthrough", thumbnail: "/projects/thumb1.png", score: 91, scoreKey: "high", duration: "00:52", style: "Subtitles Only", status: "history", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4" },
-  { id: "5", title: "Clip #05 - Closing Remarks", thumbnail: "/projects/thumb2.png", score: 42, scoreKey: "low", duration: "01:12", style: "Minimalist", status: "pending", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4" },
-  { id: "6", title: "Clip #06 - Product Detail B-Roll", thumbnail: "/projects/thumb3.png", score: 89, scoreKey: "high", duration: "00:44", style: "Bold & Dynamic", status: "listed", resolution: "1080x1920", videoUrl: "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4" },
-];
-
 export default function ProjectsPage() {
   const { showToast, ToastEl } = useToast();
+  const userPlan = useUserStore(selectUserPlan);
   const { 
     state: selectedIds, 
     set: setSelectedIds, 
@@ -37,8 +32,25 @@ export default function ProjectsPage() {
     undoMessage: "Selection undone",
     redoMessage: "Selection redone"
   });
+  
   const [loading, setLoading] = useState(true);
   const [isMinting, setIsMinting] = useState(false);
+  const [showTransformModal, setShowTransformModal] = useState(false);
+
+  const {
+    batch: transformBatch,
+    isSubmitting: isTransformSubmitting,
+    submitError: transformSubmitError,
+    completedCount: transformCompletedCount,
+    totalCount: transformTotalCount,
+    startBatch: startTransformBatch,
+    cancelJob: cancelTransformJob,
+    clearBatch: clearTransformBatch,
+  } = useBatchTransform();
+
+  const [fetchedClips, setFetchedClips] = useState<Clip[]>([]);
+  const [totalClips, setTotalClips] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const { filters, updateFilters, resetFilters } = useFilterQueryState({
     style: "All Styles",
@@ -53,51 +65,73 @@ export default function ProjectsPage() {
   const currentPage = filters.page;
   const PAGE_SIZE = 20;
   const [loadingNextPage, setLoadingNextPage] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
+  const [postError, setPostError] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveError, setArchiveError] = useState<string | null>(null);
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState(false);
-  const [editingClip, setEditingClip] = useState<typeof mockClips[0] | null>(null);
-  const [previewClip, setPreviewClip] = useState<typeof mockClips[0] | null>(null);
+  const [editingClip, setEditingClip] = useState<Clip | null>(null);
+  const [previewClip, setPreviewClip] = useState<Clip | null>(null);
 
-  // Simulate loading delay
+  // Fetch clips from API
+  const fetchClips = useCallback(async (page: number, append = false) => {
+    try {
+      if (page === 1) setLoading(true);
+      else setLoadingNextPage(true);
+      
+      const params = new URLSearchParams();
+      params.append("page", page.toString());
+      params.append("pageSize", PAGE_SIZE.toString());
+      if (vaultFilter !== "all") params.append("status", vaultFilter);
+      if (captionsStyle !== "All Styles") params.append("style", captionsStyle);
+      viralityLevels.forEach(v => params.append("virality", v));
+      
+      const res = await fetch(`/api/clips?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch clips");
+      
+      const { data } = await res.json();
+      
+      if (append) {
+        setFetchedClips(prev => [...prev, ...data.clips]);
+      } else {
+        setFetchedClips(data.clips);
+      }
+      setTotalClips(data.total);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "An error occurred");
+    } finally {
+      setLoading(false);
+      setLoadingNextPage(false);
+    }
+  }, [vaultFilter, captionsStyle, viralityLevels, PAGE_SIZE]);
+
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    fetchClips(1);
+  }, [fetchClips]);
 
-  // Clear undo/redo stack on navigate away (#277)
+  // Clear undo/redo stack on navigate away
   useEffect(() => {
     return () => clear();
   }, [clear]);
 
   // Reset page to 1 whenever filter changes
   useEffect(() => {
-    updateFilters({ page: 1 });
-  }, [captionsStyle, viralityLevels, vaultFilter, updateFilters]);
+    if (currentPage !== 1) {
+      updateFilters({ page: 1 });
+    }
+  }, [captionsStyle, viralityLevels, vaultFilter, updateFilters, currentPage]);
 
-  const filteredClips = useMemo(() => {
-    if (loading) return [];
-    return mockClips.filter(clip => {
-      const matchesStyle = captionsStyle === "All Styles" || clip.style === captionsStyle;
-      const matchesLevel = viralityLevels.includes(clip.scoreKey);
-      const matchesVault = clip.status === vaultFilter;
-      return matchesStyle && matchesLevel && matchesVault;
-    });
-  }, [captionsStyle, viralityLevels, vaultFilter, loading]);
-
-  const paginatedClips = useMemo(() => {
-    const startIndex = (currentPage - 1) * PAGE_SIZE;
-    const endIndex = startIndex + PAGE_SIZE;
-    return filteredClips.slice(0, endIndex);
-  }, [filteredClips, currentPage, PAGE_SIZE]);
-
-  const handleLoadMore = useCallback(async () => {
-    setLoadingNextPage(true);
-    // Simulate loading delay for skeletons
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    updateFilters({ page: currentPage + 1 });
-    setLoadingNextPage(false);
-  }, [currentPage, updateFilters]);
+  const handleLoadMore = useCallback(() => {
+    if (fetchedClips.length < totalClips && !loadingNextPage) {
+      const nextPage = currentPage + 1;
+      updateFilters({ page: nextPage });
+      fetchClips(nextPage, true);
+    }
+  }, [fetchedClips.length, totalClips, loadingNextPage, currentPage, updateFilters, fetchClips]);
 
   const activeFilterCount = useMemo(() => {
     return (captionsStyle !== "All Styles" ? 1 : 0) + 
@@ -107,8 +141,8 @@ export default function ProjectsPage() {
 
   // Clips that score at or above the recommendation threshold
   const recommendedIds = useMemo(
-    () => filteredClips.filter(c => c.score >= RECOMMENDATION_THRESHOLD).map(c => c.id),
-    [filteredClips]
+    () => fetchedClips.filter(c => c.score >= RECOMMENDATION_THRESHOLD).map(c => c.id),
+    [fetchedClips]
   );
 
   const handleAutoSelect = useCallback(() => {
@@ -134,52 +168,73 @@ export default function ProjectsPage() {
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
-  }, []);
+  }, [setSelectedIds]);
 
   const handleSelectAll = useCallback(() => {
     setSelectedIds(prev => {
-      if (prev.length === filteredClips.length) {
+      if (prev.length === fetchedClips.length) {
         return [];
       } else {
-        return filteredClips.map(c => c.id);
+        return fetchedClips.map(c => c.id);
       }
     });
-  }, [filteredClips]);
+  }, [fetchedClips, setSelectedIds]);
 
   const handleSelectNone = useCallback(() => {
     setSelectedIds([]);
-  }, []);
+  }, [setSelectedIds]);
 
   const handleSelectByScore = useCallback((minScore: number) => {
-    const ids = filteredClips.filter(c => c.score >= minScore).map(c => c.id);
+    const ids = fetchedClips.filter(c => c.score >= minScore).map(c => c.id);
     setSelectedIds(ids);
     showToast(`Selected ${ids.length} clip${ids.length !== 1 ? "s" : ""} with score ≥ ${minScore}`, "success");
-  }, [filteredClips, showToast]);
+  }, [fetchedClips, showToast, setSelectedIds]);
 
   const handleEdit = useCallback((id: string) => {
-    const clip = mockClips.find(c => c.id === id);
+    const clip = fetchedClips.find(c => c.id === id);
     if (clip) setEditingClip(clip);
-  }, []);
+  }, [fetchedClips]);
 
-  const handleSaveEdits = useCallback((id: string, edits: ClipEdits) => {
+  const handleSaveEdits = useCallback(async (id: string, edits: ClipEdits) => {
+    if (edits.captions) {
+      try {
+        await fetch(`/api/clips/${id}/captions`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            segments: edits.captions.segments,
+            style: edits.captions.style,
+            language: edits.captions.language,
+            burnIntoExport: edits.captions.burnIntoExport,
+          }),
+        });
+      } catch {
+        showToast("Failed to save captions", "error");
+        return;
+      }
+    }
     showToast(`Edits saved for clip ${id}`, "success");
-    console.log("Clip edits:", id, edits);
+    setEditingClip(null);
   }, [showToast]);
 
   const handlePreview = useCallback((id: string) => {
-    const clip = mockClips.find(c => c.id === id);
+    const clip = fetchedClips.find(c => c.id === id);
     if (clip) setPreviewClip(clip);
-  }, []);
+  }, [fetchedClips]);
 
   const handleMint = useCallback(async () => {
     if (selectedIds.length === 0) return;
     
     setIsMinting(true);
     try {
-      console.log(`Minting NFTs with IDs: ${selectedIds.join(", ")}`);
-      // Simulate an API call for minting
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      showToast(`Successfully minted ${selectedIds.length} clip(s)!`, "success");
+      const res = await fetch("/api/clips/mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipIds: selectedIds })
+      });
+      if (!res.ok) throw new Error("Failed to mint clips");
+      
+      showToast(`Successfully queued ${selectedIds.length} clip(s) for minting!`, "success");
       setSelectedIds([]); // Clear selection after successful mint
     } catch (error) {
       console.error("Minting failed", error);
@@ -188,7 +243,106 @@ export default function ProjectsPage() {
     } finally {
       setIsMinting(false);
     }
+  }, [selectedIds, setSelectedIds, showToast]);
+
+  const handleOpenTransformModal = useCallback(() => {
+    if (selectedIds.length === 0) return;
+    setShowTransformModal(true);
   }, [selectedIds]);
+
+  const handleTransformConfirm = useCallback(
+    async (style: string) => {
+      await startTransformBatch(selectedIds, style);
+      setShowTransformModal(false);
+      if (!transformSubmitError) {
+        showToast(
+          `Started ${selectedIds.length} AI transform job${selectedIds.length !== 1 ? "s" : ""}`,
+          "success",
+        );
+        setSelectedIds([]);
+      }
+    },
+    [selectedIds, startTransformBatch, transformSubmitError, showToast, setSelectedIds],
+  );
+
+  const handlePost = useCallback(async (clipIds: string[], platforms: string[]) => {
+    setIsPosting(true);
+    setPostError(null);
+    try {
+      const res = await fetch("/api/clips/post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipIds, platforms }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Posting failed");
+      if (Array.isArray(data.failed) && data.failed.length > 0) {
+        setPostError(`${data.failed.length} post${data.failed.length > 1 ? "s" : ""} failed`);
+        data.failed.forEach((f: unknown) => console.warn(f));
+      }
+      if (Array.isArray(data.posted) && data.posted.length > 0) {
+        showToast(`Posted ${data.posted.length} clip${data.posted.length > 1 ? "s" : ""} successfully`, "success");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Posting failed";
+      setPostError(msg);
+      showToast(msg, "error");
+    } finally {
+      setIsPosting(false);
+    }
+  }, [showToast]);
+
+  const handleDelete = useCallback(async (clipIds: string[]) => {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/clips", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Delete failed");
+
+      const count = data?.data?.deletedCount ?? clipIds.length;
+      showToast(`Deleted ${count} clip${count !== 1 ? "s" : ""}`, "success");
+      setSelectedIds([]);
+      // Deleted clips are filtered out server-side, so refetch rather than
+      // trying to reconcile the list locally.
+      await fetchClips(1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Delete failed";
+      setDeleteError(msg);
+      showToast(msg, "error");
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [fetchClips, setSelectedIds, showToast]);
+
+  const handleArchive = useCallback(async (clipIds: string[]) => {
+    setIsArchiving(true);
+    setArchiveError(null);
+    try {
+      const res = await fetch("/api/clips/archive", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clipIds }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Archive failed");
+
+      const count = data?.data?.archivedCount ?? clipIds.length;
+      showToast(`Archived ${count} clip${count !== 1 ? "s" : ""}`, "success");
+      setSelectedIds([]);
+      await fetchClips(1);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Archive failed";
+      setArchiveError(msg);
+      showToast(msg, "error");
+    } finally {
+      setIsArchiving(false);
+    }
+  }, [fetchClips, setSelectedIds, showToast]);
 
   return (
     <>
@@ -245,7 +399,7 @@ export default function ProjectsPage() {
           <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1400px] mx-auto pt-6">
             <div key={vaultFilter} className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500">
               <ClipGrid
-                clips={paginatedClips}
+                clips={fetchedClips}
                 selectedIds={selectedIds}
                 onSelect={handleSelect}
                 onSelectAll={handleSelectAll}
@@ -259,10 +413,11 @@ export default function ProjectsPage() {
                 onEdit={handleEdit}
                 onPreview={handlePreview}
                 loading={loading}
-                totalClips={filteredClips.length}
+                totalClips={totalClips}
                 loadingNextPage={loadingNextPage}
                 onLoadMore={handleLoadMore}
-                hasMore={paginatedClips.length < filteredClips.length}
+                hasMore={fetchedClips.length < totalClips}
+                userPlan={userPlan}
               />
             </div>
             
@@ -276,6 +431,15 @@ export default function ProjectsPage() {
               redo={redo}
               canUndo={canUndo}
               canRedo={canRedo}
+              onPost={handlePost}
+              isPosting={isPosting}
+              postError={postError}
+              onDelete={handleDelete}
+              isDeleting={isDeleting}
+              deleteError={deleteError}
+              onArchive={handleArchive}
+              isArchiving={isArchiving}
+              archiveError={archiveError}
             />
           </div>
         </div>
@@ -292,6 +456,26 @@ export default function ProjectsPage() {
         <ClipPreviewModal
           clip={previewClip}
           onClose={() => setPreviewClip(null)}
+        />
+      )}
+      {/* Batch Transform Modal */}
+      {showTransformModal && (
+        <BatchTransformModal
+          clipCount={selectedIds.length}
+          isSubmitting={isTransformSubmitting}
+          submitError={transformSubmitError}
+          onConfirm={handleTransformConfirm}
+          onClose={() => setShowTransformModal(false)}
+        />
+      )}
+      {/* Batch Transform Queue */}
+      {transformBatch && (
+        <BatchTransformQueue
+          batch={transformBatch}
+          completedCount={transformCompletedCount}
+          totalCount={transformTotalCount}
+          onCancelJob={cancelTransformJob}
+          onDismiss={clearTransformBatch}
         />
       )}
     </>

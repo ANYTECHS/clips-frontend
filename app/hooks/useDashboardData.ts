@@ -45,7 +45,7 @@ export interface DashboardData {
  *
  * @returns Object context containing state indicators, processing flags, and structured payloads.
  */
-export function useDashboardData(): {
+export function useDashboardData(options?: { enableStreaming?: boolean }): {
   data: DashboardData | null;
   loading: boolean;
   error: Error | null;
@@ -61,6 +61,35 @@ export function useDashboardData(): {
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
+
+  useEffect(() => {
+    if (!options?.enableStreaming) return;
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource("/api/dashboard/stream");
+      es.addEventListener("stats", (ev: MessageEvent) => {
+        const parsed = JSON.parse(ev.data);
+        if (parsed?.data) {
+          useDashboardStore.setState({
+            stats: {
+              earnings: { total: parsed.data.earnings, trendLabel: "+0%", trend: 0 },
+              clips: { total: parsed.data.clips, trendLabel: "+0%", trend: 0 },
+              platforms: { total: parsed.data.platforms, trendLabel: "Live", trend: 0 },
+            },
+            revenueTrend: [],
+            recentProjects: [],
+            loading: false,
+            error: null,
+          });
+        }
+      });
+    } catch {
+      // ignore
+    }
+    return () => {
+      if (es) es.close();
+    };
+  }, [options?.enableStreaming]);
 
   const data: DashboardData | null =
     stats !== null

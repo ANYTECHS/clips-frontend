@@ -28,7 +28,6 @@ export default function CreateClipsForm() {
       }
 
       const data = await response.json();
-      console.log("Upload successful:", data);
       setUrl("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");
@@ -58,7 +57,6 @@ export default function CreateClipsForm() {
       }
 
       const data = await response.json();
-      console.log("Upload successful:", data);
       setFile(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");

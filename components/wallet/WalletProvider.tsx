@@ -63,6 +63,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Register MetaMask event listeners
   useEffect(() => {
+    // MetaMask injects window.ethereum - types not available
     const eth = (window as any).ethereum;
     if (!eth) return;
 
@@ -88,6 +89,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Register Phantom event listeners
   useEffect(() => {
+    // Phantom injects window.solana - types not available
     const sol = (window as any).solana;
     if (!sol) return;
 
@@ -120,6 +122,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 
   const connectMetaMask = useCallback(async (): Promise<string | null> => {
+    // MetaMask injects window.ethereum - types not available
     const eth = (window as any).ethereum;
     if (!eth) {
       setState((prev) => ({ ...prev, error: "MetaMask is not installed" }));
@@ -158,6 +161,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [persist]);
 
   const connectPhantom = useCallback(async (): Promise<string | null> => {
+    // Phantom injects window.solana - types not available
     const sol = (window as any).solana;
     if (!sol?.isPhantom) {
       setState((prev) => ({ ...prev, error: "Phantom wallet not detected" }));
@@ -225,6 +229,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [persist]);
 
   const disconnect = useCallback(() => {
+    // Phantom injects window.solana - types not available
     const sol = (window as any).solana;
     if (sol && state.walletType === "phantom") {
       try { sol.disconnect(); } catch {}

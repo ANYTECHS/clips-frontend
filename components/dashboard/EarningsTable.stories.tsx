@@ -82,6 +82,6 @@ export const WithPagination: Story = {
     summary: mockSummary,
     loading: false,
     pagination: { page: 1, pageSize: 3, total: 55, totalPages: 19 },
-    onPageChange: (p) => console.log('Page change:', p),
+    onPageChange: () => {},
   },
 };

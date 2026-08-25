@@ -6,10 +6,10 @@ if (process.env.NODE_ENV === "production") {
   );
 }
 
-import { rateLimiter } from './rateLimiter';
-import { combineShares, splitSecret } from "./shamirRecovery";
-import type { User, OnboardingData } from "./types";
-import { DEFAULT_ONBOARDING_STEP } from "./types";
+import { rateLimiter } from "@/app/lib/rateLimiter";
+import { combineShares, splitSecret } from "@/app/lib/shamirRecovery";
+import type { User, OnboardingData } from "@/app/lib/types";
+import { DEFAULT_ONBOARDING_STEP } from "@/app/lib/types";
 
 // Re-export types for backward compatibility
 export type { User, OnboardingData };

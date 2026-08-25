@@ -171,8 +171,6 @@ async function scanWithVirusTotal(buffer: Buffer, timeout: number): Promise<Scan
         signal: controller.signal,
       });
 
-      clearTimeout(timeoutId);
-
       if (!response.ok) {
         throw new VirusScanError(
           `VirusTotal API error: ${response.statusText}`,
@@ -189,14 +187,101 @@ async function scanWithVirusTotal(buffer: Buffer, timeout: number): Promise<Scan
         };
       };
 
-      // VirusTotal analysis is async; we'd need to poll for results
-      // For now, assume clean (in production, implement polling or use webhook)
+      const analysisId = result.data?.id;
+      if (!analysisId) {
+        throw new VirusScanError(
+          "VirusTotal upload did not return an analysis ID",
+          "PROVIDER_ERROR",
+        );
+      }
+
+      const maxAttempts = 3;
+      const baseIntervalMs = process.env.VIRUSTOTAL_POLL_INTERVAL_MS
+        ? parseInt(process.env.VIRUSTOTAL_POLL_INTERVAL_MS, 10)
+        : 5000;
+
+      let isClean = true;
+      let threatName: string | undefined;
+      let completed = false;
+      let lastAnalysisResult: unknown = null;
+
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const delayMs = baseIntervalMs * Math.pow(2, attempt - 1);
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+
+        if (controller.signal.aborted) {
+          throw new VirusScanError("VirusTotal scan timed out", "TIMEOUT");
+        }
+
+        const pollResponse = await fetch(
+          `https://www.virustotal.com/api/v3/analyses/${analysisId}`,
+          {
+            headers: {
+              "x-apikey": apiKey,
+            },
+            signal: controller.signal,
+          }
+        );
+
+        if (!pollResponse.ok) {
+          throw new VirusScanError(
+            `VirusTotal polling API error: ${pollResponse.statusText}`,
+            "PROVIDER_ERROR",
+          );
+        }
+
+        const pollData = (await pollResponse.json()) as {
+          data: {
+            attributes?: {
+              status?: string;
+              stats?: {
+                malicious?: number;
+                suspicious?: number;
+                harmless?: number;
+                undetected?: number;
+              };
+              results?: Record<
+                string,
+                { category?: string; result?: string; engine_name?: string }
+              >;
+            };
+          };
+        };
+
+        lastAnalysisResult = pollData;
+        const status = pollData.data?.attributes?.status;
+        const stats = pollData.data?.attributes?.stats;
+
+        if (status === "completed") {
+          completed = true;
+          const maliciousCount = stats?.malicious ?? 0;
+          if (maliciousCount > 0) {
+            isClean = false;
+            const results = pollData.data?.attributes?.results ?? {};
+            const maliciousEntry = Object.values(results).find(
+              (r) => r.category === "malicious" || Boolean(r.result)
+            );
+            threatName = maliciousEntry?.result ?? "Malware detected";
+          } else {
+            isClean = true;
+          }
+          break;
+        }
+      }
+
+      clearTimeout(timeoutId);
+
+      if (!completed) {
+        throw new VirusScanError("VirusTotal scan timed out", "TIMEOUT");
+      }
+
       return {
-        isClean: true, // Placeholder: implement async polling
+        isClean,
         provider: "virustotal",
         timestamp: new Date(),
         details: {
-          rawResponse: result,
+          threatName,
+          rawResponse: lastAnalysisResult ?? result,
         },
       };
     } catch (err) {

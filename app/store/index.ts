@@ -68,3 +68,14 @@ export type {
   EarningsState,
   EarningsActions,
 } from "./types";
+
+// Transform
+export {
+  useTransformStore,
+  selectAllJobs,
+  selectJobById,
+  selectActiveJob,
+  selectTransformHasHydrated,
+} from "./transformStore";
+
+export type { TransformJob, TransformStatus } from "./transformStore";

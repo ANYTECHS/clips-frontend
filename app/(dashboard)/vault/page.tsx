@@ -4,7 +4,6 @@ import React, { useState, useEffect } from "react";
 import VaultSidebar from "@/components/vault/VaultSidebar";
 import NFTGrid from "@/components/vault/NFTGrid";
 import MintConfigForm from "@/components/projects/MintConfigForm";
-import { MockApi } from "@/__mocks__/app/lib/mockApi";
 import { ChevronRight } from "lucide-react";
 
 export default function VaultPage() {
@@ -24,12 +23,50 @@ export default function VaultPage() {
     creatorRoyalty: string;
     listingPrice: string;
   }) => {
-    // Call the actual minting API
-    const result = await MockApi.mintCollection(data);
-    console.log("Minting successful:", result);
-    // You could add additional logic here like showing a toast notification
-    // or updating the NFT grid with the new collection
-    return result;
+    try {
+      // 1. Get user's public key from freighter
+      // @ts-expect-error - Freighter adds this to window
+      const freighter = window.freighter;
+      if (!freighter) throw new Error("Freighter wallet is not installed.");
+      
+      const publicKey = await freighter.getPublicKey();
+      if (!publicKey) throw new Error("Could not get public key from wallet.");
+
+      // 2. Ask backend to build the transaction
+      const buildRes = await fetch("/api/nft/mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, publicKey })
+      });
+      if (!buildRes.ok) {
+        const errorData = await buildRes.json();
+        throw new Error(errorData.error || "Failed to build transaction");
+      }
+      const { xdr, networkPassphrase } = await buildRes.json();
+
+      // 3. Sign the transaction
+      const signedXdr = await freighter.signTransaction(xdr, {
+        network: "TESTNET", // or use networkPassphrase to derive it
+        accountToSign: publicKey
+      });
+      if (!signedXdr) throw new Error("Failed to sign transaction.");
+
+      // 4. Submit the transaction back to the backend
+      const submitRes = await fetch("/api/nft/mint", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...data, signedXdr })
+      });
+      if (!submitRes.ok) {
+        const errorData = await submitRes.json();
+        throw new Error(errorData.error || "Failed to submit transaction");
+      }
+      
+      const result = await submitRes.json();
+      return result;
+    } catch (error) {
+      throw error;
+    }
   };
 
   return (

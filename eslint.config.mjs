@@ -15,8 +15,28 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // next/jest configs must use CommonJS `require`
+    "jest.config.js",
+    "jest.integration.config.js",
+    "jest.setup.js",
   ]),
   ...storybook.configs["flat/recommended"],
+  {
+    // Security-sensitive rules
+    rules: {
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+      "no-eval": "error",
+      "react/no-danger": "error",
+      "@typescript-eslint/no-explicit-any": "error",
+    },
+  },
+  {
+    // Exclude test files from no-console
+    files: ["**/*.test.{ts,tsx,js,jsx}", "**/*.spec.{ts,tsx,js,jsx}", "**/__tests__/**", "**/__mocks__/**"],
+    rules: {
+      "no-console": "off",
+    },
+  },
   {
     files: ["app/**/*.ts", "app/**/*.tsx"],
     rules: {
@@ -72,6 +92,25 @@ const eslintConfig = defineConfig([
               group: ["**/mockApi*", "**/mockApi/**", "**/__mocks__/**"],
               message:
                 "API routes must not import from mockApi or __mocks__. Replace with a real database query.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // Build-time guard: no app page or component may import from mockApi.
+    // This prevents mock data from accidentally shipping to production.
+    files: ["app/**/*.ts", "app/**/*.tsx", "components/**/*.ts", "components/**/*.tsx"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["**/mockApi*", "**/mockApi/**"],
+              message:
+                "App pages and components must not import from mockApi. Replace with real API calls.",
             },
           ],
         },

@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { Upload, User } from "lucide-react";
 
@@ -27,9 +28,11 @@ export default function ClipsNavbar() {
 
         <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center border border-white/10">
           {session?.user?.image ? (
-            <img
+            <Image
               src={session.user.image}
               alt="User avatar"
+              width={40}
+              height={40}
               className="w-full h-full rounded-full object-cover"
             />
           ) : (

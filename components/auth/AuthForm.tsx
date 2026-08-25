@@ -22,7 +22,6 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
     try {
       // For now, this is a placeholder for email/password auth
       // In production, integrate with your backend
-      console.log(`${mode} attempt with:`, { email, password });
       setError("Email/password auth not yet implemented. Use OAuth providers below.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");

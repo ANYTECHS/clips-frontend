@@ -29,6 +29,24 @@ const initialState: UserState = {
 
 const planChangeCallbacks = new Set<(newPlan: UserProfile["plan"]) => void>();
 
+function computeQuotaRemaining(plan: UserProfile["plan"], usagePercent: number): number {
+  const limits: Record<UserProfile["plan"], number> = {
+    free: 10,
+    pro: 100,
+    enterprise: 1000,
+  };
+  const limit = limits[plan] ?? 10;
+  return Math.max(0, limit - Math.round((usagePercent / 100) * limit));
+}
+
+function enrichProfile(profile: UserProfile | null): UserProfile | null {
+  if (!profile) return null;
+  const transformQuotaRemaining =
+    profile.transformQuotaRemaining ??
+    computeQuotaRemaining(profile.plan, profile.planUsagePercent);
+  return { ...profile, transformQuotaRemaining };
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useUserStore = create<UserState & UserActions>((set, get) => ({
@@ -37,7 +55,8 @@ export const useUserStore = create<UserState & UserActions>((set, get) => ({
   fetchUser: async () => {
     set({ loading: true, error: null });
     try {
-      const profile = await fetchUserFromAPI();
+      const rawProfile = await fetchUserFromAPI();
+      const profile = enrichProfile(rawProfile);
       const previousProfile = get().profile;
 
       // Check if plan changed and notify callbacks
@@ -55,11 +74,12 @@ export const useUserStore = create<UserState & UserActions>((set, get) => ({
     }
   },
 
-  setProfile: (profile: UserProfile) => {
+  setProfile: (rawProfile: UserProfile) => {
     const previousProfile = get().profile;
+    const profile = enrichProfile(rawProfile);
 
     // Check if plan changed and notify callbacks
-    if (previousProfile && previousProfile.plan !== profile.plan) {
+    if (previousProfile && profile && previousProfile.plan !== profile.plan) {
       planChangeCallbacks.forEach((callback) => callback(profile.plan));
     }
 
@@ -90,7 +110,14 @@ export const selectUserEmail = (s: UserState & UserActions) =>
 export const selectUserAvatar = (s: UserState & UserActions) =>
   s.profile?.avatarUrl ?? null;
 
+export const selectUserPlan = (s: UserState & UserActions) =>
+  s.profile?.plan ?? "free";
+
 export const selectPlanUsage = (s: UserState & UserActions) =>
   s.profile?.planUsagePercent ?? 0;
+
+export const selectTransformQuotaRemaining = (s: UserState & UserActions) =>
+  s.profile?.transformQuotaRemaining ??
+  computeQuotaRemaining(s.profile?.plan ?? "free", s.profile?.planUsagePercent ?? 0);
 
 export const selectUserLoading = (s: UserState & UserActions) => s.loading;

@@ -5,6 +5,7 @@ import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { logger } from "@/app/lib/logger";
 import { checkCsrf } from "@/app/lib/csrf";
+import { parseRequestJson } from "@/app/lib/parseRequestJson";
 import { prisma } from "@/app/lib/prisma";
 
 export const PostOnboardingSchema = z.object({
@@ -26,12 +27,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
+    const parsedBody = await parseRequestJson(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     const parsed = PostOnboardingSchema.safeParse(body);
     if (!parsed.success) {
@@ -47,6 +45,7 @@ export async function POST(request: NextRequest) {
       where: { email: session.user.email || "" },
       data: {
         onboardingStep: step,
+        // Onboarding data types are dynamic - use as any
         onboardingData: data as any,
       },
     });

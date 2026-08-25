@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/app/api/jobs/shared/authGuard";
+import { auth } from "@/app/lib/auth";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { earningsStore } from "./earningsStore";
 import { EarningsQuerySchema, parseQuery } from "@/app/api/schemas";
@@ -42,9 +42,11 @@ export async function GET(request: NextRequest) {
   const rateLimited = applyRateLimit(request, { limit: 60, windowMs: 60_000 });
   if (rateLimited) return rateLimited;
 
-  const authResult = await requireAuth();
-  if (authResult instanceof NextResponse) return authResult;
-  const { userId } = authResult;
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const userId = session.user.id;
 
   // Validate query params — issue #890
   const queryValidation = parseQuery(EarningsQuerySchema, request.nextUrl.searchParams);

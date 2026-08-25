@@ -1,53 +1,74 @@
-import { test, expect } from '@playwright/test';
-import path from 'path';
+import { test, expect } from "@playwright/test";
+import path from "path";
+import fs from "fs";
+import { signUpAndReachDashboard } from "./helpers";
 
-// Upload a small test video from a fixture in /public.
-// If your repo doesn't have this fixture yet, we create a data-uri fallback.
-async function uploadSmallTestVideo(page: any) {
-    const fileInput = page.locator('input[type="file"]').first();
-    await expect(fileInput).toBeVisible();
+const FIXTURE_PATH = path.join(process.cwd(), "public", "test-video-small.mp4");
 
-    // Prefer a real fixture file if present.
-    const fixturePath = path.join(process.cwd(), 'public', 'test-video-small.mp4');
-    await fileInput.setInputFiles(fixturePath);
-}
+test.describe("Upload → Processing → Projects (E2E)", () => {
+  test.beforeAll(() => {
+    fs.mkdirSync(path.dirname(FIXTURE_PATH), { recursive: true });
+    if (!fs.existsSync(FIXTURE_PATH)) {
+      fs.writeFileSync(FIXTURE_PATH, Buffer.from("fake-mp4-test-fixture"));
+    }
+  });
 
-test.describe('Upload → Processing → Clips Flow (E2E)', () => {
-    test('upload a small test video, wait for processing page, assert progress bar appears', async ({ page }) => {
-        // Login
-        await page.goto('/login');
-        await page.click('text=Sign up free');
-        await page.fill('#auth-name', 'Upload E2E Tester');
-        await page.fill('input[type="email"]', `upload-${Date.now()}@example.com`);
-        await page.fill('#auth-password', 'Password123!');
-        await page.click('button:has-text("Create Account")');
+  test("uploads a video, completes processing, and lands on projects", async ({
+    page,
+  }) => {
+    const jobId = `job_e2e_${Date.now()}`;
 
-        await expect(page).toHaveURL(/\/onboarding|\/dashboard/);
-        if (page.url().includes('/onboarding')) {
-            const cont = page.locator('button:has-text("Continue"), text=Continue').first();
-            if (await cont.count()) await cont.click();
-        }
-
-        await expect(page).toHaveURL(/\/dashboard/);
-
-        // Navigate to processing/upload UI (try common routes/buttons)
-        await page.goto('/dashboard');
-
-        const uploadNav = page.locator('a:has-text("Upload"), button:has-text("Upload"), a[href*="upload"], button:has-text("Add video"), text=Upload').first();
-        if (await uploadNav.count().catch(() => 0)) {
-            await uploadNav.click();
-        }
-
-        // Find file input and upload fixture
-        await uploadSmallTestVideo(page);
-
-        // Assert processing UI
-        const processingHeading = page.locator('h1', { hasText: /Processing|Analyzing/i }).first();
-        await expect(processingHeading).toBeVisible({ timeout: 20000 });
-
-        // Progress bar / spinner
-        const progressBar = page.locator('[role="progressbar"], .progress, text=/\b\d+%\b/').first();
-        await expect(progressBar).toBeVisible({ timeout: 20000 });
+    await page.route("**/api/upload**", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ jobId }),
+      });
     });
-});
 
+    let progress = 0;
+    await page.route(`**/api/jobs/${jobId}/stream`, async (route) => {
+      progress = Math.min(100, progress + 50);
+      const status = progress >= 100 ? "complete" : "processing";
+      const payload = `data: ${JSON.stringify({
+        progress,
+        status,
+        momentsFound: 3,
+        estimatedSecondsRemaining: status === "complete" ? 0 : 5,
+      })}\n\n`;
+
+      await route.fulfill({
+        status: 200,
+        contentType: "text/event-stream",
+        body: payload,
+      });
+    });
+
+    await page.route(`**/api/jobs/${jobId}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          progress: 100,
+          status: "complete",
+          momentsFound: 3,
+          estimatedSecondsRemaining: 0,
+        }),
+      });
+    });
+
+    await signUpAndReachDashboard(page, "upload");
+
+    await page.goto("/upload");
+    await page.locator('input[type="file"]').setInputFiles(FIXTURE_PATH);
+
+    await page.waitForURL(/\/dashboard\/processing/, { timeout: 30000 });
+
+    await expect(
+      page.locator("text=/100%|Processing complete|Your clips are ready/i").first()
+    ).toBeVisible({ timeout: 30000 });
+
+    await page.goto("/projects");
+    await expect(page).toHaveURL(/\/projects/);
+  });
+});

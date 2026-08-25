@@ -3,7 +3,6 @@
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import StatCard from "@/components/dashboard/StatCard";
-import PlatformDistribution from "@/components/dashboard/PlatformDistribution";
 import AIInsightCard from "@/components/dashboard/AIInsightCard";
 import ProjectCard from "@/components/dashboard/ProjectCard";
 import EarningsSummaryCards from "@/components/dashboard/EarningsSummaryCards";
@@ -16,6 +15,7 @@ import DashboardPageHeader from "./DashboardPageHeader";
 
 // Lazy-load heavy client components for better performance
 const RevenueChart = dynamic(() => import("@/components/dashboard/RevenueChart"), {
+  ssr: false,
   loading: () => (
     <div className="bg-surface border border-border rounded-[24px] p-8 h-[300px] flex items-center justify-center">
       <Skeleton className="w-full h-full" />
@@ -24,6 +24,7 @@ const RevenueChart = dynamic(() => import("@/components/dashboard/RevenueChart")
 });
 
 const SendPaymentForm = dynamic(() => import("@/components/SendPaymentForm"), {
+  ssr: false,
   loading: () => (
     <div className="bg-surface border border-border rounded-[24px] p-8 h-[300px] flex items-center justify-center">
       <Skeleton className="w-full h-full" />
@@ -32,8 +33,18 @@ const SendPaymentForm = dynamic(() => import("@/components/SendPaymentForm"), {
 });
 
 const WalletHealthCard = dynamic(() => import("@/components/wallet/WalletHealthCard"), {
+  ssr: false,
   loading: () => (
     <div className="bg-surface border border-border rounded-[24px] p-8 h-[200px] flex items-center justify-center">
+      <Skeleton className="w-full h-full" />
+    </div>
+  ),
+});
+
+const PlatformDistribution = dynamic(() => import("@/components/dashboard/PlatformDistribution"), {
+  ssr: false,
+  loading: () => (
+    <div className="bg-surface border border-border rounded-[24px] p-6 h-[300px] flex items-center justify-center">
       <Skeleton className="w-full h-full" />
     </div>
   ),
@@ -56,7 +67,7 @@ function StatCardSkeleton() {
 
 export default function DashboardPage() {
   const { publicKey } = useAutoStellarWallet();
-  const { data, loading, error, retry } = useDashboardData();
+  const { data, loading, error, retry } = useDashboardData({ enableStreaming: true });
   const stats = data?.stats;
   const recentProjects = data?.recentProjects ?? [];
 
@@ -180,6 +191,7 @@ export default function DashboardPage() {
                 : recentProjects.map((project) => (
                     <ProjectCard
                       key={project.id}
+                      id={project.id}
                       title={project.title}
                       clipsCount={project.clipsGenerated}
                       status={project.status}

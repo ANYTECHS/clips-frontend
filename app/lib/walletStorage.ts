@@ -136,6 +136,7 @@ export const WalletStorage = {
           const { _encodedSecret, ...rest } = record;
           const newRecord = { ...rest, secretKey: decodedSecret };
           // Save using new format and await
+          // Type transition between old and new formats - use as any
           await this.save(userId, newRecord as any);
           return newRecord as StoredWalletRecord;
         }

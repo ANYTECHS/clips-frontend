@@ -870,6 +870,42 @@ When adding a new wallet feature, add tests for:
 
 ---
 
+## Integration tests (`@integration`)
+
+Network-backed Stellar tests live in `__tests__/integration/` and are tagged
+`@integration`. They hit the **public Stellar testnet** (Horizon + Friendbot) by
+default and are **excluded** from `npm test`.
+
+```bash
+# Unit tests only (default CI path)
+npm test
+
+# Integration suite (requires network; ~1–2 min)
+npm run test:integration
+```
+
+Coverage includes:
+
+| Case | Assertion |
+| --- | --- |
+| `createEmbeddedWallet()` | Valid Ed25519 keypair; Friendbot can fund the account |
+| `fundWithFriendbot()` | Account balance becomes `> 0` |
+| `buildPaymentTransaction()` | Single payment op + fee matches Horizon base fee |
+| `buildBatchTransaction()` (2 ops) | XDR parses; trustline + payment present |
+
+### Local Stellar network (optional)
+
+To run against [stellar-local-network](https://github.com/stellar/quickstart) instead
+of public testnet:
+
+1. Start Quickstart / local Horizon + Friendbot.
+2. Point the app at those URLs (Horizon via your local override / env as documented
+   in `networkConfig.ts`, Friendbot typically `http://localhost:8000/friendbot`).
+3. Keep `NEXT_PUBLIC_STELLAR_NETWORK=testnet` (Friendbot is unavailable on mainnet).
+4. Re-run `npm run test:integration`.
+
+---
+
 ## Further Reading
 
 - [`useWalletConnection` API reference](app/hooks/useWalletConnection.README.md)

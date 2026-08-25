@@ -1,5 +1,3 @@
-"use client";
-
 import { logger } from "@/app/lib/logger";
 
 /**

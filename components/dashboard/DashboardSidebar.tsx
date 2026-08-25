@@ -14,7 +14,11 @@ import {
   Shield,
   X,
   Zap,
+  Share2,
+  BarChart3,
+  CreditCard,
 } from "lucide-react";
+import PlanUsage from "@/components/dashboard/PlanUsage";
 
 interface NavItem {
   label: string;
@@ -25,7 +29,10 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Projects", href: "/projects", icon: Video },
+  { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Earnings", href: "/earnings", icon: DollarSign },
+  { label: "Referral", href: "/referral", icon: Share2 },
+  { label: "Analytics", href: "/analytics", icon: BarChart3 },
   { label: "Vault", href: "/vault", icon: Layers },
   { label: "Wallet", href: "/wallet", icon: Wallet },
   { label: "Activity", href: "/activity", icon: Activity },
@@ -135,6 +142,11 @@ const DashboardSidebar = memo(function DashboardSidebar({ isOpen, onClose }: Das
             );
           })}
         </nav>
+
+        {/* Live Plan Usage Widget */}
+        <div className="px-3 py-2 shrink-0">
+          <PlanUsage />
+        </div>
 
         {/* Bottom nav (settings) */}
         <div className="px-3 pb-5 space-y-0.5 border-t border-border pt-3 shrink-0">

@@ -116,5 +116,68 @@
     "sponsorship_desc": "Fee sponsorship allows the platform to pay transaction fees on your behalf, making your first transactions free.",
     "sponsorship_activate": "Activate with Sponsorship",
     "activating": "Activating..."
+  },
+  "transform": {
+    "sub_style": "Sub-style",
+    "intensity": "Intensity",
+    "outline": "Outline",
+    "background": "Background",
+    "muted": "Muted",
+    "vivid": "Vivid",
+    "title": "Style Transformation",
+    "select_style": "Select Style",
+    "anime": "Anime",
+    "shonen": "Shōnen",
+    "shojo": "Shōjo",
+    "chibi": "Chibi",
+    "mecha": "Mecha",
+    "ghibli": "Ghibli",
+    "thin": "Thin",
+    "medium": "Medium",
+    "bold": "Bold",
+    "original": "Original",
+    "painted": "Painted",
+    "cel_shaded": "Cel-shaded",
+    "failed_load": "Failed to load styles",
+    "try_again": "Try again",
+    "no_styles": "No styles available",
+    "no_styles_desc": "No transformation styles are configured yet.",
+    "style": {
+      "anime": {
+        "name": "Anime",
+        "description": "Bold outlines, vivid colours, cel-shaded look"
+      },
+      "cinematic": {
+        "name": "Cinematic",
+        "description": "Film grain, colour grading, anamorphic lens flares"
+      },
+      "sketch": {
+        "name": "Sketch",
+        "description": "Pencil-drawn outlines with subtle paper texture"
+      },
+      "watercolor": {
+        "name": "Watercolour",
+        "description": "Soft washes, blurred edges, painterly brush strokes"
+      },
+      "retro-vhs": {
+        "name": "Retro VHS",
+        "description": "Scan lines, colour bleed, 80s tape-deck artefacts"
+      },
+      "neon-noir": {
+        "name": "Neon Noir",
+        "description": "High-contrast shadows with vivid neon accent lighting"
+      }
+    }
+  },
+  "notifications": {
+    "title": "Notifications",
+    "unread_count": "{count} unread",
+    "mark_as_read": "Mark as read",
+    "mark_all_read": "Mark all as read",
+    "no_notifications": "No notifications",
+    "job_complete": "Your clips are ready!",
+    "transform_complete": "Style transformation completed",
+    "mint_success": "NFT minted successfully",
+    "earnings_received": "Earnings received"
   }
 }

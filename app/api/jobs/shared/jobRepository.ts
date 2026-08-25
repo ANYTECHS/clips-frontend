@@ -6,6 +6,7 @@ interface StorageAdapter {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<unknown>;
   del(key: string): Promise<number>;
+  getAll?(): Promise<string[]>;
   flushdb?(): Promise<unknown>;
 }
 
@@ -31,6 +32,13 @@ class RedisStorageAdapter implements StorageAdapter {
     return this.client.del(key);
   }
 
+  async getAll(): Promise<string[]> {
+    const keys = await this.client.keys("job:*");
+    if (keys.length === 0) return [];
+    const values = await this.client.mget(...keys);
+    return values.filter((val): val is string => val !== null);
+  }
+
   flushdb(): Promise<unknown> {
     return this.client.flushdb();
   }
@@ -50,6 +58,10 @@ class InMemoryStorageAdapter implements StorageAdapter {
 
   async del(key: string): Promise<number> {
     return this.map.delete(key) ? 1 : 0;
+  }
+
+  async getAll(): Promise<string[]> {
+    return Array.from(this.map.values());
   }
 
   async flushdb(): Promise<unknown> {
@@ -100,6 +112,25 @@ export class JobRepository {
       logger.error(`[JobRepository] failed to delete job ${jobId}:`, cause);
       throw new JobRepositoryError(`Unable to delete job state for ${jobId}`, cause);
     }
+  }
+
+  async getAll(): Promise<Job[]> {
+    try {
+      if (typeof this.adapter.getAll === "function") {
+        const raws = await this.adapter.getAll();
+        return raws.map((raw) => JSON.parse(raw) as Job);
+      }
+      return [];
+    } catch (error) {
+      const cause = error instanceof Error ? error : new Error(String(error));
+      logger.error("[JobRepository] failed to get all jobs:", cause);
+      throw new JobRepositoryError("Unable to retrieve all jobs", cause);
+    }
+  }
+
+  async getUserJobs(userId: string): Promise<Job[]> {
+    const allJobs = await this.getAll();
+    return allJobs.filter((job) => job.userId === userId);
   }
 
   async clear(): Promise<void> {

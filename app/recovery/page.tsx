@@ -1,11 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useWallet } from "@/components/wallet/WalletProvider";
-import { MockApi } from "@/__mocks__/app/lib/mockApi";
 import { restoreWalletFromMnemonic } from "@/app/lib/stellar";
 import { decryptWithPassword } from "@/app/lib/cryptoUtils";
 import { secureStorage } from "@/app/lib/secureStorage";
@@ -21,20 +20,27 @@ import {
   Users,
   ChevronRight,
   RefreshCw,
+  Upload,
 } from "lucide-react";
+import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 
 export default function RecoveryPage() {
   const router = useRouter();
   const { setUser } = useAuth();
   const { importStellarKey, connectStellar } = useWallet();
 
-  const [activeTab, setActiveTab] = useState<"mnemonic" | "social">("mnemonic");
+  const [activeTab, setActiveTab] = useState<"mnemonic" | "social" | "encrypted">("mnemonic");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
   // Mnemonic State
   const [mnemonicInput, setMnemonicInput] = useState("");
+
+  // Encrypted Backup State
+  const [encryptedFile, setEncryptedFile] = useState<File | null>(null);
+  const [encryptedPassword, setEncryptedPassword] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Social Recovery State
   const [socialEmail, setSocialEmail] = useState("");
@@ -240,11 +246,68 @@ export default function RecoveryPage() {
     }
   };
 
+  const handleEncryptedBackupRecovery = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!encryptedFile) {
+      setError("Please select a backup file.");
+      return;
+    }
+    if (!encryptedPassword) {
+      setError("Please enter your backup password.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const text = await encryptedFile.text();
+      const backup = JSON.parse(text) as { ciphertext?: string; version?: number };
+      if (!backup.ciphertext) {
+        throw new Error("Invalid backup file format. Expected a clipcash-wallet-backup.enc.json file.");
+      }
+
+      const decrypted = await decryptWithPassword(backup.ciphertext, encryptedPassword);
+
+      if (decrypted.startsWith("S") && decrypted.length === 56) {
+        await importStellarKey(decrypted);
+      } else {
+        const wallet = await restoreWalletFromMnemonic(decrypted);
+        await importStellarKey(wallet.secretKey);
+        const stored = await secureStorage.getItem("clipcash_wallet");
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          parsed.stellarMnemonic = decrypted;
+          await secureStorage.setItem("clipcash_wallet", JSON.stringify(parsed));
+        }
+      }
+
+      const loggedInUser = {
+        id: "recovered-user-id",
+        email: "",
+        username: "recovered_user",
+        onboardingStep: 3,
+        name: "Recovered User",
+      };
+      setUser(loggedInUser);
+      setSuccess("Wallet restored from encrypted backup! Redirecting to Dashboard…");
+      setTimeout(() => router.push("/dashboard"), 2000);
+    } catch (err: any) {
+      const msg = err?.message ?? "";
+      if (msg.includes("decrypt") || msg.includes("key") || msg.toLowerCase().includes("operation")) {
+        setError("Decryption failed. Check your password and try again.");
+      } else {
+        setError(msg || "Failed to restore from backup.");
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-[#030605] text-white flex flex-col font-sans relative overflow-hidden">
-      {/* Background glow effects */}
-      <div className="absolute top-[-20%] left-1/2 -translate-x-1/2 w-[800px] h-[500px] bg-brand/5 blur-[130px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-brand/[0.02] blur-[100px] rounded-full pointer-events-none" />
+      <BackgroundOrbs variant="subtle" />
 
       {/* Navigation Header */}
       <header className="p-6 border-b border-white/5 bg-[#050807]/30 backdrop-blur-md flex items-center justify-between relative z-10">
@@ -271,7 +334,7 @@ export default function RecoveryPage() {
           </div>
 
           {/* Toggle Tabs */}
-          <div className="grid grid-cols-2 gap-1 bg-[#121915] p-1 rounded-xl mb-6">
+          <div className="grid grid-cols-3 gap-1 bg-[#121915] p-1 rounded-xl mb-6">
             <button
               onClick={() => {
                 setActiveTab("mnemonic");
@@ -285,6 +348,20 @@ export default function RecoveryPage() {
               }`}
             >
               Mnemonic Phrase
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("encrypted");
+                setError("");
+                setSuccess("");
+              }}
+              className={`py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === "encrypted"
+                  ? "bg-brand text-black shadow-lg"
+                  : "text-muted-foreground hover:text-white"
+              }`}
+            >
+              Encrypted Backup
             </button>
             <button
               onClick={() => {
@@ -357,7 +434,76 @@ export default function RecoveryPage() {
             </form>
           )}
 
-          {/* Tab 2: Social Recovery Form */}
+          {/* Tab 2: Encrypted Backup Form */}
+          {activeTab === "encrypted" && (
+            <form onSubmit={handleEncryptedBackupRecovery} className="space-y-5">
+              <div className="space-y-2">
+                <label className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Backup File
+                </label>
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full bg-[#111613] border border-dashed border-white/10 hover:border-brand/40 rounded-xl px-4 py-5 text-xs text-muted-foreground flex flex-col items-center gap-2 cursor-pointer transition-colors"
+                >
+                  <Upload className="w-5 h-5 text-brand" />
+                  {encryptedFile ? (
+                    <span className="text-white font-medium">{encryptedFile.name}</span>
+                  ) : (
+                    <span>Click to select <strong className="text-white">clipcash-wallet-backup.enc.json</strong></span>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={(e) => setEncryptedFile(e.target.files?.[0] ?? null)}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label htmlFor="encrypted-password" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Backup Password
+                </label>
+                <div className="relative">
+                  <input
+                    id="encrypted-password"
+                    type="password"
+                    placeholder="Password set during export"
+                    value={encryptedPassword}
+                    onChange={(e) => setEncryptedPassword(e.target.value)}
+                    className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl pl-10 pr-4 py-3.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
+                    autoComplete="current-password"
+                  />
+                  <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                </div>
+              </div>
+
+              <div className="bg-white/[0.01] border border-white/5 rounded-xl p-3.5 flex gap-2.5">
+                <Key className="w-4 h-4 text-brand shrink-0 mt-0.5" />
+                <p className="text-[10px] text-muted-foreground leading-normal">
+                  Decryption is performed entirely client-side using AES-GCM. Your password never leaves your device.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading || !encryptedFile || !encryptedPassword}
+                className="w-full py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-40"
+              >
+                {loading ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Decrypting Backup…</>
+                ) : (
+                  <>
+                    <span>Restore from Backup</span>
+                    <ChevronRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+
+          {/* Tab 3: Social Recovery Form */}
           {activeTab === "social" && (
             <div className="space-y-5">
               {!sessionId ? (

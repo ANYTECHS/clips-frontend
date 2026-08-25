@@ -13,6 +13,7 @@ import Hero from "../../components/clips/Hero";
 // Once Issue #18 is resolved, these imports should resolve correctly.
 import CreateClipsForm from "../../components/clips/CreateClipsForm";
 import ClipsStats from "../../components/clips/ClipsStats";
+import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 import { Loader2 } from "lucide-react";
 
 export default function ClipsPage() {
@@ -39,11 +40,7 @@ export default function ClipsPage() {
 
   return (
     <div className="min-h-screen bg-background text-white font-sans selection:bg-brand/30 selection:text-brand relative overflow-x-hidden">
-      {/* Background Glow Elements */}
-      <div className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-[1400px] h-screen pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] rounded-full bg-brand/5 blur-[120px]" />
-        <div className="absolute bottom-[10%] right-[-10%] w-[30%] h-[30%] rounded-full bg-brand/[0.03] blur-[100px]" />
-      </div>
+      <BackgroundOrbs variant="default" />
 
       <div className="relative z-10 flex flex-col min-h-screen">
         <ClipsNavbar />

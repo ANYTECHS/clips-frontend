@@ -39,11 +39,11 @@ function authHeader(secret = CALLBACK_SECRET) {
   return { Authorization: `Bearer ${secret}` };
 }
 
-beforeEach(() => {
+beforeEach(async () => {
   process.env.AI_BACKEND_CALLBACK_SECRET = CALLBACK_SECRET;
   process.env.NODE_ENV = "test";
-  jobStore.clear();
-  jobStore.set("job1", { ...baseJob });
+  await jobStore.clear();
+  await jobStore.set("job1", { ...baseJob });
   jest.spyOn(console, "warn").mockImplementation(() => {});
   jest.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -123,7 +123,7 @@ describe("progress updates", () => {
       makeRequest({ status: "processing", progress: 25 }, authHeader()),
       makeContext("job1")
     );
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.status).toBe("processing");
     expect(job.progress).toBe(25);
   });
@@ -136,18 +136,18 @@ describe("progress updates", () => {
       ),
       makeContext("job1")
     );
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.momentsFound).toBe(3);
     expect(job.estimatedSecondsRemaining).toBe(120);
   });
 
   it("applies partial updates — unspecified fields retain their previous value", async () => {
-    jobStore.set("job1", { ...baseJob, status: "processing", progress: 40, momentsFound: 2 });
+    await jobStore.set("job1", { ...baseJob, status: "processing", progress: 40, momentsFound: 2 });
     await callbackPOST(
       makeRequest({ progress: 60 }, authHeader()),
       makeContext("job1")
     );
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.progress).toBe(60);
     expect(job.momentsFound).toBe(2); // unchanged
     expect(job.status).toBe("processing"); // unchanged
@@ -162,7 +162,7 @@ describe("terminal states", () => {
       makeRequest({ status: "complete", progress: 100, momentsFound: 7 }, authHeader()),
       makeContext("job1")
     );
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.status).toBe("complete");
     expect(job.progress).toBe(100);
     expect(job.momentsFound).toBe(7);
@@ -180,7 +180,7 @@ describe("terminal states", () => {
       ),
       makeContext("job1")
     );
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.status).toBe("error");
     expect(job.errorCode).toBe("UNSUPPORTED_CODEC");
     expect(job.errorMessage).toContain("H.265");
@@ -196,31 +196,31 @@ describe("terminal states", () => {
     ] as const;
 
     for (const errorCode of codes) {
-      jobStore.set("job1", { ...baseJob });
+      await jobStore.set("job1", { ...baseJob });
       const res = await callbackPOST(
         makeRequest({ status: "error", errorCode }, authHeader()),
         makeContext("job1")
       );
       expect(res.status).toBe(200);
-      expect(jobStore.get("job1")?.errorCode).toBe(errorCode);
+      expect((await jobStore.get("job1"))?.errorCode).toBe(errorCode);
     }
   });
 
   it("ignores updates after the job reaches complete state", async () => {
-    jobStore.set("job1", { ...baseJob, status: "complete", progress: 100, momentsFound: 5 });
+    await jobStore.set("job1", { ...baseJob, status: "complete", progress: 100, momentsFound: 5 });
     const res = await callbackPOST(
       makeRequest({ status: "processing", progress: 10 }, authHeader()),
       makeContext("job1")
     );
     expect(res.status).toBe(200);
     // Store must be unchanged
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.status).toBe("complete");
     expect(job.progress).toBe(100);
   });
 
   it("ignores updates after the job reaches error state", async () => {
-    jobStore.set("job1", {
+    await jobStore.set("job1", {
       ...baseJob,
       status: "error",
       errorCode: "PROCESSING_TIMEOUT",
@@ -229,7 +229,7 @@ describe("terminal states", () => {
       makeRequest({ status: "processing", progress: 50 }, authHeader()),
       makeContext("job1")
     );
-    expect(jobStore.get("job1")?.status).toBe("error");
+    expect((await jobStore.get("job1"))?.status).toBe("error");
   });
 });
 
