@@ -31,6 +31,7 @@ const CACHE_TTL_MS = DASHBOARD_CACHE_TTL_MS;
 export { DASHBOARD_CACHE_TTL_MS };
 
 import { fetchDashboardFromAPI } from "./api";
+import { startMeasure } from "@/app/lib/performanceMonitoring";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
@@ -66,6 +67,10 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
 
       set({ loading: true, error: null });
 
+      // Timed on both paths so a slow *failing* dashboard is as visible as a
+      // slow successful one.
+      const endMeasure = startMeasure("dashboard.load");
+
       try {
         const data = await fetchDashboardFromAPI();
         set({
@@ -76,6 +81,7 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
           loading: false,
           error: null,
         });
+        endMeasure({ outcome: "success" });
       } catch (err) {
         import("@/app/lib/logger").then(({ logger }) => {
           logger.error("Error fetching dashboard data:", err);
@@ -87,6 +93,7 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
               ? err.message
               : "Failed to fetch dashboard data",
         });
+        endMeasure({ outcome: "error" });
       }
     },
 
