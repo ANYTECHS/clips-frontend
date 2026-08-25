@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { memo, useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -12,6 +12,8 @@ interface StatCardProps {
   trend?: TrendValue;
   icon?: LucideIcon;
   hideTrendIcon?: boolean;
+  /** @deprecated pass trend as { value, label } object instead */
+  isPositive?: boolean;
 }
 
 function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
@@ -31,15 +33,9 @@ function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardPr
     } else {
       trendContent = <Minus className="w-3 h-3 text-muted-foreground" />;
     }
-    trendContent = (
-      <>
-        {!hideTrendIcon && trendContent}
-        <span className={trendColor}>{labelText}</span>
-      </>
-    );
-  } else if (typeof trend === "string") {
-    trendContent = <span>{trend}</span>;
-  }
+
+    return null;
+  }, [trend, hideTrendIcon]);
 
   return (
     <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col gap-3">

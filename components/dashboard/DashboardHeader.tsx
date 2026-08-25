@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, memo, useEffect, useCallback, useRef } from "react";
 import { CloudUpload, Bell, Check } from "lucide-react";
 import { useUserStore, selectUserName } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
@@ -15,7 +15,15 @@ interface NotificationItem {
   createdAt: string;
 }
 
-export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
+/**
+ * DashboardHeader — welcome banner + quick-upload button.
+ *
+ * Memoised so re-renders of the layout wrapper (e.g. mobile-menu state
+ * changes) don't cascade into this component unless the user name changes.
+ *
+ * Issue #874 – memoization for expensive computations.
+ */
+const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const userName = useUserStore(selectUserName);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -166,4 +174,6 @@ export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => v
       </div>
     </header>
   );
-}
+});
+
+export default DashboardHeader;

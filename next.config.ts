@@ -154,19 +154,42 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
     minimumCacheTTL: 60,
   },
+  /**
+   * Rewrites barrel imports (`import { X } from "lucide-react"`) into deep
+   * imports of just the modules actually used. lucide-react is imported in 60+
+   * files here and its barrel re-exports every icon in the library, so without
+   * this the whole icon set is walked on every build and a lot of it survives
+   * into the client bundle.
+   */
+  experimental: {
+    optimizePackageImports: ["lucide-react", "@stellar/stellar-sdk", "zod"],
+  },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization = {
         ...config.optimization,
+        // Only add a shared "commons" group; the previous config also set
+        // `default: false, vendors: false`, which switched off the framework
+        // and library chunk groups Next.js ships with. That collapsed
+        // node_modules into the same chunk as app code, so every deploy
+        // invalidated the whole vendor bundle in users' caches even when only
+        // app code changed.
         splitChunks: {
+          ...(typeof config.optimization?.splitChunks === "object"
+            ? config.optimization.splitChunks
+            : {}),
           chunks: "all",
           cacheGroups: {
-            default: false,
-            vendors: false,
+            ...(typeof config.optimization?.splitChunks === "object"
+              ? config.optimization.splitChunks.cacheGroups
+              : {}),
             commons: {
               name: "commons",
               chunks: "all",
               minChunks: 2,
+              // Below the default groups, so framework/lib chunking still wins.
+              priority: -10,
+              reuseExistingChunk: true,
             },
           },
         },
