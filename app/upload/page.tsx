@@ -26,6 +26,7 @@ import {
   Film,
 } from "lucide-react";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import SharedProgressBar from "@/components/ui/ProgressBar";
 import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST } from "@/app/lib/constants";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -110,20 +111,7 @@ function ProgressBar({
         ? "bg-yellow-500"
         : "bg-brand";
 
-  return (
-    <div
-      className="relative h-1.5 w-full rounded-full bg-white/10 overflow-hidden"
-      role="progressbar"
-      aria-valuenow={value}
-      aria-valuemin={0}
-      aria-valuemax={100}
-    >
-      <div
-        className={`absolute inset-y-0 left-0 rounded-full transition-all duration-300 ${color}`}
-        style={{ width: `${value}%` }}
-      />
-    </div>
-  );
+  return <SharedProgressBar value={value} fillClassName={color} />;
 }
 
 function formatBytes(bytes: number): string {

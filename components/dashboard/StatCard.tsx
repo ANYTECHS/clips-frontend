@@ -16,44 +16,22 @@ interface StatCardProps {
   isPositive?: boolean;
 }
 
-/**
- * StatCard — displays a single KPI metric.
- *
- * Wrapped in React.memo so parent re-renders that don't change props
- * skip this component entirely. The trendContent is additionally memoised
- * with useMemo to avoid reconstructing JSX on every render.
- *
- * Issue #874 – memoization for expensive computations.
- */
-const StatCard = memo(function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
-  const trendContent = useMemo<React.ReactNode>(() => {
-    if (typeof trend === "object" && trend !== null && "value" in trend && "label" in trend) {
-      const num = (trend as { value: number }).value;
-      const labelText = (trend as { label: string }).label;
-      let icon: React.ReactNode;
-      let color: string;
+function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
+  let trendContent: React.ReactNode = null;
+  let trendColor = "text-muted-foreground";
 
-      if (num > 0) {
-        color = "text-green-400";
-        icon = <TrendingUp className="w-3 h-3 text-green-400" />;
-      } else if (num < 0) {
-        color = "text-red-400";
-        icon = <TrendingDown className="w-3 h-3 text-red-400" />;
-      } else {
-        color = "text-muted-foreground";
-        icon = <Minus className="w-3 h-3 text-muted-foreground" />;
-      }
+  if (typeof trend === "object" && trend !== null && "value" in trend && "label" in trend) {
+    const num = (trend as { value: number }).value;
+    const labelText = (trend as { label: string }).label;
 
-      return (
-        <>
-          {!hideTrendIcon && icon}
-          <span className={color}>{labelText}</span>
-        </>
-      );
-    }
-
-    if (typeof trend === "string") {
-      return <span>{trend}</span>;
+    if (num > 0) {
+      trendColor = "text-green-400";
+      trendContent = <TrendingUp className="w-3 h-3 text-green-400" />;
+    } else if (num < 0) {
+      trendColor = "text-red-400";
+      trendContent = <TrendingDown className="w-3 h-3 text-red-400" />;
+    } else {
+      trendContent = <Minus className="w-3 h-3 text-muted-foreground" />;
     }
 
     return null;
@@ -69,6 +47,11 @@ const StatCard = memo(function StatCard({ label, value, trend, icon: Icon, hideT
       {trend && <div className="flex items-center gap-1 text-xs text-muted-foreground">{trendContent}</div>}
     </div>
   );
-});
+}
 
-export default StatCard;
+/**
+ * Purely presentational: every prop is a primitive or a module-scope icon
+ * component, so a shallow prop comparison is enough to skip re-rendering the
+ * card when an unrelated slice of dashboard state changes.
+ */
+export default React.memo(StatCard);

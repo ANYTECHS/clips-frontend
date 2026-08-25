@@ -12,15 +12,14 @@
  * - Shared state: all components read from the same store instance
  */
 
-import { useEffect } from "react";
-import { openManagedEventSource } from "@/app/lib/sse/ManagedEventSource";
-import { logger } from "@/app/lib/logger";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   useDashboardStore,
   selectStats,
   selectRevenueTrend,
   selectRecentProjects,
-  selectDashboardMeta,
+  selectLoading,
+  selectError,
   type DashboardState,
   type DashboardActions,
 } from "@/app/store";
@@ -58,7 +57,11 @@ export function useDashboardData(options?: { enableStreaming?: boolean }): {
   const stats = useDashboardStore(selectStats);
   const revenueTrend = useDashboardStore(selectRevenueTrend);
   const recentProjects = useDashboardStore(selectRecentProjects);
-  const { loading, error } = useDashboardStore(selectDashboardMeta);
+  // Subscribed one field at a time. A composite selector would allocate a new
+  // object per store read and so never compare equal, re-rendering every
+  // consumer on writes that touched neither flag.
+  const loading = useDashboardStore(selectLoading);
+  const error = useDashboardStore(selectError);
 
   useEffect(() => {
     fetchDashboard();
@@ -113,18 +116,25 @@ export function useDashboardData(options?: { enableStreaming?: boolean }): {
     };
   }, [options?.enableStreaming]);
 
-  const data: DashboardData | null =
-    stats !== null
-      ? { stats, revenueTrend, recentProjects }
-      : null;
+  // Held stable across renders so memoised consumers of `data` are not
+  // invalidated by a re-render that changed none of the underlying slices.
+  const data: DashboardData | null = useMemo(
+    () => (stats !== null ? { stats, revenueTrend, recentProjects } : null),
+    [stats, revenueTrend, recentProjects],
+  );
+
+  // Same reasoning: a fresh Error per render would defeat any downstream memo.
+  const errorObject = useMemo(() => (error ? new Error(error) : null), [error]);
+
+  const retry = useCallback(() => {
+    invalidateCache();
+    fetchDashboard();
+  }, [invalidateCache, fetchDashboard]);
 
   return {
     data,
     loading,
-    error: error ? new Error(error) : null,
-    retry: () => {
-      invalidateCache();
-      fetchDashboard();
-    },
+    error: errorObject,
+    retry,
   };
 }

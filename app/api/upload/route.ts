@@ -39,8 +39,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
-import { uploadToQuarantine, moveFromQuarantine, deleteFile } from "@/app/lib/cloudStorage";
-import { scanFile, VirusScanError, getScanConfig } from "@/app/lib/virusScan";
+import { getScanConfig } from "@/app/lib/virusScan";
+import {
+  ALLOWED_TYPES,
+  ALLOWED_EXTENSIONS,
+  processUploadedBuffer,
+  validateMagicBytes,
+} from "@/app/api/upload/shared/processUpload";
 import { checkCsrf } from "@/app/lib/csrf";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
@@ -49,44 +54,7 @@ import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { logger } from "@/app/lib/logger";
 
 export { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST };
-const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"];
-const ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv"];
-
-/**
- * Validates file magic bytes against known video signatures.
- * Reads first 12 bytes of buffer to detect actual file type.
- * 
- * @param buffer - File buffer to inspect
- * @param declaredType - Declared MIME type from upload
- * @returns Error message if magic bytes don't match, null if valid
- */
-function validateMagicBytes(buffer: Buffer, declaredType: string): string | null {
-  if (buffer.length < 12) {
-    return "File is too small to be a valid video file";
-  }
-
-  const header = buffer.subarray(0, 12);
-  const headerStr = header.toString('ascii', 0, Math.min(12, buffer.length));
-
-  // MP4/MOV: starts with "ftyp" at offset 4
-  // MP4: ftyp... with brand like "isom", "mp42", etc.
-  // MOV: ftyp... with brand "qt  "
-  const isFtyp = headerStr.includes('ftyp');
-  
-  // AVI: starts with "RIFF" followed by "AVI " at offset 8
-  const isAvi = headerStr.startsWith('RIFF') && headerStr.includes('AVI');
-  
-  // MKV: starts with EBML header \x1A\x45\xDF\xA3
-  const isMkv = header[0] === 0x1A && header[1] === 0x45 && header[2] === 0xDF && header[3] === 0xA3;
-
-  const isValidVideo = isFtyp || isAvi || isMkv;
-
-  if (!isValidVideo) {
-    return "File content does not match declared type";
-  }
-
-  return null;
-}
+export { ALLOWED_TYPES, ALLOWED_EXTENSIONS, validateMagicBytes };
 
 function validateFile(file: File): string | null {
   if (file.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -155,71 +123,12 @@ export async function POST(request: NextRequest) {
     // Upload all files to quarantine and scan them
     const results = await Promise.all(
       files.map(async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Validate magic bytes before any storage operations
-        const magicBytesError = validateMagicBytes(buffer, file.type || "application/octet-stream");
-        if (magicBytesError) {
-          logger.error(`[Upload] Magic bytes validation failed for ${file.name}: ${magicBytesError}`);
-          throw new Error(magicBytesError);
-        }
-
-        // Step 1: Upload to quarantine
-        const quarantine = await uploadToQuarantine(
+        const buffer = Buffer.from(await file.arrayBuffer());
+        return processUploadedBuffer(
           buffer,
           file.name,
-          file.type || "application/octet-stream"
+          file.type || "application/octet-stream",
         );
-        logger.info(`[Upload] File quarantined: ${quarantine.jobId} at ${quarantine.quarantineKey}`);
-
-        // Step 2: Scan the file
-        let scanResult;
-        try {
-          scanResult = await scanFile(buffer);
-          logger.info(
-            `[Upload] Scan complete for ${quarantine.jobId}: clean=${scanResult.isClean}, provider=${scanResult.provider}`
-          );
-        } catch (scanErr) {
-          // Scan failed or timed out - treat as quarantined (not clean)
-          const error = scanErr instanceof VirusScanError ? scanErr : new Error(String(scanErr));
-          logger.error(`[Upload] Scan error for ${quarantine.jobId}: ${error.message}`);
-
-          // Delete the quarantined file since we can't verify it's safe
-          try {
-            await deleteFile(quarantine.quarantineKey);
-            logger.info(`[Upload] Quarantined file deleted: ${quarantine.quarantineKey}`);
-          } catch (deleteErr) {
-            logger.error(`[Upload] Failed to delete quarantined file: ${deleteErr}`);
-          }
-
-          throw new Error(`File failed security scan (${error.message})`);
-        }
-
-        // Step 3: Process based on scan result
-        if (!scanResult.isClean) {
-          // File is infected - delete it
-          try {
-            await deleteFile(quarantine.quarantineKey);
-            logger.info(`[Upload] Infected file deleted: ${quarantine.quarantineKey}`);
-          } catch (deleteErr) {
-            logger.error(`[Upload] Failed to delete infected file: ${deleteErr}`);
-          }
-          throw new Error("File failed security scan");
-        }
-
-        // Step 4: Move from quarantine to final location
-        const finalResult = await moveFromQuarantine(quarantine.jobId, quarantine.filename);
-        logger.info(`[Upload] File released from quarantine: ${quarantine.jobId}`);
-
-        return {
-          name: finalResult.filename,
-          size: buffer.length,
-          type: file.type || "application/octet-stream",
-          jobId: finalResult.jobId,
-          objectKey: finalResult.objectKey,
-          url: finalResult.url,
-        };
       })
     );
 

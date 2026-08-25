@@ -11,7 +11,7 @@ export interface ProjectCardProps {
   thumbnail: string;
 }
 
-export default function ProjectCard({
+function ProjectCard({
   id,
   title,
   clipsCount = 0,
@@ -50,3 +50,9 @@ export default function ProjectCard({
 
   return content;
 }
+
+/**
+ * Purely presentational and prop-driven, so a shallow prop comparison keeps it
+ * out of re-render cycles triggered by unrelated dashboard state.
+ */
+export default React.memo(ProjectCard);
