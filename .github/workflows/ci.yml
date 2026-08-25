@@ -62,6 +62,18 @@ jobs:
       - name: Production build
         continue-on-error: true
         run: npm run build
+      # Enforces the budgets in bundle-budget.json. Skipped rather than failed
+      # when the build above produced no output, so a broken build reports as a
+      # broken build instead of a bundle regression.
+      - name: Bundle size budgets
+        if: success()
+        run: |
+          if [ ! -d .next ]; then
+            echo "::warning::No .next output from the build step - skipping bundle budget check."
+            exit 0
+          fi
+          npm run bundle:check
+
       - name: Bundle analysis
         if: success()
         continue-on-error: true

@@ -18,6 +18,7 @@ import {
   CreditCard,
 } from "lucide-react";
 import PlanUsage from "@/components/dashboard/PlanUsage";
+import { useRoutePrefetch } from "@/app/hooks/useRoutePrefetch";
 
 interface NavItem {
   label: string;
@@ -41,6 +42,53 @@ const NAV_ITEMS: NavItem[] = [
 const BOTTOM_NAV_ITEMS: NavItem[] = [
   { label: "Settings", href: "/settings", icon: Settings },
 ];
+
+interface NavLinkProps {
+  item: NavItem;
+  active: boolean;
+  onNavigate: () => void;
+}
+
+/**
+ * A sidebar link that prefetches its route on navigation intent.
+ *
+ * `prefetch={false}` turns off Next.js's default behaviour of prefetching every
+ * link in the viewport: the sidebar holds eleven of them, so the default meant
+ * eleven route payloads on every dashboard load for the one the user wanted.
+ * `useRoutePrefetch` moves that work to a hover, a focus or a touch.
+ */
+function NavLink({ item, active, onNavigate }: NavLinkProps) {
+  const { label, href, icon: Icon } = item;
+  const prefetchHandlers = useRoutePrefetch(href);
+
+  return (
+    <Link
+      href={href}
+      prefetch={false}
+      onClick={onNavigate}
+      aria-current={active ? "page" : undefined}
+      {...prefetchHandlers}
+      className={[
+        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
+        active
+          ? "bg-brand/10 text-brand border border-brand/20"
+          : "text-muted hover:text-white hover:bg-surface-hover border border-transparent",
+      ].join(" ")}
+    >
+      <Icon
+        className={[
+          "w-4 h-4 shrink-0 transition-colors",
+          active ? "text-brand" : "text-muted group-hover:text-white",
+        ].join(" ")}
+        aria-hidden="true"
+      />
+      {label}
+      {active && (
+        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand shrink-0" aria-hidden="true" />
+      )}
+    </Link>
+  );
+}
 
 interface DashboardSidebarProps {
   isOpen: boolean;
@@ -101,35 +149,14 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
           className="flex-1 overflow-y-auto scrollbar-hide px-3 py-4 space-y-0.5"
           aria-label="Main navigation"
         >
-          {NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-            const active = isActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={onClose}
-                aria-current={active ? "page" : undefined}
-                className={[
-                  "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-                  active
-                    ? "bg-brand/10 text-brand border border-brand/20"
-                    : "text-muted hover:text-white hover:bg-surface-hover border border-transparent",
-                ].join(" ")}
-              >
-                <Icon
-                  className={[
-                    "w-4 h-4 shrink-0 transition-colors",
-                    active ? "text-brand" : "text-muted group-hover:text-white",
-                  ].join(" ")}
-                  aria-hidden="true"
-                />
-                {label}
-                {active && (
-                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand shrink-0" aria-hidden="true" />
-                )}
-              </Link>
-            );
-          })}
+          {NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.href}
+              item={item}
+              active={isActive(item.href)}
+              onNavigate={onClose}
+            />
+          ))}
         </nav>
 
         {/* Live Plan Usage Widget */}
@@ -139,35 +166,14 @@ export default function DashboardSidebar({ isOpen, onClose }: DashboardSidebarPr
 
         {/* Bottom nav (settings) */}
         <div className="px-3 pb-5 space-y-0.5 border-t border-border pt-3 shrink-0">
-          {BOTTOM_NAV_ITEMS.map(({ label, href, icon: Icon }) => {
-            const active = isActive(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={onClose}
-                aria-current={active ? "page" : undefined}
-                className={[
-                  "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-                  active
-                    ? "bg-brand/10 text-brand border border-brand/20"
-                    : "text-muted hover:text-white hover:bg-surface-hover border border-transparent",
-                ].join(" ")}
-              >
-                <Icon
-                  className={[
-                    "w-4 h-4 shrink-0 transition-colors",
-                    active ? "text-brand" : "text-muted group-hover:text-white",
-                  ].join(" ")}
-                  aria-hidden="true"
-                />
-                {label}
-                {active && (
-                  <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand shrink-0" aria-hidden="true" />
-                )}
-              </Link>
-            );
-          })}
+          {BOTTOM_NAV_ITEMS.map((item) => (
+            <NavLink
+              key={item.href}
+              item={item}
+              active={isActive(item.href)}
+              onNavigate={onClose}
+            />
+          ))}
         </div>
       </aside>
     </>

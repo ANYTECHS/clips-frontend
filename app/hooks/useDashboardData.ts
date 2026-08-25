@@ -13,6 +13,8 @@
  */
 
 import { useEffect } from "react";
+import { openManagedEventSource } from "@/app/lib/sse/ManagedEventSource";
+import { logger } from "@/app/lib/logger";
 import {
   useDashboardStore,
   selectStats,
@@ -64,30 +66,50 @@ export function useDashboardData(options?: { enableStreaming?: boolean }): {
 
   useEffect(() => {
     if (!options?.enableStreaming) return;
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource("/api/dashboard/stream");
-      es.addEventListener("stats", (ev: MessageEvent) => {
-        const parsed = JSON.parse(ev.data);
-        if (parsed?.data) {
+
+    const stream = openManagedEventSource({
+      url: "/api/dashboard/stream",
+      listeners: {
+        stats: (data) => {
+          let parsed: { data?: { earnings: string; clips: number; platforms: number } };
+          try {
+            parsed = JSON.parse(data);
+          } catch (error) {
+            // A malformed frame is the server's problem, not a reason to tear
+            // down a working stream.
+            logger.error("Malformed dashboard stats frame:", error);
+            return;
+          }
+          if (!parsed?.data) return;
+
+          // Only the stats slice is live-updated. The previous version also
+          // reset revenueTrend and recentProjects to [], so the first streamed
+          // frame wiped the chart and the project list that the initial fetch
+          // had just populated.
           useDashboardStore.setState({
             stats: {
               earnings: { total: parsed.data.earnings, trendLabel: "+0%", trend: 0 },
               clips: { total: parsed.data.clips, trendLabel: "+0%", trend: 0 },
               platforms: { total: parsed.data.platforms, trendLabel: "Live", trend: 0 },
             },
-            revenueTrend: [],
-            recentProjects: [],
             loading: false,
             error: null,
           });
-        }
-      });
-    } catch {
-      // ignore
-    }
+        },
+      },
+      onError: (attempt, willRetry) => {
+        logger.warn(
+          `Dashboard stream error (attempt ${attempt}), ${willRetry ? "retrying" : "giving up"}`,
+        );
+      },
+      onGiveUp: () => {
+        // The store's own 5-minute cache and manual retry remain available.
+        logger.warn("Dashboard stream gave up; falling back to cached data.");
+      },
+    });
+
     return () => {
-      if (es) es.close();
+      stream?.close();
     };
   }, [options?.enableStreaming]);
 
