@@ -5,6 +5,9 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 
 validateRequiredEnv();
 
+/** CDN origin for static assets. Undefined disables the prefix (dev/test). */
+const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL?.replace(/\/+$/, "") || undefined;
+
 const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
@@ -93,10 +96,31 @@ async function securityHeaders() {
         },
       ],
     },
+    // Static build artefacts — content-hashed, safe to cache for a year.
+    {
+      source: "/_next/static/:path*",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+      ],
+    },
+    // Public folder media — not content-hashed but rarely changes.
+    {
+      source: "/:path*\\.(ico|png|jpg|jpeg|gif|svg|webp|avif|woff|woff2|ttf|otf|eot)",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=86400, stale-while-revalidate=604800",
+        },
+      ],
+    },
   ];
 }
 
 const nextConfig: NextConfig = {
+  // Route static build assets through the CDN when configured.
+  // In development (NEXT_PUBLIC_CDN_URL unset) this is undefined and Next.js
+  // serves assets from the app origin as normal.
+  assetPrefix: CDN_URL,
   headers: securityHeaders,
   images: {
     remotePatterns: [
