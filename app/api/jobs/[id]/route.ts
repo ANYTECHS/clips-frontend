@@ -4,6 +4,7 @@ import { requireJobOwner } from "../shared/authGuard";
 import { checkCsrf } from "@/app/lib/csrf";
 import { dispatchJob } from "@/app/lib/aiBackend";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
 
 /** Accepts UUID (with or without hyphens) or alphanumeric slugs up to 64 chars. */
 const JOB_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -21,7 +22,7 @@ export async function GET(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const rateLimited = await applyRateLimit(request, { limit: 120, windowMs: 60_000 });
+  const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/jobs/[id]"));
   if (rateLimited) return rateLimited;
 
   const { id: jobId } = await context.params;

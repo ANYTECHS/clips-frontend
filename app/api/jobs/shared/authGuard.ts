@@ -5,7 +5,11 @@ import { jobStore } from "./jobStore";
 export async function requireAuth(): Promise<{ userId: string } | NextResponse> {
   const session = await auth();
   const userId = (session?.user as { id?: string } | undefined)?.id;
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!userId)
+    return NextResponse.json(
+      { error: "Unauthorized", code: "UNAUTHORIZED" },
+      { status: 401 }
+    );
   return { userId };
 }
 
@@ -15,8 +19,16 @@ export async function requireJobOwner(jobId: string) {
   if (authRes instanceof NextResponse) return authRes;
 
   const job = await jobStore.get(jobId);
-  if (!job) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (job.userId !== authRes.userId) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  if (!job)
+    return NextResponse.json(
+      { error: "Not found", code: "NOT_FOUND" },
+      { status: 404 }
+    );
+  if (job.userId !== authRes.userId)
+    return NextResponse.json(
+      { error: "Forbidden", code: "FORBIDDEN" },
+      { status: 403 }
+    );
 
   return { job, userId: authRes.userId };
 }

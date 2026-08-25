@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
+import { compressResponse } from "@/app/lib/apiCompression";
 import { earningsStore } from "@/app/api/earnings/earningsStore";
 import { projectsStore } from "@/app/api/projects/projectsStore";
 import { clipsStore } from "@/app/api/clips/clipsStore";
@@ -41,6 +43,7 @@ import type {
 } from "@/app/store/types";
 
 export async function GET(request: NextRequest) {
+  const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/dashboard"));
   return withVersioning(request, async () => {
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
@@ -246,6 +249,5 @@ export async function GET(request: NextRequest) {
     error: null,
   };
 
-    return NextResponse.json(body);
-  });
+  return compressResponse(request, NextResponse.json(body));
 }

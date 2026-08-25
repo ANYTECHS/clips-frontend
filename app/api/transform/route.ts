@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkCsrf } from "@/app/lib/csrf";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { parseRequestJson } from "@/app/lib/parseRequestJson";
 import { dispatchJob } from "@/app/lib/aiBackend";
@@ -24,7 +25,7 @@ import { transformBodySchema } from "../schemas/index";
  */
 export async function POST(request: NextRequest) {
   // Rate-limit to 20 transform requests per minute per client
-  const rateLimited = await applyRateLimit(request, { limit: 20, windowMs: 60_000 });
+  const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/transform"));
   if (rateLimited) return rateLimited;
 
   const csrfError = checkCsrf(request);
