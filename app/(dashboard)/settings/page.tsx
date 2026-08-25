@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useWallet } from "@/components/WalletProvider";
-import SocialRecoveryConfig from "@/components/SocialRecoveryConfig";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun, TimerOff, Lock, Download, Fingerprint } from "lucide-react";
 import Link from "next/link";
@@ -20,6 +19,27 @@ import TrustlineManager from "@/components/wallet/TrustlineManager";
 import { useTheme } from "@/components/theme-provider";
 import { encryptWithPassword } from "@/app/lib/cryptoUtils";
 import { usePasskeyWallet } from "@/app/hooks/usePasskeyWallet";
+import dynamic from "next/dynamic";
+
+/**
+ * Social recovery sits behind the "advanced" disclosure and drags in Shamir
+ * secret sharing (`secrets.js-grempe`) plus the crypto helpers around it. Very
+ * few visits to Settings ever open it, so it is split out of the route bundle
+ * and fetched when it renders.
+ */
+const SocialRecoveryConfig = dynamic(
+  () => import("@/components/SocialRecoveryConfig"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-surface border border-border rounded-[24px] p-6 space-y-3">
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-full max-w-md" />
+        <Skeleton className="h-11 w-40 rounded-xl" />
+      </div>
+    ),
+  },
+);
 
 export default function SettingsPage() {
   const { showToast } = useToast();

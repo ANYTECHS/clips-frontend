@@ -1,0 +1,24 @@
+{
+  "$comment": "Budgets are gzipped JavaScript, in kilobytes, enforced by scripts/check-bundle-size.js in CI. Raising a number is a deliberate decision — say why in the PR.",
+  "budgets": {
+    "firstLoadShared": {
+      "maxKb": 300,
+      "description": "JS every page pays for: the framework, shared chunks and the root layout."
+    },
+    "perRoute": {
+      "maxKb": 450,
+      "description": "First-load JS for any single route, shared chunks included."
+    },
+    "totalClient": {
+      "maxKb": 4500,
+      "description": "Every client chunk the build emits, added up."
+    }
+  },
+  "routeOverrides": {
+    "$comment": "Routes that legitimately exceed perRoute. Each needs a reason.",
+    "/(dashboard)/settings": {
+      "maxKb": 520,
+      "reason": "Account, security, wallet and privacy panels on one page; the heavy panels are lazy-loaded but the shell is still large."
+    }
+  }
+}
