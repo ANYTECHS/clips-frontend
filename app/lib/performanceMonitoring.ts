@@ -52,6 +52,10 @@ export const CUSTOM_METRIC_THRESHOLDS: Record<string, [number, number]> = {
   "dashboard.load": [1000, 3000],
   "upload.total": [30_000, 120_000],
   "upload.chunk": [5_000, 15_000],
+  // CDN health metrics
+  "cdn.probe": [200, 1_000],
+  "cdn.purge": [500, 2_000],
+  "cdn.asset.resolve": [100, 500],
 };
 
 /**
