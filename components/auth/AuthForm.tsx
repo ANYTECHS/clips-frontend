@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { signIn } from "next-auth/react";
 import { Loader2 } from "lucide-react";
 
@@ -139,7 +140,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
       <p className="text-center text-xs text-muted mt-6">
         {mode === "login" ? (
           <>
-            Don't have an account?{" "}
+            Don&apos;t have an account?{" "}
             <a href="/signup" className="text-brand hover:text-brand-hover">
               Sign up
             </a>
@@ -147,9 +148,9 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
         ) : (
           <>
             Already have an account?{" "}
-            <a href="/login" className="text-brand hover:text-brand-hover">
+            <Link href="/login" prefetch className="text-brand hover:text-brand-hover">
               Sign in
-            </a>
+            </Link>
           </>
         )}
       </p>

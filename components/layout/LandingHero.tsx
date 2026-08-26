@@ -4,6 +4,10 @@ import React, { useState } from "react";
 import Image from "next/image";
 import { Loader2, Link2 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import {
+  LANDING_HERO_AVATAR_SEEDS,
+  landingHeroAvatarSrc,
+} from "@/app/lib/resourceHints";
 
 interface LandingHeroProps {
   /**
@@ -128,33 +132,23 @@ export default function LandingHero({
       {showSocialProof && (
         <div className="flex items-center gap-4 text-sm text-muted pt-2">
           <div className="flex -space-x-2.5">
-            <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-800 flex items-center justify-center text-[10px] overflow-hidden">
-              <Image
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
-                alt="Avatar for Felix"
-                width={36}
-                height={36}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-700 flex items-center justify-center text-[10px] overflow-hidden">
-              <Image
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka"
-                alt="Avatar for Aneka"
-                width={36}
-                height={36}
-                className="w-full h-full object-cover"
-              />
-            </div>
-            <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-600 flex items-center justify-center text-[10px] overflow-hidden">
-              <Image
-                src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jocelyn"
-                alt="Avatar for Jocelyn"
-                width={36}
-                height={36}
-                className="w-full h-full object-cover"
-              />
-            </div>
+            {LANDING_HERO_AVATAR_SEEDS.map((seed, index) => (
+              <div
+                key={seed}
+                className={`w-9 h-9 rounded-full border-2 border-[#080C0B] flex items-center justify-center text-[10px] overflow-hidden ${
+                  index === 0 ? "bg-zinc-800" : index === 1 ? "bg-zinc-700" : "bg-zinc-600"
+                }`}
+              >
+                <Image
+                  src={landingHeroAvatarSrc(seed)}
+                  alt={`Avatar for ${seed}`}
+                  width={36}
+                  height={36}
+                  priority={index === 0}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            ))}
           </div>
           Joined by 10,000+ creators this month
         </div>
