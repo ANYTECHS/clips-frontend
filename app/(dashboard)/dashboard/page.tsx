@@ -12,6 +12,7 @@ import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { useDashboardData } from "@/app/hooks/useDashboardData";
 import { DollarSign, Video, Globe, AlertCircle } from "lucide-react";
 import DashboardPageHeader from "./DashboardPageHeader";
+import SyncStatusIndicator from "@/components/SyncStatusIndicator";
 
 // Lazy-load heavy client components for better performance
 const RevenueChart = dynamic(() => import("@/components/dashboard/RevenueChart"), {
@@ -74,6 +75,9 @@ export default function DashboardPage() {
   return (
     <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
       <DashboardPageHeader />
+      <div className="px-6 sm:px-8 -mt-4">
+        <SyncStatusIndicator resource="dashboard" />
+      </div>
           {error ? (
             <div className="bg-surface border border-error/50 rounded-[24px] p-8 flex flex-col items-center justify-center gap-4 text-center">
               <AlertCircle className="w-12 h-12 text-error" />

@@ -1,19 +1,36 @@
 "use client";
 
 import React, { useState, useMemo, useCallback, useEffect } from "react";
+import dynamic from "next/dynamic";
 import ProjectFilters from "@/components/projects/ProjectFilters";
 import ClipGrid, { type Clip } from "@/components/projects/ClipGrid";
 import SelectionFooter from "@/components/projects/SelectionFooter";
-import ClipEditorModal, { type ClipEdits } from "@/components/projects/ClipEditorModal";
-import ClipPreviewModal from "@/components/projects/ClipPreviewModal";
-import { BatchTransformModal } from "@/components/transform/BatchTransformModal";
-import { BatchTransformQueue } from "@/components/transform/BatchTransformQueue";
+import type { ClipEdits } from "@/components/projects/ClipEditorModal";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 import { useBatchTransform } from "@/app/hooks/useBatchTransform";
+import { useClipRanking } from "@/app/hooks/useClipRanking";
 import { useUserStore, selectUserPlan } from "@/app/store/userStore";
+
+// Code-split the modals (#921): each one is only mounted once the user takes
+// an action (edit, preview, transform), so their code has no reason to be in
+// the initial bundle for a page whose default view is just the clip grid.
+const ClipEditorModal = dynamic(() => import("@/components/projects/ClipEditorModal"), {
+  ssr: false,
+});
+const ClipPreviewModal = dynamic(() => import("@/components/projects/ClipPreviewModal"), {
+  ssr: false,
+});
+const BatchTransformModal = dynamic(
+  () => import("@/components/transform/BatchTransformModal").then((m) => m.BatchTransformModal),
+  { ssr: false },
+);
+const BatchTransformQueue = dynamic(
+  () => import("@/components/transform/BatchTransformQueue").then((m) => m.BatchTransformQueue),
+  { ssr: false },
+);
 
 const RECOMMENDATION_THRESHOLD = 90;
 
@@ -139,11 +156,14 @@ export default function ProjectsPage() {
            (vaultFilter !== "pending" ? 1 : 0);
   }, [captionsStyle, viralityLevels, vaultFilter]);
 
-  // Clips that score at or above the recommendation threshold
-  const recommendedIds = useMemo(
-    () => fetchedClips.filter(c => c.score >= RECOMMENDATION_THRESHOLD).map(c => c.id),
-    [fetchedClips]
+  // Clips that score at or above the recommendation threshold. Ranking runs
+  // in a web worker (#921) so scoring a large clip list doesn't block the
+  // main thread.
+  const clipScores = useMemo(
+    () => fetchedClips.map((c) => ({ id: c.id, score: c.score })),
+    [fetchedClips],
   );
+  const recommendedIds = useClipRanking(clipScores, RECOMMENDATION_THRESHOLD);
 
   const handleAutoSelect = useCallback(() => {
     setSelectedIds(recommendedIds);
@@ -295,6 +315,17 @@ export default function ProjectsPage() {
   const handleDelete = useCallback(async (clipIds: string[]) => {
     setIsDeleting(true);
     setDeleteError(null);
+
+    // Optimistic update: remove the clips from the grid immediately instead
+    // of waiting on the round trip, and restore the exact previous list if
+    // the request fails.
+    const idSet = new Set(clipIds);
+    const previousClips = fetchedClips;
+    const previousTotal = totalClips;
+    setFetchedClips((prev) => prev.filter((c) => !idSet.has(c.id)));
+    setTotalClips((prev) => Math.max(0, prev - clipIds.length));
+    setSelectedIds([]);
+
     try {
       const res = await fetch("/api/clips", {
         method: "DELETE",
@@ -306,22 +337,29 @@ export default function ProjectsPage() {
 
       const count = data?.data?.deletedCount ?? clipIds.length;
       showToast(`Deleted ${count} clip${count !== 1 ? "s" : ""}`, "success");
-      setSelectedIds([]);
-      // Deleted clips are filtered out server-side, so refetch rather than
-      // trying to reconcile the list locally.
-      await fetchClips(1);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Delete failed";
       setDeleteError(msg);
       showToast(msg, "error");
+      // Roll back to the pre-optimistic state.
+      setFetchedClips(previousClips);
+      setTotalClips(previousTotal);
     } finally {
       setIsDeleting(false);
     }
-  }, [fetchClips, setSelectedIds, showToast]);
+  }, [fetchedClips, totalClips, setSelectedIds, showToast]);
 
   const handleArchive = useCallback(async (clipIds: string[]) => {
     setIsArchiving(true);
     setArchiveError(null);
+
+    const idSet = new Set(clipIds);
+    const previousClips = fetchedClips;
+    const previousTotal = totalClips;
+    setFetchedClips((prev) => prev.filter((c) => !idSet.has(c.id)));
+    setTotalClips((prev) => Math.max(0, prev - clipIds.length));
+    setSelectedIds([]);
+
     try {
       const res = await fetch("/api/clips/archive", {
         method: "PATCH",
@@ -333,16 +371,16 @@ export default function ProjectsPage() {
 
       const count = data?.data?.archivedCount ?? clipIds.length;
       showToast(`Archived ${count} clip${count !== 1 ? "s" : ""}`, "success");
-      setSelectedIds([]);
-      await fetchClips(1);
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Archive failed";
       setArchiveError(msg);
       showToast(msg, "error");
+      setFetchedClips(previousClips);
+      setTotalClips(previousTotal);
     } finally {
       setIsArchiving(false);
     }
-  }, [fetchClips, setSelectedIds, showToast]);
+  }, [fetchedClips, totalClips, setSelectedIds, showToast]);
 
   return (
     <>
