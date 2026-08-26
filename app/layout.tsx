@@ -13,6 +13,7 @@ import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
+import DnsPrefetchHints from "@/components/DnsPrefetchHints";
 import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 
@@ -56,6 +57,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <head>
+        <DnsPrefetchHints />
+      </head>
       <body className={`${inter.className} font-sans antialiased`}>
         <div className="radial-bg" />
         <PerformanceMonitor />
