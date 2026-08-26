@@ -2,11 +2,6 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { getStellarNetwork } from "@/app/lib/networkConfig";
-import {
-  getSponsorBalance,
-  hasSufficientSponsorBalance,
-  estimateSponsoredFee,
-} from "@/app/lib/feeSponsorship";
 
 /** Core literal indicators tracking the platform's sponsorship eligibility states */
 export type SponsorshipStatus =
@@ -84,18 +79,18 @@ export function useFeeSponsorship(operationCount: number = 1) {
 
     try {
       const network = getStellarNetwork();
-      const [balance, sufficient] = await Promise.all([
-        getSponsorBalance(DEFAULT_SPONSOR_PUBLIC_KEY, network),
-        hasSufficientSponsorBalance(DEFAULT_SPONSOR_PUBLIC_KEY, network, 5),
-      ]);
-
-      const feeEstimate = estimateSponsoredFee(operationCount);
+      const res = await fetch(`/api/sponsorship?publicKey=${encodeURIComponent(DEFAULT_SPONSOR_PUBLIC_KEY)}&operationCount=${operationCount}`);
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new Error(errBody?.error || `HTTP ${res.status}`);
+      }
+      const data = await res.json();
 
       setState({
-        status: sufficient ? "available" : "insufficient_balance",
-        sponsorBalance: balance,
-        estimatedFee: feeEstimate,
-        error: sufficient
+        status: data.isAvailable ? "available" : "insufficient_balance",
+        sponsorBalance: data.sponsorBalance ?? null,
+        estimatedFee: data.feeEstimate ?? null,
+        error: data.isAvailable
           ? null
           : "Sponsor account balance is too low to cover fees.",
       });

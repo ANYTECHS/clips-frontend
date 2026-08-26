@@ -14,8 +14,16 @@ import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 import ResourceHints from "@/components/ResourceHints";
+import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
+import PerformanceMonitor from "@/components/PerformanceMonitor";
 
-const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap" });
+const inter = Inter({ 
+  subsets: ["latin", "latin-ext"], 
+  display: "swap",
+  variable: "--font-inter",
+  preload: true,
+  adjustFontFallback: "Arial",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://clipcash.ai"),
@@ -53,7 +61,11 @@ export default function RootLayout({
         <ResourceHints />
       </head>
       <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <body className={`${inter.className} font-sans antialiased`}>
         <div className="radial-bg" />
+        <PerformanceMonitor />
+        <CryptoSaltInitializer />
         <ThemeProvider>
           <ErrorBoundary>
             <I18nProvider>

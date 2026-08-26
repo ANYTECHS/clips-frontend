@@ -36,9 +36,12 @@ export function migrateCryptoSalt(): boolean {
 }
 
 /**
- * Evaluates storage allocations to detect existing keys or wallet payloads needing decryption.
+ * Migration sequence:
+ * 1. On app startup, migrateCryptoSalt() is called in layout.tsx before any storage reads.
+ * 2. getCryptoKey() also calls migrateCryptoSalt() as a safeguard against race conditions.
+ * 3. Salt is stored in localStorage for persistence; sessionStorage is cleared after migration.
  *
- * @returns True if active ciphertext configurations are present on the client.
+ * @returns True if any ciphertext wallet entries are available on this client.
  */
 function hasEncryptedWalletEntries(): boolean {
   if (typeof window === 'undefined') return false;

@@ -33,6 +33,7 @@ interface MultiWalletContextValue {
 }
 
 const MultiWalletContext = createContext<MultiWalletContextValue | null>(null);
+MultiWalletContext.displayName = "MultiWalletContext";
 
 export function MultiWalletProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();

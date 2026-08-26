@@ -5,7 +5,123 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 
 validateRequiredEnv();
 
+/** CDN origin for static assets. Undefined disables the prefix (dev/test). */
+const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL?.replace(/\/+$/, "") || undefined;
+
+const withAnalyzer = withBundleAnalyzer({
+  enabled: process.env.ANALYZE === "true",
+});
+
+const ANALYTICS_ENABLED = ["ga4", "plausible"].includes(
+  (process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER ?? "").toLowerCase()
+);
+
+const CSP_REPORT_URI = "/api/csp-report";
+
+function buildCsp(): string {
+  const scriptSrc = ["'self'"];
+  if (ANALYTICS_ENABLED) {
+    scriptSrc.push("https://www.googletagmanager.com", "https://plausible.io");
+  }
+
+  const connectSrc = [
+    "'self'",
+    "https://horizon-testnet.stellar.org",
+    "https://horizon.stellar.org",
+    "https://api.coingecko.com",
+  ];
+  if (ANALYTICS_ENABLED) {
+    connectSrc.push("https://www.google-analytics.com", "https://plausible.io");
+  }
+
+  const directives: Record<string, string[]> = {
+    "default-src": ["'self'"],
+    "script-src": scriptSrc,
+    "connect-src": connectSrc,
+    "img-src": [
+      "'self'",
+      "data:",
+      "blob:",
+      "https://api.dicebear.com",
+      "https://images.unsplash.com",
+      "https://*.cloudfront.net",
+      "https://*.amazonaws.com",
+      "https://*.cloudflarestorage.com",
+      "https://cdn.clipcash.dev",
+      "https://lh3.googleusercontent.com",
+      "https://avatars.githubusercontent.com"
+    ],
+    "style-src": ["'self'", "'unsafe-inline'"],
+    "frame-ancestors": ["'none'"],
+    // Both enforcing and report-only policies share the same report sink.
+    "report-uri": [CSP_REPORT_URI],
+  };
+
+  return Object.entries(directives)
+    .map(([directive, sources]) => `${directive} ${sources.join(" ")}`)
+    .join("; ");
+}
+
+/**
+ * Staging uses Report-Only so violations are logged without breaking the UI.
+ * All other environments enforce the policy.
+ * See docs/SECURITY.md — "CSP rollout (report-only → enforce)".
+ */
+function cspHeader(): { key: string; value: string } {
+  const isStaging = process.env.NEXT_PUBLIC_ENVIRONMENT === "staging";
+  return {
+    key: isStaging
+      ? "Content-Security-Policy-Report-Only"
+      : "Content-Security-Policy",
+    value: buildCsp(),
+  };
+}
+
+async function securityHeaders() {
+  return [
+    {
+      source: "/:path*",
+      headers: [
+        cspHeader(),
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        {
+          key: "Strict-Transport-Security",
+          value: "max-age=63072000; includeSubDomains; preload",
+        },
+        {
+          key: "Permissions-Policy",
+          value: "camera=(), microphone=(), geolocation=()",
+        },
+      ],
+    },
+    // Static build artefacts — content-hashed, safe to cache for a year.
+    {
+      source: "/_next/static/:path*",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+      ],
+    },
+    // Public folder media — not content-hashed but rarely changes.
+    {
+      source: "/:path*\\.(ico|png|jpg|jpeg|gif|svg|webp|avif|woff|woff2|ttf|otf|eot)",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=86400, stale-while-revalidate=604800",
+        },
+      ],
+    },
+  ];
+}
+
 const nextConfig: NextConfig = {
+  // Route static build assets through the CDN when configured.
+  // In development (NEXT_PUBLIC_CDN_URL unset) this is undefined and Next.js
+  // serves assets from the app origin as normal.
+  assetPrefix: CDN_URL,
+  headers: securityHeaders,
   images: {
     remotePatterns: [
       {
@@ -20,21 +136,84 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: '**.cloudfront.net',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.cloudflarestorage.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.clipcash.dev',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'avatars.githubusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
+    formats: ['image/avif', 'image/webp'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
+    minimumCacheTTL: 60,
   },
-  webpack: (config: any, { isServer }: { isServer: boolean }) => {
+  /**
+   * Rewrites barrel imports (`import { X } from "lucide-react"`) into deep
+   * imports of just the modules actually used. lucide-react is imported in 60+
+   * files here and its barrel re-exports every icon in the library, so without
+   * this the whole icon set is walked on every build and a lot of it survives
+   * into the client bundle.
+   */
+  experimental: {
+    optimizePackageImports: ["lucide-react", "@stellar/stellar-sdk", "zod"],
+  },
+  webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization = {
         ...config.optimization,
+        // Only add a shared "commons" group; the previous config also set
+        // `default: false, vendors: false`, which switched off the framework
+        // and library chunk groups Next.js ships with. That collapsed
+        // node_modules into the same chunk as app code, so every deploy
+        // invalidated the whole vendor bundle in users' caches even when only
+        // app code changed.
         splitChunks: {
-          chunks: 'all',
+          ...(typeof config.optimization?.splitChunks === "object"
+            ? config.optimization.splitChunks
+            : {}),
+          chunks: "all",
           cacheGroups: {
-            default: false,
-            vendors: false,
+            ...(typeof config.optimization?.splitChunks === "object"
+              ? config.optimization.splitChunks.cacheGroups
+              : {}),
             commons: {
-              name: 'commons',
-              chunks: 'all',
+              name: "commons",
+              chunks: "all",
               minChunks: 2,
+              // Below the default groups, so framework/lib chunking still wins.
+              priority: -10,
+              reuseExistingChunk: true,
             },
           },
         },
@@ -44,7 +223,7 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withAnalyzer(nextConfig), {
   // For all available options, see:
   // https://github.com/getsentry/sentry-webpack-plugin#options
 

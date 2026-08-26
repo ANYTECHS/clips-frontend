@@ -124,7 +124,7 @@ export function useTrustline(options: UseTrustlineOptions = {}) {
           signedXdr = tx.toEnvelope().toXDR("base64");
         } else {
           // Freighter wallet: request signing from browser extension
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          // Freighter injects window.freighter - types not available
           const freighter = (window as any).freighter;
           if (!freighter) {
             throw {

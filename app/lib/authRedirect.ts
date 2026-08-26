@@ -1,6 +1,6 @@
 import type { User } from "./types";
 
-const PROTECTED_ROUTES = [
+export const PROTECTED_ROUTES = [
   "/dashboard",
   "/onboarding",
   "/earnings",

@@ -137,7 +137,7 @@ class Analytics {
    */
   private initializeGA4(): void {
     const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-    
+
     if (!measurementId) {
       logger.warn('GA4 measurement ID not configured');
       return;
@@ -147,6 +147,18 @@ class Analytics {
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+    script.crossOrigin = 'anonymous';
+    // Subresource Integrity (issue #801): gtag.js is served dynamically per
+    // measurement ID and Google explicitly does not support pinning it with
+    // SRI (the file can change without notice, which would break tracking
+    // the moment the hash goes stale). NEXT_PUBLIC_GA4_SCRIPT_SRI_HASH is
+    // opt-in for teams that have accepted that tradeoff and want to pin a
+    // known-good snapshot anyway; the docs/SECURITY.md SRI section explains
+    // the risk. Left unset by default.
+    const ga4Integrity = process.env.NEXT_PUBLIC_GA4_SCRIPT_SRI_HASH;
+    if (ga4Integrity) {
+      script.integrity = ga4Integrity;
+    }
     document.head.appendChild(script);
 
     // Initialize gtag
@@ -168,11 +180,23 @@ class Analytics {
    */
   private initializePlausible(): void {
     const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || window.location.hostname;
-    
+
     const script = document.createElement('script');
     script.defer = true;
+    script.crossOrigin = 'anonymous';
     script.setAttribute('data-domain', domain);
-    script.src = 'https://plausible.io/js/script.js';
+    // Subresource Integrity (issue #801): plausible.io/js/script.js is a
+    // rolling "latest" URL with no first-party version-pinned path, so
+    // "pin to a specific version" here means pinning to a known-good SRI
+    // hash of a snapshot rather than a versioned URL — set
+    // NEXT_PUBLIC_PLAUSIBLE_SCRIPT_SRI_HASH once one has been captured (see
+    // docs/SECURITY.md for the exact command). Falls back to the
+    // unpinned script (current behavior) when unset.
+    script.src = process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL || 'https://plausible.io/js/script.js';
+    const plausibleIntegrity = process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_SRI_HASH;
+    if (plausibleIntegrity) {
+      script.integrity = plausibleIntegrity;
+    }
     document.head.appendChild(script);
   }
 

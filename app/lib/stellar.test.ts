@@ -4,6 +4,8 @@ import {
   generateMnemonic,
   createRandomWallet,
   restoreWalletFromMnemonic,
+  submitTransaction,
+  getStellarNetwork,
 } from "./stellar";
 
 describe("stellar BIP39 wallet", () => {
@@ -44,5 +46,128 @@ describe("stellar BIP39 wallet", () => {
     await expect(
       deriveSeedFromMnemonic("not a valid mnemonic phrase at all")
     ).rejects.toThrow("Invalid BIP39 mnemonic phrase");
+  });
+});
+
+describe("submitTransaction", () => {
+  const mockSignedXdr = "AAAAAgAAAAA...";
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    global.fetch = jest.fn();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  it("successfully submits a transaction", async () => {
+    const mockResponse = {
+      hash: "test-hash",
+      ledger: 12345,
+      envelope_xdr: "envelope-xdr",
+      result_xdr: "result-xdr",
+      result_meta_xdr: "meta-xdr",
+    };
+
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const result = await submitTransaction({ signedXdr: mockSignedXdr });
+
+    expect(result).toEqual(mockResponse);
+    expect(global.fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/transactions"),
+      expect.objectContaining({
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: expect.stringContaining("tx="),
+      })
+    );
+  });
+
+  it("throws SUBMISSION_ERROR when response is not ok", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({
+        title: "Transaction failed",
+        extras: {
+          result_codes: {
+            transaction: "tx_bad_seq",
+          },
+        },
+      }),
+    });
+
+    await expect(submitTransaction({ signedXdr: mockSignedXdr })).rejects.toMatchObject({
+      code: "tx_bad_seq",
+      message: "Transaction failed",
+      extras: expect.any(Object),
+    });
+  });
+
+  it("throws TIMEOUT on AbortError", async () => {
+    const abortError = new Error("Aborted");
+    abortError.name = "AbortError";
+
+    (global.fetch as jest.Mock).mockRejectedValueOnce(abortError);
+
+    await expect(submitTransaction({ signedXdr: mockSignedXdr })).rejects.toMatchObject({
+      code: "TIMEOUT",
+      message: "Transaction submission timed out",
+    });
+  });
+
+  it("throws NETWORK_ERROR on generic network failure", async () => {
+    (global.fetch as jest.Mock).mockRejectedValueOnce(new Error("Network unreachable"));
+
+    await expect(submitTransaction({ signedXdr: mockSignedXdr })).rejects.toMatchObject({
+      code: "NETWORK_ERROR",
+      message: "Network unreachable",
+    });
+  });
+
+  it("re-throws SubmitTransactionError with code property", async () => {
+    const customError = {
+      code: "CUSTOM_ERROR",
+      message: "Custom error message",
+      extras: { detail: "Some detail" },
+    };
+
+    (global.fetch as jest.Mock).mockRejectedValueOnce(customError);
+
+    await expect(submitTransaction({ signedXdr: mockSignedXdr })).rejects.toEqual(
+      customError
+    );
+  });
+
+  it("uses correct Horizon URL for mainnet", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ hash: "test" }),
+    });
+
+    await submitTransaction({ signedXdr: mockSignedXdr, network: "mainnet" });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://horizon.stellar.org/transactions",
+      expect.any(Object)
+    );
+  });
+
+  it("uses correct Horizon URL for testnet", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ hash: "test" }),
+    });
+
+    await submitTransaction({ signedXdr: mockSignedXdr, network: "testnet" });
+
+    expect(global.fetch).toHaveBeenCalledWith(
+      "https://horizon-testnet.stellar.org/transactions",
+      expect.any(Object)
+    );
   });
 });

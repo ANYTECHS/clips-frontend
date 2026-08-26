@@ -3,6 +3,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { BALANCE_REFRESH_INTERVAL_MS, PRICE_CACHE_TTL_MS } from "@/app/lib/constants";
 import { logger } from "@/app/lib/logger";
+import {
+  openManagedEventSource,
+  type ManagedEventSource,
+} from "@/app/lib/sse/ManagedEventSource";
 
 /**
  * Balance data structure
@@ -276,7 +280,7 @@ export function useBalance(options: UseBalanceOptions) {
 
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const isMountedRef = useRef(true);
-  const streamRef = useRef<EventSource | null>(null);
+  const streamRef = useRef<ManagedEventSource | null>(null);
   const onSuccessRef = useRef(onSuccess);
   const onErrorRef = useRef(onError);
   useEffect(() => { onSuccessRef.current = onSuccess; }, [onSuccess]);
@@ -370,7 +374,7 @@ export function useBalance(options: UseBalanceOptions) {
   }, [publicKey, network, autoRefresh, refreshInterval, fetchBalance]);
 
   useEffect(() => {
-    if (!publicKey || !enableStreaming || typeof EventSource === "undefined") return;
+    if (!publicKey || !enableStreaming) return;
 
     const horizonUrl =
       network === "PUBLIC"
@@ -382,21 +386,34 @@ export function useBalance(options: UseBalanceOptions) {
       streamRef.current = null;
     }
 
-    const es = new EventSource(
-      `${horizonUrl}/accounts/${publicKey}/payments?cursor=now`
-    );
-
-    es.addEventListener("message", () => {
-      fetchBalance();
+    // Horizon drops long-lived payment streams routinely, and the previous
+    // no-op error handler left the native EventSource to reconnect on its own
+    // — immediately, forever, with no cap. Backoff and a retry ceiling now
+    // live in ManagedEventSource; polling (above) is the fallback when it
+    // gives up, so a dead stream degrades instead of spinning.
+    const stream = openManagedEventSource({
+      url: `${horizonUrl}/accounts/${publicKey}/payments?cursor=now`,
+      listeners: {
+        message: () => {
+          fetchBalance();
+        },
+      },
+      onError: (attempt, willRetry) => {
+        logger.warn(
+          `Horizon payment stream error (attempt ${attempt}), ${willRetry ? "retrying" : "giving up"}`,
+        );
+      },
+      onGiveUp: () => {
+        logger.warn(
+          "Horizon payment stream gave up; balance updates now rely on the refresh interval.",
+        );
+      },
     });
 
-    es.addEventListener("error", () => {
-    });
-
-    streamRef.current = es;
+    streamRef.current = stream;
 
     return () => {
-      es.close();
+      stream?.close();
       streamRef.current = null;
     };
   }, [publicKey, network, enableStreaming, fetchBalance]);

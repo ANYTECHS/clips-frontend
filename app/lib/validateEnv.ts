@@ -1,4 +1,4 @@
-import { logger } from "@/app/lib/logger";
+import { logger } from "./logger";
 
 // Variables required in every environment (dev, CI, production).
 const REQUIRED_ENV_VARS = [

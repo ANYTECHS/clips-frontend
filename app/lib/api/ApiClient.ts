@@ -1,4 +1,5 @@
 import { getSession } from 'next-auth/react';
+import type { Session } from 'next-auth';
 
 export type ApiErrorShape = {
   error: string;
@@ -27,8 +28,7 @@ export class ApiClient {
     try {
       const session = await getSession();
       // session may include an accessToken depending on NextAuth callbacks
-      // try common locations
-      const token = (session as any)?.accessToken || (session as any)?.token || null;
+      const token = (session as Session & { accessToken?: string })?.accessToken || null;
       if (token) return { Authorization: `Bearer ${token}` };
     } catch (err) {
       // ignore — no session on server or not configured

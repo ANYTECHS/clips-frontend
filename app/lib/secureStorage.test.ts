@@ -64,6 +64,37 @@ describe('secureStorage', () => {
   });
 });
 
+describe('secureStorage – salt migration edge cases', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+
+  it('uses sessionStorage salt when localStorage has none, and migrates it', async () => {
+    const legacySalt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+    sessionStorage.setItem(__testing__.CRYPTO_SALT_KEY, legacySalt);
+
+    const migrated = __testing__.migrateCryptoSalt();
+
+    expect(migrated).toBe(true);
+    expect(localStorage.getItem(__testing__.CRYPTO_SALT_KEY)).toBe(legacySalt);
+    expect(sessionStorage.getItem(__testing__.CRYPTO_SALT_KEY)).toBeNull();
+  });
+
+  it('does not overwrite existing localStorage salt with sessionStorage salt', async () => {
+    const localSalt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+    const sessionSalt = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+    localStorage.setItem(__testing__.CRYPTO_SALT_KEY, localSalt);
+    sessionStorage.setItem(__testing__.CRYPTO_SALT_KEY, sessionSalt);
+
+    const migrated = __testing__.migrateCryptoSalt();
+
+    expect(migrated).toBe(false);
+    expect(localStorage.getItem(__testing__.CRYPTO_SALT_KEY)).toBe(localSalt);
+    expect(sessionStorage.getItem(__testing__.CRYPTO_SALT_KEY)).toBeNull();
+  });
+});
+
 // Property-based tests for round-trip correctness (#440)
 describe('secureStorage – property-based round-trip', () => {
   beforeEach(() => {

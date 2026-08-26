@@ -116,5 +116,68 @@
     "sponsorship_desc": "O patrocínio de taxas permite que a plataforma pague as taxas de transação em seu nome, tornando suas primeiras transações gratuitas.",
     "sponsorship_activate": "Ativar com Patrocínio",
     "activating": "Ativando..."
+  },
+  "transform": {
+    "sub_style": "Subestilo",
+    "intensity": "Intensidade",
+    "outline": "Contorno",
+    "background": "Fundo",
+    "muted": "Suave",
+    "vivid": "Vívido",
+    "title": "Transformação de Estilo",
+    "select_style": "Selecionar Estilo",
+    "anime": "Anime",
+    "shonen": "Shōnen",
+    "shojo": "Shōjo",
+    "chibi": "Chibi",
+    "mecha": "Mecha",
+    "ghibli": "Ghibli",
+    "thin": "Fino",
+    "medium": "Médio",
+    "bold": "Negrito",
+    "original": "Original",
+    "painted": "Pintado",
+    "cel_shaded": "Cel-shaded",
+    "failed_load": "Falha ao carregar estilos",
+    "try_again": "Tentar novamente",
+    "no_styles": "Nenhum estilo disponível",
+    "no_styles_desc": "Nenhum estilo de transformação configurado ainda.",
+    "style": {
+      "anime": {
+        "name": "Anime",
+        "description": "Contornos fortes, cores vívidas e aparência cel-shaded"
+      },
+      "cinematic": {
+        "name": "Cinematográfico",
+        "description": "Grão de filme, color grading e brilho anamórfico"
+      },
+      "sketch": {
+        "name": "Esboço",
+        "description": "Contornos desenhados à mão com textura sutil de papel"
+      },
+      "watercolor": {
+        "name": "Aquarela",
+        "description": "Lavados suaves, bordas desfocadas e traços de pincel"
+      },
+      "retro-vhs": {
+        "name": "VHS retrô",
+        "description": "Linhas de varredura, sangramento de cor e artefatos de fita dos anos 80"
+      },
+      "neon-noir": {
+        "name": "Neon noir",
+        "description": "Sombras de alto contraste com iluminação neon vibrante"
+      }
+    }
+  },
+  "notifications": {
+    "title": "Notificações",
+    "unread_count": "{count} não lidas",
+    "mark_as_read": "Marcar como lida",
+    "mark_all_read": "Marcar todas como lidas",
+    "no_notifications": "Nenhuma notificação",
+    "job_complete": "Seus clips estão prontos!",
+    "transform_complete": "Transformação de estilo concluída",
+    "mint_success": "NFT cunhado com sucesso",
+    "earnings_received": "Ganhos recebidos"
   }
 }

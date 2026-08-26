@@ -2,10 +2,12 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter, usePathname } from "next/navigation";
 import { persistClipcashUser, loadClipcashUser, clearClipcashUser } from "@/app/lib/authUser";
 
-const PUBLIC_ROUTES = ["/", "/login", "/privacy", "/terms", "/status", "/cookies"];
+// Route protection is handled server-side by middleware.ts via NextAuth JWT.
+// The AuthProvider no longer performs client-side redirects, which previously
+// caused dashboard content to flash for one frame before the redirect fired.
+// See: middleware.ts
 
 export interface AuthUser {
   id: string;
@@ -23,11 +25,10 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+AuthContext.displayName = "AuthContext";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
-  const router = useRouter();
-  const pathname = usePathname();
 
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [storageLoaded, setStorageLoaded] = useState(false);
@@ -66,18 +67,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
     }
   }, [status, session]);
-
-  // Route guard
-  useEffect(() => {
-    if (isLoading) return;
-    if (status === "authenticated") return;
-    const isPublic = PUBLIC_ROUTES.some(
-      (r) => pathname === r || pathname.startsWith(r + "/")
-    );
-    if (!user && !isPublic) {
-      router.push("/login");
-    }
-  }, [user, isLoading, status, pathname, router]);
 
   const setUser = useCallback((newUser: AuthUser) => {
     setUserState(newUser);

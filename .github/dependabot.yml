@@ -1,0 +1,107 @@
+version: 2
+updates:
+  # Patch updates: weekly, grouped, low-risk enough to auto-approve.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "patch"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      stellar-patch:
+        patterns:
+          - "@stellar/*"
+          - "stellar-sdk"
+        update-types:
+          - "patch"
+      sentry-patch:
+        patterns:
+          - "@sentry/*"
+        update-types:
+          - "patch"
+      storybook-patch:
+        patterns:
+          - "@storybook/*"
+          - "storybook"
+        update-types:
+          - "patch"
+      testing-patch:
+        patterns:
+          - "@testing-library/*"
+        update-types:
+          - "patch"
+      all-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    ignore:
+      # Minor and major land on the monthly schedule below, so this weekly
+      # run stays patch-only.
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-minor"
+          - "version-update:semver-major"
+
+  # Minor updates: monthly, grouped, always reviewed by a human.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "minor"
+      - "needs-review"
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      stellar-minor:
+        patterns:
+          - "@stellar/*"
+          - "stellar-sdk"
+        update-types:
+          - "minor"
+      sentry-minor:
+        patterns:
+          - "@sentry/*"
+        update-types:
+          - "minor"
+      storybook-minor:
+        patterns:
+          - "@storybook/*"
+          - "storybook"
+        update-types:
+          - "minor"
+      testing-minor:
+        patterns:
+          - "@testing-library/*"
+        update-types:
+          - "minor"
+      all-minor:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+    ignore:
+      # Majors stay manual — Next and React majors carry breaking changes this
+      # app has to migrate deliberately.
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-patch"
+          - "version-update:semver-major"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "ci(deps)"

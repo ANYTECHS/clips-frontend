@@ -116,5 +116,68 @@
     "sponsorship_desc": "El patrocinio de comisiones permite a la plataforma pagar las comisiones de transacci\u00f3n por ti, haciendo tus primeras transacciones gratuitas.",
     "sponsorship_activate": "Activar con Patrocinio",
     "activating": "Activando..."
+  },
+  "transform": {
+    "sub_style": "Subestilo",
+    "intensity": "Intensidad",
+    "outline": "Contorno",
+    "background": "Fondo",
+    "muted": "Atenuado",
+    "vivid": "Vívido",
+    "title": "Transformación de Estilo",
+    "select_style": "Seleccionar Estilo",
+    "anime": "Anime",
+    "shonen": "Shōnen",
+    "shojo": "Shōjo",
+    "chibi": "Chibi",
+    "mecha": "Mecha",
+    "ghibli": "Ghibli",
+    "thin": "Fino",
+    "medium": "Medio",
+    "bold": "Grueso",
+    "original": "Original",
+    "painted": "Pintado",
+    "cel_shaded": "Cel-shaded",
+    "failed_load": "Error al cargar estilos",
+    "try_again": "Intentar de nuevo",
+    "no_styles": "No hay estilos disponibles",
+    "no_styles_desc": "Aún no hay estilos de transformación configurados.",
+    "style": {
+      "anime": {
+        "name": "Anime",
+        "description": "Contornos audaces, colores vívidos y aspecto cel-shaded"
+      },
+      "cinematic": {
+        "name": "Cinematográfico",
+        "description": "Grano de película, color grading y destellos anamórficos"
+      },
+      "sketch": {
+        "name": "Boceto",
+        "description": "Contornos dibujados a lápiz con textura de papel sutil"
+      },
+      "watercolor": {
+        "name": "Acuarela",
+        "description": "Lavados suaves, bordes borrosos y trazos de pincel"
+      },
+      "retro-vhs": {
+        "name": "VHS Retro",
+        "description": "Líneas de exploración, sangrado de color y artefactos de cinta de los años 80"
+      },
+      "neon-noir": {
+        "name": "Neón Noir",
+        "description": "Sombras de alto contraste con iluminación neón vívida"
+      }
+    }
+  },
+  "notifications": {
+    "title": "Notificaciones",
+    "unread_count": "{count} sin leer",
+    "mark_as_read": "Marcar como leída",
+    "mark_all_read": "Marcar todas como leídas",
+    "no_notifications": "Sin notificaciones",
+    "job_complete": "¡Tus clips están listos!",
+    "transform_complete": "Transformación de estilo completada",
+    "mint_success": "NFT acuñado con éxito",
+    "earnings_received": "Ganancias recibidas"
   }
 }

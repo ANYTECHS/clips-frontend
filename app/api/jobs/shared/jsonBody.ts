@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { parseRequestJson } from "@/app/lib/parseRequestJson";
 
 export function validateJsonContentType(request: NextRequest): NextResponse | null {
   const contentType = request.headers.get("content-type");
@@ -22,16 +23,5 @@ export async function parseJsonRequest<T = unknown>(
     return { ok: false, response: headerError };
   }
 
-  try {
-    const body = await request.json();
-    return { ok: true, body: body as T };
-  } catch {
-    return {
-      ok: false,
-      response: NextResponse.json(
-        { error: "Invalid or malformed JSON payload" },
-        { status: 400 }
-      ),
-    };
-  }
+  return parseRequestJson<T>(request);
 }

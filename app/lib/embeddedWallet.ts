@@ -36,6 +36,7 @@
 import { WalletStorage, WalletStorageError } from "./walletStorage";
 import { getStellarNetwork, NETWORK_CONFIGS, StellarNetwork } from "./networkConfig";
 import { withRetry, withFallback } from "./retryUtils";
+import { Keypair } from "@stellar/stellar-sdk";
 
 export type { StellarNetwork };
 
@@ -147,78 +148,7 @@ function classifyError(err: unknown): WalletCreationError {
   );
 }
 
-// ─── Stellar keypair generation (pure JS, no native deps) ─────────────────────
 
-const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-
-/**
- * Packs raw byte components down to a normalized Base32 format encoding string sequence.
- * @param bytes - High-precision unsigned integer data vector.
- * @returns Character sequence representation string.
- */
-function toBase32(bytes: Uint8Array): string {
-  let result = "";
-  let buffer = 0;
-  let bitsLeft = 0;
-  for (const byte of bytes) {
-    buffer = (buffer << 8) | byte;
-    bitsLeft += 8;
-    while (bitsLeft >= 5) {
-      bitsLeft -= 5;
-      result += BASE32_ALPHABET[(buffer >> bitsLeft) & 31];
-    }
-  }
-  if (bitsLeft > 0) {
-    result += BASE32_ALPHABET[(buffer << (5 - bitsLeft)) & 31];
-  }
-  return result;
-}
-
-/**
- * Generate a Stellar-compatible keypair using the Web Crypto API.
- * Returns { publicKey, secretKey } in Stellar StrKey format (G.../S...).
- *
- * NOTE: In production, use `Keypair.random()` from @stellar/stellar-sdk
- * which uses proper Ed25519 key generation and CRC16 checksums.
- *
- * @returns Resolves with generated cryptographic strings.
- * @throws {WalletCreationError} Thrown if Web Crypto API configurations are missing or insecure.
- */
-async function generateStellarKeypair(): Promise<{ publicKey: string; secretKey: string }> {
-  try {
-    if (typeof crypto === "undefined" || !crypto.subtle) {
-      throw new WalletCreationError(
-        "KEYPAIR_GENERATION_FAILED",
-        "Web Crypto API is not available in this environment.",
-        undefined,
-        false
-      );
-    }
-
-    // Generate 32 random bytes for the secret key seed
-    const secretBytes = crypto.getRandomValues(new Uint8Array(32));
-    // Derive a "public key" by hashing the secret (simplified — real Stellar uses Ed25519)
-    const publicBytes = new Uint8Array(await crypto.subtle.digest("SHA-256", secretBytes));
-
-    // Stellar StrKey: version byte + payload + checksum (simplified)
-    // Real format: version(1) + key(32) + checksum(2) → base32
-    const secretPayload = new Uint8Array(33);
-    secretPayload[0] = 0x90; // 'S' version byte (18 << 3)
-    secretPayload.set(secretBytes, 1);
-
-    const publicPayload = new Uint8Array(33);
-    publicPayload[0] = 0x30; // 'G' version byte (6 << 3)
-    publicPayload.set(publicBytes, 1);
-
-    return {
-      publicKey: "G" + toBase32(publicPayload).slice(1, 56),
-      secretKey: "S" + toBase32(secretPayload).slice(1, 56),
-    };
-  } catch (err) {
-    if (err instanceof WalletCreationError) throw err;
-    throw classifyError(err);
-  }
-}
 
 // ─── Freighter detection ───────────────────────────────────────────────────────
 
@@ -286,7 +216,7 @@ export async function createEmbeddedWallet(
   fund = true
 ): Promise<WalletCreationResult> {
   // Return existing wallet if already created
-  const existing = WalletStorage.get(userId);
+  const existing = await WalletStorage.get(userId);
   if (existing) {
     return {
       wallet: {
@@ -301,11 +231,13 @@ export async function createEmbeddedWallet(
   }
 
   // Generate a new keypair
-  const { publicKey, secretKey } = await generateStellarKeypair();
+  const keypair = Keypair.random();
+  const publicKey = keypair.publicKey();
+  const secretKey = keypair.secret();
   const createdAt = new Date().toISOString();
 
   // Persist to storage (secret key is obfuscated at rest)
-  WalletStorage.save(userId, {
+  await WalletStorage.save(userId, {
     userId,
     publicKey,
     secretKey,
@@ -340,8 +272,8 @@ export async function createEmbeddedWallet(
  * @param userId - Target identification mapping key corresponding to the session owner.
  * @returns The structured target context record object model or null if absent.
  */
-export function getEmbeddedWallet(userId: string): EmbeddedWallet | null {
-  const record = WalletStorage.get(userId);
+export async function getEmbeddedWallet(userId: string): Promise<EmbeddedWallet | null> {
+  const record = await WalletStorage.get(userId);
   if (!record) return null;
   return {
     publicKey: record.publicKey,

@@ -21,7 +21,11 @@ export async function fetchDashboardFromAPI(): Promise<{
   if (!response.ok) {
     throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
   }
-  return response.json();
+  const json = await response.json();
+  if (json && json.data) {
+    return json.data;
+  }
+  return json;
 }
 
 /**

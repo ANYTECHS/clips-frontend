@@ -79,6 +79,7 @@
   body {
     background-color: var(--color-background);
     color: var(--color-text);
+    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     transition: background-color 0.3s ease, color 0.3s ease;
   }
@@ -155,6 +156,12 @@
   40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 
+/* Skeleton shimmer animation — used by components/ui/Skeleton.tsx (#871) */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
 @keyframes spin-slow {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -184,6 +191,19 @@
   to {
     transform: translateX(0);
     opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-spin {
+    animation-duration: 0.3s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 

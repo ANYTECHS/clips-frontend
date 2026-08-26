@@ -2,7 +2,35 @@ import {
   estimateSponsoredFee,
   wrapWithSponsorship,
   createSponsoredAccountOps,
-} from "@/app/lib/feeSponsorship";
+} from "@/app/api/lib/feeSponsorship";
+import * as StellarSdk from "@stellar/stellar-sdk";
+
+jest.mock("@stellar/stellar-sdk", () => {
+  const makeOp = (name: string) =>
+    jest.fn().mockReturnValue({ switch: () => ({ name }) });
+  return {
+    Horizon: { Server: jest.fn() },
+    TransactionBuilder: { fromXDR: jest.fn() },
+    Operation: {
+      beginSponsoringFutureReserves: makeOp("beginSponsoringFutureReserves"),
+      endSponsoringFutureReserves: makeOp("endSponsoringFutureReserves"),
+      createAccount: makeOp("createAccount"),
+      revokeSponsorship: makeOp("revokeSponsorship"),
+    },
+    Memo: { text: jest.fn(() => ({})) },
+    Keypair: { random: jest.fn(() => ({ publicKey: () => "GSPONSORKEY" })) },
+  };
+});
+
+jest.mock("@/app/lib/networkConfig", () => ({
+  getStellarNetwork: () => "TESTNET",
+  getHorizonUrl: () => "https://horizon-testnet.stellar.org",
+  getNetworkPassphrase: () => "Test SDF Network ; September 2015",
+}));
+
+jest.mock("@/app/lib/logger", () => ({
+  logger: { warn: jest.fn(), error: jest.fn(), info: jest.fn() },
+}));
 
 describe("feeSponsorship", () => {
   describe("estimateSponsoredFee", () => {
@@ -69,6 +97,38 @@ describe("feeSponsorship", () => {
       const result = wrapWithSponsorship(userPublicKey, [op1, op2]);
       expect(result[1]).toBe(op1);
       expect(result[2]).toBe(op2);
+    });
+  });
+
+  describe("submitSponsoredTransaction", () => {
+    const SPONSOR_PUBLIC_KEY =
+      "GDTMVOKYEGPB7IFHN7I7OXIZNSVRJ7B5MODPSZEWVXI5BXU5K6JR2HV7";
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it("should extract the sponsor key from the transaction source", async () => {
+      const mockTransaction = { source: SPONSOR_PUBLIC_KEY, operations: [] };
+      (StellarSdk.TransactionBuilder.fromXDR as jest.Mock).mockReturnValue(mockTransaction);
+
+      const MockServer = StellarSdk.Horizon.Server as jest.Mock;
+      const mockSubmit = jest.fn().mockResolvedValue({ hash: "deadbeef" });
+      MockServer.mockImplementation(() => ({
+        submitTransaction: mockSubmit,
+        loadAccount: jest.fn(),
+        fetchBaseFee: jest.fn(),
+      }));
+
+      const { submitSponsoredTransaction } = await import(
+        "@/app/api/lib/feeSponsorship"
+      );
+
+      const result = await submitSponsoredTransaction("fake-xdr", "TESTNET");
+
+      expect(result.sponsorKey).toBe(SPONSOR_PUBLIC_KEY);
+      expect(result.feeSponsored).toBe(true);
+      expect(mockSubmit).toHaveBeenCalledWith(mockTransaction);
     });
   });
 });

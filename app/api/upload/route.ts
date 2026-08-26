@@ -7,7 +7,7 @@
  * S3-compatible bucket (AWS S3, Cloudflare R2, or GCS S3 interop).
  *
  * Upload flow:
- * 1. File validation (size, type, extension)
+ * 1. File validation (size, type, extension, magic bytes)
  * 2. Upload to quarantine prefix (uploads/quarantine/)
  * 3. Virus scan (ClamAV / VirusTotal / Cloudmersive)
  * 4a. If clean: Move from quarantine to uploads/ prefix
@@ -15,6 +15,11 @@
  * 5. Return presigned URL or public URL
  *
  * File size limit: 500 MB (hard-rejected before any storage call).
+ *
+ * Magic bytes verification:
+ * - Reads first 12 bytes of file buffer to verify actual file content
+ * - Checks against known video signatures: MP4 (ftyp), MOV (ftyp/wide), AVI (RIFF), MKV (\x1A\x45\xDF\xA3)
+ * - Prevents malware masquerading as video files via extension/MIME spoofing
  *
  * Environment variables required (see app/lib/cloudStorage.ts for full list):
  *   CLOUD_STORAGE_BUCKET, CLOUD_STORAGE_REGION, AWS_ACCESS_KEY_ID,
@@ -34,17 +39,23 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
-import { uploadToQuarantine, moveFromQuarantine, deleteFile } from "@/app/lib/cloudStorage";
-import { scanFile, VirusScanError, getScanConfig } from "@/app/lib/virusScan";
+import { getScanConfig } from "@/app/lib/virusScan";
+import {
+  ALLOWED_TYPES,
+  ALLOWED_EXTENSIONS,
+  processUploadedBuffer,
+  validateMagicBytes,
+} from "@/app/api/upload/shared/processUpload";
 import { checkCsrf } from "@/app/lib/csrf";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
-import { MAX_UPLOAD_SIZE_BYTES } from "@/app/lib/constants";
+import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST } from "@/app/lib/constants";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
 import { logger } from "@/app/lib/logger";
 
-export { MAX_UPLOAD_SIZE_BYTES };
-const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/x-msvideo", "video/x-matroska"];
-const ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv"];
+export { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST };
+export { ALLOWED_TYPES, ALLOWED_EXTENSIONS, validateMagicBytes };
 
 function validateFile(file: File): string | null {
   if (file.size > MAX_UPLOAD_SIZE_BYTES) {
@@ -59,6 +70,9 @@ function validateFile(file: File): string | null {
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/upload"));
+    if (rateLimited) return rateLimited;
+
     const csrfError = checkCsrf(request);
     if (csrfError) return csrfError;
 
@@ -79,6 +93,13 @@ export async function POST(request: NextRequest) {
         code: "NO_FILES",
       };
       return NextResponse.json(body, { status: 400 });
+    }
+
+    if (files.length > MAX_FILES_PER_REQUEST) {
+      return NextResponse.json(
+        { error: `Too many files. Maximum ${MAX_FILES_PER_REQUEST} files per request.` },
+        { status: 400 }
+      );
     }
 
     // Validate every file before touching storage
@@ -103,64 +124,12 @@ export async function POST(request: NextRequest) {
     // Upload all files to quarantine and scan them
     const results = await Promise.all(
       files.map(async (file) => {
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
-
-        // Step 1: Upload to quarantine
-        const quarantine = await uploadToQuarantine(
+        const buffer = Buffer.from(await file.arrayBuffer());
+        return processUploadedBuffer(
           buffer,
           file.name,
-          file.type || "application/octet-stream"
+          file.type || "application/octet-stream",
         );
-        logger.info(`[Upload] File quarantined: ${quarantine.jobId} at ${quarantine.quarantineKey}`);
-
-        // Step 2: Scan the file
-        let scanResult;
-        try {
-          scanResult = await scanFile(buffer);
-          logger.info(
-            `[Upload] Scan complete for ${quarantine.jobId}: clean=${scanResult.isClean}, provider=${scanResult.provider}`
-          );
-        } catch (scanErr) {
-          // Scan failed or timed out - treat as quarantined (not clean)
-          const error = scanErr instanceof VirusScanError ? scanErr : new Error(String(scanErr));
-          logger.error(`[Upload] Scan error for ${quarantine.jobId}: ${error.message}`);
-
-          // Delete the quarantined file since we can't verify it's safe
-          try {
-            await deleteFile(quarantine.quarantineKey);
-            logger.info(`[Upload] Quarantined file deleted: ${quarantine.quarantineKey}`);
-          } catch (deleteErr) {
-            logger.error(`[Upload] Failed to delete quarantined file: ${deleteErr}`);
-          }
-
-          throw new Error(`File failed security scan (${error.message})`);
-        }
-
-        // Step 3: Process based on scan result
-        if (!scanResult.isClean) {
-          // File is infected - delete it
-          try {
-            await deleteFile(quarantine.quarantineKey);
-            logger.info(`[Upload] Infected file deleted: ${quarantine.quarantineKey}`);
-          } catch (deleteErr) {
-            logger.error(`[Upload] Failed to delete infected file: ${deleteErr}`);
-          }
-          throw new Error("File failed security scan");
-        }
-
-        // Step 4: Move from quarantine to final location
-        const finalResult = await moveFromQuarantine(quarantine.jobId, quarantine.filename);
-        logger.info(`[Upload] File released from quarantine: ${quarantine.jobId}`);
-
-        return {
-          name: finalResult.filename,
-          size: buffer.length,
-          type: file.type || "application/octet-stream",
-          jobId: finalResult.jobId,
-          objectKey: finalResult.objectKey,
-          url: finalResult.url,
-        };
       })
     );
 

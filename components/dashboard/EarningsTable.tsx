@@ -3,13 +3,14 @@
 import React, { useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
-import type { Transaction, Summary } from "@/app/lib/mockApi";
+import SkeletonTable from "@/components/ui/SkeletonTable";
+import type { EarningTransaction, EarningsSummary } from "@/app/api/earnings/types";
 
 interface EarningsTableProps {
-  transactions: Transaction[];
-  summary: Summary;
+  transactions: EarningTransaction[];
+  summary: EarningsSummary;
   loading?: boolean;
-  onFilteredTransactionsChange?: (filtered: Transaction[]) => void;
+  onFilteredTransactionsChange?: (filtered: EarningTransaction[]) => void;
   /** Pagination from the parent (server-driven). When provided, renders prev/next controls. */
   pagination?: { page: number; pageSize: number; total: number; totalPages: number };
   onPageChange?: (page: number) => void;
@@ -19,6 +20,13 @@ const STATUS_STYLES: Record<string, string> = {
   completed: "text-green-400",
   pending: "text-yellow-400",
   failed: "text-red-400",
+};
+
+const TYPE_LABEL: Record<string, string> = {
+  payout: "Payout",
+  royalty: "Royalty",
+  mint: "Mint",
+  referral: "Referral Bonus",
 };
 
 export default function EarningsTable({
@@ -72,7 +80,7 @@ export default function EarningsTable({
             value={search}
             onChange={(e) => updateFilters({ search: e.target.value })}
             placeholder="Search by ID, description or platform"
-            className="w-full bg-input text-white text-sm rounded-xl px-4 py-2.5 pr-8 border border-white/10 placeholder:text-muted-foreground focus:outline-none focus:border-brand/50"
+            className="w-full bg-input text-white text-sm rounded-xl px-4 py-2.5 pr-8 border border-white/10 placeholder:text-muted-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
           />
           {search && (
             <button
@@ -93,7 +101,7 @@ export default function EarningsTable({
               type="date"
               value={startDate}
               onChange={(e) => updateFilters({ startDate: e.target.value })}
-              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus:border-brand/50"
+              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
             />
           </label>
           <label className="flex flex-col gap-1 text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
@@ -102,7 +110,7 @@ export default function EarningsTable({
               type="date"
               value={endDate}
               onChange={(e) => updateFilters({ endDate: e.target.value })}
-              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus:border-brand/50"
+              className="bg-input text-white text-sm rounded-xl px-3 py-2 border border-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus:border-brand/50"
             />
           </label>
           {hasDates && (
@@ -129,6 +137,7 @@ export default function EarningsTable({
               <th className="px-5 py-3 text-left">Date</th>
               <th className="px-5 py-3 text-left">Description</th>
               <th className="px-5 py-3 text-left">Platform</th>
+              <th className="px-5 py-3 text-left">Type</th>
               <th className="px-5 py-3 text-right">Amount</th>
               <th className="px-5 py-3 text-left">Status</th>
               <th className="px-5 py-3 text-left">Tax ID</th>
@@ -138,7 +147,7 @@ export default function EarningsTable({
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i} className="border-b border-white/5">
-                  {Array.from({ length: 6 }).map((_, j) => (
+                  {Array.from({ length: 7 }).map((_, j) => (
                     <td key={j} className="px-5 py-3.5">
                       <div className="h-4 rounded bg-white/6 animate-pulse" />
                     </td>
@@ -147,7 +156,7 @@ export default function EarningsTable({
               ))
             ) : filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-10 text-center text-muted-foreground">
+                <td colSpan={7} className="px-5 py-10 text-center text-muted-foreground">
                   No transactions match your filters.
                 </td>
               </tr>
@@ -157,6 +166,7 @@ export default function EarningsTable({
                   <td className="px-5 py-3.5 text-muted-foreground">{tx.date}</td>
                   <td className="px-5 py-3.5 text-white">{tx.description}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{tx.platform}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground">{TYPE_LABEL[tx.type] ?? tx.type}</td>
                   <td className="px-5 py-3.5 text-right font-mono font-bold text-white">
                     ${tx.amount.toFixed(2)}
                     {tx.cryptoAmount && (

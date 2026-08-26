@@ -318,14 +318,13 @@ export default function MintComponent() {
 Use the `mintUtils` for cost calculations:
 
 ```tsx
-import { calculateMintCost, formatSol } from '@/app/lib/mintUtils';
+import { calculateStellarMintCost, formatXlm } from '@/app/lib/mintUtils';
 
 const clipCount = 5;
-const { gasFee, storageCost, totalCost } = calculateMintCost(clipCount);
+const { gasFee, totalCost } = calculateStellarMintCost(clipCount);
 
-console.log(`Gas: ${formatSol(gasFee)}`);
-console.log(`Storage: ${formatSol(storageCost)}`);
-console.log(`Total: ${formatSol(totalCost)}`);
+console.log(`Gas: ${formatXlm(gasFee)}`);
+console.log(`Total: ${formatXlm(totalCost)}`);
 ```
 
 ## Testing
