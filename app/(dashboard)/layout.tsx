@@ -1,5 +1,6 @@
 "use client";
 
+import "./dashboard.css";
 import React, {
   useState,
   useMemo,

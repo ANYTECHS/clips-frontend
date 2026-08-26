@@ -92,7 +92,6 @@
   }
 }
 
-/* Micro-animations and utility classes for effects */
 @layer utilities {
   .radial-bg {
     position: fixed;
@@ -106,41 +105,6 @@
     z-index: -1;
   }
 
-  .glass-card {
-    background: rgba(16, 22, 20, 0.7);
-    backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.05);
-  }
-
-  .shake {
-    animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
-  }
-
-  /* Mobile optimizations */
-  .dashboard-main {
-    @apply px-3 sm:px-6 lg:px-10 pb-12;
-    padding-bottom: env(safe-area-inset-bottom);
-    padding-left: max(1rem, env(safe-area-inset-left));
-    padding-right: max(1rem, env(safe-area-inset-right));
-  }
-
-  .sidebar-nav-item {
-    @apply py-3 sm:py-4 px-4;
-  }
-
-  .chart-container {
-    @apply w-full h-auto min-h-[250px] sm:min-h-[300px] lg:min-h-[350px];
-  }
-
-  /* Smooth mobile scrollbar */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
-
   /* Glow scaling for mobile */
   @media (max-width: 640px) {
     .glow-large {
@@ -149,49 +113,10 @@
   }
 }
 
-@keyframes shake {
-  10%, 90% { transform: translate3d(-1px, 0, 0); }
-  20%, 80% { transform: translate3d(2px, 0, 0); }
-  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-  40%, 60% { transform: translate3d(4px, 0, 0); }
-}
-
 /* Skeleton shimmer animation — used by components/ui/Skeleton.tsx (#871) */
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(200%); }
-}
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes ping-once {
-  0% { transform: scale(1); opacity: 0.6; }
-  70% { transform: scale(1.4); opacity: 0; }
-  100% { transform: scale(1.4); opacity: 0; }
-}
-
-@layer utilities {
-  .animate-spin-slow {
-    animation: spin-slow 3s linear infinite;
-  }
-
-  .animate-slide-in {
-    animation: slide-in 0.3s ease-out;
-  }
-}
-
-@keyframes slide-in {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -206,4 +131,3 @@
     animation-iteration-count: infinite !important;
   }
 }
-
