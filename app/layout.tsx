@@ -56,12 +56,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
         <ResourceHints />
       </head>
-      <body className={inter.className}>
-    <html lang="en" suppressHydrationWarning className={inter.variable}>
       <body className={`${inter.className} font-sans antialiased`}>
         <div className="radial-bg" />
         <PerformanceMonitor />
