@@ -8,6 +8,7 @@ import { AnimeTransformControls } from "@/components/transform/AnimeTransformCon
 import { useAnimePreview } from "@/app/hooks/useAnimePreview";
 import { DEFAULT_ANIME_OPTIONS, type AnimeTransformOptions } from "@/app/lib/animeTransform";
 import { sanitize } from "@/app/lib/sanitize";
+import { DEFAULT_BLUR_PLACEHOLDER, SIZES_MODAL_PREVIEW } from "@/app/lib/imageUtils";
 import type { TransformOptions } from "@/app/api/transform/batch/route";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -62,6 +63,9 @@ function PreviewThumbnail({ previewUrl, isLoading, error }: PreviewThumbnailProp
             src={previewUrl}
             alt="Low-res anime style preview"
             fill
+            sizes={SIZES_MODAL_PREVIEW}
+            placeholder="blur"
+            blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
             className="object-contain"
           />
         )}

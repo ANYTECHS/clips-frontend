@@ -2,6 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { sanitize } from "@/app/lib/sanitize";
+import { DEFAULT_BLUR_PLACEHOLDER, SIZES_PROJECT_CARD_THUMB } from "@/app/lib/imageUtils";
 
 export interface ProjectCardProps {
   id?: string;
@@ -25,6 +26,9 @@ function ProjectCard({
           src={thumbnail}
           alt={sanitize(title)}
           fill
+          sizes={SIZES_PROJECT_CARD_THUMB}
+          placeholder="blur"
+          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
           className="object-cover"
         />
       </div>

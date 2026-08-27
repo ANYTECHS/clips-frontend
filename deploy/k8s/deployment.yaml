@@ -1,0 +1,125 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: clipcash-frontend
+  namespace: clipcash
+  labels:
+    app.kubernetes.io/name: clipcash-frontend
+    app.kubernetes.io/component: web
+spec:
+  # HPA controls replicas — keep a floor of 2 for HA across nodes.
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: clipcash-frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      # Allow one extra pod during rollout so traffic is never dropped.
+      maxSurge: 1
+      # Never remove more than one pod at a time; maintains N-1 capacity.
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: clipcash-frontend
+        app.kubernetes.io/name: clipcash-frontend
+      annotations:
+        # Prometheus will scrape this pod directly if you're not using a
+        # ServiceMonitor CRD (e.g. bare kube-prometheus-stack install).
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/api/metrics"
+        prometheus.io/port: "3000"
+        prometheus.io/scheme: "http"
+    spec:
+      # Spread pods across failure domains (zones) for HA.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: clipcash-frontend
+      # Don't schedule two frontend pods on the same node.
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: clipcash-frontend
+                topologyKey: kubernetes.io/hostname
+
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: frontend
+          # Replace with your actual image reference.
+          # Build: docker build -t your-registry/clipcash-frontend:$(git rev-parse --short HEAD) .
+          image: your-registry/clipcash-frontend:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: clipcash-frontend-config
+            - secretRef:
+                name: clipcash-frontend-secrets
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "512Mi"
+            limits:
+              # No CPU limit intentionally — CPU throttling causes latency
+              # spikes on Node.js; let the HPA handle scale-out instead.
+              memory: "1Gi"
+
+          # Readiness: wait until all external dependencies are reachable
+          # before sending traffic. Checked every 10 s; pod removed from
+          # service endpoints after 3 consecutive failures.
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+            successThreshold: 1
+            timeoutSeconds: 5
+
+          # Liveness: restart the container if the process hangs.
+          # More lenient than readiness — only fails after 3 consecutive
+          # misses to avoid restart loops during transient dependency blips.
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+            successThreshold: 1
+            timeoutSeconds: 5
+
+          # Startup: give the Next.js server up to 60 s to boot before
+          # liveness/readiness probes kick in (important on cold starts with
+          # large bundles or slow secrets injection).
+          startupProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
+            timeoutSeconds: 5
+
+          lifecycle:
+            # Drain in-flight requests before the pod is terminated.
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]

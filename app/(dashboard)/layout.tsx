@@ -1,66 +1,42 @@
-"use client";
+/**
+ * Dashboard layout — Server Component.
+ *
+ * Responsibilities:
+ *  1. Read the session via auth() — the only server-side auth call needed
+ *     for the entire dashboard subtree.
+ *  2. Redirect unauthenticated visitors to /login before any child renders,
+ *     eliminating the client-side flash that the previous "use client" layout
+ *     caused (AuthProvider would redirect one frame after mount).
+ *  3. Render <DashboardShell> — the "use client" interactive wrapper that
+ *     owns sidebar state, service-health polling, and the degraded banner.
+ *
+ * This file intentionally has NO "use client" directive so Next.js can:
+ *  - Stream the layout HTML before JS bundles are parsed
+ *  - Cache the shell across navigations at the segment level
+ *  - Avoid including auth/session logic in any client bundle
+ */
 
-import React, {
-  useState,
-  useMemo,
-  useCallback,
-  createContext,
-  useContext,
-} from "react";
-import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
-import DashboardHeader from "@/components/dashboard/DashboardHeader";
-import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import { redirect } from "next/navigation";
+import { auth } from "@/app/lib/auth";
+import DashboardShell from "./DashboardShell";
 
-interface SidebarContextType {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
-}
-
-const SidebarContext = createContext<SidebarContextType>({
-  sidebarOpen: false,
-  setSidebarOpen: () => {},
-});
-
-export function useSidebar() {
-  return useContext(SidebarContext);
-}
-
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const session = await auth();
 
-  const closeSidebar = useCallback(() => setSidebarOpen(false), []);
-  const openSidebar = useCallback(() => setSidebarOpen(true), []);
+  // Hard-redirect unauthenticated visitors server-side.
+  // This replaces the previous client-side redirect in AuthProvider and
+  // eliminates a full round-trip + hydration before the user is sent to /login.
+  if (!session?.user) {
+    redirect("/login");
+  }
 
-  // An inline object literal here would be a new value on every layout render,
-  // re-rendering every `useSidebar()` consumer even when the flag is unchanged.
-  const sidebarContext = useMemo(
-    () => ({ sidebarOpen, setSidebarOpen }),
-    [sidebarOpen],
-  );
-
-  return (
-    <SidebarContext.Provider value={sidebarContext}>
-      <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
-        <BackgroundOrbs variant="default" />
-
-        {sidebarOpen && (
-          <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden animate-in fade-in duration-300"
-            onClick={closeSidebar}
-          />
-        )}
-
-        <DashboardSidebar isOpen={sidebarOpen} onClose={closeSidebar} />
-
-        <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
-          <DashboardHeader onMenuClick={openSidebar} />
-          {children}
-        </main>
-      </div>
-    </SidebarContext.Provider>
-  );
+  return <DashboardShell>{children}</DashboardShell>;
 }
+
+// Re-export useSidebar so existing consumers that import it from the layout
+// path continue to work without changes.
+export { useSidebar } from "./DashboardShell";
