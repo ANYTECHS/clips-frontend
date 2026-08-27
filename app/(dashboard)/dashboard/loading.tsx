@@ -1,31 +1,28 @@
-import React from "react";
-import Skeleton from "@/components/ui/Skeleton";
+/**
+ * Streaming loading UI for the dashboard home page.
+ *
+ * Next.js streams this component while the async server component (page.tsx)
+ * awaits its data fetch. It covers only the page content area — the shell
+ * chrome (sidebar, header) is already rendered by the server layout and does
+ * not need to be duplicated here.
+ */
+import RouteSkeleton from "@/components/ui/RouteSkeleton";
 
 export default function Loading() {
   return (
-    <div className="flex h-screen bg-background text-white font-sans overflow-hidden">
-      <div className="hidden lg:flex flex-col sticky top-0 h-screen py-10 pl-10 shrink-0 w-64 border-r border-white/5">
-        <Skeleton className="w-full h-8 mb-6" />
-        <Skeleton className="w-full h-10 mb-2" />
-        <Skeleton className="w-full h-10 mb-2" />
-        <Skeleton className="w-full h-10 mb-2" />
-        <Skeleton className="w-full h-10 mb-2" />
+    <div className="px-4 sm:px-6 lg:px-10 xl:px-16 py-10 min-w-0">
+      {/* Page heading placeholder */}
+      <div className="flex flex-col gap-2 mb-8 px-2">
+        <div className="h-9 w-48 rounded-xl bg-white/5 animate-pulse" />
+        <div className="h-4 w-80 rounded-lg bg-white/5 animate-pulse" />
       </div>
-      <main className="flex-1 flex flex-col h-screen relative z-10 px-4 sm:px-6 lg:px-10 xl:px-16 overflow-hidden min-w-0 pt-10">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-8">
-          <Skeleton className="h-10 w-64" />
-          <Skeleton className="h-10 w-10 rounded-full" />
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Skeleton className="h-32 w-full rounded-2xl" />
-          <Skeleton className="h-32 w-full rounded-2xl" />
-          <Skeleton className="h-32 w-full rounded-2xl" />
-          <Skeleton className="h-32 w-full rounded-2xl" />
-        </div>
-        <div className="mt-8">
-          <Skeleton className="h-[400px] w-full rounded-2xl" />
-        </div>
-      </main>
+
+      {/* Stat cards + chart */}
+      <RouteSkeleton
+        variant="stats"
+        maxWidthClass="max-w-[1400px]"
+        count={3}
+      />
     </div>
   );
 }

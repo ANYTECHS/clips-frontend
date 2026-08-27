@@ -1,0 +1,66 @@
+{
+  "framework": "nextjs",
+
+  "regions": ["iad1"],
+
+  "functions": {
+    "app/api/upload/route.ts": {
+      "memory": 3008,
+      "maxDuration": 60
+    },
+    "app/api/jobs/[id]/callback/route.ts": {
+      "memory": 256,
+      "maxDuration": 10
+    },
+    "app/api/jobs/[id]/stream/route.ts": {
+      "memory": 256,
+      "maxDuration": 300
+    },
+    "app/api/health/route.ts": {
+      "memory": 128,
+      "maxDuration": 5
+    },
+    "app/api/health/ready/route.ts": {
+      "memory": 256,
+      "maxDuration": 15
+    },
+    "app/api/health/circuit-breakers/route.ts": {
+      "memory": 128,
+      "maxDuration": 5
+    },
+    "app/api/metrics/route.ts": {
+      "memory": 256,
+      "maxDuration": 15
+    },
+    "app/api/jobs/[id]/route.ts": {
+      "memory": 256,
+      "maxDuration": 15
+    }
+  },
+
+  "crons": [
+    {
+      "path": "/api/cron/requeue-stalled-jobs",
+      "schedule": "*/5 * * * *"
+    },
+    {
+      "path": "/api/cron/cleanup-old-jobs",
+      "schedule": "0 3 * * *"
+    }
+  ],
+
+  "headers": [
+    {
+      "source": "/api/metrics",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    },
+    {
+      "source": "/api/health/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
+      ]
+    }
+  ]
+}
