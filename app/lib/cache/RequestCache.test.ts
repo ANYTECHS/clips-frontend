@@ -158,6 +158,68 @@ describe("RequestCache", () => {
     });
   });
 
+  describe("batching", () => {
+    it("loads multiple missing keys with one batch request", async () => {
+      const cache = new RequestCache({ ttlMs: 60_000 });
+      const batchFetcher = jest.fn(async (keys: readonly string[]) =>
+        new Map(keys.map((key) => [key, key.toUpperCase()])),
+      );
+
+      const result = await cache.fetchBatch(["a", "b", "c"], batchFetcher);
+
+      expect(batchFetcher).toHaveBeenCalledTimes(1);
+      expect(batchFetcher).toHaveBeenCalledWith(["a", "b", "c"]);
+      expect([...result.entries()]).toEqual([["a", "A"], ["b", "B"], ["c", "C"]]);
+
+      await cache.fetch("b", jest.fn());
+      expect(cache.peek("a")).toBe("A");
+      expect(cache.peek("b")).toBe("B");
+      expect(cache.peek("c")).toBe("C");
+    });
+
+    it("batches only keys that are not already cached", async () => {
+      const cache = new RequestCache({ ttlMs: 60_000 });
+      await cache.fetch("a", async () => "A");
+      const batchFetcher = jest.fn(async (keys: readonly string[]) =>
+        new Map(keys.map((key) => [key, key.toUpperCase()])),
+      );
+
+      const result = await cache.fetchBatch(["a", "b"], batchFetcher);
+
+      expect(batchFetcher).toHaveBeenCalledWith(["b"]);
+      expect(result.get("a")).toBe("A");
+      expect(result.get("b")).toBe("B");
+    });
+
+    it("keeps results aligned when a batch meets an in-flight read", async () => {
+      const cache = new RequestCache({ ttlMs: 60_000 });
+      const firstRequest = deferred<string>();
+      const singleFetcher = jest.fn().mockReturnValue(firstRequest.promise);
+      const firstRead = cache.fetch("a", singleFetcher);
+      const batchFetcher = jest.fn(async (keys: readonly string[]) =>
+        new Map(keys.map((key) => [key, key.toUpperCase()])),
+      );
+
+      const batchRead = cache.fetchBatch(["b", "a"], batchFetcher);
+      firstRequest.resolve("A");
+
+      const result = await batchRead;
+      await firstRead;
+      expect(result.get("b")).toBe("B");
+      expect(result.get("a")).toBe("A");
+      expect(batchFetcher).toHaveBeenCalledWith(["b"]);
+    });
+
+    it("rejects invalid keys and incomplete results", async () => {
+      const cache = new RequestCache();
+      const batchFetcher = jest.fn(async () => new Map<string, string>());
+
+      await expect(cache.fetchBatch([], batchFetcher)).rejects.toThrow("at least one key");
+      await expect(cache.fetchBatch(["a", "a"], batchFetcher)).rejects.toThrow("unique");
+      await expect(cache.fetchBatch(["a"], batchFetcher)).rejects.toThrow("exactly one value");
+    });
+  });
+
   describe("size limits", () => {
     it("evicts the least recently used entry past the limit", async () => {
       const cache = new RequestCache({ maxEntries: 2, ttlMs: 60_000 });

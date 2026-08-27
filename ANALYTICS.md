@@ -223,6 +223,25 @@ Event Recorded
 
 ## Testing
 
+### Data Fetching Analytics
+
+The shared `RequestCache` records bounded, process-local fetch telemetry in
+`app/lib/cache/FetchAnalytics.ts`. It tracks total reads, errors, cache hits,
+batch size, average duration, and p95 duration. Keys are retained only as
+internal metric labels; response data, request bodies, and user identifiers are
+never recorded.
+
+The protected `GET /api/metrics` dashboard feed exposes these values as JSON
+under `fetches` and as Prometheus metrics such as
+`clipcash_fetch_p95_duration_ms` and `clipcash_fetch_errors_total`. Configure
+the existing `METRICS_TOKEN` before scraping production metrics. The values are
+process-local and bounded to the latest 1,000 samples, so aggregate them in
+Prometheus or your monitoring provider for a multi-instance deployment.
+
+Fetch analytics is enabled automatically for the shared cache. Custom cache
+instances can inject an isolated `FetchAnalytics` collector through the
+`analytics` constructor option, which is useful for tests and benchmarks.
+
 ### Development Mode
 
 In development, analytics events are logged to the console:
