@@ -1,4 +1,7 @@
-"use client";
+import React, { Suspense } from "react";
+import { getProjectDetail } from "@/app/lib/projectService";
+import ProjectDetailClient from "./ProjectDetailClient";
+import ProjectDetailLoading from "./loading";
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
@@ -13,101 +16,9 @@ import {
   SIZES_CLIP_GRID,
 } from "@/app/lib/imageUtils";
 
-interface ProjectDetail {
-  id: string;
-  name: string;
-  thumbnailUrl: string;
-  videoUrl: string;
-  clipCount: number;
-}
-
-export default function ProjectDetailPage() {
-  const params = useParams();
-  const router = useRouter();
-  const projectId = params.id as string;
-  const { showToast, ToastEl } = useToast();
-
-  const [project, setProject] = useState<ProjectDetail | null>(null);
-  const [clips, setClips] = useState<Clip[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [renaming, setRenaming] = useState(false);
-  const [newName, setNewName] = useState("");
-
-  const fetchProject = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [projRes, clipsRes] = await Promise.all([
-        fetch(`/api/projects/${projectId}`),
-        fetch(`/api/projects/${projectId}/clips`),
-      ]);
-
-      if (!projRes.ok) throw new Error("Project not found");
-      const projJson = await projRes.json();
-      setProject(projJson.data);
-      setNewName(projJson.data.name);
-
-      if (clipsRes.ok) {
-        const clipsJson = await clipsRes.json();
-        setClips(clipsJson.data?.clips ?? []);
-      }
-    } catch {
-      showToast("Failed to load project", "error");
-    } finally {
-      setLoading(false);
-    }
-  }, [projectId, showToast]);
-
-  useEffect(() => {
-    fetchProject();
-  }, [fetchProject]);
-
-  const handleRename = async () => {
-    if (!newName.trim()) return;
-    try {
-      const res = await fetch(`/api/projects/${projectId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: newName.trim() }),
-      });
-      if (!res.ok) throw new Error("Rename failed");
-      setRenaming(false);
-      showToast("Project renamed", "success");
-      fetchProject();
-    } catch {
-      showToast("Failed to rename project", "error");
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm("Delete this project and all its clips?")) return;
-    try {
-      const res = await fetch(`/api/projects/${projectId}`, { method: "DELETE" });
-      if (!res.ok) throw new Error("Delete failed");
-      showToast("Project deleted", "success");
-      router.push("/projects");
-    } catch {
-      showToast("Failed to delete project", "error");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="w-8 h-8 border-4 border-brand border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!project) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-muted-foreground">Project not found</p>
-        <Link href="/projects" className="text-brand hover:underline mt-4 inline-block">
-          Back to Projects
-        </Link>
-      </div>
-    );
-  }
+export default async function ProjectPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
+  const { project, clips } = await getProjectDetail(params.id);
 
   return (
     <div className="space-y-8 max-w-[1400px] mx-auto w-full">
