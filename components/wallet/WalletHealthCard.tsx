@@ -10,12 +10,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   UNKNOWN_ERROR: "An unexpected error occurred.",
 };
 
-interface WalletHealthCardProps {
-  publicKey: string | null;
-}
-
-export default function WalletHealthCard({ publicKey }: WalletHealthCardProps) {
-  const { status, error, balance, networkLabel } = useAutoStellarWallet();
+export default function WalletHealthCard() {
+  const { publicKey, status, error, balance, networkLabel } = useAutoStellarWallet();
 
   if (!publicKey) {
     return null;

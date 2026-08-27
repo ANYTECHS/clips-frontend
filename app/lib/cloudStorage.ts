@@ -31,6 +31,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";
 import { withRetry } from "./retryUtils";
+import { getCircuitBreaker } from "./circuitBreaker";
+import { logger } from "./logger";
 
 // ─── Concurrency Limited Execution Utility ───────────────────────────────────
 
@@ -158,6 +160,31 @@ export interface UploadResult {
   contentType: string;
 }
 
+// ─── S3 error classification ──────────────────────────────────────────────────
+
+/**
+ * Returns true for S3 errors that should NOT be retried.
+ * Credentials, bucket-not-found and permission errors are permanent failures.
+ */
+function isNonRetryableS3Error(err: unknown): boolean {
+  if (!(err instanceof Error)) return false;
+  const name = (err as Error & { name?: string }).name ?? "";
+  const code = (err as Error & { Code?: string; $metadata?: { httpStatusCode?: number } }).Code ?? "";
+  const httpStatus =
+    (err as Error & { $metadata?: { httpStatusCode?: number } }).$metadata
+      ?.httpStatusCode ?? 0;
+  return (
+    name === "NoSuchBucket" ||
+    name === "AccessDenied" ||
+    code === "NoSuchBucket" ||
+    code === "AccessDenied" ||
+    code === "InvalidAccessKeyId" ||
+    code === "SignatureDoesNotMatch" ||
+    httpStatus === 403 ||
+    httpStatus === 404
+  );
+}
+
 // ─── Single-part upload (<= MULTIPART_THRESHOLD) ─────────────────────────────
 
 /**
@@ -177,14 +204,23 @@ async function uploadSinglePart(
   buffer: Buffer,
   contentType: string,
 ): Promise<void> {
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: buffer,
-      ContentType: contentType,
-      ContentLength: buffer.length,
-    }),
+  await withRetry(
+    () =>
+      client.send(
+        new PutObjectCommand({
+          Bucket: bucket,
+          Key: key,
+          Body: buffer,
+          ContentType: contentType,
+          ContentLength: buffer.length,
+        }),
+      ),
+    {
+      maxAttempts: 3,
+      baseDelayMs: 300,
+      maxDelayMs: 5_000,
+      shouldAbort: isNonRetryableS3Error,
+    },
   );
 }
 
@@ -244,7 +280,7 @@ async function uploadMultipart(
                 ContentLength: chunk.length,
               }),
             ),
-          { maxAttempts: 3 },
+          { maxAttempts: 3, shouldAbort: isNonRetryableS3Error },
         );
         if (!ETag) throw new Error(`Missing ETag for part ${partNumber}`);
         return { ETag, PartNumber: partNumber };
@@ -290,26 +326,29 @@ export async function uploadFile(
   filename: string,
   contentType: string,
 ): Promise<UploadResult> {
-  const client = buildS3Client();
-  const bucket = BUCKET();
+  const cb = getCircuitBreaker("cloudStorage");
+  return cb.executeOrThrow(async () => {
+    const client = buildS3Client();
+    const bucket = BUCKET();
 
-  const jobId = `job_${randomUUID().replace(/-/g, "")}`;
-  const ext = filename.split(".").pop() ?? "bin";
-  const objectKey = `${KEY_PREFIX}${jobId}.${ext}`;
+    const jobId = `job_${randomUUID().replace(/-/g, "")}`;
+    const ext = filename.split(".").pop() ?? "bin";
+    const objectKey = `${KEY_PREFIX}${jobId}.${ext}`;
 
-  if (buffer.length > MULTIPART_THRESHOLD) {
-    await uploadMultipart(client, bucket, objectKey, buffer, contentType);
-  } else {
-    await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
-  }
+    if (buffer.length > MULTIPART_THRESHOLD) {
+      await uploadMultipart(client, bucket, objectKey, buffer, contentType);
+    } else {
+      await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
+    }
 
-  const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
-  const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
-  const url = endpoint
-    ? `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`
-    : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+    const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
+    const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
+    const url = endpoint
+      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`
+      : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
 
-  return { jobId, objectKey, url, filename, size: buffer.length, contentType };
+    return { jobId, objectKey, url, filename, size: buffer.length, contentType };
+  });
 }
 
 /**
@@ -328,20 +367,23 @@ export async function uploadToQuarantine(
   filename: string,
   contentType: string,
 ): Promise<{ jobId: string; quarantineKey: string; filename: string }> {
-  const client = buildS3Client();
-  const bucket = BUCKET();
+  const cb = getCircuitBreaker("cloudStorage");
+  return cb.executeOrThrow(async () => {
+    const client = buildS3Client();
+    const bucket = BUCKET();
 
-  const jobId = `job_${randomUUID().replace(/-/g, "")}`;
-  const ext = filename.split(".").pop() ?? "bin";
-  const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
+    const jobId = `job_${randomUUID().replace(/-/g, "")}`;
+    const ext = filename.split(".").pop() ?? "bin";
+    const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
 
-  if (buffer.length > MULTIPART_THRESHOLD) {
-    await uploadMultipart(client, bucket, quarantineKey, buffer, contentType);
-  } else {
-    await uploadSinglePart(client, bucket, quarantineKey, buffer, contentType);
-  }
+    if (buffer.length > MULTIPART_THRESHOLD) {
+      await uploadMultipart(client, bucket, quarantineKey, buffer, contentType);
+    } else {
+      await uploadSinglePart(client, bucket, quarantineKey, buffer, contentType);
+    }
 
-  return { jobId, quarantineKey, filename };
+    return { jobId, quarantineKey, filename };
+  });
 }
 
 /**
@@ -356,42 +398,50 @@ export async function uploadToQuarantine(
  * @returns UploadResult with the final object key and URL.
  */
 export async function moveFromQuarantine(jobId: string, filename: string): Promise<UploadResult> {
-  const client = buildS3Client();
-  const bucket = BUCKET();
+  const cb = getCircuitBreaker("cloudStorage");
+  return cb.executeOrThrow(async () => {
+    const client = buildS3Client();
+    const bucket = BUCKET();
 
-  const ext = filename.split(".").pop() ?? "bin";
-  const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
-  const finalKey = `${KEY_PREFIX}${jobId}.${ext}`;
+    const ext = filename.split(".").pop() ?? "bin";
+    const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
+    const finalKey = `${KEY_PREFIX}${jobId}.${ext}`;
 
-  await client.send(
-    new CopyObjectCommand({
-      Bucket: bucket,
-      CopySource: `${bucket}/${quarantineKey}`,
-      Key: finalKey,
-    }),
-  );
+    await withRetry(
+      () =>
+        client.send(
+          new CopyObjectCommand({
+            Bucket: bucket,
+            CopySource: `${bucket}/${quarantineKey}`,
+            Key: finalKey,
+          }),
+        ),
+      { maxAttempts: 3, baseDelayMs: 300, shouldAbort: isNonRetryableS3Error },
+    );
 
-  await client.send(
-    new DeleteObjectCommand({
-      Bucket: bucket,
-      Key: quarantineKey,
-    }),
-  );
+    await withRetry(
+      () =>
+        client.send(
+          new DeleteObjectCommand({ Bucket: bucket, Key: quarantineKey }),
+        ),
+      { maxAttempts: 3, baseDelayMs: 300, shouldAbort: isNonRetryableS3Error },
+    );
 
-  const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
-  const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
-  const url = endpoint
-    ? `${endpoint.replace(/\/$/, "")}/${bucket}/${finalKey}`
-    : `https://${bucket}.s3.${region}.amazonaws.com/${finalKey}`;
+    const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
+    const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
+    const url = endpoint
+      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${finalKey}`
+      : `https://${bucket}.s3.${region}.amazonaws.com/${finalKey}`;
 
-  return {
-    jobId,
-    objectKey: finalKey,
-    url,
-    filename,
-    size: 0,
-    contentType: "application/octet-stream",
-  };
+    return {
+      jobId,
+      objectKey: finalKey,
+      url,
+      filename,
+      size: 0,
+      contentType: "application/octet-stream",
+    };
+  });
 }
 
 /**
@@ -401,14 +451,24 @@ export async function moveFromQuarantine(jobId: string, filename: string): Promi
  * @returns Resolves when the file deletion confirmation completes.
  */
 export async function deleteFile(objectKey: string): Promise<void> {
-  const client = buildS3Client();
-  const bucket = BUCKET();
-
-  await client.send(
-    new DeleteObjectCommand({
-      Bucket: bucket,
-      Key: objectKey,
-    }),
+  const cb = getCircuitBreaker("cloudStorage");
+  await cb.execute(
+    () =>
+      withRetry(
+        async () => {
+          const client = buildS3Client();
+          const bucket = BUCKET();
+          await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: objectKey }));
+        },
+        { maxAttempts: 3, baseDelayMs: 300, shouldAbort: isNonRetryableS3Error },
+      ),
+    () => {
+      // Storage is down — log the orphaned key so ops can clean up manually.
+      // Don't throw: callers (virus scan cleanup) already wrap this in .catch().
+      logger.error(
+        `[cloudStorage] deleteFile: circuit open, could not delete orphaned key: ${objectKey}`
+      );
+    },
   );
 }
 
@@ -429,32 +489,35 @@ export async function uploadTransformResult(
   jobId: string,
   contentType: string,
 ): Promise<UploadResult> {
-  const client = buildS3Client();
-  const bucket = BUCKET();
+  const cb = getCircuitBreaker("cloudStorage");
+  return cb.executeOrThrow(async () => {
+    const client = buildS3Client();
+    const bucket = BUCKET();
 
-  const ext = contentType.includes("mp4") ? "mp4" : "mp4";
-  const objectKey = `${TRANSFORMS_PREFIX}${jobId}.${ext}`;
+    const ext = contentType.includes("mp4") ? "mp4" : "mp4";
+    const objectKey = `${TRANSFORMS_PREFIX}${jobId}.${ext}`;
 
-  if (buffer.length > MULTIPART_THRESHOLD) {
-    await uploadMultipart(client, bucket, objectKey, buffer, contentType);
-  } else {
-    await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
-  }
+    if (buffer.length > MULTIPART_THRESHOLD) {
+      await uploadMultipart(client, bucket, objectKey, buffer, contentType);
+    } else {
+      await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
+    }
 
-  const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
-  const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
-  const url = endpoint
-    ? `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`
-    : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+    const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
+    const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
+    const url = endpoint
+      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`
+      : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
 
-  return {
-    jobId,
-    objectKey,
-    url,
-    filename: `${jobId}.${ext}`,
-    size: buffer.length,
-    contentType,
-  };
+    return {
+      jobId,
+      objectKey,
+      url,
+      filename: `${jobId}.${ext}`,
+      size: buffer.length,
+      contentType,
+    };
+  });
 }
 
 // ─── Chunked upload sessions (#881) ──────────────────────────────────────────

@@ -1,9 +1,17 @@
 "use client";
 
 import React from "react";
-import TransactionHistoryViewer from "@/components/wallet/TransactionHistoryViewer";
+import dynamic from "next/dynamic";
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
+
+const TransactionHistoryViewer = dynamic(() => import("@/components/wallet/TransactionHistoryViewer"), {
+  loading: () => (
+    <div className="bg-surface border border-border rounded-[24px] p-6 h-[400px] flex items-center justify-center animate-pulse">
+      <span className="text-muted text-[13px]">Loading transactions...</span>
+    </div>
+  )
+});
 
 export default function TransactionHistoryPage() {
   return (
