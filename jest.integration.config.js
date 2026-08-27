@@ -1,27 +1,29 @@
-/**
- * Jest config for @integration tests (Stellar testnet / local network).
- * Kept separate so `npm test` stays fast and offline-friendly.
- */
-const nextJest = require("next/jest");
+const nextJest = require('next/jest')
 
 const createJestConfig = nextJest({
-  dir: "./",
-});
+  dir: './',
+})
 
 const customJestConfig = {
-  setupFilesAfterEnv: ["<rootDir>/jest.setup.js"],
-  testEnvironment: "jest-environment-node",
+  setupFilesAfterEnv: ['<rootDir>/jest.integration.setup.js'],
+  testEnvironment: 'node',
   moduleNameMapper: {
-    "^@/hooks/(.*)$": "<rootDir>/app/hooks/$1",
-    "^@/components/(.*)$": "<rootDir>/components/$1",
-    "^@/app/(.*)$": "<rootDir>/app/$1",
-    "^@/(.*)$": "<rootDir>/$1",
+    '^@/hooks/(.*)$': '<rootDir>/app/hooks/$1',
+    '^@/components/(.*)$': '<rootDir>/components/$1',
+    '^@/app/(.*)$': '<rootDir>/app/$1',
+    '^@/(.*)$': '<rootDir>/$1',
   },
-  testMatch: ["**/__tests__/integration/**/*.integration.test.[jt]s?(x)"],
-  testPathIgnorePatterns: ["<rootDir>/node_modules/", "<rootDir>/tests/e2e/"],
-  testTimeout: 90_000,
-  // Friendbot / Horizon are shared public services — avoid parallel account spam
-  maxWorkers: 1,
-};
+  testMatch: ['**/__tests__/integration/**/*.test.[jt]s?(x)'],
+  testPathIgnorePatterns: [
+    '<rootDir>/node_modules/',
+    '<rootDir>/.next/',
+  ],
+  collectCoverageFrom: [
+    'app/api/**/*.{js,jsx,ts,tsx}',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+    '!**/.next/**',
+  ],
+}
 
-module.exports = createJestConfig(customJestConfig);
+module.exports = createJestConfig(customJestConfig)

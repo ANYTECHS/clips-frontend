@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "next build && node scripts/check-performance-budget.js",
     "start": "next start",
     "lint": "eslint",
     "test": "jest",
@@ -12,6 +12,8 @@
     "test:visual": "npx playwright test tests/e2e/visual.spec.ts",
     "test:visual:update": "npx playwright test tests/e2e/visual.spec.ts --update-snapshots",
     "test:e2e": "npx playwright test",
+    "test:coverage": "jest --coverage",
+    "test:coverage:integration": "jest --config jest.integration.config.js --coverage --runInBand",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "prepare": "husky",
