@@ -1,3 +1,5 @@
+import { fetchAnalytics, type FetchAnalytics } from "./FetchAnalytics";
+
 /**
  * A small stale-while-revalidate cache for API responses.
  *
@@ -52,6 +54,8 @@ export interface RequestCacheOptions {
   maxEntries?: number;
   /** Injectable clock for tests. */
   now?: () => number;
+  /** Metrics sink for fetch performance and error tracking. */
+  analytics?: FetchAnalytics;
 }
 
 export interface FetchOptions<T> {
@@ -69,6 +73,8 @@ export interface FetchOptions<T> {
   onRevalidateError?: (error: unknown) => void;
 }
 
+export type BatchFetcher<T> = (keys: readonly string[]) => Promise<ReadonlyMap<string, T>>;
+
 export interface CacheStats {
   size: number;
   maxEntries: number;
@@ -83,6 +89,7 @@ export class RequestCache {
   private readonly staleTtlMs: number;
   private readonly maxEntries: number;
   private readonly now: () => number;
+  private readonly analytics: FetchAnalytics;
 
   /** Insertion order doubles as LRU order: re-reading re-inserts at the end. */
   private readonly entries = new Map<string, CacheEntry<unknown>>();
@@ -99,6 +106,7 @@ export class RequestCache {
     this.staleTtlMs = options.staleTtlMs ?? DEFAULT_STALE_TTL_MS;
     this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
     this.now = options.now ?? Date.now;
+    this.analytics = options.analytics ?? fetchAnalytics;
 
     if (this.maxEntries < 1) throw new Error("maxEntries must be at least 1");
   }
@@ -120,12 +128,14 @@ export class RequestCache {
     if (entry && !options.forceRefresh) {
       if (now < entry.freshUntil) {
         this.hits += 1;
+        this.analytics.record({ key, kind: "single", status: "success", cacheStatus: "hit", durationMs: 0, batchSize: 1 });
         this.touch(key, entry);
         return entry.value;
       }
 
       if (now < entry.staleUntil) {
         this.staleHits += 1;
+        this.analytics.record({ key, kind: "single", status: "success", cacheStatus: "stale", durationMs: 0, batchSize: 1 });
         this.touch(key, entry);
         // Revalidate behind the caller's back. Failures leave the stale value
         // in place — a slightly old number beats an error state.
@@ -139,6 +149,76 @@ export class RequestCache {
 
     this.misses += 1;
     return this.load(key, fetcher, options);
+  }
+
+  /**
+   * Read several keys with one batch request for the keys not already cached.
+   * Results are validated before each value enters the cache.
+   */
+  async fetchBatch<T>(
+    keys: readonly string[],
+    batchFetcher: BatchFetcher<T>,
+    options: FetchOptions<T> = {},
+  ): Promise<ReadonlyMap<string, T>> {
+    this.validateBatchKeys(keys);
+
+    const values = new Map<string, T>();
+    const pending: Array<{ key: string; request?: Promise<T> }> = [];
+
+    for (const key of keys) {
+      const entry = !options.forceRefresh
+        ? (this.entries.get(key) as CacheEntry<T> | undefined)
+        : undefined;
+
+      if (entry && this.now() < entry.freshUntil) {
+        this.hits += 1;
+        this.analytics.record({ key, kind: "batch", status: "success", cacheStatus: "hit", durationMs: 0, batchSize: 1 });
+        this.touch(key, entry);
+        values.set(key, entry.value);
+        continue;
+      }
+
+      const existing = this.inFlight.get(key) as Promise<T> | undefined;
+      if (existing) {
+        this.analytics.record({ key, kind: "batch", status: "success", cacheStatus: "in_flight", durationMs: 0, batchSize: 1 });
+        pending.push({ key, request: existing });
+        continue;
+      }
+
+      if (entry) this.delete(key);
+      this.misses += 1;
+      pending.push({ key });
+    }
+
+    const keysToLoad = pending.filter(({ request }) => !request).map(({ key }) => key);
+    if (keysToLoad.length > 0) {
+      const startedAt = this.now();
+      const batchRequest = batchFetcher(keysToLoad).then((result) => {
+        this.validateBatchResult(keysToLoad, result);
+        for (const key of keysToLoad) {
+          this.set(key, result.get(key) as T, options);
+        }
+        return result;
+      });
+      batchRequest.then(
+        () => this.analytics.record({ key: "batch", kind: "batch", status: "success", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: keysToLoad.length }),
+        () => this.analytics.record({ key: "batch", kind: "batch", status: "error", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: keysToLoad.length }),
+      );
+
+      for (const key of keysToLoad) {
+        const keyRequest = batchRequest
+          .then((result) => result.get(key) as T)
+          .finally(() => {
+            if (this.inFlight.get(key) === keyRequest) this.inFlight.delete(key);
+          });
+        this.inFlight.set(key, keyRequest);
+        pending.find((item) => item.key === key)!.request = keyRequest;
+      }
+    }
+
+    const pendingValues = await Promise.all(pending.map(({ request }) => request!));
+    pending.forEach(({ key }, index) => values.set(key, pendingValues[index]));
+    return values;
   }
 
   /** Read without fetching. Returns undefined when absent or fully expired. */
@@ -249,10 +329,16 @@ export class RequestCache {
     const existing = this.inFlight.get(key) as Promise<T> | undefined;
     if (existing) return existing;
 
+    const startedAt = this.now();
     const request = fetcher()
       .then((value) => {
+        this.analytics.record({ key, kind: "single", status: "success", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: 1 });
         this.set(key, value, options);
         return value;
+      })
+      .catch((error) => {
+        this.analytics.record({ key, kind: "single", status: "error", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: 1 });
+        throw error;
       })
       .finally(() => {
         this.inFlight.delete(key);
@@ -283,6 +369,22 @@ export class RequestCache {
       if (oldest.done) break;
       this.delete(oldest.value);
       this.evictions += 1;
+    }
+  }
+
+  private validateBatchKeys(keys: readonly string[]): void {
+    if (keys.length === 0) throw new Error("Batch must contain at least one key");
+    const uniqueKeys = new Set(keys);
+    if (uniqueKeys.size !== keys.length) throw new Error("Batch keys must be unique");
+    if (keys.some((key) => typeof key !== "string" || key.length === 0)) {
+      throw new Error("Batch keys must be non-empty strings");
+    }
+  }
+
+  private validateBatchResult<T>(keys: readonly string[], result: ReadonlyMap<string, T>): void {
+    if (!(result instanceof Map)) throw new Error("Batch fetcher must return a Map");
+    if (result.size !== keys.length || keys.some((key) => !result.has(key))) {
+      throw new Error("Batch fetcher must return exactly one value for every requested key");
     }
   }
 }

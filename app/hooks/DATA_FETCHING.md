@@ -32,6 +32,32 @@ const { data, loading, validating, error, refresh, invalidate } = useApiQuery<Pr
 - Pass `key: null` (or `url: null`) to skip fetching, e.g. while a required id
   is still unknown.
 
+## Batching independent reads
+
+When an endpoint accepts multiple identifiers, use `RequestCache.fetchBatch` at
+the data boundary instead of starting one request per identifier. The cache
+skips fresh entries, shares keys already in flight, stores each returned value
+under its own key, and validates that the loader returned exactly the requested
+set.
+
+```ts
+const values = await requestCache.fetchBatch(
+  clipIds.map((id) => cacheKey("/api/clips", { id })),
+  (keys) => apiFetch("/api/clips/batch", {
+    method: "POST",
+    body: JSON.stringify({ keys }),
+  }),
+  { tags: ["clips"] },
+);
+```
+
+Batch loaders must return a `Map` with one value for every unique, non-empty
+key. Keep the batch size bounded by the receiving API's limits, and preserve
+the caller's order when rendering by mapping the original key list over the
+returned map. Measure batching with the loader call count and request latency;
+the expected improvement is one network request per batch rather than one per
+item.
+
 ## Writes: `useApiMutation`
 
 ```ts

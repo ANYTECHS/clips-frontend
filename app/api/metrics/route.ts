@@ -37,6 +37,7 @@ import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { allCircuitBreakerSnapshots } from "@/app/lib/circuitBreaker";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { logger } from "@/app/lib/logger";
+import { fetchAnalytics } from "@/app/lib/cache/FetchAnalytics";
 
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
@@ -124,6 +125,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   const { queued, active, complete, failed, mem, uptime, breakers } =
     await collectMetrics();
+  const fetches = fetchAnalytics.snapshot();
 
   const wantsJson =
     (request.headers.get("accept") ?? "").toLowerCase().includes("application/json");
@@ -148,6 +150,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
           openedAt: b.openedAt,
           lastFailureAt: b.lastFailureAt,
         })),
+        fetches,
         timestamp: new Date().toISOString(),
       },
       { headers: { "Cache-Control": "no-store" } },
@@ -199,6 +202,21 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     promMetric("clipcash_circuit_breaker_total_fallbacks",
       "Total fallback invocations for each circuit breaker", "counter",
       breakers.map((b) => promLine("clipcash_circuit_breaker_total_fallbacks", { service: b.name }, b.totalFallbacks))),
+
+    promMetric("clipcash_fetch_total", "Fetch attempts recorded in the bounded process window", "counter",
+      [promLine("clipcash_fetch_total", {}, fetches.total)]),
+    promMetric("clipcash_fetch_errors_total", "Fetch attempts that failed", "counter",
+      [promLine("clipcash_fetch_errors_total", {}, fetches.errors)]),
+    promMetric("clipcash_fetch_cache_hits_total", "Fetches served from a fresh cache entry", "counter",
+      [promLine("clipcash_fetch_cache_hits_total", {}, fetches.cacheHits)]),
+    promMetric("clipcash_fetch_batches_total", "Batch fetch requests recorded", "counter",
+      [promLine("clipcash_fetch_batches_total", {}, fetches.batches)]),
+    promMetric("clipcash_fetch_batched_items_total", "Items loaded by batch requests", "counter",
+      [promLine("clipcash_fetch_batched_items_total", {}, fetches.batchedItems)]),
+    promMetric("clipcash_fetch_average_duration_ms", "Average fetch duration in milliseconds", "gauge",
+      [promLine("clipcash_fetch_average_duration_ms", {}, fetches.averageDurationMs)]),
+    promMetric("clipcash_fetch_p95_duration_ms", "95th percentile fetch duration in milliseconds", "gauge",
+      [promLine("clipcash_fetch_p95_duration_ms", {}, fetches.p95DurationMs)]),
   ];
 
   const body = blocks.join("\n\n") + "\n";
