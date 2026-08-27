@@ -18,6 +18,7 @@
 
 import { logger } from "@/app/lib/logger";
 import { VIRUS_SCAN_DEFAULT_TIMEOUT_MS } from "@/app/lib/constants";
+import { getCircuitBreaker } from "@/app/lib/circuitBreaker";
 
 export type ScanProvider = "clamav" | "virustotal" | "cloudmersive" | "disabled";
 
@@ -371,38 +372,33 @@ async function scanWithCloudmersive(buffer: Buffer, timeout: number): Promise<Sc
 
 // ─── Public API ────────────────────────────────────────────────────────────────
 
-/**
- * Scan a file buffer for malware.
- *
- * Returns a ScanResult indicating whether the file is clean.
- * If scanning is disabled, returns isClean=true.
- * If the scan times out or fails, throws a VirusScanError.
- *
- * @param buffer File data to scan
- * @returns ScanResult indicating if file is clean
- * @throws VirusScanError if scanning fails, times out, or is misconfigured
- */
-export async function scanFile(buffer: Buffer): Promise<ScanResult> {
-  // Quick exit if scanning is disabled
-  if (!isEnabled()) {
-    return {
-      isClean: true,
-      provider: "disabled",
-      timestamp: new Date(),
-    };
-  }
+// ─── Degraded-mode result ─────────────────────────────────────────────────────
 
+/**
+ * Result emitted when the scan service is unavailable and
+ * VIRUS_SCAN_ALLOW_ON_FAILURE=true is set.
+ *
+ * The file is allowed through but the result is clearly flagged as
+ * unverified so callers can attach a warning flag to the job record.
+ */
+export interface DegradedScanResult extends ScanResult {
+  degraded: true;
+  degradedReason: string;
+}
+
+function isDegradedAllowed(): boolean {
+  return (
+    process.env.VIRUS_SCAN_ALLOW_ON_FAILURE?.toLowerCase() === "true"
+  );
+}
+
+/**
+ * Perform the actual provider scan. Called by scanFile after all guard
+ * checks pass. Throws VirusScanError on any failure.
+ */
+async function doScan(buffer: Buffer): Promise<ScanResult> {
   const provider = getProvider();
   const timeout = getScanTimeout();
-
-  // Additional quick exit for "disabled" provider
-  if (provider === "disabled") {
-    return {
-      isClean: true,
-      provider: "disabled",
-      timestamp: new Date(),
-    };
-  }
 
   logger.info(`[VirusScan] Scanning with ${provider} (timeout: ${timeout}ms)`);
 
@@ -416,6 +412,85 @@ export async function scanFile(buffer: Buffer): Promise<ScanResult> {
     default:
       throw new VirusScanError(`Unsupported scan provider: ${provider}`, "CONFIG_ERROR");
   }
+}
+
+/**
+ * Scan a file buffer for malware.
+ *
+ * Returns a ScanResult indicating whether the file is clean.
+ * If scanning is disabled, returns isClean=true.
+ *
+ * Graceful degradation behaviour
+ * ────────────────────────────────
+ * When the scan provider is unreachable or times out the circuit breaker
+ * opens after `failureThreshold` consecutive failures.  Subsequent upload
+ * requests are handled according to VIRUS_SCAN_ALLOW_ON_FAILURE:
+ *
+ *  - "true"  — upload proceeds; the returned ScanResult carries
+ *              `degraded: true` and `degradedReason` so the upload route
+ *              can attach a warning flag to the job record.
+ *  - (unset) — upload is rejected with a VirusScanError (existing behaviour,
+ *              the safe default).
+ *
+ * Set VIRUS_SCAN_ALLOW_ON_FAILURE=true only when you have an alternative
+ * security control in place (e.g. post-processing re-scan by the AI backend).
+ *
+ * @param buffer File data to scan
+ * @returns ScanResult (may be a DegradedScanResult when scan service is down)
+ * @throws VirusScanError if scanning fails and degraded mode is not enabled
+ */
+export async function scanFile(buffer: Buffer): Promise<ScanResult> {
+  // Quick exit if scanning is globally disabled
+  if (!isEnabled()) {
+    return { isClean: true, provider: "disabled", timestamp: new Date() };
+  }
+
+  // Quick exit for "disabled" provider (checked early to avoid circuit-breaker
+  // overhead on paths that never reach the network).
+  let provider: ScanProvider;
+  try {
+    provider = getProvider();
+  } catch (err) {
+    // CONFIG_ERROR — misconfigured provider value; fail hard regardless of
+    // degraded mode because we can't know whether to trust the file.
+    throw err;
+  }
+
+  if (provider === "disabled") {
+    return { isClean: true, provider: "disabled", timestamp: new Date() };
+  }
+
+  const cb = getCircuitBreaker("virusScan");
+
+  if (isDegradedAllowed()) {
+    // Degraded mode: use circuit breaker with a safe fallback instead of
+    // throwing so the upload pipeline can continue with a warning flag.
+    return cb.execute(
+      () => doScan(buffer),
+      () => {
+        logger.warn(
+          "[VirusScan] Scan service unavailable — allowing upload in degraded mode " +
+            "(VIRUS_SCAN_ALLOW_ON_FAILURE=true)"
+        );
+        const degraded: DegradedScanResult = {
+          isClean: true,
+          provider,
+          timestamp: new Date(),
+          degraded: true,
+          degradedReason:
+            cb.currentState === "OPEN"
+              ? "Scan service circuit breaker is open"
+              : "Scan service unavailable",
+        };
+        return degraded;
+      }
+    );
+  }
+
+  // Default (safe) mode: use executeOrThrow so any failure propagates and
+  // the upload is rejected — same behaviour as before, but the circuit breaker
+  // now trips after repeated failures to avoid hammering a downed scanner.
+  return cb.executeOrThrow(() => doScan(buffer));
 }
 
 /**

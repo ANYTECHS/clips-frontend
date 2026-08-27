@@ -5,6 +5,9 @@ import withBundleAnalyzer from "@next/bundle-analyzer";
 
 validateRequiredEnv();
 
+/** CDN origin for static assets. Undefined disables the prefix (dev/test). */
+const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL?.replace(/\/+$/, "") || undefined;
+
 const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
 });
@@ -93,13 +96,41 @@ async function securityHeaders() {
         },
       ],
     },
+    // Static build artefacts — content-hashed, safe to cache for a year.
+    {
+      source: "/_next/static/:path*",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+      ],
+    },
+    // Public folder media — not content-hashed but rarely changes.
+    {
+      source: "/:path*\\.(ico|png|jpg|jpeg|gif|svg|webp|avif|woff|woff2|ttf|otf|eot)",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=86400, stale-while-revalidate=604800",
+        },
+      ],
+    },
   ];
 }
 
 const nextConfig: NextConfig = {
+  // Produces a self-contained `/.next/standalone` directory that includes
+  // only the files needed to run `node server.js` in production. Required
+  // by deploy/Dockerfile for Fly.io / Kubernetes / Render deployments.
+  // Vercel ignores this option — it uses its own build output format.
+  output: "standalone",
+
+  // Route static build assets through the CDN when configured.
+  // In development (NEXT_PUBLIC_CDN_URL unset) this is undefined and Next.js
+  // serves assets from the app origin as normal.
+  assetPrefix: CDN_URL,
   headers: securityHeaders,
   images: {
     remotePatterns: [
+      // Dicebear avatar SVGs (social proof, onboarding)
       {
         protocol: 'https',
         hostname: 'api.dicebear.com',
@@ -112,36 +143,49 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      // AWS CloudFront CDN distributions
       {
         protocol: 'https',
         hostname: '**.cloudfront.net',
         port: '',
         pathname: '/**',
       },
+      // AWS S3 buckets (direct and region-specific)
       {
         protocol: 'https',
         hostname: '**.amazonaws.com',
         port: '',
         pathname: '/**',
       },
+      // Cloudflare R2 (S3-compatible storage alternative)
       {
         protocol: 'https',
         hostname: '**.cloudflarestorage.com',
         port: '',
         pathname: '/**',
       },
+      // GCS via S3 interop (storage.googleapis.com/bucket-name/…)
+      {
+        protocol: 'https',
+        hostname: 'storage.googleapis.com',
+        port: '',
+        pathname: '/**',
+      },
+      // App CDN
       {
         protocol: 'https',
         hostname: 'cdn.clipcash.dev',
         port: '',
         pathname: '/**',
       },
+      // Google OAuth avatar (lh3 = Google's image CDN)
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
         port: '',
         pathname: '/**',
       },
+      // GitHub OAuth avatar
       {
         protocol: 'https',
         hostname: 'avatars.githubusercontent.com',
@@ -149,24 +193,57 @@ const nextConfig: NextConfig = {
         pathname: '/**',
       },
     ],
+    // Allow Next.js to serve and optimise SVGs from the configured remote
+    // patterns above. Required for Dicebear which returns SVG content.
+    // dangerouslyAllowSVG is safe here because all remote patterns are
+    // locked to trusted hostnames above — no arbitrary user-supplied SVG
+    // from untrusted origins reaches the image optimizer.
+    dangerouslyAllowSVG: true,
+    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    minimumCacheTTL: 60,
+    // 24-hour minimum CDN cache for optimized images.
+    // The previous value of 60 s caused the optimizer to be hammered on
+    // every request in production since CDN TTL < typical cache lifetime.
+    minimumCacheTTL: 86400,
+  },
+  /**
+   * Rewrites barrel imports (`import { X } from "lucide-react"`) into deep
+   * imports of just the modules actually used. lucide-react is imported in 60+
+   * files here and its barrel re-exports every icon in the library, so without
+   * this the whole icon set is walked on every build and a lot of it survives
+   * into the client bundle.
+   */
+  experimental: {
+    optimizePackageImports: ["lucide-react", "@stellar/stellar-sdk", "zod"],
   },
   webpack: (config, { isServer }) => {
     if (!isServer) {
       config.optimization = {
         ...config.optimization,
+        // Only add a shared "commons" group; the previous config also set
+        // `default: false, vendors: false`, which switched off the framework
+        // and library chunk groups Next.js ships with. That collapsed
+        // node_modules into the same chunk as app code, so every deploy
+        // invalidated the whole vendor bundle in users' caches even when only
+        // app code changed.
         splitChunks: {
+          ...(typeof config.optimization?.splitChunks === "object"
+            ? config.optimization.splitChunks
+            : {}),
           chunks: "all",
           cacheGroups: {
-            default: false,
-            vendors: false,
+            ...(typeof config.optimization?.splitChunks === "object"
+              ? config.optimization.splitChunks.cacheGroups
+              : {}),
             commons: {
               name: "commons",
               chunks: "all",
               minChunks: 2,
+              // Below the default groups, so framework/lib chunking still wins.
+              priority: -10,
+              reuseExistingChunk: true,
             },
           },
         },

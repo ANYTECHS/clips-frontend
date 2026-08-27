@@ -17,6 +17,9 @@ export {
   selectRevenueTrend,
   selectRecentProjects,
   selectDashboardMeta,
+  selectLoading,
+  selectError,
+  selectLastFetchedAt,
 } from "./dashboardStore";
 
 // Earnings
