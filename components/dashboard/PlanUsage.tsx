@@ -9,6 +9,13 @@ import {
   selectPlanUsage,
   selectTransformQuotaRemaining,
 } from "@/app/store/userStore";
+import ProgressBar from "@/components/ui/ProgressBar";
+
+/** Quota usage at or above this shows the bar in red. */
+const USAGE_CRITICAL_PERCENT = 90;
+
+/** Quota usage at or above this shows the bar in amber. */
+const USAGE_WARNING_PERCENT = 70;
 
 interface PlanUsageProps {
   compact?: boolean;
@@ -28,6 +35,14 @@ export default function PlanUsage({ compact = false, className = "" }: PlanUsage
   const planLabel = plan.toUpperCase();
   const isFree = plan === "free";
 
+  // Shared by the compact and full variants so the two bars cannot drift apart.
+  const usageFillClassName =
+    usagePercent >= USAGE_CRITICAL_PERCENT
+      ? "bg-red-500"
+      : usagePercent >= USAGE_WARNING_PERCENT
+        ? "bg-yellow-400"
+        : "bg-brand";
+
   if (compact) {
     return (
       <div className={`flex items-center gap-3 bg-surface border border-white/10 px-3.5 py-2 rounded-xl text-xs ${className}`}>
@@ -35,14 +50,12 @@ export default function PlanUsage({ compact = false, className = "" }: PlanUsage
           <Zap className="w-3.5 h-3.5 text-brand" />
           <span>{planLabel}</span>
         </div>
-        <div className="w-20 bg-input rounded-full h-2 overflow-hidden border border-white/5">
-          <div
-            className={`h-full rounded-full transition-all ${
-              usagePercent >= 90 ? "bg-red-500" : usagePercent >= 70 ? "bg-yellow-400" : "bg-brand"
-            }`}
-            style={{ width: `${Math.min(100, Math.max(0, usagePercent))}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={usagePercent}
+          className="w-20 bg-input rounded-full h-2 border border-white/5"
+          fillClassName={usageFillClassName}
+          label={`Monthly quota usage: ${usagePercent}%`}
+        />
         <span className="text-[11px] text-muted font-medium">{usagePercent}%</span>
         {isFree && (
           <Link
@@ -78,14 +91,12 @@ export default function PlanUsage({ compact = false, className = "" }: PlanUsage
           <span>Monthly Quota Usage</span>
           <span className="text-white font-bold">{usagePercent}%</span>
         </div>
-        <div className="w-full bg-input rounded-full h-2 overflow-hidden border border-white/5">
-          <div
-            className={`h-full rounded-full transition-all ${
-              usagePercent >= 90 ? "bg-red-500" : usagePercent >= 70 ? "bg-yellow-400" : "bg-brand"
-            }`}
-            style={{ width: `${Math.min(100, Math.max(0, usagePercent))}%` }}
-          />
-        </div>
+        <ProgressBar
+          value={usagePercent}
+          className="w-full bg-input rounded-full h-2 border border-white/5"
+          fillClassName={usageFillClassName}
+          label={`Monthly quota usage: ${usagePercent}%`}
+        />
       </div>
 
       <Link

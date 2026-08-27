@@ -1,0 +1,51 @@
+# CronJob — delete terminal jobs older than 7 days, runs daily at 03:00 UTC.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clipcash-cleanup-old-jobs
+  namespace: clipcash
+  labels:
+    app.kubernetes.io/name: clipcash-frontend
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "0 3 * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  startingDeadlineSeconds: 300
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      activeDeadlineSeconds: 300
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: cron-cleanup
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: cleanup
+              image: curlimages/curl:8.7.1
+              command:
+                - sh
+                - -c
+                - |
+                  curl -sf \
+                    -H "Authorization: Bearer ${CRON_SECRET}" \
+                    http://clipcash-frontend.clipcash.svc.cluster.local/api/cron/cleanup-old-jobs \
+                    && echo "Cleanup complete" \
+                    || { echo "Cleanup failed"; exit 1; }
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: clipcash-frontend-secrets
+                      key: CRON_SECRET
+              resources:
+                requests:
+                  cpu: "10m"
+                  memory: "16Mi"
+                limits:
+                  cpu: "50m"
+                  memory: "32Mi"

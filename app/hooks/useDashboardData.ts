@@ -12,13 +12,14 @@
  * - Shared state: all components read from the same store instance
  */
 
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   useDashboardStore,
   selectStats,
   selectRevenueTrend,
   selectRecentProjects,
-  selectDashboardMeta,
+  selectLoading,
+  selectError,
   type DashboardState,
   type DashboardActions,
 } from "@/app/store";
@@ -56,7 +57,11 @@ export function useDashboardData(options?: { enableStreaming?: boolean }): {
   const stats = useDashboardStore(selectStats);
   const revenueTrend = useDashboardStore(selectRevenueTrend);
   const recentProjects = useDashboardStore(selectRecentProjects);
-  const { loading, error } = useDashboardStore(selectDashboardMeta);
+  // Subscribed one field at a time. A composite selector would allocate a new
+  // object per store read and so never compare equal, re-rendering every
+  // consumer on writes that touched neither flag.
+  const loading = useDashboardStore(selectLoading);
+  const error = useDashboardStore(selectError);
 
   useEffect(() => {
     fetchDashboard();
@@ -64,45 +69,72 @@ export function useDashboardData(options?: { enableStreaming?: boolean }): {
 
   useEffect(() => {
     if (!options?.enableStreaming) return;
-    let es: EventSource | null = null;
-    try {
-      es = new EventSource("/api/dashboard/stream");
-      es.addEventListener("stats", (ev: MessageEvent) => {
-        const parsed = JSON.parse(ev.data);
-        if (parsed?.data) {
+
+    const stream = openManagedEventSource({
+      url: "/api/dashboard/stream",
+      listeners: {
+        stats: (data) => {
+          let parsed: { data?: { earnings: string; clips: number; platforms: number } };
+          try {
+            parsed = JSON.parse(data);
+          } catch (error) {
+            // A malformed frame is the server's problem, not a reason to tear
+            // down a working stream.
+            logger.error("Malformed dashboard stats frame:", error);
+            return;
+          }
+          if (!parsed?.data) return;
+
+          // Only the stats slice is live-updated. The previous version also
+          // reset revenueTrend and recentProjects to [], so the first streamed
+          // frame wiped the chart and the project list that the initial fetch
+          // had just populated.
           useDashboardStore.setState({
             stats: {
               earnings: { total: parsed.data.earnings, trendLabel: "+0%", trend: 0 },
               clips: { total: parsed.data.clips, trendLabel: "+0%", trend: 0 },
               platforms: { total: parsed.data.platforms, trendLabel: "Live", trend: 0 },
             },
-            revenueTrend: [],
-            recentProjects: [],
             loading: false,
             error: null,
           });
-        }
-      });
-    } catch {
-      // ignore
-    }
+        },
+      },
+      onError: (attempt, willRetry) => {
+        logger.warn(
+          `Dashboard stream error (attempt ${attempt}), ${willRetry ? "retrying" : "giving up"}`,
+        );
+      },
+      onGiveUp: () => {
+        // The store's own 5-minute cache and manual retry remain available.
+        logger.warn("Dashboard stream gave up; falling back to cached data.");
+      },
+    });
+
     return () => {
-      if (es) es.close();
+      stream?.close();
     };
   }, [options?.enableStreaming]);
 
-  const data: DashboardData | null =
-    stats !== null
-      ? { stats, revenueTrend, recentProjects }
-      : null;
+  // Held stable across renders so memoised consumers of `data` are not
+  // invalidated by a re-render that changed none of the underlying slices.
+  const data: DashboardData | null = useMemo(
+    () => (stats !== null ? { stats, revenueTrend, recentProjects } : null),
+    [stats, revenueTrend, recentProjects],
+  );
+
+  // Same reasoning: a fresh Error per render would defeat any downstream memo.
+  const errorObject = useMemo(() => (error ? new Error(error) : null), [error]);
+
+  const retry = useCallback(() => {
+    invalidateCache();
+    fetchDashboard();
+  }, [invalidateCache, fetchDashboard]);
 
   return {
     data,
     loading,
-    error: error ? new Error(error) : null,
-    retry: () => {
-      invalidateCache();
-      fetchDashboard();
-    },
+    error: errorObject,
+    retry,
   };
 }

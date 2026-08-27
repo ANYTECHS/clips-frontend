@@ -1,0 +1,15 @@
+# Grafana dashboard provisioning config.
+# Place in /etc/grafana/provisioning/dashboards/ (or mount as a ConfigMap).
+# Grafana will automatically load all JSON files in the folder below.
+
+apiVersion: 1
+providers:
+  - name: clipcash
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards/clipcash
+      foldersFromFilesStructure: false

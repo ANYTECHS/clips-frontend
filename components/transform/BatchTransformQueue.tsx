@@ -3,6 +3,7 @@
 import React from "react";
 import { X, CheckCircle, AlertCircle, Loader2, Clock, RefreshCw, Ban } from "lucide-react";
 import { sanitize } from "@/app/lib/sanitize";
+import ProgressBar from "@/components/ui/ProgressBar";
 import { useTransformStatus } from "@/app/hooks/useTransformStatus";
 import type { BatchTransformState, BatchTransformJob, BatchJobStatus } from "@/app/store/types";
 
@@ -89,19 +90,13 @@ function OverallProgressBar({
         </span>
         <span className="text-xs font-bold text-brand">{pct}%</span>
       </div>
-      <div
-        className="h-2 w-full bg-input rounded-full overflow-hidden border border-white/5"
-        role="progressbar"
-        aria-valuenow={pct}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-label={`Overall batch progress: ${pct}%`}
-      >
-        <div
-          className="h-full bg-brand rounded-full transition-all duration-700 ease-out shadow-[0_0_8px_rgba(0,255,133,0.35)]"
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      <ProgressBar
+        value={pct}
+        className="h-2 w-full bg-input rounded-full border border-white/5"
+        fillClassName="bg-brand shadow-[0_0_8px_rgba(0,255,133,0.35)]"
+        durationMs={700}
+        label={`Overall batch progress: ${pct}%`}
+      />
     </div>
   );
 }
@@ -151,14 +146,13 @@ function JobRow({
 
         {/* Per-job progress bar (only for active jobs) */}
         {(job.status === "processing" || job.status === "queued") && (
-          <div className="mt-1.5 h-1 w-full bg-input rounded-full overflow-hidden">
-            <div
-              className="h-full bg-brand/60 rounded-full transition-all duration-500"
-              style={{
-                width: job.status === "queued" ? "0%" : `${job.progress}%`,
-              }}
-            />
-          </div>
+          <ProgressBar
+            value={job.status === "queued" ? 0 : job.progress}
+            className="mt-1.5 h-1 w-full bg-input rounded-full"
+            fillClassName="bg-brand/60"
+            durationMs={500}
+            label={`Job progress: ${job.status === "queued" ? 0 : job.progress}%`}
+          />
         )}
 
         {safeError && (

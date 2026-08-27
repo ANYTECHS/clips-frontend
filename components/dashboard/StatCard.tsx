@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { memo, useMemo } from "react";
 import type { LucideIcon } from "lucide-react";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 
@@ -12,9 +12,11 @@ interface StatCardProps {
   trend?: TrendValue;
   icon?: LucideIcon;
   hideTrendIcon?: boolean;
+  /** @deprecated pass trend as { value, label } object instead */
+  isPositive?: boolean;
 }
 
-export default function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
+function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
   let trendContent: React.ReactNode = null;
   let trendColor = "text-muted-foreground";
 
@@ -31,15 +33,9 @@ export default function StatCard({ label, value, trend, icon: Icon, hideTrendIco
     } else {
       trendContent = <Minus className="w-3 h-3 text-muted-foreground" />;
     }
-    trendContent = (
-      <>
-        {!hideTrendIcon && trendContent}
-        <span className={trendColor}>{labelText}</span>
-      </>
-    );
-  } else if (typeof trend === "string") {
-    trendContent = <span>{trend}</span>;
-  }
+
+    return null;
+  }, [trend, hideTrendIcon]);
 
   return (
     <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col gap-3">
@@ -52,3 +48,10 @@ export default function StatCard({ label, value, trend, icon: Icon, hideTrendIco
     </div>
   );
 }
+
+/**
+ * Purely presentational: every prop is a primitive or a module-scope icon
+ * component, so a shallow prop comparison is enough to skip re-rendering the
+ * card when an unrelated slice of dashboard state changes.
+ */
+export default React.memo(StatCard);
