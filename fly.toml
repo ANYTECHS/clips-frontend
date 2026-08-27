@@ -1,0 +1,151 @@
+# fly.toml — Fly.io deployment configuration for clipcash-frontend
+#
+# Deploy:
+#   fly launch   (first time — creates the app and provisions secrets)
+#   fly deploy   (subsequent deploys)
+#
+# Secrets (set before first deploy):
+#   fly secrets set \
+#     NEXTAUTH_SECRET=<value> \
+#     NEXTAUTH_URL=https://<app-name>.fly.dev \
+#     REDIS_URL=<value> \
+#     AI_BACKEND_CALLBACK_SECRET=<value> \
+#     AI_BACKEND_SECRET=<value> \
+#     AWS_ACCESS_KEY_ID=<value> \
+#     AWS_SECRET_ACCESS_KEY=<value> \
+#     CLOUD_STORAGE_BUCKET=<value> \
+#     CRON_SECRET=<value> \
+#     METRICS_TOKEN=<value> \
+#     NEXT_PUBLIC_SENTRY_DSN=<value>
+
+app = "clipcash-frontend"
+primary_region = "iad"          # US-East — closest to the default S3 us-east-1
+kill_signal = "SIGTERM"
+kill_timeout = "30s"            # Matches terminationGracePeriodSeconds in K8s
+
+[build]
+  # Dockerfile is required for Fly.io. See deploy/Dockerfile.
+  dockerfile = "deploy/Dockerfile"
+
+# ─── HTTP service ─────────────────────────────────────────────────────────────
+[[services]]
+  protocol = "tcp"
+  internal_port = 3000
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
+
+  # ── Auto-scaling: concurrency-based ──────────────────────────────────────
+  # Fly scales machines up when concurrent connections or requests hit the
+  # soft_limit, and back down when they drop below the hard_limit threshold.
+  #
+  # soft_limit: when a machine handles this many concurrent requests Fly will
+  #   spin up another machine to share the load.
+  # hard_limit: connections above this are rejected (circuit-level backpressure).
+  #   Set hard_limit higher than soft_limit to give the new machine time to boot.
+  [services.concurrency]
+    type       = "requests"
+    soft_limit = 50     # scale out trigger
+    hard_limit = 75     # reject trigger (backpressure)
+
+  # ── Health checks ─────────────────────────────────────────────────────────
+  # Liveness — restarts the machine if the process hangs.
+  [[services.tcp_checks]]
+    interval      = "10s"
+    timeout       = "2s"
+    grace_period  = "20s"
+    restart_limit = 3
+
+  # Readiness — waits for all external deps before routing traffic.
+  [[services.http_checks]]
+    interval      = "15s"
+    timeout       = "5s"
+    grace_period  = "20s"
+    method        = "GET"
+    path          = "/api/health/ready"
+    protocol      = "http"
+    restart_limit = 0   # don't restart on readiness failure — just remove from LB
+
+  # Liveness via HTTP.
+  [[services.http_checks]]
+    interval      = "30s"
+    timeout       = "5s"
+    grace_period  = "30s"
+    method        = "GET"
+    path          = "/api/health"
+    protocol      = "http"
+    restart_limit = 3
+
+# ─── Machine sizing and auto-stop/start ───────────────────────────────────────
+[vm]
+  # performance-1x: 1 vCPU shared, 256 MB RAM — baseline for low traffic.
+  # Upgrade to performance-2x (2 shared vCPU, 512 MB) under sustained load.
+  # See: https://fly.io/docs/about/pricing/#machines
+  size   = "performance-1x"
+  memory = "512mb"
+
+[machines]
+  # Auto-stop: shut down machines that receive no traffic for the idle period.
+  # auto_start matches: Fly starts a new machine on the next inbound request.
+  # idle_timeout: how long a machine must be idle before it is stopped.
+  #   10 min balances cold-start latency vs. cost.
+  #   SSE streams keep a machine "active" for their duration — a user watching
+  #   a processing job won't trigger an idle stop.
+  auto_stop    = true
+  auto_start   = true
+  idle_timeout = "10m"
+  min_machines_running = 1   # always keep 1 machine warm to avoid cold starts
+
+# ─── Multi-region scaling ─────────────────────────────────────────────────────
+# Uncomment and extend to serve users from additional regions.
+# Each region gets its own pool of machines, auto-stopped when idle.
+#
+# [[regions]]
+#   code = "lhr"   # London — EU users
+#   min_machines_running = 1
+#
+# [[regions]]
+#   code = "nrt"   # Tokyo — APAC users
+#   min_machines_running = 1
+
+# ─── Environment (non-secret) ─────────────────────────────────────────────────
+[env]
+  NODE_ENV                  = "production"
+  PORT                      = "3000"
+  STALLED_JOB_THRESHOLD_MS  = "600000"
+  CLEANUP_JOB_AGE_MS        = "604800000"
+  REQUEUE_MAX_JOBS          = "20"
+  VIRUS_SCAN_ALLOW_ON_FAILURE = "false"
+
+# ─── Scheduled tasks (Fly Machines cron) ─────────────────────────────────────
+# Fly runs these as ephemeral machines on the given schedule.
+# Requires fly.io/machines-cron feature (currently in beta).
+# Alternative: use an external cron (GitHub Actions, etc.) to curl the
+# /api/cron/* endpoints directly — see SCALING.md.
+
+[[crons]]
+  schedule = "*/5 * * * *"
+  command  = [
+    "sh", "-c",
+    "curl -sf -H 'Authorization: Bearer $CRON_SECRET' http://localhost:3000/api/cron/requeue-stalled-jobs"
+  ]
+
+[[crons]]
+  schedule = "0 3 * * *"
+  command  = [
+    "sh", "-c",
+    "curl -sf -H 'Authorization: Bearer $CRON_SECRET' http://localhost:3000/api/cron/cleanup-old-jobs"
+  ]
+
+# ─── Metrics ──────────────────────────────────────────────────────────────────
+# Fly's built-in Prometheus scrape. Scrapes /api/metrics every 15 s and
+# exposes the data in the Fly.io metrics dashboard (fly.io Metrics tab).
+[metrics]
+  port = 3000
+  path = "/api/metrics"

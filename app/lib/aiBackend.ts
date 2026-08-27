@@ -1,5 +1,7 @@
 import type { AnimeTransformOptions } from "@/app/lib/animeTransform";
 import { logger } from "@/app/lib/logger";
+import { getCircuitBreaker } from "@/app/lib/circuitBreaker";
+import { withRetry } from "@/app/lib/retryUtils";
 
 /**
  * aiBackend.ts — thin client for dispatching video processing jobs to the AI
@@ -103,6 +105,57 @@ export interface DispatchResult {
  * });
  * ```
  */
+/**
+ * The fallback result returned whenever the circuit is open or all retries
+ * are exhausted. The job is left in "queued" state; the AI backend can be
+ * re-dispatched once service is restored via POST /api/jobs/[id].
+ */
+const DISPATCH_FALLBACK: DispatchResult = {
+  dispatched: false,
+  reason: "AI_BACKEND_UNAVAILABLE",
+};
+
+/**
+ * Perform the raw HTTP dispatch to the AI backend.
+ * Throws on any failure so the circuit breaker and retry wrapper can act on it.
+ */
+async function doDispatch(
+  baseUrl: string,
+  headers: Record<string, string>,
+  payload: DispatchJobPayload
+): Promise<DispatchResult> {
+  const url = `${baseUrl.replace(/\/$/, "")}/jobs`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+    // 10-second timeout for the dispatch call itself; processing is async.
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "(no body)");
+    const reason = `HTTP_${res.status}`;
+    logger.error(
+      `[aiBackend] Dispatch failed for job ${payload.jobId}: ` +
+        `${res.status} ${res.statusText} — ${text}`
+    );
+    // 4xx errors (except 429) are not retryable — signal that with a typed error.
+    if (res.status >= 400 && res.status < 500 && res.status !== 429) {
+      const err = new Error(reason);
+      (err as Error & { nonRetryable: boolean }).nonRetryable = true;
+      throw err;
+    }
+    throw new Error(reason);
+  }
+
+  const data = (await res.json().catch(() => ({}))) as { jobId?: string };
+  return {
+    dispatched: true,
+    remoteJobId: data.jobId ?? payload.jobId,
+  };
+}
+
 export async function dispatchJob(payload: DispatchJobPayload): Promise<DispatchResult> {
   const baseUrl = process.env.NEXT_PUBLIC_AI_API_URL;
 
@@ -120,36 +173,31 @@ export async function dispatchJob(payload: DispatchJobPayload): Promise<Dispatch
     ...(secret ? { Authorization: `Bearer ${secret}` } : {}),
   };
 
-  try {
-    const url = `${baseUrl.replace(/\/$/, "")}/jobs`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-      // 10-second timeout for the dispatch call itself; processing is async.
-      signal: AbortSignal.timeout(10_000),
-    });
+  const cb = getCircuitBreaker("aiBackend");
 
-    if (!res.ok) {
-      const text = await res.text().catch(() => "(no body)");
-      logger.error(
-        `[aiBackend] Dispatch failed for job ${payload.jobId}: ` +
-          `${res.status} ${res.statusText} — ${text}`
+  return cb.execute(
+    () =>
+      withRetry(() => doDispatch(baseUrl, headers, payload), {
+        maxAttempts: 3,
+        baseDelayMs: 500,
+        maxDelayMs: 4_000,
+        // Don't retry client-side errors (4xx except 429)
+        shouldAbort: (err) =>
+          err instanceof Error &&
+          (err as Error & { nonRetryable?: boolean }).nonRetryable === true,
+        onRetry: (attempt, err) => {
+          const message = err instanceof Error ? err.message : String(err);
+          logger.warn(
+            `[aiBackend] Retrying dispatch for job ${payload.jobId} ` +
+              `(attempt ${attempt}): ${message}`
+          );
+        },
+      }),
+    () => {
+      logger.warn(
+        `[aiBackend] Circuit open — job ${payload.jobId} queued for later dispatch`
       );
-      return {
-        dispatched: false,
-        reason: `HTTP_${res.status}`,
-      };
+      return DISPATCH_FALLBACK;
     }
-
-    const data = (await res.json().catch(() => ({}))) as { jobId?: string };
-    return {
-      dispatched: true,
-      remoteJobId: data.jobId ?? payload.jobId,
-    };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    logger.error(`[aiBackend] Dispatch error for job ${payload.jobId}: ${message}`);
-    return { dispatched: false, reason: message };
-  }
+  );
 }

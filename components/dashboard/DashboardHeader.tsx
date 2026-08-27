@@ -50,19 +50,37 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
   }, [fetchNotifications]);
 
   const handleMarkAsRead = async (id: string) => {
+    // Optimistic update: remove from the list immediately so the UI feels
+    // instant, and restore it if the request turns out to have failed.
+    const previous = notifications;
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+
     try {
       const res = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
-      if (res.ok) {
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      if (!res.ok) {
+        setNotifications(previous);
       }
     } catch {
-      // Ignore error
+      setNotifications(previous);
     }
   };
 
   const handleMarkAllRead = async () => {
-    for (const item of notifications) {
-      await handleMarkAsRead(item.id);
+    const previous = notifications;
+    const ids = notifications.map((n) => n.id);
+    setNotifications([]);
+
+    const results = await Promise.allSettled(
+      ids.map((id) => fetch(`/api/notifications/${id}/read`, { method: "PATCH" })),
+    );
+    const failedIds = ids.filter((_, i) => {
+      const result = results[i];
+      return result.status === "rejected" || !result.value.ok;
+    });
+
+    if (failedIds.length > 0) {
+      // Restore only the notifications that actually failed to mark as read.
+      setNotifications(previous.filter((n) => failedIds.includes(n.id)));
     }
   };
 

@@ -7,6 +7,7 @@ import { usePathname } from "next/navigation";
 import { Zap, Menu, X, User, ChevronDown, LogOut, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { sanitize } from "@/app/lib/sanitize";
+import { DEFAULT_BLUR_PLACEHOLDER, SIZES_AVATAR_SM, SIZES_AVATAR_MD } from "@/app/lib/imageUtils";
 
 /**
  * Public-facing Navbar used on /, /login, /onboarding and other public pages.
@@ -286,6 +287,9 @@ function AvatarDisplay({ avatarUrl, displayName, size }: AvatarDisplayProps) {
         alt={`${sanitize(displayName)} avatar`}
         width={size}
         height={size}
+        sizes={size <= 32 ? SIZES_AVATAR_SM : SIZES_AVATAR_MD}
+        placeholder="blur"
+        blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
         className="rounded-full object-cover shrink-0"
         style={{ width: size, height: size }}
       />

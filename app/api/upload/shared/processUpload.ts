@@ -12,7 +12,7 @@ import {
   moveFromQuarantine,
   deleteFile,
 } from "@/app/lib/cloudStorage";
-import { scanFile, VirusScanError } from "@/app/lib/virusScan";
+import { scanFile, VirusScanError, DegradedScanResult } from "@/app/lib/virusScan";
 import { MAX_UPLOAD_SIZE_BYTES } from "@/app/lib/constants";
 import { logger } from "@/app/lib/logger";
 
@@ -98,6 +98,12 @@ export interface ProcessedUpload {
   jobId: string;
   objectKey: string;
   url: string;
+  /** True when the virus scan service was unavailable and the file was allowed
+   *  through in degraded mode (VIRUS_SCAN_ALLOW_ON_FAILURE=true). Consumers
+   *  should persist this flag on the job record so it can be audited later. */
+  scanDegraded?: boolean;
+  /** Human-readable reason for the degraded scan result, when applicable. */
+  scanDegradedReason?: string;
 }
 
 /**
@@ -135,7 +141,8 @@ export async function processUploadedBuffer(
   try {
     scanResult = await scanFile(buffer);
     logger.info(
-      `[Upload] Scan complete for ${quarantine.jobId}: clean=${scanResult.isClean}, provider=${scanResult.provider}`,
+      `[Upload] Scan complete for ${quarantine.jobId}: clean=${scanResult.isClean}, provider=${scanResult.provider}` +
+        ((scanResult as DegradedScanResult).degraded ? " (DEGRADED)" : ""),
     );
   } catch (scanErr) {
     // Scan failed or timed out — treat as quarantined, not clean.
@@ -172,5 +179,11 @@ export async function processUploadedBuffer(
     jobId: finalResult.jobId,
     objectKey: finalResult.objectKey,
     url: finalResult.url,
+    ...((scanResult as DegradedScanResult).degraded
+      ? {
+          scanDegraded: true,
+          scanDegradedReason: (scanResult as DegradedScanResult).degradedReason,
+        }
+      : {}),
   };
 }
