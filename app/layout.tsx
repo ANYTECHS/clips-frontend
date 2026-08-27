@@ -16,7 +16,18 @@ import AnalyticsProvider from "@/components/AnalyticsProvider";
 import ResourceHints from "@/components/ResourceHints";
 import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
+import FontPreload from "@/components/FontPreload";
 
+/**
+ * Inter font configuration with performance optimizations:
+ * - Subsets: latin + latin-ext for European languages
+ * - display: "swap" - Shows fallback immediately, swaps when loaded (FOUT strategy)
+ * - preload: true - Eager load for LCP improvements
+ * - adjustFontFallback: "Arial" - Smooth visual transition on swap
+ * 
+ * Font subsetting reduces file size by ~60% for most use cases.
+ * See: https://web.dev/articles/variable-fonts-optimize-performance
+ */
 const inter = Inter({ 
   subsets: ["latin", "latin-ext"], 
   display: "swap",
@@ -58,6 +69,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
+        <FontPreload />
         <ResourceHints />
       </head>
       <body className={`${inter.className} font-sans antialiased`}>

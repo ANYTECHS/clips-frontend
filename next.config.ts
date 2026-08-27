@@ -113,6 +113,36 @@ async function securityHeaders() {
         },
       ],
     },
+    // Service worker - always revalidate
+    {
+      source: "/sw.js",
+      headers: [
+        { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
+        { key: "Service-Worker-Allowed", value: "/" },
+      ],
+    },
+    // API responses with conditional requests support
+    {
+      source: "/api/:path*",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=60, stale-while-revalidate=300",
+        },
+        // Enable ETag-based conditional requests for cache revalidation
+        { key: "Vary", value: "Accept-Encoding" },
+      ],
+    },
+    // HTML pages - must revalidate
+    {
+      source: "/:path*\\.html",
+      headers: [
+        {
+          key: "Cache-Control",
+          value: "public, max-age=0, must-revalidate",
+        },
+      ],
+    },
   ];
 }
 
