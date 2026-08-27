@@ -21,12 +21,17 @@ export interface Clip {
   resolution: string;
   videoUrl: string;
   createdAt: string;
+  scoreBreakdown?: ScoreBreakdown;
   /** Tags for organizing clips by topic, campaign, or style. Max 10 tags per clip. */
   tags?: string[];
   /** Set by a soft delete. Excluded from every read path once present. */
   deletedAt?: string | null;
   /** Set by archiving. Surfaced only under the "Archived" filter. */
   archivedAt?: string | null;
+  /** Transformation history for the clip. */
+  transformations?: unknown[];
+  /** Share link ID if the clip has been shared. */
+  shareId?: string | null;
 }
 
 class ClipsStore {
@@ -223,8 +228,18 @@ class ClipsStore {
     return clipIds.filter(id => !owned.has(id));
   }
 
+  clipExists(clipId: string): boolean {
+    return this.clips.some(c => c.id === clipId);
+  }
+
   getClipsForProject(userId: string, projectId: string): Clip[] {
     return this.getClipsForUser(userId).filter((c) => c.projectId === projectId);
+  }
+
+  getClipById(userId: string, clipId: string): Clip | undefined {
+    return this.clips.find(
+      (c) => c.userId === userId && c.id === clipId && !c.deletedAt,
+    );
   }
 
   /** Cascade soft-delete all clips belonging to a project. */

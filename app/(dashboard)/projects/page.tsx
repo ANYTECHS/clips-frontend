@@ -3,8 +3,35 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import dynamic from "next/dynamic";
 import ProjectFilters from "@/components/projects/ProjectFilters";
-import ClipGrid, { type Clip } from "@/components/projects/ClipGrid";
+import {
+  FolderOpen,
+  Plus,
+  Search,
+  Filter,
+  Grid,
+  List,
+  MoreVertical,
+  Clock,
+  Sparkles,
+} from "lucide-react";
+import dynamic from "next/dynamic";
+import type { Clip } from "@/components/projects/ClipGrid";
+
+const ClipGrid = dynamic(() => import("@/components/projects/ClipGrid"), {
+  loading: () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+        <div key={i} className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 animate-pulse h-64" />
+      ))}
+    </div>
+  )
+});
 import SelectionFooter from "@/components/projects/SelectionFooter";
+const ClipEditorModal = dynamic(() => import("@/components/projects/ClipEditorModal"), { ssr: false });
+const ClipPreviewModal = dynamic(() => import("@/components/projects/ClipPreviewModal"), { ssr: false });
+const BatchTransformModal = dynamic(() => import("@/components/transform/BatchTransformModal").then(mod => mod.BatchTransformModal), { ssr: false });
+const BatchTransformQueue = dynamic(() => import("@/components/transform/BatchTransformQueue").then(mod => mod.BatchTransformQueue), { ssr: false });
+
 import type { ClipEdits } from "@/components/projects/ClipEditorModal";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";

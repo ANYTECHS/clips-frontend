@@ -22,6 +22,11 @@ import {
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 import { useTransformStore, selectJobById, selectTransformHasHydrated } from "@/app/store/transformStore";
 import { useTransformStatus } from "@/app/hooks/useTransformStatus";
+import {
+  DEFAULT_BLUR_PLACEHOLDER,
+  SIZES_TRANSFORM_THUMB,
+  SIZES_TRANSFORM_PREVIEW,
+} from "@/app/lib/imageUtils";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -344,6 +349,9 @@ export default function TransformProgressPage() {
                     src={previewUrl}
                     alt="Latest preview frame"
                     fill
+                    sizes={SIZES_TRANSFORM_THUMB}
+                    placeholder="blur"
+                    blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
                     className="object-cover rounded-xl"
                   />
                 ) : (
@@ -395,6 +403,9 @@ export default function TransformProgressPage() {
                     src={previewUrl}
                     alt="Preview frame from AI transformation"
                     fill
+                    sizes={SIZES_TRANSFORM_PREVIEW}
+                    placeholder="blur"
+                    blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
                     className="object-contain"
                   />
                 </div>
