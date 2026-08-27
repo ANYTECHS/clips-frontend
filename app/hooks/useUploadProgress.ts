@@ -12,6 +12,8 @@
 
 import { useState, useCallback, useRef } from "react";
 import { UPLOAD_CONCURRENCY } from "@/app/lib/constants";
+import { shouldChunk, uploadFileInChunks } from "@/app/lib/chunkedUpload";
+import { startMeasure } from "@/app/lib/performanceMonitoring";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,10 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
 
   // Map from file name → active XHR (so individual files can be cancelled)
   const xhrMap = useRef<Map<string, XMLHttpRequest>>(new Map());
+
+  // Chunked uploads are fetch-based, so they cancel through an AbortController
+  // rather than an XHR handle.
+  const abortMap = useRef<Map<string, AbortController>>(new Map());
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -128,6 +134,51 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
     [setFileProgress],
   );
 
+  // ── Chunked upload for large files ─────────────────────────────────────────
+
+  /**
+   * Upload one large file in resumable chunks.
+   *
+   * Progress, cancellation and the resolved shape match `uploadFile`, so the
+   * queue below does not care which path a given file took.
+   */
+  const uploadFileChunked = useCallback(
+    async (file: File): Promise<UploadResult> => {
+      const controller = new AbortController();
+      abortMap.current.set(file.name, controller);
+      setFileProgress(file.name, { percent: 0, status: "uploading" });
+
+      const endMeasure = startMeasure("upload.total", {
+        bytes: file.size,
+        mode: "chunked",
+      });
+
+      try {
+        const result = await uploadFileInChunks(file, {
+          signal: controller.signal,
+          onProgress: (percent) =>
+            setFileProgress(file.name, { percent, status: "uploading" }),
+        });
+        setFileProgress(file.name, { percent: 100, status: "done" });
+        endMeasure({ outcome: "success" });
+        return result;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          setFileProgress(file.name, { status: "cancelled" });
+          endMeasure({ outcome: "cancelled" });
+          throw err;
+        }
+        const msg = err instanceof Error ? err.message : "Upload failed";
+        setFileProgress(file.name, { status: "error", error: msg });
+        endMeasure({ outcome: "error" });
+        throw new Error(msg);
+      } finally {
+        abortMap.current.delete(file.name);
+      }
+    },
+    [setFileProgress],
+  );
+
   // ── Concurrency-limited queue ──────────────────────────────────────────────
 
   /**
@@ -140,6 +191,7 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
 
       // Reset state
       xhrMap.current = new Map();
+      abortMap.current = new Map();
       const initProgress: Record<string, FileProgress> = {};
       files.forEach((f) => {
         initProgress[f.name] = { percent: 0, status: "idle" };
@@ -157,7 +209,10 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
         const worker = async () => {
           while (index < files.length) {
             const current = files[index++];
-            const result = await uploadFile(current).catch(() => null);
+            // Large files go through the resumable chunked path; small ones
+            // keep the cheaper single-request upload.
+            const send = shouldChunk(current) ? uploadFileChunked : uploadFile;
+            const result = await send(current).catch(() => null);
             if (result) successful.push(result);
           }
         };
@@ -170,15 +225,23 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
       } finally {
         setIsUploading(false);
         xhrMap.current.clear();
+        abortMap.current.clear();
       }
     },
-    [uploadFile, concurrency],
+    [uploadFile, uploadFileChunked, concurrency],
   );
 
   // ── Cancel helpers ─────────────────────────────────────────────────────────
 
   /** Abort a single in-flight upload by filename */
   const cancelFile = useCallback((name: string) => {
+    const controller = abortMap.current.get(name);
+    if (controller) {
+      controller.abort();
+      abortMap.current.delete(name);
+      return;
+    }
+
     const xhr = xhrMap.current.get(name);
     if (xhr) {
       xhr.abort();
@@ -189,10 +252,12 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
     }
   }, [setFileProgress]);
 
-  /** Abort all in-flight uploads */
+  /** Abort all in-flight uploads, on either transport */
   const cancelAll = useCallback(() => {
     xhrMap.current.forEach((xhr) => xhr.abort());
     xhrMap.current.clear();
+    abortMap.current.forEach((controller) => controller.abort());
+    abortMap.current.clear();
   }, []);
 
   return { progresses, results, isUploading, upload, cancelFile, cancelAll };

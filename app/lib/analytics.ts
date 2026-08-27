@@ -148,6 +148,12 @@ class Analytics {
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
     script.crossOrigin = 'anonymous';
+    // Analytics is not needed for the page to be interactive, so it's
+    // deprioritized relative to the app's own scripts (#917).
+    script.setAttribute('fetchpriority', 'low');
+    script.onerror = () => {
+      logger.error('Failed to load GA4 script (network or ad-blocker); analytics disabled for this session.');
+    };
     // Subresource Integrity (issue #801): gtag.js is served dynamically per
     // measurement ID and Google explicitly does not support pinning it with
     // SRI (the file can change without notice, which would break tracking
@@ -185,6 +191,10 @@ class Analytics {
     script.defer = true;
     script.crossOrigin = 'anonymous';
     script.setAttribute('data-domain', domain);
+    script.setAttribute('fetchpriority', 'low');
+    script.onerror = () => {
+      logger.error('Failed to load Plausible script (network or ad-blocker); analytics disabled for this session.');
+    };
     // Subresource Integrity (issue #801): plausible.io/js/script.js is a
     // rolling "latest" URL with no first-party version-pinned path, so
     // "pin to a specific version" here means pinning to a known-good SRI

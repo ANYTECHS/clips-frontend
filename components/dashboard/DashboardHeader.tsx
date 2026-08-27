@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, memo, useEffect, useCallback, useRef } from "react";
 import { CloudUpload, Bell, Check } from "lucide-react";
 import { useUserStore, selectUserName } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
@@ -15,7 +15,15 @@ interface NotificationItem {
   createdAt: string;
 }
 
-export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
+/**
+ * DashboardHeader — welcome banner + quick-upload button.
+ *
+ * Memoised so re-renders of the layout wrapper (e.g. mobile-menu state
+ * changes) don't cascade into this component unless the user name changes.
+ *
+ * Issue #874 – memoization for expensive computations.
+ */
+const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const userName = useUserStore(selectUserName);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -42,19 +50,37 @@ export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => v
   }, [fetchNotifications]);
 
   const handleMarkAsRead = async (id: string) => {
+    // Optimistic update: remove from the list immediately so the UI feels
+    // instant, and restore it if the request turns out to have failed.
+    const previous = notifications;
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+
     try {
       const res = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
-      if (res.ok) {
-        setNotifications((prev) => prev.filter((n) => n.id !== id));
+      if (!res.ok) {
+        setNotifications(previous);
       }
     } catch {
-      // Ignore error
+      setNotifications(previous);
     }
   };
 
   const handleMarkAllRead = async () => {
-    for (const item of notifications) {
-      await handleMarkAsRead(item.id);
+    const previous = notifications;
+    const ids = notifications.map((n) => n.id);
+    setNotifications([]);
+
+    const results = await Promise.allSettled(
+      ids.map((id) => fetch(`/api/notifications/${id}/read`, { method: "PATCH" })),
+    );
+    const failedIds = ids.filter((_, i) => {
+      const result = results[i];
+      return result.status === "rejected" || !result.value.ok;
+    });
+
+    if (failedIds.length > 0) {
+      // Restore only the notifications that actually failed to mark as read.
+      setNotifications(previous.filter((n) => failedIds.includes(n.id)));
     }
   };
 
@@ -166,4 +192,6 @@ export default function DashboardHeader({ onMenuClick }: { onMenuClick?: () => v
       </div>
     </header>
   );
-}
+});
+
+export default DashboardHeader;

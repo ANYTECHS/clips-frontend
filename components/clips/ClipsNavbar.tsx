@@ -4,6 +4,7 @@ import React from "react";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { Upload, User } from "lucide-react";
+import { DEFAULT_BLUR_PLACEHOLDER, SIZES_AVATAR_SM } from "@/app/lib/imageUtils";
 
 export default function ClipsNavbar() {
   const { data: session } = useSession();
@@ -33,6 +34,9 @@ export default function ClipsNavbar() {
               alt="User avatar"
               width={40}
               height={40}
+              sizes={SIZES_AVATAR_SM}
+              placeholder="blur"
+              blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
               className="w-full h-full rounded-full object-cover"
             />
           ) : (

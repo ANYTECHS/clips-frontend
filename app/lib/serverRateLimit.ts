@@ -152,13 +152,14 @@ export async function applyRateLimit(
   if (count > limit) {
     const retryAfter = windowSeconds;
     return NextResponse.json(
-      { error: "Too many requests" },
+      { error: "Too many requests", code: "RATE_LIMITED" },
       {
         status: 429,
         headers: {
           "X-RateLimit-Limit": String(limit),
           "X-RateLimit-Remaining": "0",
           "Retry-After": String(retryAfter),
+          "X-RateLimit-Reset": String(Math.ceil((Date.now() + windowMs) / 1000)),
         },
       }
     );
@@ -177,30 +178,35 @@ export async function getRateLimitHeaders(
   request: NextRequest,
   options: RateLimitOptions = {}
 ): Promise<Record<string, string>> {
-  const { limit = 60 } = options;
+  const { limit = 60, windowMs = 60_000 } = options;
   const key = getClientKey(request);
   const storage = getAdapter();
 
   const raw = await storage.get(key);
   if (!raw) {
+    const resetEpoch = Math.ceil((Date.now() + windowMs) / 1000);
     return {
       "X-RateLimit-Limit": String(limit),
       "X-RateLimit-Remaining": String(limit),
+      "X-RateLimit-Reset": String(resetEpoch),
     };
   }
 
   const entry = JSON.parse(raw) as { count: number; resetAt: number };
   const now = Date.now();
   if (now >= entry.resetAt) {
+    const resetEpoch = Math.ceil((now + windowMs) / 1000);
     return {
       "X-RateLimit-Limit": String(limit),
       "X-RateLimit-Remaining": String(limit),
+      "X-RateLimit-Reset": String(resetEpoch),
     };
   }
 
   return {
     "X-RateLimit-Limit": String(limit),
     "X-RateLimit-Remaining": String(Math.max(0, limit - entry.count)),
+    "X-RateLimit-Reset": String(Math.ceil(entry.resetAt / 1000)),
   };
 }
 

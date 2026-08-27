@@ -15,9 +15,15 @@
 import { NextRequest } from "next/server";
 import { jobStore } from "../../shared/jobStore";
 import { requireJobOwner } from "../../shared/authGuard";
+import { logger } from "@/app/lib/logger";
 import type { Job } from "../../shared/jobStore";
 
 const POLL_INTERVAL_MS = 1_000;
+/**
+ * After this many consecutive store read failures the stream sends an error
+ * event and closes rather than looping indefinitely on a downed Redis.
+ */
+const MAX_STORE_ERRORS = 5;
 
 export async function GET(
   request: NextRequest,
@@ -30,14 +36,49 @@ export async function GET(
   const stream = new ReadableStream({
     start(controller) {
       let closed = false;
+      let consecutiveStoreErrors = 0;
 
       // Send the current state immediately so the client doesn't have to wait
       // for the first poll interval.
-      const initial = jobStore.get(jobId);
-      if (initial) safeSendEvent(controller, initial);
+      (async () => {
+        try {
+          const initial = await jobStore.get(jobId);
+          if (initial) safeSendEvent(controller, initial);
+        } catch (err) {
+          logger.error(`[SSE:${jobId}] Failed to read initial job state:`, err);
+          // Don't close yet — give the poll loop a chance to recover.
+        }
+      })();
 
-      const intervalId = setInterval(() => {
-        const job = jobStore.get(jobId);
+      const intervalId = setInterval(async () => {
+        let job: Job | undefined = undefined;
+
+        try {
+          job = await jobStore.get(jobId);
+          // A successful read resets the error counter.
+          consecutiveStoreErrors = 0;
+        } catch (err) {
+          consecutiveStoreErrors += 1;
+          logger.error(
+            `[SSE:${jobId}] Store read error (${consecutiveStoreErrors}/${MAX_STORE_ERRORS}):`,
+            err,
+          );
+
+          if (consecutiveStoreErrors >= MAX_STORE_ERRORS) {
+            logger.error(
+              `[SSE:${jobId}] Store unavailable after ${MAX_STORE_ERRORS} attempts — closing stream`,
+            );
+            safeSendErrorEvent(
+              controller,
+              "STORE_UNAVAILABLE",
+              "Job store is temporarily unavailable. Please refresh to reconnect.",
+            );
+            clearInterval(intervalId);
+            safeClose(controller);
+          }
+          // Don't process a null job — wait for next tick.
+          return;
+        }
 
         if (!job) {
           // Job was deleted while the client was watching — close cleanly.

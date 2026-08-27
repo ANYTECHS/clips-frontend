@@ -2,6 +2,7 @@ import React from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { sanitize } from "@/app/lib/sanitize";
+import { DEFAULT_BLUR_PLACEHOLDER, SIZES_PROJECT_CARD_THUMB } from "@/app/lib/imageUtils";
 
 export interface ProjectCardProps {
   id?: string;
@@ -11,7 +12,7 @@ export interface ProjectCardProps {
   thumbnail: string;
 }
 
-export default function ProjectCard({
+function ProjectCard({
   id,
   title,
   clipsCount = 0,
@@ -25,6 +26,9 @@ export default function ProjectCard({
           src={thumbnail}
           alt={sanitize(title)}
           fill
+          sizes={SIZES_PROJECT_CARD_THUMB}
+          placeholder="blur"
+          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
           className="object-cover"
         />
       </div>
@@ -50,3 +54,9 @@ export default function ProjectCard({
 
   return content;
 }
+
+/**
+ * Purely presentational and prop-driven, so a shallow prop comparison keeps it
+ * out of re-render cycles triggered by unrelated dashboard state.
+ */
+export default React.memo(ProjectCard);

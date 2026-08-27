@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { memo, useEffect, useCallback } from "react";
 import { useEarningsStore } from "@/app/store/earningsStore";
 import { ArrowUpRight, ArrowDownRight, Minus } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
@@ -9,7 +9,15 @@ interface TrendProps {
   change: number;
 }
 
-function TrendIndicator({ change }: TrendProps) {
+/**
+ * TrendIndicator — small pill showing percentage change direction.
+ *
+ * Memoised because it is rendered three times per parent render and its
+ * output depends solely on the `change` prop.
+ *
+ * Issue #874 – memoization for expensive computations.
+ */
+const TrendIndicator = memo(function TrendIndicator({ change }: TrendProps) {
   if (change > 0) {
     return (
       <div className="flex items-center gap-1 text-green-500 bg-green-500/10 px-2 py-1 rounded-full text-xs font-medium">
@@ -32,14 +40,27 @@ function TrendIndicator({ change }: TrendProps) {
       <span>Steady</span>
     </div>
   );
-}
+});
 
-export default function EarningsSummaryCards() {
+/**
+ * EarningsSummaryCards — three KPI cards for fiat, crypto, and pending payouts.
+ *
+ * The fetchEarnings call is stabilised with useCallback to avoid re-subscribing
+ * to the effect on each render. The component itself is memo-wrapped so it only
+ * re-renders when the store values change.
+ *
+ * Issue #874 – memoization for expensive computations.
+ */
+const EarningsSummaryCards = memo(function EarningsSummaryCards() {
   const { fetchEarnings, totalFiat, cryptoRevenue, pendingPayouts, loading } = useEarningsStore();
 
-  useEffect(() => {
+  const stableFetchEarnings = useCallback(() => {
     fetchEarnings();
   }, [fetchEarnings]);
+
+  useEffect(() => {
+    stableFetchEarnings();
+  }, [stableFetchEarnings]);
 
   if (loading && totalFiat.value === "$0.00") {
     return (
@@ -87,4 +108,6 @@ export default function EarningsSummaryCards() {
       </div>
     </div>
   );
-}
+});
+
+export default EarningsSummaryCards;

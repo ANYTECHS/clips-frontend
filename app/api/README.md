@@ -9,6 +9,10 @@ Next.js App Router API routes. Auth column values:
 
 | Route | Methods | Auth | Notes |
 |---|---|---|---|
+| `health` | GET | None | Liveness probe — confirms process is alive. Always 200. |
+| `health/ready` | GET | None | Readiness probe — checks Redis, AI backend, and S3. 200/503. |
+| `docs` | GET | None | Interactive Swagger UI (Swagger UI 5 via CDN). |
+| `docs/openapi.json` | GET | None | OpenAPI 3.1 spec as JSON. |
 | `auth/[...nextauth]` | GET/POST | None (NextAuth's own flow) | OAuth sign-in/callback handlers. |
 | `auth/passkey/register` | GET, POST | Session | WebAuthn passkey registration options + verification. |
 | `auth/passkey/authenticate` | GET, POST | Session | WebAuthn passkey authentication options + verification. |
@@ -40,3 +44,10 @@ Next.js App Router API routes. Auth column values:
 - `jsonBody.ts` — `parseJsonRequest()` validates `Content-Type` and safely parses the JSON body.
 - `jobStore.ts` / `jobRepository.ts` — Redis-backed (falls back to in-memory) job persistence.
 - `feeSponsorship.ts` — sponsor balance/fee estimation logic used by `sponsorship/route.ts`.
+
+## API infrastructure (`app/api/`)
+- `types.ts` — `ApiResponse<T>` envelope, `ErrorCode` union, `PaginationMeta`, `ResponseMeta`, and builder utilities (`ok`, `err`, `paginationMeta`). (Issue #891)
+- `apiResponse.ts` — `NextResponse` factory functions: `success`, `created`, `paginated`, `badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `rateLimited`, `internalError`, `serviceUnavailable`. (Issue #891)
+- `requestLogger.ts` — `withRequestLogging(handler)` HOF and imperative `logRequest(req)` for structured request/response logging with sensitive-data redaction and `X-Request-ID` propagation. (Issue #894)
+- `health/healthCheck.ts` — `livenessCheck()` and `readinessCheck()` with concurrent dependency probes (Redis, AI backend, S3). (Issue #898)
+- `docs/openapi.ts` — OpenAPI 3.1 specification object (TypeScript const). (Issue #896)

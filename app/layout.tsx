@@ -13,7 +13,9 @@ import RateLimitToast from "@/components/RateLimitToast";
 import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
+import ResourceHints from "@/components/ResourceHints";
 import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
+import PerformanceMonitor from "@/components/PerformanceMonitor";
 
 const inter = Inter({ 
   subsets: ["latin", "latin-ext"], 
@@ -55,8 +57,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <head>
+        <ResourceHints />
+      </head>
       <body className={`${inter.className} font-sans antialiased`}>
         <div className="radial-bg" />
+        <PerformanceMonitor />
         <CryptoSaltInitializer />
         <ThemeProvider>
           <ErrorBoundary>
