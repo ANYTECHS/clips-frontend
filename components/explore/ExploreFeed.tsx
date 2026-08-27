@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { TrendingUp, Loader2, Sparkles } from "lucide-react";
 import analytics from "@/app/lib/analytics";
+import { DEFAULT_BLUR_PLACEHOLDER, SIZES_CLIP_GRID } from "@/app/lib/imageUtils";
 
 interface TrendingClip {
   id: string;
@@ -104,6 +105,9 @@ export default function ExploreFeed() {
                 src={clip.thumbnail}
                 alt={clip.title}
                 fill
+                sizes={SIZES_CLIP_GRID}
+                placeholder="blur"
+                blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
                 className="object-cover group-hover:scale-105 transition-transform duration-300"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
