@@ -2,6 +2,25 @@
 
 React hooks used across the app. Each entry lists what it takes in, what it returns, and a minimal usage example.
 
+### `useApiMutation`
+- **Input:** `(mutationFn: (args: TArgs) => Promise<TResult>, options?: { invalidateTags?, onSuccess?, onError? })`
+- **Output:** `{ mutate, mutateAsync, data, loading, error, reset }`
+- **Use when:** performing a write (POST/PATCH/DELETE) and invalidating the cached reads it affects. See `DATA_FETCHING.md`.
+```ts
+const { mutate, loading } = useApiMutation(
+  (title: string) => apiFetch("/api/projects", { method: "POST", body: JSON.stringify({ title }) }),
+  { invalidateTags: ["projects"] },
+);
+```
+
+### `useApiQuery`
+- **Input:** `(key: string | null, url: string | null, options?: { tags?, ttlMs?, retry?, ... })`
+- **Output:** `{ data, loading, validating, error, refresh, invalidate }`
+- **Use when:** fetching from an API route — the app's unified data-fetching hook (stale-while-revalidate cache + normalized errors). See `DATA_FETCHING.md`.
+```ts
+const { data, loading, error, refresh } = useApiQuery<Project[]>(cacheKey("/api/projects"), "/api/projects");
+```
+
 ### `useAutoStellarWallet`
 - **Input:** none
 - **Output:** `AutoStellarWallet` — `{ status: "idle"|"ready"|"loading"|"error", ...wallet fields }`
@@ -53,6 +72,14 @@ const sponsorship = useFeeSponsorship(2);
 ### `useFilterQueryState`
 - Re-exports the top-level `hooks/useFilterQueryState.ts`. Syncs filter state with the URL query string.
 - **Use when:** a list/grid needs shareable, URL-persisted filters.
+
+### `useIntersectionObserver`
+- **Input:** `UseIntersectionObserverOptions` (`root`, `rootMargin`, `threshold`, `once`, `enabled`)
+- **Output:** `{ ref, isIntersecting, entry }`
+- **Use when:** viewport-based rendering or data fetching — attach `ref` to the element to watch. Backs `LazyRender`, `LazyImage`, and `useViewportFetch`.
+```ts
+const { ref, isIntersecting } = useIntersectionObserver<HTMLDivElement>({ rootMargin: "200px" });
+```
 
 ### `useKeyboardShortcuts`
 - **Input:** `KeyboardShortcutsOptions` — callbacks for each registered shortcut (`onOpenSearch`, `onOpenUpload`, `onNavigateEarnings`, etc.)
@@ -141,6 +168,14 @@ const { state, set, undo, redo } = useUndoRedo(initialClip);
 - **Use when:** rendering per-file progress bars during video upload.
 ```ts
 const { files, uploadFile } = useUploadProgress();
+```
+
+### `useViewportFetch`
+- **Input:** `(key: string | null, fetcher: () => Promise<T>, options?: UseViewportFetchOptions<T>)`
+- **Output:** `{ ref, isIntersecting, data, loading, error, refresh, invalidate }`
+- **Use when:** a below-fold widget shouldn't fetch its data until the user scrolls near it.
+```ts
+const { ref, data, loading } = useViewportFetch("/api/stats/secondary", () => apiFetch("/api/stats/secondary"));
 ```
 
 ### `useWalletConnection`
