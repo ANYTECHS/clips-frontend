@@ -20,6 +20,7 @@ export {
   withApiMiddleware,
   ApiError,
   errorResponse,
+  DEFAULT_API_TIMEOUT_MS,
   type ApiContext,
   type ApiHandler,
   type AuthContext,
@@ -27,6 +28,12 @@ export {
   type FormattedError,
   type ApiErrorCode,
 } from "@/app/lib/apiMiddleware";
+
+export {
+  ERROR_CODE_STATUS,
+  errorCodeForStatus,
+  normalizeErrorCode,
+} from "@/app/api/errorCodes";
 
 export {
   getEndpointRateLimit,
