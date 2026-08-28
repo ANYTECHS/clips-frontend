@@ -28,9 +28,18 @@ const { data, loading, validating, error, refresh, invalidate } = useApiQuery<Pr
   non-2xx response — no more checking `res.ok` at every call site.
 - `loading` is only true when there's nothing to show yet; a stale value
   renders immediately while `validating` refreshes it in the background.
-- `retry` / `retryDelayMs` add automatic retries with exponential backoff.
+- `retry` / `retryDelayMs` / `retryOptions` add automatic retries with exponential backoff.
 - Pass `key: null` (or `url: null`) to skip fetching, e.g. while a required id
   is still unknown.
+
+### Retry strategy & exponential backoff
+
+Data fetching uses a centralized retry mechanism (`app/lib/retry.ts`) configured via `retryOptions` or `retry` / `retryDelayMs`:
+
+- **Transient failures retried automatically**: Network failures (status 0), rate limits (HTTP 429), and server errors (HTTP 500, 502, 503, 504) are retried automatically.
+- **Non-retryable errors fail fast**: Client errors (HTTP 400, 401, 403, 404, 405, 409, 422) and explicit `AbortError` / unmount operations fail fast on the initial attempt without unnecessary retries.
+- **Exponential backoff**: Backoff delay increases exponentially between attempts: `delay = min(baseDelayMs * (backoffFactor ^ attempt), maxDelayMs)`. Default configuration uses `baseDelayMs: 500`, `maxRetries: 3`, `maxDelayMs: 10000`, `backoffFactor: 2`.
+- **Cancellation & memory safety**: All retries respect `AbortSignal`. If a component unmounts or a request is cancelled while waiting in backoff sleep, the pending timer is cleared immediately, cancelling the operation without updating unmounted component state or creating memory leaks.
 
 Requests started by `useCachedFetch` and `useApiQuery` receive an `AbortSignal`
 and are cancelled when the hook unmounts or its key changes. Custom fetchers

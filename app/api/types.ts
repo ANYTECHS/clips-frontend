@@ -68,7 +68,10 @@ export type ErrorCode =
   // Blockchain
   | "WALLET_NOT_FOUND"
   | "MINT_FAILED"
-  | "INSUFFICIENT_BALANCE";
+  | "INSUFFICIENT_BALANCE"
+  // Versioning
+  | "UNSUPPORTED_API_VERSION"
+  | "VERSION_RETIRED";
 
 // ─── Response builder helpers ─────────────────────────────────────────────────
 
