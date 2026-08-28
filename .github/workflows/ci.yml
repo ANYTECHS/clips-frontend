@@ -49,6 +49,8 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+      - name: Formatting check
+        run: npm run format:check
       - name: Unit tests
         run: echo "E2E PR — unit coverage validated on sibling PRs."
       - name: Check for changeset
