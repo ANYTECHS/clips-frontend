@@ -16,7 +16,7 @@
     "test:coverage:integration": "jest --config jest.integration.config.js --coverage --runInBand",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "prepare": "husky",
+    "prepare": "husky || true",
     "changeset": "changeset",
     "analyze": "ANALYZE=true next build",
     "bundle:check": "node scripts/check-bundle-size.js",
