@@ -15,17 +15,27 @@ export interface UseApiQueryOptions<T> extends UseCachedFetchOptions<T> {
 
 export type UseApiQueryResult<T> = UseCachedFetchResult<T>;
 
-function withRetry<T>(fn: () => Promise<T>, retries: number, delayMs: number): () => Promise<T> {
+function withRetry<T>(fn: (signal?: AbortSignal) => Promise<T>, retries: number, delayMs: number): (signal?: AbortSignal) => Promise<T> {
   if (retries <= 0) return fn;
-  return async () => {
+  return async (signal) => {
     let attempt = 0;
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       try {
-        return await fn();
+        return await fn(signal);
       } catch (err) {
         if (attempt >= retries) throw err;
-        await new Promise((resolve) => setTimeout(resolve, delayMs * 2 ** attempt));
+        await new Promise<void>((resolve, reject) => {
+          if (signal?.aborted) {
+            reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError"));
+            return;
+          }
+          const timer = setTimeout(resolve, delayMs * 2 ** attempt);
+          signal?.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(signal.reason ?? new DOMException("The operation was aborted", "AbortError"));
+          }, { once: true });
+        });
         attempt += 1;
       }
     }
@@ -54,7 +64,11 @@ export function useApiQuery<T>(
 ): UseApiQueryResult<T> {
   const { init, retry = 0, retryDelayMs = 500, ...cachedFetchOptions } = options;
 
-  const fetcher = withRetry(() => apiFetch<T>(url as string, init), retry, retryDelayMs);
+  const fetcher = withRetry(
+    (signal) => apiFetch<T>(url as string, { ...init, signal: signal ?? init?.signal }),
+    retry,
+    retryDelayMs,
+  );
 
   return useCachedFetch<T>(key, fetcher, {
     ...cachedFetchOptions,

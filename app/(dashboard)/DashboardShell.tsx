@@ -17,12 +17,14 @@ import React, {
   useCallback,
   createContext,
   useContext,
+  useEffect,
 } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 import DegradedModeBanner from "@/app/components/DegradedModeBanner";
 import { useServiceHealth } from "@/app/hooks/useServiceHealth";
+import { warmCriticalData } from "@/app/lib/cache/warmCriticalData";
 
 // ─── Sidebar context ──────────────────────────────────────────────────────────
 
@@ -49,6 +51,14 @@ export default function DashboardShell({
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { degraded, services, lastCheckedAt, refresh } = useServiceHealth();
+
+  useEffect(() => {
+    const controller = new AbortController();
+    void warmCriticalData(controller.signal).catch(() => {
+      // The dashboard's normal consumer will retry if warming fails.
+    });
+    return () => controller.abort();
+  }, []);
 
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const openSidebar  = useCallback(() => setSidebarOpen(true),  []);

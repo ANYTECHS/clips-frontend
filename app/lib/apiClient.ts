@@ -34,8 +34,8 @@ export async function fetchDashboardFromAPI(): Promise<{
  * @returns Resolves with structural payload variables mapped to the current authenticated identity.
  * @throws {Error} Thrown if the secure network line encounters an outage or identity lookups fail.
  */
-export async function fetchUserFromAPI(): Promise<UserProfile> {
-  const response = await fetch("/api/user");
+export async function fetchUserFromAPI(signal?: AbortSignal): Promise<UserProfile> {
+  const response = await fetch("/api/user", { signal });
   if (!response.ok) {
     throw new Error(`Failed to fetch user: ${response.statusText}`);
   }

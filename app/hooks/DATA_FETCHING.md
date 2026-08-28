@@ -32,6 +32,39 @@ const { data, loading, validating, error, refresh, invalidate } = useApiQuery<Pr
 - Pass `key: null` (or `url: null`) to skip fetching, e.g. while a required id
   is still unknown.
 
+Requests started by `useCachedFetch` and `useApiQuery` receive an `AbortSignal`
+and are cancelled when the hook unmounts or its key changes. Custom fetchers
+should accept the optional signal and pass it to `fetch`:
+
+```ts
+useCachedFetch(key, (signal) => fetch(url, { signal }).then((response) => response.json()));
+```
+
+Treat `AbortError` as expected cancellation rather than displaying it as a
+request failure. Retry delays are cancelled by the same signal.
+
+### Priority strategy
+
+Cache misses are scheduled through a bounded queue with three priority levels:
+`high` is for data required to render the current view, `normal` is for the
+usual page data, and `low` is for secondary widgets or opportunistic work.
+Requests at the same level run in FIFO order. Fresh cache hits and requests
+already in flight are not delayed or duplicated.
+
+Set priority on a query when the default is not appropriate:
+
+```ts
+useApiQuery(key, url, { priority: "high" });
+useApiQuery(secondaryKey, secondaryUrl, { priority: "low" });
+```
+
+The authenticated dashboard warms `/api/user` when its shell mounts because
+the profile is needed by both the header and plan-usage panel. Use
+`warmCriticalData` for similarly small, shared datasets that are needed
+immediately; keep speculative or below-fold data on demand or idle-prefetched.
+Warmers should accept an `AbortSignal`, use the shared `RequestCache`, and
+assign `high` priority so they deduplicate with the eventual consumer.
+
 ## Batching independent reads
 
 When an endpoint accepts multiple identifiers, use `RequestCache.fetchBatch` at

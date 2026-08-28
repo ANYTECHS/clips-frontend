@@ -26,6 +26,7 @@ export async function apiFetch<T = unknown>(input: string, init?: RequestInit): 
   try {
     res = await fetch(input, init);
   } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") throw err;
     throw new ApiError(err instanceof Error ? err.message : "Network request failed", 0);
   }
 

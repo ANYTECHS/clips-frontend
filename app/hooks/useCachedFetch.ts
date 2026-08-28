@@ -7,7 +7,7 @@ import {
   type RequestCache,
 } from "@/app/lib/cache/RequestCache";
 
-export interface UseCachedFetchOptions<T> extends Pick<FetchOptions<T>, "tags" | "ttlMs" | "staleTtlMs"> {
+export interface UseCachedFetchOptions<T> extends Pick<FetchOptions<T>, "tags" | "ttlMs" | "staleTtlMs" | "priority"> {
   /** Skip fetching entirely, e.g. while a required parameter is still null. */
   enabled?: boolean;
   /** Cache instance to use. Defaults to the shared one. */
@@ -46,10 +46,10 @@ export interface UseCachedFetchResult<T> {
  */
 export function useCachedFetch<T>(
   key: string | null,
-  fetcher: () => Promise<T>,
+  fetcher: (signal?: AbortSignal) => Promise<T>,
   options: UseCachedFetchOptions<T> = {},
 ): UseCachedFetchResult<T> {
-  const { enabled = true, cache = requestCache, tags, ttlMs, staleTtlMs } = options;
+  const { enabled = true, cache = requestCache, tags, ttlMs, staleTtlMs, priority } = options;
 
   const cached = key ? cache.peek<T>(key) : undefined;
   const [data, setData] = useState<T | undefined>(cached);
@@ -62,6 +62,7 @@ export function useCachedFetch<T>(
   const fetcherRef = useRef(fetcher);
   fetcherRef.current = fetcher;
   const mountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -74,13 +75,19 @@ export function useCachedFetch<T>(
     async (forceRefresh: boolean) => {
       if (!key || !enabled) return;
 
+      abortControllerRef.current?.abort();
+      const controller = new AbortController();
+      abortControllerRef.current = controller;
+
       const hadValue = cache.peek<T>(key) !== undefined;
       if (hadValue) setValidating(true);
       else setLoading(true);
       setError(null);
 
       try {
-        const value = await cache.fetch<T>(key, () => fetcherRef.current(), {
+        const value = await cache.fetch<T>(key, (signal) => fetcherRef.current(signal), {
+          signal: controller.signal,
+          priority,
           tags,
           ttlMs,
           staleTtlMs,
@@ -91,7 +98,7 @@ export function useCachedFetch<T>(
         });
         if (mountedRef.current) setData(value);
       } catch (err) {
-        if (mountedRef.current) {
+        if (mountedRef.current && !(err instanceof Error && err.name === "AbortError")) {
           setError(err instanceof Error ? err : new Error(String(err)));
         }
       } finally {
@@ -103,11 +110,12 @@ export function useCachedFetch<T>(
     },
     // `tags` is typically an inline array; joining it keeps the identity stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [key, enabled, cache, ttlMs, staleTtlMs, (tags ?? []).join("|")],
+    [key, enabled, cache, ttlMs, staleTtlMs, priority, (tags ?? []).join("|")],
   );
 
   useEffect(() => {
     void run(false);
+    return () => abortControllerRef.current?.abort();
   }, [run]);
 
   const refresh = useCallback(() => run(true), [run]);

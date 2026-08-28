@@ -1,11 +1,13 @@
 import { act, renderHook } from '@testing-library/react';
 import { useUserStore, selectUserProfile, selectUserName, selectUserEmail, selectUserAvatar, selectPlanUsage, selectUserLoading } from './userStore';
 import * as api from './api';
+import { requestCache } from '../lib/cache/RequestCache';
 
 jest.mock('./api');
 
 describe('userStore', () => {
   beforeEach(() => {
+    requestCache.delete('/api/user');
     useUserStore.setState({
       profile: null,
       loading: false,
