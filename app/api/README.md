@@ -47,7 +47,8 @@ Next.js App Router API routes. Auth column values:
 
 ## API infrastructure (`app/api/`)
 - `types.ts` — `ApiResponse<T>` envelope, `ErrorCode` union, `PaginationMeta`, `ResponseMeta`, and builder utilities (`ok`, `err`, `paginationMeta`). (Issue #891)
-- `apiResponse.ts` — `NextResponse` factory functions: `success`, `created`, `paginated`, `badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `rateLimited`, `internalError`, `serviceUnavailable`. (Issue #891)
+- `apiResponse.ts` — `NextResponse` factory functions: `success`, `created`, `paginated`, `badRequest`, `unauthorized`, `forbidden`, `notFound`, `conflict`, `rateLimited`, `internalError`, `serviceUnavailable`, `timeout`. (Issue #891)
 - `requestLogger.ts` — `withRequestLogging(handler)` HOF and imperative `logRequest(req)` for structured request/response logging with sensitive-data redaction and `X-Request-ID` propagation. (Issue #894)
+- `withApiMiddleware` — shared auth, error, and timeout handling. Standard routes time out after 10 seconds (configurable with `API_TIMEOUT_MS`); streaming routes must opt out with `timeoutMs: false`. Timeout responses are `504` with code `TIMEOUT`. See [`docs/API_TIMEOUT_POLICY.md`](../../docs/API_TIMEOUT_POLICY.md).
 - `health/healthCheck.ts` — `livenessCheck()` and `readinessCheck()` with concurrent dependency probes (Redis, AI backend, S3). (Issue #898)
 - `docs/openapi.ts` — OpenAPI 3.1 specification object (TypeScript const). (Issue #896)
