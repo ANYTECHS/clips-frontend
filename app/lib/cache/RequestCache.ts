@@ -33,6 +33,11 @@ import { fetchAnalytics, type FetchAnalytics } from "./FetchAnalytics";
 export const DEFAULT_TTL_MS = 60_000;
 export const DEFAULT_STALE_TTL_MS = 5 * 60_000;
 export const DEFAULT_MAX_ENTRIES = 100;
+export const DEFAULT_MAX_CONCURRENT = 6;
+
+export type RequestPriority = "high" | "normal" | "low";
+
+const PRIORITY_WEIGHT: Record<RequestPriority, number> = { high: 3, normal: 2, low: 1 };
 
 export interface CacheEntry<T> {
   value: T;
@@ -56,9 +61,15 @@ export interface RequestCacheOptions {
   now?: () => number;
   /** Metrics sink for fetch performance and error tracking. */
   analytics?: FetchAnalytics;
+  /** Maximum number of network requests active at once. Default 6. */
+  maxConcurrent?: number;
 }
 
 export interface FetchOptions<T> {
+  /** Signal used to cancel the underlying request. */
+  signal?: AbortSignal;
+  /** Scheduling priority for a cache miss. Default `normal`. */
+  priority?: RequestPriority;
   /** Tags to associate with this entry, for later bulk invalidation. */
   tags?: string[];
   /** Per-call TTL override. */
@@ -90,11 +101,23 @@ export class RequestCache {
   private readonly maxEntries: number;
   private readonly now: () => number;
   private readonly analytics: FetchAnalytics;
+  private readonly maxConcurrent: number;
 
   /** Insertion order doubles as LRU order: re-reading re-inserts at the end. */
   private readonly entries = new Map<string, CacheEntry<unknown>>();
   private readonly inFlight = new Map<string, Promise<unknown>>();
   private readonly tagIndex = new Map<string, Set<string>>();
+  private readonly queue: Array<{
+    key: string;
+    fetcher: (signal?: AbortSignal) => Promise<unknown>;
+    options: FetchOptions<unknown>;
+    request: Promise<unknown>;
+    resolve: (value: unknown) => void;
+    reject: (error: unknown) => void;
+    sequence: number;
+  }> = [];
+  private activeRequests = 0;
+  private sequence = 0;
 
   private hits = 0;
   private misses = 0;
@@ -107,8 +130,10 @@ export class RequestCache {
     this.maxEntries = options.maxEntries ?? DEFAULT_MAX_ENTRIES;
     this.now = options.now ?? Date.now;
     this.analytics = options.analytics ?? fetchAnalytics;
+    this.maxConcurrent = options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
 
     if (this.maxEntries < 1) throw new Error("maxEntries must be at least 1");
+    if (this.maxConcurrent < 1) throw new Error("maxConcurrent must be at least 1");
   }
 
   /**
@@ -119,7 +144,7 @@ export class RequestCache {
    */
   async fetch<T>(
     key: string,
-    fetcher: () => Promise<T>,
+    fetcher: (signal?: AbortSignal) => Promise<T>,
     options: FetchOptions<T> = {},
   ): Promise<T> {
     const now = this.now();
@@ -325,32 +350,69 @@ export class RequestCache {
     this.entries.set(key, entry);
   }
 
-  private load<T>(key: string, fetcher: () => Promise<T>, options: FetchOptions<T>): Promise<T> {
+  private load<T>(key: string, fetcher: (signal?: AbortSignal) => Promise<T>, options: FetchOptions<T>): Promise<T> {
     const existing = this.inFlight.get(key) as Promise<T> | undefined;
     if (existing) return existing;
 
-    const startedAt = this.now();
-    const request = fetcher()
-      .then((value) => {
-        this.analytics.record({ key, kind: "single", status: "success", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: 1 });
-        this.set(key, value, options);
-        return value;
-      })
-      .catch((error) => {
-        this.analytics.record({ key, kind: "single", status: "error", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: 1 });
-        throw error;
-      })
-      .finally(() => {
-        this.inFlight.delete(key);
-      });
-
+    let resolve!: (value: T) => void;
+    let reject!: (error: unknown) => void;
+    const request = new Promise<T>((requestResolve, requestReject) => {
+      resolve = requestResolve;
+      reject = requestReject;
+    });
     this.inFlight.set(key, request);
+    this.queue.push({
+      key,
+      fetcher: fetcher as (signal?: AbortSignal) => Promise<unknown>,
+      options: options as FetchOptions<unknown>,
+      request,
+      resolve: resolve as (value: unknown) => void,
+      reject,
+      sequence: this.sequence++,
+    });
+    this.drainQueue();
     return request;
+  }
+
+  private drainQueue(): void {
+    while (this.activeRequests < this.maxConcurrent && this.queue.length > 0) {
+      this.queue.sort((left, right) => {
+        const priorityDifference = PRIORITY_WEIGHT[right.options.priority ?? "normal"] - PRIORITY_WEIGHT[left.options.priority ?? "normal"];
+        return priorityDifference || left.sequence - right.sequence;
+      });
+      const queued = this.queue.shift()!;
+      this.activeRequests += 1;
+      const startedAt = this.now();
+      let fetchResult: Promise<unknown>;
+      try {
+        if (queued.options.signal?.aborted) {
+          throw queued.options.signal.reason ?? new DOMException("The operation was aborted", "AbortError");
+        }
+        fetchResult = queued.options.signal ? queued.fetcher(queued.options.signal) : queued.fetcher();
+      } catch (error) {
+        fetchResult = Promise.reject(error);
+      }
+      fetchResult
+        .then((value) => {
+          this.analytics.record({ key: queued.key, kind: "single", status: "success", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: 1 });
+          this.set(queued.key, value, queued.options);
+          queued.resolve(value);
+        })
+        .catch((error) => {
+          this.analytics.record({ key: queued.key, kind: "single", status: "error", cacheStatus: "miss", durationMs: this.now() - startedAt, batchSize: 1 });
+          queued.reject(error);
+        })
+        .finally(() => {
+          if (this.inFlight.get(queued.key) === queued.request) this.inFlight.delete(queued.key);
+          this.activeRequests -= 1;
+          this.drainQueue();
+        });
+    }
   }
 
   private async revalidate<T>(
     key: string,
-    fetcher: () => Promise<T>,
+    fetcher: (signal?: AbortSignal) => Promise<T>,
     options: FetchOptions<T>,
   ): Promise<void> {
     if (this.inFlight.has(key)) return;

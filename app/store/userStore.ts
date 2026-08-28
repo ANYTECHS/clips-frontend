@@ -16,6 +16,9 @@ import { create } from "zustand";
 import type { UserState, UserActions, UserProfile } from "./types";
 
 import { fetchUserFromAPI } from "./api";
+import { requestCache } from "../lib/cache/RequestCache";
+
+export const USER_PROFILE_CACHE_KEY = "/api/user";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
@@ -55,7 +58,9 @@ export const useUserStore = create<UserState & UserActions>((set, get) => ({
   fetchUser: async () => {
     set({ loading: true, error: null });
     try {
-      const rawProfile = await fetchUserFromAPI();
+      const rawProfile = await requestCache.fetch(USER_PROFILE_CACHE_KEY, fetchUserFromAPI, {
+        priority: "high",
+      });
       const profile = enrichProfile(rawProfile);
       const previousProfile = get().profile;
 

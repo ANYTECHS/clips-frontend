@@ -120,6 +120,27 @@ describe("RequestCache", () => {
   });
 
   describe("deduplication", () => {
+    it("starts queued requests in priority order", async () => {
+      const cache = new RequestCache({ maxConcurrent: 1 });
+      const blocker = deferred<string>();
+      const started: string[] = [];
+      const makeFetcher = (name: string, result: string) => () => {
+        started.push(name);
+        return Promise.resolve(result);
+      };
+
+      const first = cache.fetch("first", () => blocker.promise);
+      const low = cache.fetch("low", makeFetcher("low", "low"), { priority: "low" });
+      const high = cache.fetch("high", makeFetcher("high", "high"), { priority: "high" });
+      const normal = cache.fetch("normal", makeFetcher("normal", "normal"), { priority: "normal" });
+
+      expect(started).toEqual([]);
+      blocker.resolve("first");
+      await Promise.all([first, low, high, normal]);
+
+      expect(started).toEqual(["high", "normal", "low"]);
+    });
+
     it("shares one request between concurrent readers", async () => {
       const cache = new RequestCache();
       const gate = deferred<string>();
