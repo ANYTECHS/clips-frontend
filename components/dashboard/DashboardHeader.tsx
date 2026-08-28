@@ -16,12 +16,9 @@ interface NotificationItem {
 }
 
 /**
- * DashboardHeader — welcome banner + quick-upload button.
- *
- * Memoised so re-renders of the layout wrapper (e.g. mobile-menu state
- * changes) don't cascade into this component unless the user name changes.
- *
- * Issue #874 – memoization for expensive computations.
+ * Dashboard header with welcome banner, notification bell, and quick-upload button.
+ * Polls notifications every 15 seconds and supports mark-as-read with optimistic updates.
+ * Memoized to prevent re-renders from parent layout state changes.
  */
 const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const userName = useUserStore(selectUserName);

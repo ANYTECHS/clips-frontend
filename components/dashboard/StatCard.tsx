@@ -16,6 +16,15 @@ interface StatCardProps {
   isPositive?: boolean;
 }
 
+/**
+ * Displays a single dashboard statistic with optional trend indicator.
+ * Memoized to prevent unnecessary re-renders when parent state changes.
+ *
+ * @param props.label - The stat label (e.g., "Total Views")
+ * @param props.value - The formatted stat value (e.g., "12.5K")
+ * @param props.trend - Optional trend data showing direction and label
+ * @param props.icon - Optional Lucide icon to display
+ */
 function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
   let trendContent: React.ReactNode = null;
   let trendColor = "text-muted-foreground";

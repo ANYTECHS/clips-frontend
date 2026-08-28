@@ -4,6 +4,10 @@ import React, { useState, useEffect } from "react";
 import { Shield } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 
+/**
+ * Privacy settings panel for controlling explore visibility and username display.
+ * Loads current settings on mount and saves changes via PATCH to /api/user/privacy.
+ */
 export default function PrivacySettings() {
   const { showToast } = useToast();
   const [exploreOptIn, setExploreOptIn] = useState(false);

@@ -20,6 +20,14 @@ const FORMATS: ExportOptions["format"][] = ["mp4", "webm"];
 const ASPECT_RATIOS: ExportOptions["aspectRatio"][] = ["9:16", "1:1", "16:9"];
 const QUALITIES: ExportOptions["quality"][] = ["720p", "1080p"];
 
+/**
+ * Dropdown menu for exporting video clips with format, aspect ratio, and quality options.
+ * Sends export request to the API and shows loading/success states.
+ *
+ * @param props.clipId - The ID of the clip to export
+ * @param props.userPlan - User's plan tier for quality restrictions
+ * @param props.onExportStarted - Callback fired when export request is initiated
+ */
 export default function ExportDropdown({
   clipId,
   userPlan = "free",

@@ -10,6 +10,11 @@ interface Insight {
   createdAt: string;
 }
 
+/**
+ * Displays AI-generated insights for the user's content.
+ * Handles loading, empty, error, and API-not-available states gracefully.
+ * Falls back to a "Coming soon" message if the insights API returns 404.
+ */
 export default function AIInsightCard() {
   const [insights, setInsights] = useState<Insight[] | null>(null);
   const [loading, setLoading] = useState(true);

@@ -109,6 +109,16 @@ export interface ActivityFeedProps {
   onTotalCountChange?: (count: number) => void;
 }
 
+/**
+ * Displays a paginated feed of Stellar blockchain transactions for a given wallet.
+ * Supports date range filtering, infinite scroll via Horizon API cursor pagination,
+ * and auto-refresh on network changes.
+ *
+ * @param props.publicKey - Stellar public key to fetch transactions for
+ * @param props.network - "PUBLIC" or "TESTNET" Horizon network
+ * @param props.pageSize - Number of transactions per page (default: 20)
+ * @param props.onTotalCountChange - Callback when the total transaction count changes
+ */
 export default function ActivityFeed({
   publicKey,
   network,

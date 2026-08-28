@@ -12,6 +12,11 @@ import { useToast } from "@/hooks/useToast";
 // env var is baked in at build time and never changes at runtime.
 const IS_TESTNET = isTestnet();
 
+/**
+ * Displays testnet wallet information with a Friendbot funding button.
+ * Only renders on testnet environments. Shows wallet address, network label,
+ * and allows one-click funding with 10,000 XLM.
+ */
 export default function WalletInfoCard() {
   const { publicKey, networkLabel } = useAutoStellarWallet();
   const { showToast, ToastEl } = useToast();
