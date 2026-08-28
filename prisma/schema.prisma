@@ -8,6 +8,9 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  // Connection pooling configuration
+  // These values are parsed from DATABASE_URL connection string parameters
+  // Example: postgresql://user:pass@host:5432/db?connection_limit=10&pool_timeout=10
 }
 
 model User {

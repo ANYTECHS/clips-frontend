@@ -16,8 +16,16 @@ Users → Load Balancer → N × Next.js instances → Redis (job store)
 
 **Statefulness requirements before scaling beyond 1 instance:**
 - `REDIS_URL` must be set. Without it each instance uses an in-memory store that is not shared.
+- Redis connection pooling is automatically configured for optimal performance in serverless environments.
+- The system automatically falls back to in-memory storage if Redis is unavailable (logs warnings).
 - The AI backend callback (`POST /api/jobs/[id]/callback`) can land on any instance; all instances read/write the same Redis key, so this is safe.
 - SSE streams (`GET /api/jobs/[id]/stream`) poll Redis every 1 s — they work correctly across instances.
+
+**Redis health monitoring:**
+- Automatic health checks every 30 seconds (configurable via `REDIS_HEALTH_CHECK_INTERVAL`)
+- Health endpoint at `/api/health/redis` for monitoring
+- Connection pooling with automatic reconnection on failure
+- See `docs/REDIS_SESSION_SHARING.md` for full configuration details
 
 ---
 
@@ -277,11 +285,18 @@ Auto-refreshes every 30 seconds. Default time range: last 1 hour.
 |----------|---------|-------------|
 | `METRICS_TOKEN` | — | Bearer token required to scrape `/api/metrics`. Required in production. |
 | `CRON_SECRET` | — | Bearer token for cron endpoint authentication. Required in production. |
+| `REDIS_URL` | — | Required for multi-instance deployments. Format: `redis://` or `rediss://` for TLS. |
+| `REDIS_MAX_RETRIES` | `3` | Max command retry attempts |
+| `REDIS_RETRY_DELAY` | `1000` | Delay between retries in ms |
+| `REDIS_CONNECT_TIMEOUT` | `10000` | Connection timeout in ms |
+| `REDIS_COMMAND_TIMEOUT` | `5000` | Command execution timeout in ms |
+| `REDIS_KEEP_ALIVE` | `30000` | TCP keep-alive interval in ms |
+| `REDIS_MAX_RECONNECT_ATTEMPTS` | `10` | Max reconnection attempts before fallback |
+| `REDIS_HEALTH_CHECK_INTERVAL` | `30000` | Health check interval in ms |
 | `STALLED_JOB_THRESHOLD_MS` | `600000` | Age before a queued job is re-dispatched (10 min) |
 | `REQUEUE_MAX_JOBS` | `20` | Max stalled jobs re-dispatched per cron run |
 | `CLEANUP_JOB_AGE_MS` | `604800000` | Age before a terminal job is deleted (7 days) |
 | `CLEANUP_MAX_JOBS` | `500` | Max terminal jobs deleted per cleanup run |
-| `REDIS_URL` | — | Required for multi-instance deployments |
 
 ---
 
@@ -318,7 +333,12 @@ Auto-refreshes every 30 seconds. Default time range: last 1 hour.
 
 1. The HPA max (10) is a hard cap. If you consistently need more, raise `maxReplicas` in both HPA files and re-apply.
 2. Before raising the cap, check whether the bottleneck is actually Redis or the AI backend — more frontend replicas won't help if Redis is saturated.
-3. Redis connection pool saturation: each Next.js instance holds one persistent connection. 10 instances = 10 connections. Ensure your Redis plan supports at least `maxReplicas + 5` connections.
+3. Redis connection pool saturation: Connection pooling is automatically configured. Each Next.js instance maintains a persistent connection to Redis. Check Redis server metrics to ensure it can handle the connection load.
+4. Monitor Redis health via `/api/health/redis` endpoint to verify connectivity across all instances.
+5. If Redis is the bottleneck, consider:
+   - Upgrading your Redis plan for more connections
+   - Using Redis Cluster for horizontal scaling
+   - Implementing read replicas for read-heavy workloads
 
 ### Fly.io: all machines stopped — cold start on first request
 
@@ -340,7 +360,31 @@ curl -sf \
   https://<app-name>.fly.dev/api/cron/requeue-stalled-jobs
 ```
 
-### Circuit breaker is OPEN — scaling won't help
+### Redis connection issues
+
+**Symptoms:**
+- Logs show "Redis not available" or "Using in-memory storage as fallback"
+- `/api/health/redis` returns 503
+- Job state inconsistency across instances
+
+**Diagnosis:**
+1. Check Redis health: `curl https://<host>/api/health/redis`
+2. Review Redis connection logs for error messages
+3. Verify `REDIS_URL` is correctly set in all environments
+4. Test Redis connectivity: `redis-cli -u $REDIS_URL ping`
+
+**Solutions:**
+1. **Connection timeout:** Increase `REDIS_CONNECT_TIMEOUT` and `REDIS_COMMAND_TIMEOUT`
+2. **Network issues:** Check firewall rules and security groups
+3. **TLS mismatch:** Ensure URL uses `rediss://` for TLS connections
+4. **Max connections:** Verify Redis server allows enough connections for your instance count
+5. **Temporary outage:** System automatically falls back to in-memory storage and reconnects automatically
+6. **Persistent failure:** Check Redis provider status page and connection credentials
+
+**Monitoring:**
+- Set up alerts for `/api/health/redis` returning non-200 status
+- Monitor `redis.reconnectAttempts` in health metrics
+- Track `fallback.active` status to detect when in-memory fallback is used
 
 A circuit breaker opening is a signal of an *external* service failure, not an application capacity problem. Scaling up more replicas will not fix an open circuit breaker. Follow the runbook in `FALLBACK_BEHAVIORS.md` for the affected service.
 
