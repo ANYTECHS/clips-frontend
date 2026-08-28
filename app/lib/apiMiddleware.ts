@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { logger } from "@/app/lib/logger";
+import { transformResponse } from "@/app/api/apiResponse";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -187,7 +188,9 @@ export function withApiMiddleware<TParams = unknown>(
         const resolved = await resolveAuthContext();
         if (!resolved) {
           const body: FormattedError = { error: "Unauthorized", code: "UNAUTHORIZED" };
-          return NextResponse.json(body, { status: 401 });
+          return transformResponse(NextResponse.json(body, { status: 401 }), {
+            requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+          });
         }
         authCtx = resolved;
       }
@@ -197,18 +200,25 @@ export function withApiMiddleware<TParams = unknown>(
         const hasRole = requiredRoles.some((r) => authCtx.roles.includes(r));
         if (!hasRole) {
           const body: FormattedError = { error: "Forbidden", code: "FORBIDDEN" };
-          return NextResponse.json(body, { status: 403 });
+          return transformResponse(NextResponse.json(body, { status: 403 }), {
+            requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+          });
         }
       }
 
       // ── 3. Delegate to handler ────────────────────────────────────────────
       const ctx: ApiContext = { auth: authCtx, request };
       const params = routeCtx?.params ? await routeCtx.params : undefined;
-      return await handler(request, ctx, params as TParams | undefined);
+      const response = await handler(request, ctx, params as TParams | undefined);
+      return await transformResponse(response, {
+        requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+      });
     } catch (err) {
       // ── 4. Centralised error handling ─────────────────────────────────────
       const { status, body } = classifyError(err);
-      return NextResponse.json(body, { status });
+      return transformResponse(NextResponse.json(body, { status }), {
+        requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+      });
     }
   };
 }
@@ -220,10 +230,10 @@ export function withApiMiddleware<TParams = unknown>(
 export function errorResponse(
   err: unknown,
   fallbackMessage = "Internal server error"
-): NextResponse {
+): Promise<NextResponse> {
   const { status, body } = classifyError(err);
   if (body.code === "INTERNAL_ERROR" && body.error === "Internal server error") {
     body.error = fallbackMessage;
   }
-  return NextResponse.json(body, { status });
+  return transformResponse(NextResponse.json(body, { status }));
 }

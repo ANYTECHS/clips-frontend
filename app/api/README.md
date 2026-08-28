@@ -51,3 +51,27 @@ Next.js App Router API routes. Auth column values:
 - `requestLogger.ts` — `withRequestLogging(handler)` HOF and imperative `logRequest(req)` for structured request/response logging with sensitive-data redaction and `X-Request-ID` propagation. (Issue #894)
 - `health/healthCheck.ts` — `livenessCheck()` and `readinessCheck()` with concurrent dependency probes (Redis, AI backend, S3). (Issue #898)
 - `docs/openapi.ts` — OpenAPI 3.1 specification object (TypeScript const). (Issue #896)
+
+## Response transformation standard
+
+All JSON API responses use the following envelope:
+
+```ts
+{ data: T | null, error: string | null, code?: ErrorCode, meta?: ResponseMeta }
+```
+
+Successful responses put the resource or result in `data` and set `error` to
+`null`. Errors set `data` to `null`, provide a human-readable `error`, and use
+the `code` field for machine-readable handling. `meta` contains the response
+timestamp and, when available, pagination or the inbound `X-Request-ID`.
+
+Use the factories in `app/api/apiResponse.ts` (`success`, `created`,
+`paginated`, and the error helpers) when creating a route response. Routes
+wrapped with `withApiMiddleware` in `app/lib/apiMiddleware.ts` are transformed
+at the boundary as a compatibility measure: raw JSON success and error objects
+are normalized automatically, and existing envelopes are preserved.
+
+Transformation only applies to JSON responses. `204 No Content`, text, file,
+and streaming responses pass through unchanged. Do not put secrets or internal
+exception details in response data; use an `ApiError` when a controlled error
+status and code are needed.
