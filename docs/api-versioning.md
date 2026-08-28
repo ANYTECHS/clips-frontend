@@ -13,9 +13,64 @@ Un-prefixed routes (`/api/upload`) resolve to the default version (v1) so all ex
 When a request arrives, the version is resolved from:
 
 1. **URL path prefix** — `/api/v1/…`, `/api/v2/…`
-2. **`X-API-Version` request header** — `"v1"`, `"v2"`
-3. **`api-version` query param** — `?api-version=v1`
-4. **Default** — falls back to `v1`
+2. **`X-API-Version` / `Accept-Version` request header** — `"v1"`, `"v2"`
+3. **`api-version` / `version` query param** — `?api-version=v1`
+4. **Default** — falls back to `v1` if no explicit version candidate is provided.
+
+### Unsupported Versions
+
+If a request explicitly specifies an unsupported API version (e.g. `X-API-Version: v99` or `/api/v99/upload`), the server responds with **400 Bad Request**:
+
+```json
+{
+  "data": null,
+  "error": "Unsupported API version 'v99'. Supported versions are: v1, v2.",
+  "code": "UNSUPPORTED_API_VERSION",
+  "meta": {
+    "requestedVersion": "v99",
+    "supportedVersions": ["v1", "v2"],
+    "latestVersion": "v1"
+  }
+}
+```
+
+---
+
+## API Metadata & Capability Discovery Endpoint
+
+Machine-readable service information and capabilities are available at `GET /api/metadata`:
+
+```http
+GET /api/metadata HTTP/1.1
+Host: api.clipcash.io
+```
+
+**Response (200 OK):**
+
+```json
+{
+  "data": {
+    "name": "ClipCash API",
+    "description": "Public API for ClipCash short-form video clip extraction, earnings tracking, and wallet management.",
+    "version": "v1",
+    "supportedVersions": ["v1", "v2"],
+    "latestVersion": "v1",
+    "documentationUrl": "/docs/api-versioning.md",
+    "capabilities": {
+      "upload": { "enabled": true, "maxFileSizeMb": 500, "supportedCodecs": ["mp4", "mov", "webm", "avi"] },
+      "earnings": { "enabled": true, "exportFormats": ["csv", "json"] },
+      "wallet": { "enabled": true, "supportedChains": ["stellar", "soroban"] },
+      "passkey": { "enabled": true },
+      "transform": { "enabled": true, "maxBatchSize": 10 },
+      "versioning": { "enabled": true, "negotiationMethods": ["path", "header", "query"] }
+    },
+    "endpoints": [
+      { "path": "/api/metadata", "method": "GET", "description": "API capability discovery and service metadata", "version": "v1" }
+    ]
+  },
+  "error": null
+}
+```
 
 ---
 

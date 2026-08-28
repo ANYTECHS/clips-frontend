@@ -1,38 +1,26 @@
 /**
  * app/api/versioning.ts
  *
- * API versioning strategy for ClipCash.
+ * API versioning and negotiation strategy for ClipCash.
  *
  * ## Strategy
  *
- * Versions are expressed as `v{major}` prefixes in the URL path:
+ * Versions are expressed as `v{major}` prefixes in the URL path,
+ * request headers (`X-API-Version`, `Accept-Version`), or query parameters (`api-version`, `version`).
  *   /api/v1/upload   ← current stable
- *   /api/v2/upload   ← future breaking change
+ *   /api/v2/upload   ← future major version
  *
- * Un-prefixed routes (`/api/upload`) are treated as the **current default
- * version** so existing clients continue to work with zero changes.
+ * Un-prefixed requests without version indicators default to `v1` for backward compatibility.
+ * Invalid/unsupported versions return a 400 Bad Request response with code `UNSUPPORTED_API_VERSION`.
  *
  * ## Lifecycle
  *
  * CURRENT   — fully supported, no deprecation warnings.
- * DEPRECATED — still works but adds `Deprecation` + `Sunset` headers so
- *              clients know to upgrade.  Gives consumers ≥ 6 months notice.
+ * DEPRECATED — still works but adds `Deprecation` + `Sunset` headers.
  * RETIRED   — returns 410 Gone immediately.
  *
- * ## Usage in route handlers
- *
- * ```ts
- * import { resolveVersion, addVersionHeaders } from "@/app/api/versioning";
- *
- * export async function GET(req: NextRequest) {
- *   const version = resolveVersion(req);
- *   const res = NextResponse.json({ data: "…", error: null });
- *   addVersionHeaders(res, version);
- *   return res;
- * }
- * ```
- *
  * Issue #889 – API versioning strategy.
+ * Issue #984 – API version negotiation.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -45,11 +33,7 @@ type VersionStatus = "current" | "deprecated" | "retired";
 
 interface VersionMeta {
   status: VersionStatus;
-  /**
-   * ISO date after which the version is considered sunset (only for
-   * deprecated versions).  Sent as the `Sunset` response header so tooling
-   * can surface it to developers.
-   */
+  /** ISO date after which the version is sunset. */
   sunsetDate?: string;
   /** Human-readable note added to the Deprecation-Notice header. */
   deprecationNote?: string;
@@ -60,68 +44,98 @@ const VERSION_REGISTRY: Record<ApiVersion, VersionMeta> = {
     status: "current",
   },
   v2: {
-    // Placeholder for the next major version — not yet released.
     status: "current",
   },
 };
 
+/** List of all supported API versions. */
+export const SUPPORTED_VERSIONS: ApiVersion[] = Object.keys(VERSION_REGISTRY) as ApiVersion[];
+
 /** The version served when no explicit version prefix is found in the URL. */
 export const DEFAULT_VERSION: ApiVersion = "v1";
 
-/** The latest stable version.  Included in every response as `API-Version`. */
+/** The latest stable version. Included in every response as `API-Version`. */
 export const CURRENT_VERSION: ApiVersion = "v1";
 
-// ── Resolution ───────────────────────────────────────────────────────────────
+// ── Version Negotiation ──────────────────────────────────────────────────────
+
+export type VersionNegotiationResult =
+  | { status: "success"; version: ApiVersion }
+  | { status: "unsupported"; requestedVersion: string };
 
 /**
- * resolveVersion — infer the requested API version from the incoming request.
+ * negotiateVersion — extract and validate the requested API version.
  *
- * Checks (in order):
+ * Resolution order:
  * 1. URL path prefix  → `/api/v1/…`, `/api/v2/…`
- * 2. `X-API-Version` header  → "v1", "v2"
- * 3. `api-version` query param  → "v1", "v2"
- * 4. Falls back to DEFAULT_VERSION.
+ * 2. Header `X-API-Version` or `Accept-Version`
+ * 3. Query param `api-version` or `version`
+ * 4. Fallback to DEFAULT_VERSION if no explicit version candidate is supplied.
  */
-export function resolveVersion(request: NextRequest): ApiVersion {
-  // 1. Path prefix
+export function negotiateVersion(request: NextRequest): VersionNegotiationResult {
   const pathname = request.nextUrl.pathname;
-  const pathMatch = pathname.match(/\/api\/(v\d+)\//);
-  if (pathMatch) {
-    const candidate = pathMatch[1] as ApiVersion;
-    if (candidate in VERSION_REGISTRY) return candidate;
+  const pathMatch = pathname.match(/\/api\/(v\d+)(\/|$)/);
+  const pathCandidate = pathMatch ? pathMatch[1] : null;
+
+  const headerCandidate =
+    request.headers.get("x-api-version") ?? request.headers.get("accept-version");
+
+  const queryCandidate =
+    request.nextUrl.searchParams.get("api-version") ??
+    request.nextUrl.searchParams.get("version");
+
+  const candidate = pathCandidate ?? headerCandidate ?? queryCandidate;
+
+  if (!candidate) {
+    return { status: "success", version: DEFAULT_VERSION };
   }
 
-  // 2. Header
-  const headerVersion = request.headers.get("x-api-version");
-  if (headerVersion && headerVersion in VERSION_REGISTRY) {
-    return headerVersion as ApiVersion;
+  if (candidate in VERSION_REGISTRY) {
+    return { status: "success", version: candidate as ApiVersion };
   }
 
-  // 3. Query param
-  const queryVersion = request.nextUrl.searchParams.get("api-version");
-  if (queryVersion && queryVersion in VERSION_REGISTRY) {
-    return queryVersion as ApiVersion;
-  }
-
-  return DEFAULT_VERSION;
+  return { status: "unsupported", requestedVersion: candidate };
 }
 
-// ── Response headers ─────────────────────────────────────────────────────────
+/**
+ * resolveVersion — infer the requested API version, falling back to DEFAULT_VERSION.
+ */
+export function resolveVersion(request: NextRequest): ApiVersion {
+  const result = negotiateVersion(request);
+  return result.status === "success" ? result.version : DEFAULT_VERSION;
+}
+
+// ── Response helpers ─────────────────────────────────────────────────────────
+
+/**
+ * rejectUnsupportedVersion — return a 400 Bad Request for unsupported API version requests.
+ */
+export function rejectUnsupportedVersion(
+  negotiation: { status: "unsupported"; requestedVersion: string }
+): NextResponse {
+  return NextResponse.json(
+    {
+      data: null,
+      error: `Unsupported API version '${negotiation.requestedVersion}'. Supported versions are: ${SUPPORTED_VERSIONS.join(", ")}.`,
+      code: "UNSUPPORTED_API_VERSION",
+      meta: {
+        requestedVersion: negotiation.requestedVersion,
+        supportedVersions: SUPPORTED_VERSIONS,
+        latestVersion: CURRENT_VERSION,
+      },
+    },
+    {
+      status: 400,
+      headers: {
+        "API-Version": DEFAULT_VERSION,
+        "X-API-Latest": CURRENT_VERSION,
+      },
+    }
+  );
+}
 
 /**
  * addVersionHeaders — attach versioning metadata to an outgoing response.
- *
- * Always sets:
- *   `API-Version: v1`          — the version that handled this request
- *   `X-API-Latest: v1`         — the current stable version
- *
- * When the resolved version is deprecated, also sets:
- *   `Deprecation: true`
- *   `Sunset: <ISO date>`
- *   `Link: <migration URL>; rel="successor-version"`
- *
- * When the version is retired, returns 410 Gone instead of modifying the
- * response so the caller can short-circuit.
  */
 export function addVersionHeaders(
   response: NextResponse,
@@ -132,7 +146,7 @@ export function addVersionHeaders(
   response.headers.set("API-Version", version);
   response.headers.set("X-API-Latest", CURRENT_VERSION);
 
-  if (meta.status === "deprecated") {
+  if (meta && meta.status === "deprecated") {
     response.headers.set("Deprecation", "true");
     if (meta.sunsetDate) {
       response.headers.set("Sunset", meta.sunsetDate);
@@ -151,26 +165,19 @@ export function addVersionHeaders(
 
 /**
  * rejectRetiredVersion — return a 410 Gone if the version has been retired.
- *
- * Returns `null` when the version is still usable, or a NextResponse with
- * status 410 when it has been retired.  Route handlers should check this
- * before doing any work.
- *
- * @example
- * ```ts
- * const gone = rejectRetiredVersion(version);
- * if (gone) return gone;
- * ```
  */
 export function rejectRetiredVersion(version: ApiVersion): NextResponse | null {
   const meta = VERSION_REGISTRY[version];
-  if (meta.status !== "retired") return null;
+  if (!meta || meta.status !== "retired") return null;
 
   return NextResponse.json(
     {
+      data: null,
       error: `API version ${version} has been retired. Please migrate to ${CURRENT_VERSION}.`,
       code: "VERSION_RETIRED",
-      migrateUrl: `/api/${CURRENT_VERSION}`,
+      meta: {
+        migrateUrl: `/api/${CURRENT_VERSION}`,
+      },
     },
     {
       status: 410,
@@ -186,23 +193,20 @@ export function rejectRetiredVersion(version: ApiVersion): NextResponse | null {
 // ── Convenience wrapper ───────────────────────────────────────────────────────
 
 /**
- * withVersioning — higher-order helper that resolves the version, rejects
- * retired versions, and attaches headers to the returned response.
- *
- * @example
- * ```ts
- * export function GET(req: NextRequest) {
- *   return withVersioning(req, (version) => {
- *     return NextResponse.json({ data: "…", error: null });
- *   });
- * }
- * ```
+ * withVersioning — higher-order helper that negotiates the version, rejects
+ * unsupported or retired versions, and attaches response headers.
  */
 export async function withVersioning(
   request: NextRequest,
   handler: (version: ApiVersion) => NextResponse | Promise<NextResponse>
 ): Promise<NextResponse> {
-  const version = resolveVersion(request);
+  const negotiation = negotiateVersion(request);
+
+  if (negotiation.status === "unsupported") {
+    return rejectUnsupportedVersion(negotiation);
+  }
+
+  const version = negotiation.version;
 
   const gone = rejectRetiredVersion(version);
   if (gone) return gone;

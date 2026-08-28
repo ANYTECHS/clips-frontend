@@ -98,6 +98,52 @@ export const OnboardingSchema = z.object({
   goal: z.enum(["grow_audience", "monetise", "repurpose", "all"]).optional(),
 });
 
+/**
+ * API discovery metadata schema — GET /api/metadata.
+ */
+export const ApiMetadataSchema = z.object({
+  name: z.string(),
+  description: z.string(),
+  version: z.string(),
+  supportedVersions: z.array(z.string()),
+  latestVersion: z.string(),
+  documentationUrl: z.string().optional(),
+  capabilities: z.object({
+    upload: z.object({
+      enabled: z.boolean(),
+      maxFileSizeMb: z.number(),
+      supportedCodecs: z.array(z.string()),
+    }),
+    earnings: z.object({
+      enabled: z.boolean(),
+      exportFormats: z.array(z.string()),
+    }),
+    wallet: z.object({
+      enabled: z.boolean(),
+      supportedChains: z.array(z.string()),
+    }),
+    passkey: z.object({
+      enabled: z.boolean(),
+    }),
+    transform: z.object({
+      enabled: z.boolean(),
+      maxBatchSize: z.number(),
+    }),
+    versioning: z.object({
+      enabled: z.boolean(),
+      negotiationMethods: z.array(z.string()),
+    }),
+  }),
+  endpoints: z.array(
+    z.object({
+      path: z.string(),
+      method: z.string(),
+      description: z.string(),
+      version: z.string(),
+    })
+  ),
+});
+
 // ── Helper ────────────────────────────────────────────────────────────────────
 
 export type ValidationError = { error: "Validation failed"; issues: ZodIssue[] };
