@@ -29,7 +29,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { logger } from "@/app/lib/logger";
-import { transformResponse } from "@/app/api/apiResponse";
+import { errorCodeForStatus, normalizeErrorCode } from "@/app/api/errorCodes";
+import type { ErrorCode } from "@/app/api/types";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,23 +64,31 @@ export interface MiddlewareOptions {
    * user does not hold at least one of these roles the middleware returns 403.
    */
   requiredRoles?: string[];
+  /** Maximum time for authentication and route execution; false disables it. */
+  timeoutMs?: number | false;
+}
+
+export const DEFAULT_API_TIMEOUT_MS = 10_000;
+
+function getTimeoutMs(timeoutMs: number | false | undefined): number | false {
+  if (timeoutMs === false) return false;
+  if (timeoutMs !== undefined) return timeoutMs;
+
+  const configured = Number(process.env.API_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0
+    ? configured
+    : DEFAULT_API_TIMEOUT_MS;
 }
 
 // ─── Error classification ─────────────────────────────────────────────────────
 
-export type ApiErrorCode =
-  | "UNAUTHORIZED"
-  | "FORBIDDEN"
-  | "NOT_FOUND"
-  | "VALIDATION_ERROR"
-  | "RATE_LIMITED"
-  | "INTERNAL_ERROR"
-  | "SERVICE_UNAVAILABLE"
-  | "BAD_REQUEST";
+export type ApiErrorCode = ErrorCode;
 
 export interface FormattedError {
+  data: null;
   error: string;
-  code: ApiErrorCode;
+  code: ErrorCode;
+  meta: { timestamp: string };
   /** Human-friendly detail; omitted in production to avoid leaking internals. */
   detail?: string;
 }
@@ -98,15 +107,18 @@ export class ApiError extends Error {
 }
 
 /** Maps an unknown thrown value to a structured error response. */
-function classifyError(err: unknown): { status: number; body: FormattedError } {
+export function classifyError(err: unknown): { status: number; body: FormattedError } {
   const isProd = process.env.NODE_ENV === "production";
 
   if (err instanceof ApiError) {
+    const code = normalizeErrorCode(err.code);
     return {
       status: err.statusCode,
       body: {
+        data: null,
         error: err.message,
-        code: err.code,
+        code,
+        meta: { timestamp: new Date().toISOString() },
         ...(err.detail && !isProd ? { detail: err.detail } : {}),
       },
     };
@@ -115,7 +127,12 @@ function classifyError(err: unknown): { status: number; body: FormattedError } {
   if (err instanceof SyntaxError) {
     return {
       status: 400,
-      body: { error: "Invalid JSON", code: "BAD_REQUEST" },
+      body: {
+        data: null,
+        error: "Invalid JSON",
+        code: "INVALID_INPUT",
+        meta: { timestamp: new Date().toISOString() },
+      },
     };
   }
 
@@ -125,7 +142,12 @@ function classifyError(err: unknown): { status: number; body: FormattedError } {
   if (message === "RATE_LIMIT_EXCEEDED") {
     return {
       status: 429,
-      body: { error: "Too many requests", code: "RATE_LIMITED" },
+      body: {
+        data: null,
+        error: "Too many requests",
+        code: "RATE_LIMITED",
+        meta: { timestamp: new Date().toISOString() },
+      },
     };
   }
 
@@ -134,8 +156,10 @@ function classifyError(err: unknown): { status: number; body: FormattedError } {
   return {
     status: 500,
     body: {
+      data: null,
       error: "Internal server error",
-      code: "INTERNAL_ERROR",
+      code: errorCodeForStatus(500),
+      meta: { timestamp: new Date().toISOString() },
       ...(!isProd ? { detail: message } : {}),
     },
   };
@@ -174,23 +198,26 @@ export function withApiMiddleware<TParams = unknown>(
   handler: ApiHandler<TParams>,
   options: MiddlewareOptions = {}
 ): (request: NextRequest, routeCtx?: { params?: Promise<TParams> }) => Promise<NextResponse> {
-  const { requireAuth: shouldRequireAuth = true, requiredRoles = [] } = options;
+  const {
+    requireAuth: shouldRequireAuth = true,
+    requiredRoles = [],
+    timeoutMs: configuredTimeoutMs,
+  } = options;
+  const timeoutMs = getTimeoutMs(configuredTimeoutMs);
 
   return async (
     request: NextRequest,
     routeCtx?: { params?: Promise<TParams> }
   ): Promise<NextResponse> => {
-    try {
+    const execute = async (): Promise<NextResponse> => {
       // ── 1. Authentication ─────────────────────────────────────────────────
       let authCtx: AuthContext = { userId: "", roles: [] };
 
       if (shouldRequireAuth) {
         const resolved = await resolveAuthContext();
         if (!resolved) {
-          const body: FormattedError = { error: "Unauthorized", code: "UNAUTHORIZED" };
-          return transformResponse(NextResponse.json(body, { status: 401 }), {
-            requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
-          });
+          const body = { data: null, error: "Unauthorized", code: "UNAUTHORIZED" as const, meta: { timestamp: new Date().toISOString() } };
+          return NextResponse.json(body, { status: 401 });
         }
         authCtx = resolved;
       }
@@ -199,25 +226,38 @@ export function withApiMiddleware<TParams = unknown>(
       if (requiredRoles.length > 0) {
         const hasRole = requiredRoles.some((r) => authCtx.roles.includes(r));
         if (!hasRole) {
-          const body: FormattedError = { error: "Forbidden", code: "FORBIDDEN" };
-          return transformResponse(NextResponse.json(body, { status: 403 }), {
-            requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
-          });
+          const body = { data: null, error: "Forbidden", code: "FORBIDDEN" as const, meta: { timestamp: new Date().toISOString() } };
+          return NextResponse.json(body, { status: 403 });
         }
       }
 
       // ── 3. Delegate to handler ────────────────────────────────────────────
       const ctx: ApiContext = { auth: authCtx, request };
       const params = routeCtx?.params ? await routeCtx.params : undefined;
-      const response = await handler(request, ctx, params as TParams | undefined);
-      return await transformResponse(response, {
-        requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+      return await handler(request, ctx, params as TParams | undefined);
+    };
+
+    try {
+      if (timeoutMs === false) return await execute();
+
+      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<never>((_, reject) => {
+        timeoutHandle = setTimeout(() => {
+          reject(new ApiError("Request timed out", 504, "TIMEOUT"));
+        }, timeoutMs);
       });
+
+      try {
+        return await Promise.race([execute(), timeout]);
+      } finally {
+        if (timeoutHandle) clearTimeout(timeoutHandle);
+      }
     } catch (err) {
       // ── 4. Centralised error handling ─────────────────────────────────────
       const { status, body } = classifyError(err);
-      return transformResponse(NextResponse.json(body, { status }), {
-        requestId: request.headers.get("x-request-id") ?? crypto.randomUUID(),
+      return NextResponse.json(body, {
+        status,
+        headers: body.code === "TIMEOUT" ? { "Retry-After": "1" } : undefined,
       });
     }
   };
@@ -235,5 +275,8 @@ export function errorResponse(
   if (body.code === "INTERNAL_ERROR" && body.error === "Internal server error") {
     body.error = fallbackMessage;
   }
-  return transformResponse(NextResponse.json(body, { status }));
+  return NextResponse.json(body, {
+    status,
+    headers: body.code === "TIMEOUT" ? { "Retry-After": "1" } : undefined,
+  });
 }

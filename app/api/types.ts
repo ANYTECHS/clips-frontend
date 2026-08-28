@@ -54,6 +54,7 @@ export type ErrorCode =
   // Server
   | "INTERNAL_ERROR"
   | "SERVICE_UNAVAILABLE"
+  | "TIMEOUT"
   | "UPSTREAM_ERROR"
   // Jobs / AI
   | "JOB_NOT_FOUND"

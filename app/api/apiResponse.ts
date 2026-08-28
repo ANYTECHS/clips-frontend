@@ -194,6 +194,16 @@ export function serviceUnavailable(
   return NextResponse.json(err(message, "SERVICE_UNAVAILABLE", buildMeta()), { status: 503 });
 }
 
+/** 504 Gateway Timeout. */
+export function timeout(
+  message = "Request timed out"
+): NextResponse<ApiResponse<null>> {
+  return NextResponse.json(err(message, "TIMEOUT", buildMeta()), {
+    status: 504,
+    headers: { "Retry-After": "1" },
+  });
+}
+
 // ─── Request ID ───────────────────────────────────────────────────────────────
 
 /**
