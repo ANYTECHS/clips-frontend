@@ -19,7 +19,7 @@
  */
 
 import { NextResponse } from "next/server";
-import type { ApiResponse, ErrorCode, ResponseMeta, PaginationMeta } from "./types";
+import type { ApiResponse, ErrorCode, ResponseMeta } from "./types";
 import { ok, err, paginationMeta } from "./types";
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +28,47 @@ function buildMeta(extra?: Partial<ResponseMeta>): ResponseMeta {
     timestamp: new Date().toISOString(),
     ...extra,
   };
+}
+
+function isApiResponse(value: unknown): value is ApiResponse<unknown> {
+  if (!value || typeof value !== "object") return false;
+  const body = value as Record<string, unknown>;
+  return "data" in body && "error" in body &&
+    (body.error === null || typeof body.error === "string");
+}
+
+/**
+ * Normalize a JSON response to the API envelope while preserving its status
+ * and headers. Empty and non-JSON responses are returned unchanged.
+ */
+export async function transformResponse(
+  response: NextResponse,
+  meta?: Partial<ResponseMeta>
+): Promise<NextResponse> {
+  if (response.status === 204 || !response.headers.get("content-type")?.includes("application/json")) {
+    return response;
+  }
+
+  let body: unknown;
+  try {
+    body = await response.clone().json();
+  } catch {
+    return response;
+  }
+
+  const transformed = isApiResponse(body)
+    ? { ...body, meta: { ...buildMeta(meta), ...(body.meta ?? {}) } }
+    : body && typeof body === "object" && "error" in body
+      ? {
+          ...err(String((body as { error: unknown }).error),
+            (body as { code?: ErrorCode }).code, buildMeta(meta)),
+          ...("detail" in body ? { detail: (body as { detail: unknown }).detail } : {}),
+        }
+      : ok(body, buildMeta(meta));
+
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  return NextResponse.json(transformed, { status: response.status, headers });
 }
 
 // ─── Success responses ────────────────────────────────────────────────────────

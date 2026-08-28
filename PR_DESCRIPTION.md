@@ -28,3 +28,12 @@
 - Updated `StellarWalletProvider` to call `CryptoSaltInitializer` on mount and wrap children in `EmbeddedWalletProvider`.
 - Ensured SSR safety on both providers.
 - Created comprehensive unit tests in `__tests__/components/StellarWalletProvider.test.tsx` verifying wallet creation and retrieval.
+
+## Code Review Checklist (additions)
+
+- Naming conventions: ensure files, components, types, variables, and hooks follow the project's naming conventions (see `docs/naming-conventions.md`).
+	- Files: kebab-case
+	- Components/Types: PascalCase
+	- Variables/Functions: camelCase
+	- Hooks: start with `use`
+

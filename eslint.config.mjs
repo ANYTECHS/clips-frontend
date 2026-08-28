@@ -117,6 +117,28 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // Global stylistic and cleanup rules
+    files: ["**/*.{ts,tsx,js,jsx}"],
+    rules: {
+      // Remove unused imports via plugin
+      "unused-imports/no-unused-imports": "error",
+      "unused-imports/no-unused-vars": [
+        "warn",
+        { "vars": "all", "varsIgnorePattern": "^_", "args": "after-used", "argsIgnorePattern": "^_" }
+      ],
+      // Enforce TypeScript naming conventions
+      "@typescript-eslint/naming-convention": [
+        "error",
+        { "selector": "default", "format": ["camelCase"] },
+        { "selector": "variableLike", "format": ["camelCase", "UPPER_CASE"] },
+        { "selector": "typeLike", "format": ["PascalCase"] },
+        { "selector": "function", "format": ["camelCase", "PascalCase"] }
+      ],
+      // Warn about large blocks of commented-out code
+      "no-commented-out-code/no-commented-out-code": ["warn", { "allow": ["TODO", "FIXME"] }]
+    },
+  },
 ]);
 
 export default eslintConfig;

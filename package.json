@@ -10,6 +10,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
+    "lint:fix": "eslint --fix '**/*.{js,jsx,ts,tsx}'",
+    "cleanup": "npm run lint:fix && npx depcheck --json || true",
     "test": "jest",
     "test:a11y": "jest --runInBand __tests__/accessibility/a11y.test.tsx",
     "test:integration": "jest --config jest.integration.config.js --runInBand",
@@ -20,11 +22,13 @@
     "test:coverage:integration": "jest --config jest.integration.config.js --coverage --runInBand",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
-    "prepare": "husky",
+    "prepare": "node -e \"if (!process.env.CI && process.env.NODE_ENV !== 'production') { try { require('child_process').execSync('husky', { stdio: 'inherit' }); } catch (e) {} }\"",
     "changeset": "changeset",
     "analyze": "ANALYZE=true next build",
     "bundle:check": "node scripts/check-bundle-size.js",
-    "bundle:report": "node scripts/check-bundle-size.js --report"
+    "bundle:report": "node scripts/check-bundle-size.js --report",
+    "mutation": "stryker run",
+    "perf:test": "lhci autorun --config=./.lighthouserc.json"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.637.0",
@@ -81,7 +85,15 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "vite": "^8.0.14",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "@stryker-mutator/core": "^5.0.0",
+    "@stryker-mutator/jest-runner": "^5.0.0",
+    "@typescript-eslint/eslint-plugin": "^6.0.0",
+    "@typescript-eslint/parser": "^6.0.0",
+    "eslint-plugin-unused-imports": "^3.1.0",
+    "eslint-plugin-no-commented-out-code": "^1.0.0",
+    "depcheck": "^1.4.0",
+    "@lhci/cli": "^0.10.0"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,json,md}": [

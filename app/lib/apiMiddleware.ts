@@ -270,7 +270,7 @@ export function withApiMiddleware<TParams = unknown>(
 export function errorResponse(
   err: unknown,
   fallbackMessage = "Internal server error"
-): NextResponse {
+): Promise<NextResponse> {
   const { status, body } = classifyError(err);
   if (body.code === "INTERNAL_ERROR" && body.error === "Internal server error") {
     body.error = fallbackMessage;

@@ -12,6 +12,13 @@ interface MintConfigFormProps {
   }) => Promise<any>;
 }
 
+/**
+ * Form for configuring NFT minting parameters on Stellar.
+ * Validates collection name, description, royalty percentage, and listing price.
+ * Displays estimated minting cost in XLM.
+ *
+ * @param props.onSubmit - Async callback receiving the validated form data
+ */
 export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
   const [collectionName, setCollectionName] = useState("");
   const [description, setDescription] = useState("");
