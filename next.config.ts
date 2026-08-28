@@ -246,38 +246,105 @@ const nextConfig: NextConfig = {
    * into the client bundle.
    */
   experimental: {
-    optimizePackageImports: ["lucide-react", "@stellar/stellar-sdk", "zod"],
+    optimizePackageImports: [
+      "lucide-react", 
+      "@stellar/stellar-sdk", 
+      "zod",
+      "dompurify",
+      "zustand",
+    ],
   },
-  webpack: (config, { isServer }) => {
+  
+  // Production-only optimizations for JavaScript parsing performance (#880)
+  ...(process.env.NODE_ENV === "production" && {
+    // Enable SWC minification with aggressive optimizations
+    swcMinify: true,
+    compiler: {
+      // Remove console.* in production except errors
+      removeConsole: {
+        exclude: ["error", "warn"],
+      },
+    },
+  }),
+  webpack: (config, { isServer, dev }) => {
     if (!isServer) {
-      config.optimization = {
-        ...config.optimization,
-        // Only add a shared "commons" group; the previous config also set
-        // `default: false, vendors: false`, which switched off the framework
-        // and library chunk groups Next.js ships with. That collapsed
-        // node_modules into the same chunk as app code, so every deploy
-        // invalidated the whole vendor bundle in users' caches even when only
-        // app code changed.
-        splitChunks: {
-          ...(typeof config.optimization?.splitChunks === "object"
-            ? config.optimization.splitChunks
-            : {}),
-          chunks: "all",
-          cacheGroups: {
+      // Production-specific optimizations (#880)
+      if (!dev) {
+        config.optimization = {
+          ...config.optimization,
+          // Split vendor bundles for better caching
+          splitChunks: {
             ...(typeof config.optimization?.splitChunks === "object"
-              ? config.optimization.splitChunks.cacheGroups
+              ? config.optimization.splitChunks
               : {}),
-            commons: {
-              name: "commons",
-              chunks: "all",
-              minChunks: 2,
-              // Below the default groups, so framework/lib chunking still wins.
-              priority: -10,
-              reuseExistingChunk: true,
+            chunks: "all",
+            cacheGroups: {
+              ...(typeof config.optimization?.splitChunks === "object"
+                ? config.optimization.splitChunks.cacheGroups
+                : {}),
+              // Framework chunk (React, Next.js core)
+              framework: {
+                name: "framework",
+                test: /[\\/]node_modules[\\/](react|react-dom|scheduler|next)[\\/]/,
+                priority: 40,
+                reuseExistingChunk: true,
+              },
+              // Large libraries that change infrequently
+              lib: {
+                test: /[\\/]node_modules[\\/]/,
+                name(module: any) {
+                  // Group by package name for stable chunk names
+                  const packageName = module.context?.match(
+                    /[\\/]node_modules[\\/](.*?)([\\/]|$)/
+                  )?.[1];
+                  return `lib.${packageName?.replace("@", "")}`;
+                },
+                priority: 30,
+                minChunks: 1,
+                reuseExistingChunk: true,
+              },
+              // Shared commons across pages
+              commons: {
+                name: "commons",
+                chunks: "all",
+                minChunks: 2,
+                priority: 20,
+                reuseExistingChunk: true,
+              },
             },
           },
-        },
-      };
+          // Module concatenation (scope hoisting) for smaller bundles
+          concatenateModules: true,
+          // Use deterministic module IDs for better long-term caching
+          moduleIds: "deterministic",
+          // Tree shake more aggressively
+          usedExports: true,
+          sideEffects: true,
+        };
+      } else {
+        // Development: simpler splitting for faster builds
+        config.optimization = {
+          ...config.optimization,
+          splitChunks: {
+            ...(typeof config.optimization?.splitChunks === "object"
+              ? config.optimization.splitChunks
+              : {}),
+            chunks: "all",
+            cacheGroups: {
+              ...(typeof config.optimization?.splitChunks === "object"
+                ? config.optimization.splitChunks.cacheGroups
+                : {}),
+              commons: {
+                name: "commons",
+                chunks: "all",
+                minChunks: 2,
+                priority: -10,
+                reuseExistingChunk: true,
+              },
+            },
+          },
+        };
+      }
     }
     return config;
   },
