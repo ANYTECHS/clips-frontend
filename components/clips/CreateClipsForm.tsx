@@ -3,6 +3,11 @@
 import React, { useState } from "react";
 import { Upload, Link, Loader2 } from "lucide-react";
 
+/**
+ * Form for creating video clips via URL or file upload.
+ * Supports both URL-based video import and direct file upload.
+ * Sends the video to /api/upload for processing.
+ */
 export default function CreateClipsForm() {
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);

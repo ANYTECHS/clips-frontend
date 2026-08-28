@@ -44,6 +44,14 @@ export interface ClipGridProps {
   userPlan?: "free" | "pro" | "enterprise";
 }
 
+/**
+ * Displays a responsive grid of video clips with selection, preview, and export capabilities.
+ * Supports infinite scroll via IntersectionObserver, AI-powered recommendations,
+ * and bulk selection by score threshold.
+ *
+ * @param props - ClipGridProps containing clips data, selection handlers, and UI state
+ * @returns A responsive grid of clip cards with selection controls
+ */
 export default function ClipGrid({
   clips,
   selectedIds,

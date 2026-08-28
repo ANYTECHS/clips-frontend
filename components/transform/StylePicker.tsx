@@ -41,6 +41,10 @@ interface UseStylesResult {
   retry: () => void;
 }
 
+/**
+ * Fetches available transform styles from the API with automatic retry on failure.
+ * @returns Styles array, loading state, error message, and retry function
+ */
 function useStyles(): UseStylesResult {
   const [styles, setStyles] = useState<TransformStyle[]>([]);
   const [loading, setLoading] = useState(true);
