@@ -117,6 +117,12 @@ export interface RateLimitOptions {
   limit?: number;
   /** Window duration in milliseconds. Default: 60_000 (1 minute) */
   windowMs?: number;
+  /**
+   * Overrides the bucketing key (defaults to the client's IP address).
+   * Pass a user-scoped key (e.g. `user:<id>:<route>`) for per-user rate
+   * limits — see app/lib/customRateLimit.ts.
+   */
+  key?: string;
 }
 
 /**
@@ -135,7 +141,7 @@ export async function applyRateLimit(
 ): Promise<NextResponse | null> {
   const { limit = 60, windowMs = 60_000 } = options;
 
-  const key = getClientKey(request);
+  const key = options.key ?? getClientKey(request);
   const storage = getAdapter();
   const windowSeconds = Math.ceil(windowMs / 1000);
 
@@ -179,7 +185,7 @@ export async function getRateLimitHeaders(
   options: RateLimitOptions = {}
 ): Promise<Record<string, string>> {
   const { limit = 60, windowMs = 60_000 } = options;
-  const key = getClientKey(request);
+  const key = options.key ?? getClientKey(request);
   const storage = getAdapter();
 
   const raw = await storage.get(key);

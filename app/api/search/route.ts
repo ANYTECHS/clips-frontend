@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
-import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
 import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
 import { clipsStore } from "@/app/api/clips/clipsStore";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
@@ -55,7 +55,7 @@ function deriveProjectTitle(job: { id: string; filename?: string }): string {
  * a user's full history.
  */
 async function handleGet(request: NextRequest) {
-  const rateLimited = await applyRateLimit(request, { limit: 30, windowMs: 60_000 });
+  const rateLimited = await applyCustomRateLimit(request, "/api/search");
   if (rateLimited) return rateLimited;
 
   const authResult = await requireAuth();
