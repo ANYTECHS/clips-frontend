@@ -21,6 +21,8 @@ import ProjectCard from "@/components/dashboard/ProjectCard";
 import EarningsSummaryCards from "@/components/dashboard/EarningsSummaryCards";
 import WalletInfoCard from "@/components/dashboard/WalletInfoCard";
 import Skeleton from "@/components/ui/Skeleton";
+import ProgressiveHydrate from "@/app/components/ProgressiveHydrate";
+import HydrationErrorBoundary from "@/app/components/HydrationErrorBoundary";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { useDashboardData } from "@/app/hooks/useDashboardData";
 import { useDashboardStore } from "@/app/store/dashboardStore";
@@ -210,17 +212,32 @@ export default function DashboardClient({ initialData }: DashboardClientProps) {
               <h3 className="text-[18px] font-extrabold text-white tracking-tight">
                 Payments Hub
               </h3>
-              <SendPaymentForm />
+              <HydrationErrorBoundary sectionName="send-payment-form">
+                <ProgressiveHydrate
+                  strategy="visible"
+                  fallback={skeletonBox(RESERVED_HEIGHTS.CHART)}
+                >
+                  <SendPaymentForm />
+                </ProgressiveHydrate>
+              </HydrationErrorBoundary>
             </div>
             <div className="space-y-4 flex flex-col">
               <h3 className="text-[18px] font-extrabold text-white tracking-tight">
                 Stellar Wallet Status
               </h3>
-              <WalletHealthCard publicKey={publicKey} />
+              <HydrationErrorBoundary sectionName="wallet-health-card">
+                <ProgressiveHydrate strategy="visible" fallback={skeletonBox("h-[200px]")}>
+                  <WalletHealthCard publicKey={publicKey} />
+                </ProgressiveHydrate>
+              </HydrationErrorBoundary>
             </div>
           </div>
 
-          <AIInsightCard />
+          <HydrationErrorBoundary sectionName="ai-insight-card">
+            <ProgressiveHydrate strategy="idle" fallback={skeletonBox("h-[120px]")}>
+              <AIInsightCard />
+            </ProgressiveHydrate>
+          </HydrationErrorBoundary>
 
           {/* ── Recent projects ── */}
           <div className="space-y-6">
