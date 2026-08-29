@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
 import { X, Crop, Type, MonitorPlay, Smartphone, Loader2, Sparkles } from "lucide-react";
 import type { Clip } from "./ClipGrid";
@@ -106,6 +106,17 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
+  // Tracks the "poll again shortly" timer from handleGenerateCaptions so it
+  // can be cancelled if the modal closes first — otherwise it fires
+  // loadCaptions() (and its setState calls) after unmount.
+  const captionsPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (captionsPollTimeoutRef.current) clearTimeout(captionsPollTimeoutRef.current);
+    };
+  }, []);
+
   const handleGenerateCaptions = async () => {
     setCaptionGenerating(true);
     try {
@@ -116,7 +127,11 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
       });
       if (res.ok) {
         setCaptionStatus("queued");
-        setTimeout(loadCaptions, 1500);
+        if (captionsPollTimeoutRef.current) clearTimeout(captionsPollTimeoutRef.current);
+        captionsPollTimeoutRef.current = setTimeout(() => {
+          captionsPollTimeoutRef.current = null;
+          loadCaptions();
+        }, 1500);
       }
     } finally {
       setCaptionGenerating(false);

@@ -47,7 +47,7 @@ export const WEB_VITAL_THRESHOLDS: Record<WebVitalName, [number, number]> = {
   TTFB: [800, 1800],
 };
 
-/** Budgets for app-specific metrics, in milliseconds. */
+/** Budgets for app-specific metrics, in milliseconds unless noted otherwise. */
 export const CUSTOM_METRIC_THRESHOLDS: Record<string, [number, number]> = {
   "dashboard.load": [1000, 3000],
   "upload.total": [30_000, 120_000],
@@ -55,6 +55,9 @@ export const CUSTOM_METRIC_THRESHOLDS: Record<string, [number, number]> = {
   // CDN health metrics
   "cdn.probe": [200, 1_000],
   "cdn.purge": [500, 2_000],
+  // Heap usage ratio (usedJSHeapSize / jsHeapSizeLimit), unitless 0-1 — see
+  // app/hooks/useMemoryMonitor.ts.
+  "memory.heapUsedRatio": [0.7, 0.9],
   "cdn.asset.resolve": [100, 500],
 };
 
@@ -92,9 +95,11 @@ export interface PerformanceMetric {
   attributes?: Record<string, string | number | boolean>;
 }
 
-/** CLS is a score rather than a duration; everything else is a duration. */
+const UNITLESS_METRICS = new Set(["CLS", "memory.heapUsedRatio"]);
+
+/** CLS and ratio-style metrics are unitless scores; everything else is a duration. */
 function unitFor(name: string): PerformanceMetric["unit"] {
-  return name === "CLS" ? "none" : "millisecond";
+  return UNITLESS_METRICS.has(name) ? "none" : "millisecond";
 }
 
 // ─── Sinks ────────────────────────────────────────────────────────────────────
