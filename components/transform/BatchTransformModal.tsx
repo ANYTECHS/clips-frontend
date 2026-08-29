@@ -10,6 +10,7 @@ import { DEFAULT_ANIME_OPTIONS, type AnimeTransformOptions } from "@/app/lib/ani
 import { sanitize } from "@/app/lib/sanitize";
 import { DEFAULT_BLUR_PLACEHOLDER, SIZES_MODAL_PREVIEW } from "@/app/lib/imageUtils";
 import type { TransformOptions } from "@/app/api/transform/batch/route";
+import { useWillChange } from "@/app/hooks/useWillChange";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,7 @@ export function BatchTransformModal({
   onConfirm,
   onClose,
 }: BatchTransformModalProps) {
+  const panelRef = useWillChange<HTMLDivElement>("transform, opacity");
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
   const [animeOptions, setAnimeOptions] = useState<AnimeTransformOptions>(DEFAULT_ANIME_OPTIONS);
 
@@ -140,6 +142,7 @@ export function BatchTransformModal({
     >
       {/* Panel */}
       <div
+        ref={panelRef}
         className={[
           "relative w-full max-w-2xl bg-surface border border-white/10 rounded-3xl",
           "shadow-2xl flex flex-col overflow-hidden",

@@ -253,7 +253,7 @@ export default function ClipGrid({
                           </div>
                         </div>
 
-                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/90 translate-y-full group-hover:translate-y-0 transition-transform flex items-center-stretch gap-2 backdrop-blur-md">
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/90 translate-y-full group-hover:translate-y-0 group-hover:will-change-transform transition-transform flex items-center-stretch gap-2 backdrop-blur-md">
                           <button onClick={(e) => { e.stopPropagation(); onPreview(clip.id); }} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors" aria-label="Preview clip"><Play className="w-4 h-4" /> Preview</button>
                           <button onClick={(e) => { e.stopPropagation(); onEdit(clip.id); }} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors" aria-label="Edit clip"><Edit2 className="w-4 h-4" /> Edit</button>
                           <ExportDropdown clipId={clip.id} userPlan={userPlan} />

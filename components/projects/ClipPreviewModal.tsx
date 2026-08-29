@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { X, Play, Pause, Volume2, VolumeX, Share2, TrendingUp } from "lucide-react";
 import type { Clip } from "./ClipGrid";
+import { useWillChange } from "@/app/hooks/useWillChange";
 
 export interface ClipPreviewModalProps {
   clip: Clip;
@@ -13,6 +14,7 @@ export default function ClipPreviewModal({ clip, onClose }: ClipPreviewModalProp
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const panelRef = useWillChange<HTMLDivElement>("transform, opacity");
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -42,7 +44,8 @@ export default function ClipPreviewModal({ clip, onClose }: ClipPreviewModalProp
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
-      <div 
+      <div
+        ref={panelRef}
         className="relative bg-[#111] rounded-2xl w-full max-w-5xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in zoom-in-95 duration-300"
         role="dialog"
         aria-modal="true"
@@ -95,7 +98,7 @@ export default function ClipPreviewModal({ clip, onClose }: ClipPreviewModalProp
           {!isPlaying && (
             <button
               onClick={togglePlay}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-full bg-brand/90 text-black hover:bg-brand hover:scale-110 transition-all duration-300 shadow-[0_0_30px_rgba(var(--brand),0.4)]"
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 rounded-full bg-brand/90 text-black hover:bg-brand hover:scale-110 hover:will-change-transform transition-all duration-300 shadow-[0_0_30px_rgba(var(--brand),0.4)]"
             >
               <Play className="w-8 h-8 ml-1" />
             </button>
