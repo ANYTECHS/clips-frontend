@@ -5,6 +5,7 @@ import Image, { type ImageProps } from "next/image";
 import { ImageOff } from "lucide-react";
 import { useIntersectionObserver } from "@/app/hooks/useIntersectionObserver";
 import { DEFAULT_BLUR_PLACEHOLDER } from "@/app/lib/imageUtils";
+import { aspectRatioClass, type AspectRatioKey, ASPECT_RATIOS } from "@/app/lib/layoutShiftPrevention";
 
 export interface LazyImageProps extends Omit<ImageProps, "onLoad" | "onError" | "placeholder" | "blurDataURL"> {
   /** Distance from the viewport at which to start loading. Default "200px". */
@@ -15,6 +16,8 @@ export interface LazyImageProps extends Omit<ImageProps, "onLoad" | "onError" | 
   errorFallback?: React.ReactNode;
   onLoadingComplete?: () => void;
   onLoadError?: (error: unknown) => void;
+  /** Aspect ratio to preserve (prevents CLS). If provided, container reserves space. */
+  aspectRatio?: AspectRatioKey | number;
 }
 
 /**
@@ -26,6 +29,9 @@ export interface LazyImageProps extends Omit<ImageProps, "onLoad" | "onError" | 
  * network request — the `<img>` element and its wrapping DOM still mount
  * immediately. This additionally defers mounting the image itself, which
  * matters for long below-fold grids (explore feed, clip grids, vault).
+ *
+ * **CLS Prevention**: When aspectRatio is provided, reserves space before loading
+ * to prevent layout shift (#873).
  */
 export default function LazyImage({
   rootMargin = "200px",
@@ -35,13 +41,23 @@ export default function LazyImage({
   onLoadError,
   className,
   alt,
+  aspectRatio,
   ...imageProps
 }: LazyImageProps) {
   const { ref, isIntersecting } = useIntersectionObserver<HTMLDivElement>({ rootMargin, once: true });
   const [status, setStatus] = useState<"pending" | "loaded" | "error">("pending");
 
+  // Calculate aspect ratio class for CLS prevention
+  const aspectRatioValue = typeof aspectRatio === "string" 
+    ? ASPECT_RATIOS[aspectRatio] 
+    : aspectRatio;
+  
+  const containerClass = aspectRatioValue 
+    ? aspectRatioClass(aspectRatioValue)
+    : "";
+
   return (
-    <div ref={ref} className="relative w-full h-full">
+    <div ref={ref} className={`relative w-full ${containerClass || "h-full"}`}>
       {isIntersecting && status !== "error" && (
         <Image
           {...imageProps}

@@ -24,25 +24,30 @@ import Skeleton from "@/components/ui/Skeleton";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { useDashboardData } from "@/app/hooks/useDashboardData";
 import { useDashboardStore } from "@/app/store/dashboardStore";
+import { useCLSMonitoring } from "@/app/hooks/useCLSMonitoring";
+import { RESERVED_HEIGHTS } from "@/app/lib/layoutShiftPrevention";
 import { DollarSign, Video, Globe, AlertCircle } from "lucide-react";
 import type { DashboardData } from "@/app/lib/serverData";
 
 // ─── Lazy-loaded heavy islands ────────────────────────────────────────────────
 
 const skeletonBox = (h: string) => (
-  <div className={`bg-surface border border-border rounded-[24px] p-8 ${h} flex items-center justify-center`}>
+  <div 
+    className={`bg-surface border border-border rounded-[24px] p-8 ${h} flex items-center justify-center`}
+    style={{ minHeight: h.replace('h-[', '').replace(']', '') }}
+  >
     <Skeleton className="w-full h-full" />
   </div>
 );
 
 const RevenueChart = dynamic(() => import("@/components/dashboard/RevenueChart"), {
   ssr: false,
-  loading: () => skeletonBox("h-[300px]"),
+  loading: () => skeletonBox(RESERVED_HEIGHTS.CHART),
 });
 
 const SendPaymentForm = dynamic(() => import("@/components/SendPaymentForm"), {
   ssr: false,
-  loading: () => skeletonBox("h-[300px]"),
+  loading: () => skeletonBox(RESERVED_HEIGHTS.CHART),
 });
 
 const WalletHealthCard = dynamic(() => import("@/components/wallet/WalletHealthCard"), {
@@ -52,14 +57,17 @@ const WalletHealthCard = dynamic(() => import("@/components/wallet/WalletHealthC
 
 const PlatformDistribution = dynamic(
   () => import("@/components/dashboard/PlatformDistribution"),
-  { ssr: false, loading: () => skeletonBox("h-[300px] p-6") },
+  { ssr: false, loading: () => skeletonBox(RESERVED_HEIGHTS.CHART) },
 );
 
 // ─── Skeleton for stat cards ──────────────────────────────────────────────────
 
 function StatCardSkeleton() {
   return (
-    <div className="bg-surface border border-border rounded-[24px] p-8 flex flex-col gap-6">
+    <div 
+      className="bg-surface border border-border rounded-[24px] p-8 flex flex-col gap-6"
+      style={{ minHeight: RESERVED_HEIGHTS.STAT_CARD }}
+    >
       <div className="flex items-center justify-between">
         <Skeleton className="h-4 w-28" />
         <Skeleton className="w-10 h-10 rounded-xl" />
@@ -87,6 +95,9 @@ interface DashboardClientProps {
 
 export default function DashboardClient({ initialData }: DashboardClientProps) {
   const { publicKey } = useAutoStellarWallet();
+
+  // Monitor CLS in development (#873)
+  useCLSMonitoring();
 
   // Seed the store with server data before the first client render so
   // useDashboardData() returns non-null data immediately without a fetch.
