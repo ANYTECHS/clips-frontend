@@ -198,7 +198,7 @@ export default function ClipGrid({
                     const isRecommended = aiRecommendations && clip.score >= recommendationThreshold;
 
                     return (
-                      <div key={clip.id} className={`group relative rounded-2xl overflow-hidden transition-all duration-300 border-2 ${isSelected ? "border-brand shadow-[0_0_20px_rgba(var(--brand),0.3)]" : "border-transparent hover:border-white/20"}`}>
+                      <div key={clip.id} className={`group relative rounded-2xl overflow-hidden contain-layout-style transition-all duration-300 border-2 ${isSelected ? "border-brand shadow-[0_0_20px_rgba(var(--brand),0.3)]" : "border-transparent hover:border-white/20"}`}>
                         <div className="aspect-[9/16] w-full bg-black relative cursor-pointer" onClick={() => onSelect(clip.id)} role="checkbox" aria-checked={isSelected} tabIndex={0} onKeyDown={(e) => handleKeyDown(e, clip.id)}>
                           <Image 
                             src={clip.thumbnail} 
