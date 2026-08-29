@@ -5,9 +5,13 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { sanitize } from "@/app/lib/sanitize";
 import { formatAmount } from "@/app/lib/formatAmount";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
+import VirtualList from "@/components/common/VirtualList";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_HORIZON_PAGE_SIZE = 200;
+/** Row height (px) reserved per transaction, incl. padding. Keep in sync with the row's own padding/line-heights below. */
+const ACTIVITY_ROW_HEIGHT = 84;
+const ACTIVITY_ROW_GAP = 8;
 
 type HorizonNetwork = "PUBLIC" | "TESTNET";
 
@@ -304,6 +308,16 @@ export default function ActivityFeed({
           No transactions found for the selected filters.
         </div>
       ) : (
+        <VirtualList
+          items={filteredTransactions}
+          itemKey={(transaction) => transaction.id}
+          rowHeight={ACTIVITY_ROW_HEIGHT}
+          gap={ACTIVITY_ROW_GAP}
+          ariaRole="list"
+          renderItem={(transaction) => (
+            <div
+              role="listitem"
+              className="flex h-full items-start justify-between gap-3 rounded-xl border border-border bg-surface-hover/40 px-4 py-3"
         <ul className="space-y-2">
           {filteredTransactions.map((transaction) => (
             <li
@@ -327,9 +341,9 @@ export default function ActivityFeed({
                 </p>
                 <p className="text-xs text-muted">Fee: {toFeeXLM(transaction.fee_charged)} XLM</p>
               </div>
-            </li>
-          ))}
-        </ul>
+            </div>
+          )}
+        />
       )}
 
       <div className="flex items-center justify-between pt-2">

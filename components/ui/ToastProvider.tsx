@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -17,14 +17,29 @@ const ToastContext = createContext<ToastContextType | undefined>(undefined);
 export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
+  // Auto-dismiss timers, keyed by toast id, so a toast that's still pending
+  // when the provider unmounts doesn't fire setState afterward (or just sit
+  // there holding its closure alive until it does).
+  const dismissTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+
+  useEffect(() => {
+    const timers = dismissTimersRef.current;
+    return () => {
+      timers.forEach((timer) => clearTimeout(timer));
+      timers.clear();
+    };
+  }, []);
+
   const addToast = useCallback((message: string, type: ToastType = 'info') => {
     const id = Math.random().toString(36).substring(2, 9);
     setToasts((prev) => [...prev, { id, message, type }]);
 
     // Acceptance Criteria: Auto-dismiss set to 5 seconds (5000ms) for screen readers
-    setTimeout(() => {
+    const timer = setTimeout(() => {
+      dismissTimersRef.current.delete(id);
       setToasts((prev) => prev.filter((toast) => toast.id !== id));
     }, 5000);
+    dismissTimersRef.current.set(id, timer);
   }, []);
 
   return (
