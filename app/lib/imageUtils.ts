@@ -7,7 +7,9 @@
  *  - ImageLoadingState type consumed by load/error handlers
  *
  * All exports are safe to use in both Server Components and Client Components.
- * Canvas-based helpers are guarded with `typeof window !== 'undefined'`.
+ * Canvas-based helpers are guarded with `typeof window !== 'undefined'`. The
+ * `*Async` variants render via OffscreenCanvas in a worker instead of the
+ * main-thread canvas; see docs/offscreen-canvas-usage.md.
  */
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -198,6 +200,74 @@ export function getBlurPlaceholder(
   if (blurCache.has(imageUrl)) return blurCache.get(imageUrl)!;
 
   const placeholder = generateBlurPlaceholder(width, height);
+  blurCache.set(imageUrl, placeholder);
+  return placeholder;
+}
+
+// ─── OffscreenCanvas-based placeholder (client-only, off main thread) ────────
+//
+// Same gradient + encode as generateBlurPlaceholder above, but run inside a
+// worker via OffscreenCanvas so drawing and JPEG encoding never block the
+// main thread. Falls back to the synchronous canvas implementation where
+// OffscreenCanvas or Worker aren't available (Safari < 16.4, SSR, jsdom).
+
+let blurWorker: Worker | null = null;
+let blurRequestId = 0;
+const pendingBlurRequests = new Map<number, (dataUrl: string) => void>();
+
+function supportsOffscreenCanvas(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof Worker !== "undefined" &&
+    typeof OffscreenCanvas !== "undefined"
+  );
+}
+
+function getBlurWorker(): Worker {
+  if (!blurWorker) {
+    blurWorker = new Worker(new URL("../workers/blurPlaceholder.worker.ts", import.meta.url));
+    blurWorker.onmessage = (event: MessageEvent<{ requestId: number; dataUrl: string }>) => {
+      const resolve = pendingBlurRequests.get(event.data.requestId);
+      if (!resolve) return;
+      resolve(event.data.dataUrl);
+      pendingBlurRequests.delete(event.data.requestId);
+    };
+  }
+  return blurWorker;
+}
+
+/**
+ * Generate a tiny gradient placeholder off the main thread using
+ * OffscreenCanvas. Falls back to `generateBlurPlaceholder` (synchronous,
+ * main-thread canvas) where OffscreenCanvas/Worker support is missing.
+ */
+export function generateBlurPlaceholderAsync(width = 10, height = 10): Promise<string> {
+  if (typeof window === "undefined") return Promise.resolve(DEFAULT_BLUR_PLACEHOLDER);
+  if (!supportsOffscreenCanvas()) return Promise.resolve(generateBlurPlaceholder(width, height));
+
+  const worker = getBlurWorker();
+  const requestId = ++blurRequestId;
+
+  return new Promise((resolve) => {
+    pendingBlurRequests.set(requestId, resolve);
+    worker.postMessage({ requestId, width, height });
+  });
+}
+
+/**
+ * Get or generate a cached blur placeholder keyed by image URL, generating
+ * off the main thread via `generateBlurPlaceholderAsync`.
+ * Client-only — resolves to DEFAULT_BLUR_PLACEHOLDER on the server.
+ */
+export async function getBlurPlaceholderAsync(
+  imageUrl: string,
+  width = 10,
+  height = 10,
+): Promise<string> {
+  if (typeof window === "undefined") return DEFAULT_BLUR_PLACEHOLDER;
+  if (blurCache.has(imageUrl)) return blurCache.get(imageUrl)!;
+
+  const placeholder = await generateBlurPlaceholderAsync(width, height);
   blurCache.set(imageUrl, placeholder);
   return placeholder;
 }
