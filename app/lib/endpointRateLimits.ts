@@ -320,6 +320,18 @@ const ENDPOINT_LIMITS: Record<string, EndpointRateLimit> = {
     windowMs: 60_000,
     description: "20 caption generations/min",
   },
+
+  // ── Webhooks ───────────────────────────────────────────────────────────────
+  "/api/webhooks": {
+    limit: 20,
+    windowMs: 60_000,
+    description: "20 webhook list/register calls/min",
+  },
+  "/api/webhooks/[id]": {
+    limit: 30,
+    windowMs: 60_000,
+    description: "30 webhook update/delete calls/min",
+  },
 };
 
 /**

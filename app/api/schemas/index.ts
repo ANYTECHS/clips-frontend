@@ -12,3 +12,4 @@ export * from "./transform.schema";
 export * from "./billing.schema";
 export * from "./projects.schema";
 export * from "./batch.schema";
+export * from "./webhooks.schema";
