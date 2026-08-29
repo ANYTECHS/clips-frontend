@@ -14,6 +14,7 @@ import {
   SIZES_EDITOR_PREVIEW,
   SIZES_TRIM_TIMELINE,
 } from "@/app/lib/imageUtils";
+import { useWillChange } from "@/app/hooks/useWillChange";
 
 export interface ClipEdits {
   trimStart: number;
@@ -57,6 +58,7 @@ const POSITIONS: { id: CaptionStyle["position"]; label: string }[] = [
 type EditorTab = "edit" | "captions";
 
 export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorModalProps) {
+  const panelRef = useWillChange<HTMLDivElement>("transform, opacity");
   const [activeTab, setActiveTab] = useState<EditorTab>("edit");
   const [edits, setEdits] = useState<ClipEdits>({
     trimStart: 0,
@@ -175,6 +177,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div
+        ref={panelRef}
         className="bg-[#111] border border-white/10 rounded-2xl w-full max-w-4xl shadow-2xl flex flex-col md:flex-row overflow-hidden animate-in slide-in-from-bottom-8 duration-300 max-h-[90vh]"
         role="dialog"
         aria-modal="true"

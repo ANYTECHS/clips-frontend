@@ -198,7 +198,7 @@ export default function ClipGrid({
                     const isRecommended = aiRecommendations && clip.score >= recommendationThreshold;
 
                     return (
-                      <div key={clip.id} className={`group relative rounded-2xl overflow-hidden transition-all duration-300 border-2 ${isSelected ? "border-brand shadow-[0_0_20px_rgba(var(--brand),0.3)]" : "border-transparent hover:border-white/20"}`}>
+                      <div key={clip.id} className={`group relative rounded-2xl overflow-hidden contain-layout-style transition-all duration-300 border-2 ${isSelected ? "border-brand shadow-[0_0_20px_rgba(var(--brand),0.3)]" : "border-transparent hover:border-white/20"}`}>
                         <div className="aspect-[9/16] w-full bg-black relative cursor-pointer" onClick={() => onSelect(clip.id)} role="checkbox" aria-checked={isSelected} tabIndex={0} onKeyDown={(e) => handleKeyDown(e, clip.id)}>
                           <Image 
                             src={clip.thumbnail} 
@@ -253,7 +253,7 @@ export default function ClipGrid({
                           </div>
                         </div>
 
-                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/90 translate-y-full group-hover:translate-y-0 transition-transform flex items-center-stretch gap-2 backdrop-blur-md">
+                        <div className="absolute bottom-0 left-0 right-0 p-3 bg-black/90 translate-y-full group-hover:translate-y-0 group-hover:will-change-transform transition-transform flex items-center-stretch gap-2 backdrop-blur-md">
                           <button onClick={(e) => { e.stopPropagation(); onPreview(clip.id); }} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors" aria-label="Preview clip"><Play className="w-4 h-4" /> Preview</button>
                           <button onClick={(e) => { e.stopPropagation(); onEdit(clip.id); }} className="flex-1 bg-white/10 hover:bg-white/20 text-white py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors" aria-label="Edit clip"><Edit2 className="w-4 h-4" /> Edit</button>
                           <ExportDropdown clipId={clip.id} userPlan={userPlan} />
