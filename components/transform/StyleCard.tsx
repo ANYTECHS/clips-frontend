@@ -95,7 +95,7 @@ export function StyleCard({
           blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
           className={[
             "object-cover transition-transform duration-300",
-            !isDisabled && !isSelected ? "group-hover:scale-105" : "",
+            !isDisabled && !isSelected ? "group-hover:scale-105 group-hover:will-change-transform" : "",
           ].join(" ")}
         />
 

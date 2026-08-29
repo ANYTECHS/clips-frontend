@@ -308,7 +308,7 @@ export default function ActivityFeed({
           {filteredTransactions.map((transaction) => (
             <li
               key={transaction.id}
-              className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface-hover/40 px-4 py-3"
+              className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface-hover/40 px-4 py-3 contain-layout-style"
             >
               <div className="min-w-0 space-y-1">
                 <p className="truncate text-sm font-semibold text-white">

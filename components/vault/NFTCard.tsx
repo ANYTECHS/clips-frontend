@@ -54,7 +54,7 @@ export default function NFTCard({ id, title, thumbnail, viralityScore, mintStatu
   };
 
   return (
-    <div className="bg-input border border-white/10 rounded-[20px] overflow-hidden hover:border-brand/50 transition-colors">
+    <div className="bg-input border border-white/10 rounded-[20px] overflow-hidden contain-layout-style hover:border-brand/50 transition-colors">
       {/* Thumbnail */}
       <div className="aspect-video w-full relative">
         <Image

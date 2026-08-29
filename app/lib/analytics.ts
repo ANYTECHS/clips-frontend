@@ -1,4 +1,5 @@
 import { logger } from "@/app/lib/logger";
+import { scheduleWork } from "@/app/lib/mainThreadOptimization";
 
 /**
  * Analytics Tracking Utility
@@ -269,32 +270,37 @@ class Analytics {
       return;
     }
 
-    const sanitizedPath = this.sanitize(path);
-    this.log('Page view:', sanitizedPath);
+    // PII sanitization and provider dispatch aren't needed for this frame to
+    // paint, so they run at idle time instead of on the click/navigation
+    // that triggered them.
+    scheduleWork(() => {
+      const sanitizedPath = this.sanitize(path);
+      this.log('Page view:', sanitizedPath);
 
-    try {
-      switch (this.provider) {
-        case 'ga4':
-          if (window.gtag) {
-            window.gtag('event', 'page_view', {
-              page_path: sanitizedPath,
-            });
-          }
-          break;
+      try {
+        switch (this.provider) {
+          case 'ga4':
+            if (window.gtag) {
+              window.gtag('event', 'page_view', {
+                page_path: sanitizedPath,
+              });
+            }
+            break;
 
-        case 'plausible':
-          if (window.plausible) {
-            window.plausible('pageview', { props: { path: sanitizedPath } });
-          }
-          break;
+          case 'plausible':
+            if (window.plausible) {
+              window.plausible('pageview', { props: { path: sanitizedPath } });
+            }
+            break;
 
-        case 'custom':
-          this.sendCustomEvent('page_view', { path: sanitizedPath });
-          break;
+          case 'custom':
+            this.sendCustomEvent('page_view', { path: sanitizedPath });
+            break;
+        }
+      } catch (error) {
+        logger.error('Failed to track page view:', error);
       }
-    } catch (error) {
-      logger.error('Failed to track page view:', error);
-    }
+    }, 'background');
   }
 
   /**
@@ -308,30 +314,34 @@ class Analytics {
       return;
     }
 
-    const sanitizedProperties = properties ? this.sanitize(properties) : {};
-    this.log('Event:', name, sanitizedProperties);
+    // Same reasoning as trackPageView: sanitization + dispatch is non-critical
+    // and shouldn't run in the same task as the interaction that fired it.
+    scheduleWork(() => {
+      const sanitizedProperties = properties ? this.sanitize(properties) : {};
+      this.log('Event:', name, sanitizedProperties);
 
-    try {
-      switch (this.provider) {
-        case 'ga4':
-          if (window.gtag) {
-            window.gtag('event', name, sanitizedProperties);
-          }
-          break;
+      try {
+        switch (this.provider) {
+          case 'ga4':
+            if (window.gtag) {
+              window.gtag('event', name, sanitizedProperties);
+            }
+            break;
 
-        case 'plausible':
-          if (window.plausible) {
-            window.plausible(name, { props: sanitizedProperties });
-          }
-          break;
+          case 'plausible':
+            if (window.plausible) {
+              window.plausible(name, { props: sanitizedProperties });
+            }
+            break;
 
-        case 'custom':
-          this.sendCustomEvent(name, sanitizedProperties);
-          break;
+          case 'custom':
+            this.sendCustomEvent(name, sanitizedProperties);
+            break;
+        }
+      } catch (error) {
+        logger.error('Failed to track event:', error);
       }
-    } catch (error) {
-      logger.error('Failed to track event:', error);
-    }
+    }, 'background');
   }
 
   /**
