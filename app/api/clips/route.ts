@@ -4,6 +4,7 @@ import { clipsStore } from "./clipsStore";
 import type { ApiResponse } from "../types";
 import { getClipsQuerySchema, bulkClipIdsBodySchema } from "../schemas/index";
 import { parseFieldSelection, pickFields } from "@/app/lib/fieldSelection";
+import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
 import type { Clip } from "./clipsStore";
 
 const CLIP_FIELD_CONFIG = {
@@ -18,7 +19,7 @@ const CLIP_FIELD_CONFIG = {
   ] as (keyof Clip & string)[],
 };
 
-export async function GET(request: NextRequest) {
+async function handleGet(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -91,6 +92,11 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json(body);
 }
+
+export const GET = withApiAnalytics("/api/clips", handleGet, async () => {
+  const session = await auth();
+  return session?.user?.id;
+});
 
 /**
  * DELETE /api/clips
