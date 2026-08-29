@@ -4,11 +4,12 @@ import ResourceHints from "@/components/ResourceHints";
 import { DEFERRED_PRECONNECT_ORIGINS, DICEBEAR_ORIGIN } from "@/app/lib/resourceHints";
 
 describe("ResourceHints", () => {
-  it("emits a single Dicebear preconnect for the landing critical path", () => {
+  it("emits the critical landing hints in priority order", () => {
     const { container } = render(<ResourceHints />);
-    const links = container.querySelectorAll('link[rel="preconnect"]');
+    const links = Array.from(container.querySelectorAll("link"));
 
-    expect(links).toHaveLength(1);
+    expect(links.some((link) => link.getAttribute("href") === DICEBEAR_ORIGIN)).toBe(true);
+    expect(links[0]).toHaveAttribute("rel", "preconnect");
     expect(links[0]).toHaveAttribute("href", DICEBEAR_ORIGIN);
     expect(links[0]).toHaveAttribute("crossorigin", "anonymous");
   });

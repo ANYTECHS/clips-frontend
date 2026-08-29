@@ -184,7 +184,36 @@ export default function ProjectsList() {
 - **Before**: Initial /projects load: 1500ms (waiting for /api/projects)
 - **After**: 200-400ms (data prefetched during navigation)
 
-## 4. Service Worker Caching
+## 4. Resource Prioritization
+
+### Problem
+- The app loads every asset and request at roughly the same urgency.
+- Above-the-fold content competes with lower-value data and below-the-fold work.
+- The browser cannot distinguish truly critical assets from optional extras.
+
+### Critical resources
+**File**: `app/lib/resourcePriority.ts`
+
+The app now defines a single priority list for the assets that matter immediately:
+
+1. `api.dicebear.com` preconnect for the landing hero avatars
+2. Critical font preload for the first text render (`Inter`)
+3. Low-noise secondary assets like the favicon are intentionally lower priority
+
+These values are fed into the shared document hints rendered by `components/ResourceHints.tsx`.
+
+### Priority hints
+- `high`: preconnect or preload immediately in the head
+- `medium`: still eager, but not blocked behind the first paint
+- `low`: defer to later idle time or background work
+
+This keeps the browser's network scheduler aligned with real user impact rather than a flat, all-at-once request queue.
+
+### Testing
+- Unit coverage lives in `__tests__/lib/resourcePriority.test.ts`.
+- The tests assert the critical landing origin is included and ordered before lower-priority assets.
+
+## 5. Service Worker Caching
 
 ### Problem
 - No service worker exists for offline caching
