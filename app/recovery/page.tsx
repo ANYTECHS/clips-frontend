@@ -4,7 +4,7 @@ import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useWallet } from "@/components/wallet/WalletProvider";
+import { useWalletActions } from "@/components/wallet/WalletProvider";
 import { restoreWalletFromMnemonic } from "@/app/lib/stellar";
 import { decryptWithPassword } from "@/app/lib/cryptoUtils";
 import { secureStorage } from "@/app/lib/secureStorage";
@@ -27,7 +27,9 @@ import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 export default function RecoveryPage() {
   const router = useRouter();
   const { setUser } = useAuth();
-  const { importStellarKey, connectStellar } = useWallet();
+  // Only actions are needed here, so this never re-renders on wallet state
+  // changes (connection status, address, etc.) elsewhere in the app.
+  const { importStellarKey, connectStellar } = useWalletActions();
 
   const [activeTab, setActiveTab] = useState<"mnemonic" | "social" | "encrypted">("mnemonic");
   const [loading, setLoading] = useState(false);
