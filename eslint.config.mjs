@@ -1,5 +1,6 @@
 // For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
 import storybook from "eslint-plugin-storybook";
+import unusedImports from "eslint-plugin-unused-imports";
 
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
@@ -120,6 +121,9 @@ const eslintConfig = defineConfig([
   {
     // Global stylistic and cleanup rules
     files: ["**/*.{ts,tsx,js,jsx}"],
+    plugins: {
+      "unused-imports": unusedImports,
+    },
     rules: {
       // Remove unused imports via plugin
       "unused-imports/no-unused-imports": "error",
@@ -131,12 +135,12 @@ const eslintConfig = defineConfig([
       "@typescript-eslint/naming-convention": [
         "error",
         { "selector": "default", "format": ["camelCase"] },
+        { "selector": "import", "format": ["camelCase", "PascalCase"] },
+        { "selector": "objectLiteralProperty", "format": null },
         { "selector": "variableLike", "format": ["camelCase", "UPPER_CASE"] },
         { "selector": "typeLike", "format": ["PascalCase"] },
         { "selector": "function", "format": ["camelCase", "PascalCase"] }
       ],
-      // Warn about large blocks of commented-out code
-      "no-commented-out-code/no-commented-out-code": ["warn", { "allow": ["TODO", "FIXME"] }]
     },
   },
 ]);

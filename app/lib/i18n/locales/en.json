@@ -179,5 +179,17 @@
     "transform_complete": "Style transformation completed",
     "mint_success": "NFT minted successfully",
     "earnings_received": "Earnings received"
+  },
+  "sync": {
+    "offline": "You're offline",
+    "offlineHint": "Showing saved data. Changes will sync when you reconnect.",
+    "pendingCount": "{count} action(s) waiting to sync",
+    "reconnecting": "Reconnecting…",
+    "syncing": "Syncing saved changes…",
+    "synced": "All changes synced",
+    "failed": "Sync failed",
+    "failedHint": "We'll retry when you're back online.",
+    "retry": "Retry",
+    "backOnline": "You're back online"
   }
 }

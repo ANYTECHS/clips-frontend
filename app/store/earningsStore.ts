@@ -20,7 +20,6 @@ import { create } from "zustand";
 import type {
   EarningsState,
   EarningsActions,
-  EarningsBreakdownItem,
 } from "./types";
 import { useUserStore } from "./userStore";
 
@@ -32,6 +31,7 @@ const CACHE_TTL_MS = EARNINGS_CACHE_TTL_MS;
 export { EARNINGS_CACHE_TTL_MS };
 
 import { fetchEarningsFromAPI } from "./api";
+import { subscribeInvalidation } from "@/app/lib/data-layer";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
@@ -103,6 +103,11 @@ export const useEarningsStore = create<EarningsState & EarningsActions>(
 if (typeof window !== "undefined") {
   useUserStore.getState().onPlanChange(() => {
     useEarningsStore.getState().invalidateEarningsCache();
+  });
+  subscribeInvalidation((keys) => {
+    if (keys.some((key) => key === "*" || key === "earnings" || key.includes("/api/earnings"))) {
+      useEarningsStore.getState().invalidateEarningsCache();
+    }
   });
 }
 

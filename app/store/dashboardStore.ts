@@ -17,9 +17,6 @@ import { create } from "zustand";
 import type {
   DashboardState,
   DashboardActions,
-  DashboardStats,
-  RevenuePoint,
-  Project,
 } from "./types";
 import { useUserStore } from "./userStore";
 
@@ -32,6 +29,7 @@ export { DASHBOARD_CACHE_TTL_MS };
 
 import { fetchDashboardFromAPI } from "./api";
 import { startMeasure } from "@/app/lib/performanceMonitoring";
+import { subscribeInvalidation } from "@/app/lib/data-layer";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
@@ -102,6 +100,14 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
     setRecentProjects: (projects) => set({ recentProjects: projects }),
   })
 );
+
+if (typeof window !== "undefined") {
+  subscribeInvalidation((keys) => {
+    if (keys.some((key) => key === "*" || key === "dashboard" || key.includes("/api/dashboard"))) {
+      useDashboardStore.getState().invalidateCache();
+    }
+  });
+}
 
 // ─── Selectors (memoised slices — prevent unnecessary re-renders) ─────────────
 

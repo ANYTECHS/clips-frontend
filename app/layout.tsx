@@ -17,6 +17,7 @@ import ResourceHints from "@/components/ResourceHints";
 import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 import FontPreload from "@/components/FontPreload";
+import DataSyncProvider from "@/components/DataSyncProvider";
 
 /**
  * Inter font configuration with performance optimizations:
@@ -79,6 +80,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ErrorBoundary>
             <I18nProvider>
+              <DataSyncProvider>
               <AuthProvider>
                 <ToastProvider>
                   <NetworkProvider>
@@ -93,6 +95,7 @@ export default function RootLayout({
                   </NetworkProvider>
                 </ToastProvider>
               </AuthProvider>
+              </DataSyncProvider>
             </I18nProvider>
           </ErrorBoundary>
         </ThemeProvider>

@@ -5,6 +5,7 @@ import type {
   UserProfile,
   EarningsBreakdownItem,
 } from "../store/types";
+import { requestJson } from "./data-layer";
 
 /**
  * Fetches the baseline analytics summary metrics and chronological data logs for the user workspace dashboard.
@@ -17,15 +18,28 @@ export async function fetchDashboardFromAPI(): Promise<{
   revenueTrend: RevenuePoint[];
   recentProjects: Project[];
 }> {
-  const response = await fetch("/api/dashboard");
-  if (!response.ok) {
-    throw new Error(`Failed to fetch dashboard: ${response.statusText}`);
-  }
-  const json = await response.json();
+  const json = await requestJson<{
+    data?: {
+      stats: DashboardStats;
+      revenueTrend: RevenuePoint[];
+      recentProjects: Project[];
+    };
+    stats?: DashboardStats;
+    revenueTrend?: RevenuePoint[];
+    recentProjects?: Project[];
+  }>({
+    url: "/api/dashboard",
+    tags: ["dashboard"],
+    persist: true,
+  });
   if (json && json.data) {
     return json.data;
   }
-  return json;
+  return json as {
+    stats: DashboardStats;
+    revenueTrend: RevenuePoint[];
+    recentProjects: Project[];
+  };
 }
 
 /**
@@ -35,11 +49,12 @@ export async function fetchDashboardFromAPI(): Promise<{
  * @throws {Error} Thrown if the secure network line encounters an outage or identity lookups fail.
  */
 export async function fetchUserFromAPI(signal?: AbortSignal): Promise<UserProfile> {
-  const response = await fetch("/api/user", { signal });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch user: ${response.statusText}`);
-  }
-  return response.json();
+  return requestJson<UserProfile>({
+    url: "/api/user",
+    tags: ["user"],
+    persist: true,
+    signal,
+  });
 }
 
 /**
@@ -57,9 +72,9 @@ export async function fetchEarningsFromAPI(): Promise<{
   pendingPayouts: { value: string; change: number };
   breakdown: EarningsBreakdownItem[];
 }> {
-  const response = await fetch("/api/earnings");
-  if (!response.ok) {
-    throw new Error(`Failed to fetch earnings: ${response.statusText}`);
-  }
-  return response.json();
+  return requestJson({
+    url: "/api/earnings",
+    tags: ["earnings"],
+    persist: true,
+  });
 }

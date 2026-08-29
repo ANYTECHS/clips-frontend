@@ -146,3 +146,20 @@ const { ref, data, loading } = useViewportFetch<Stats, HTMLDivElement>(
 (`useTransformStatus`, `useProcessingStatus`) have their own caching/polling
 needs and are left as-is — this pattern is for new and migrated call sites,
 not a mandate to rewrite hooks that already work.
+
+## Offline, dedup, and invalidation
+
+The data layer in `app/lib/data-layer` sits next to `RequestCache`:
+
+- **Offline (#910).** `navigator.onLine` plus `online`/`offline` events. GETs
+  serve cached JSON while disconnected. Mutations that opt in are queued to
+  localStorage and replayed by `DataSyncProvider` on reconnect. Auth and mint
+  paths are never queued.
+- **Dedup (#913).** Identical in-flight GETs share one network call. Optional
+  `dedupeWindowMs` reuses a settled result. Metrics: `getDedupMetrics()` and
+  `requestCache.stats().deduplicationRate`.
+- **Invalidation (#911).** Successful mutations drop matching tags/keys/prefixes
+  in both the data-layer cache and `RequestCache`. `invalidateStale()` is
+  time-based eviction. `invalidateKey` / `invalidateAll` are the manual APIs.
+  Zustand dashboard/earnings TTLs subscribe so the UI refetches after a write.
+

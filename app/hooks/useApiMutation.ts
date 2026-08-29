@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { requestCache } from "@/app/lib/cache/RequestCache";
+import { invalidateTags } from "@/app/lib/data-layer";
 import { ApiError } from "@/app/lib/apiError";
 
 export interface UseApiMutationOptions<TResult, TArgs> {
@@ -61,9 +61,8 @@ export function useApiMutation<TResult, TArgs = void>(
       const result = await mutationFnRef.current(args);
       if (mountedRef.current) setData(result);
 
-      for (const tag of optionsRef.current.invalidateTags ?? []) {
-        requestCache.invalidateTag(tag);
-      }
+      const tags = optionsRef.current.invalidateTags ?? [];
+      if (tags.length) invalidateTags(tags);
       optionsRef.current.onSuccess?.(result, args);
       return result;
     } catch (err) {

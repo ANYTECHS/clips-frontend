@@ -382,6 +382,46 @@ describe("RequestCache", () => {
       expect(cache.invalidateTag("new")).toBe(1);
     });
   });
+
+  describe("offline fallback and time-based invalidation", () => {
+    it("records in-flight shares as deduplication metrics", async () => {
+      const cache = new RequestCache();
+      const gate = deferred<string>();
+      const fetcher = jest.fn().mockReturnValue(gate.promise);
+
+      const reads = Promise.all([cache.fetch("k", fetcher), cache.fetch("k", fetcher)]);
+      gate.resolve("value");
+      await reads;
+
+      expect(cache.stats().inFlightHits).toBe(1);
+      expect(cache.stats().deduplicationRate).toBeGreaterThan(0);
+    });
+
+    it("drops stale entries via invalidateStale", () => {
+      const clock = createClock();
+      const cache = new RequestCache({ ttlMs: 1_000, staleTtlMs: 10_000, now: clock.now });
+      cache.set("k", "value");
+      clock.advance(1_001);
+      expect(cache.invalidateStale()).toBe(1);
+      expect(cache.peek("k")).toBeUndefined();
+    });
+
+    it("serves expired cache when the browser is offline", async () => {
+      const clock = createClock();
+      const cache = new RequestCache({
+        ttlMs: 1_000,
+        staleTtlMs: 1_000,
+        now: clock.now,
+        isOnline: () => false,
+      });
+      const fetcher = jest.fn().mockResolvedValue("fresh");
+      cache.set("k", "stale");
+      clock.advance(3_000);
+
+      await expect(cache.fetch("k", fetcher)).resolves.toBe("stale");
+      expect(fetcher).not.toHaveBeenCalled();
+    });
+  });
 });
 
 describe("cacheKey", () => {

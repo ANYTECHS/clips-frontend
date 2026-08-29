@@ -63,6 +63,8 @@ export interface RequestCacheOptions {
   analytics?: FetchAnalytics;
   /** Maximum number of network requests active at once. Default 6. */
   maxConcurrent?: number;
+  /** When false, expired entries are served instead of hitting the network. Default true. */
+  isOnline?: () => boolean;
 }
 
 export interface FetchOptions<T> {
@@ -92,7 +94,10 @@ export interface CacheStats {
   hits: number;
   misses: number;
   staleHits: number;
+  inFlightHits: number;
   evictions: number;
+  /** inFlightHits / (hits + misses + staleHits + inFlightHits), or 0. */
+  deduplicationRate: number;
 }
 
 export class RequestCache {
@@ -102,6 +107,7 @@ export class RequestCache {
   private readonly now: () => number;
   private readonly analytics: FetchAnalytics;
   private readonly maxConcurrent: number;
+  private readonly isOnlineFn: () => boolean;
 
   /** Insertion order doubles as LRU order: re-reading re-inserts at the end. */
   private readonly entries = new Map<string, CacheEntry<unknown>>();
@@ -122,6 +128,7 @@ export class RequestCache {
   private hits = 0;
   private misses = 0;
   private staleHits = 0;
+  private inFlightHits = 0;
   private evictions = 0;
 
   constructor(options: RequestCacheOptions = {}) {
@@ -131,9 +138,14 @@ export class RequestCache {
     this.now = options.now ?? Date.now;
     this.analytics = options.analytics ?? fetchAnalytics;
     this.maxConcurrent = options.maxConcurrent ?? DEFAULT_MAX_CONCURRENT;
+    this.isOnlineFn = options.isOnline ?? (() => true);
 
     if (this.maxEntries < 1) throw new Error("maxEntries must be at least 1");
     if (this.maxConcurrent < 1) throw new Error("maxConcurrent must be at least 1");
+  }
+
+  private isOffline(): boolean {
+    return this.isOnlineFn() === false;
   }
 
   /**
@@ -164,7 +176,15 @@ export class RequestCache {
         this.touch(key, entry);
         // Revalidate behind the caller's back. Failures leave the stale value
         // in place — a slightly old number beats an error state.
-        void this.revalidate(key, fetcher, options);
+        if (!this.isOffline()) {
+          void this.revalidate(key, fetcher, options);
+        }
+        return entry.value;
+      }
+
+      if (this.isOffline()) {
+        this.staleHits += 1;
+        this.touch(key, entry);
         return entry.value;
       }
 
@@ -327,13 +347,16 @@ export class RequestCache {
   }
 
   stats(): CacheStats {
+    const requestCount = this.hits + this.misses + this.staleHits + this.inFlightHits;
     return {
       size: this.entries.size,
       maxEntries: this.maxEntries,
       hits: this.hits,
       misses: this.misses,
       staleHits: this.staleHits,
+      inFlightHits: this.inFlightHits,
       evictions: this.evictions,
+      deduplicationRate: requestCount === 0 ? 0 : this.inFlightHits / requestCount,
     };
   }
 
@@ -341,7 +364,24 @@ export class RequestCache {
     this.hits = 0;
     this.misses = 0;
     this.staleHits = 0;
+    this.inFlightHits = 0;
     this.evictions = 0;
+  }
+
+  /** Drop entries that have passed their fresh window (time-based invalidation). */
+  invalidateStale(): number {
+    const now = this.now();
+    let removed = 0;
+    for (const [key, entry] of [...this.entries]) {
+      if (now >= entry.freshUntil && this.delete(key)) removed += 1;
+    }
+    return removed;
+  }
+
+  /** Read a stored value even after it has expired. Used as an offline fallback. */
+  peekExpired<T>(key: string): T | undefined {
+    const entry = this.entries.get(key) as CacheEntry<T> | undefined;
+    return entry?.value;
   }
 
   /** Re-insert to move the key to the most-recently-used end of the Map. */
@@ -352,7 +392,18 @@ export class RequestCache {
 
   private load<T>(key: string, fetcher: (signal?: AbortSignal) => Promise<T>, options: FetchOptions<T>): Promise<T> {
     const existing = this.inFlight.get(key) as Promise<T> | undefined;
-    if (existing) return existing;
+    if (existing) {
+      this.inFlightHits += 1;
+      this.analytics.record({
+        key,
+        kind: "single",
+        status: "success",
+        cacheStatus: "in_flight",
+        durationMs: 0,
+        batchSize: 1,
+      });
+      return existing;
+    }
 
     let resolve!: (value: T) => void;
     let reject!: (error: unknown) => void;
