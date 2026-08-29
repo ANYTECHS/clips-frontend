@@ -4,6 +4,7 @@ import React from "react";
 import * as Sentry from "@sentry/nextjs";
 import { AlertCircle, RefreshCw } from "lucide-react";
 import { sanitize } from "@/app/lib/sanitize";
+import { RenderPropCache } from "@/app/lib/renderProp";
 
 interface DataErrorBoundaryState {
   hasError: boolean;
@@ -56,6 +57,11 @@ export default class DataErrorBoundary extends React.Component<
     errorId: null,
   };
 
+  private fallbackCache = new RenderPropCache<
+    [DataErrorBoundaryProps["fallback"], Error, () => void],
+    React.ReactNode
+  >();
+
   static getDerivedStateFromError(error: Error): Partial<DataErrorBoundaryState> {
     const errorId = Sentry.captureException(error, {
       tags: { category: "data-fetching" },
@@ -105,10 +111,11 @@ export default class DataErrorBoundary extends React.Component<
   render() {
     if (this.state.hasError && this.state.error) {
       if (typeof this.props.fallback === "function") {
-        return this.props.fallback({
-          error: this.state.error,
-          resetErrorBoundary: this.resetErrorBoundary,
-        });
+        const fallback = this.props.fallback;
+        return this.fallbackCache.get(
+          [fallback, this.state.error, this.resetErrorBoundary],
+          () => fallback({ error: this.state.error!, resetErrorBoundary: this.resetErrorBoundary }),
+        );
       }
 
       if (this.props.fallback) {

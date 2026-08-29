@@ -2,6 +2,7 @@
 
 import React from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { useRenderPropResult } from "@/app/lib/renderProp";
 
 export interface AsyncBoundaryProps {
   loading: boolean;
@@ -31,7 +32,7 @@ export interface AsyncBoundaryProps {
  * );
  * ```
  */
-export default function AsyncBoundary({
+function AsyncBoundary({
   loading,
   error,
   skeleton,
@@ -39,6 +40,11 @@ export default function AsyncBoundary({
   children,
   errorFallback,
 }: AsyncBoundaryProps) {
+  // Called unconditionally (Rules of Hooks) even though the result is only
+  // read below when `error` is set; the cast is safe since `errorFallback`
+  // is never invoked with a null/undefined error in that case.
+  const fallbackNode = useRenderPropResult(errorFallback, [error as Error, onRetry] as const);
+
   if (loading) {
     return (
       <>
@@ -52,7 +58,7 @@ export default function AsyncBoundary({
   }
 
   if (error) {
-    if (errorFallback) return <>{errorFallback(error, onRetry)}</>;
+    if (errorFallback) return <>{fallbackNode}</>;
 
     return (
       <div className="flex flex-col items-center justify-center gap-4 py-16 text-center" role="alert">
@@ -78,3 +84,5 @@ export default function AsyncBoundary({
 
   return <>{children}</>;
 }
+
+export default React.memo(AsyncBoundary);
