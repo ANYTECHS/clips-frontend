@@ -13,6 +13,8 @@ Shared utilities and framework-agnostic logic used across the app (routes, hooks
 | `authRedirect.ts` | Determines whether a path is in the protected-route list. | Middleware/redirect logic for auth-gated pages. |
 | `authUser.ts` | Maps a NextAuth `Session` to the app's `User` type. | Converting session data for UI/store consumption. |
 | `cloudStorage.ts` | S3-compatible storage abstraction (AWS S3, GCS, R2) driven by env vars. | Uploading/reading files from cloud storage. |
+| `sync/backgroundSync.ts` | Shared background sync API with deduplication, retry, fallback handling, and structured errors. | Refreshing dashboard/earnings/project data in the background without duplicate requests. |
+| `sync/conflictResolution.ts` | Merge strategy for local vs remote writes when streaming or polling updates. | Resolving racing writes while preserving the newest `updatedAt`. |
 | `constants.ts` | Cross-cutting numeric/string constants (upload limits, PBKDF2 iterations, refresh intervals). | Any code needing a shared limit or interval instead of a magic number. |
 | `cryptoUtils.ts` | Web Crypto–based password encryption/decryption helpers. | Encrypting secrets client-side (e.g. wallet keys) with a user password. |
 | `csrf.ts` | CSRF token validation for custom API routes (NextAuth routes are covered automatically). | Any state-mutating custom route (POST/PATCH/DELETE) outside `/api/auth/*`. |
