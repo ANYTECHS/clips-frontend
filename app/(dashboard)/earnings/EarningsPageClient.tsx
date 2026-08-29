@@ -9,8 +9,20 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import EarningsTable from "@/components/dashboard/EarningsTable";
+import dynamic from "next/dynamic";
 import StatCard from "@/components/dashboard/StatCard";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const EarningsTable = dynamic(() => import("@/components/dashboard/EarningsTable"), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-3 animate-pulse">
+      {Array.from({ length: 5 }).map((unused, i) => (
+        <div key={i} className="h-12 bg-white/5 rounded-xl" />
+      ))}
+    </div>
+  ),
+});
 import {
   Download,
   DollarSign,
