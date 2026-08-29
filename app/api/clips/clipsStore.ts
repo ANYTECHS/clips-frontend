@@ -249,6 +249,67 @@ class ClipsStore {
       .map((c) => c.id);
     return this.softDeleteClips(userId, clipIds);
   }
+
+  bulkUpdateTags(
+    userId: string,
+    clipIds: string[],
+    tags: string[],
+    mode: "set" | "add" | "remove"
+  ): { updatedCount: number; errors: Array<{ clipId: string; error: string }> } {
+    const errors: Array<{ clipId: string; error: string }> = [];
+    let updatedCount = 0;
+
+    this.clips = this.clips.map(clip => {
+      if (clip.userId !== userId || !clipIds.includes(clip.id) || clip.deletedAt) {
+        return clip;
+      }
+
+      let newTags: string[];
+      const existing = clip.tags ?? [];
+
+      switch (mode) {
+        case "set":
+          newTags = [...new Set(tags)];
+          break;
+        case "add":
+          newTags = [...new Set([...existing, ...tags])];
+          break;
+        case "remove":
+          newTags = existing.filter(t => !tags.includes(t));
+          break;
+      }
+
+      const MAX_TAGS = 10;
+      if (newTags.length > MAX_TAGS) {
+        errors.push({ clipId: clip.id, error: "Tag limit exceeded (max 10)" });
+        return clip;
+      }
+
+      updatedCount++;
+      return { ...clip, tags: newTags };
+    });
+
+    return { updatedCount, errors };
+  }
+
+  bulkUpdateStatus(
+    userId: string,
+    clipIds: string[],
+    status: string
+  ): { updatedCount: number; errors: Array<{ clipId: string; error: string }> } {
+    const errors: Array<{ clipId: string; error: string }> = [];
+    let updatedCount = 0;
+
+    this.clips = this.clips.map(clip => {
+      if (clip.userId !== userId || !clipIds.includes(clip.id) || clip.deletedAt) {
+        return clip;
+      }
+      updatedCount++;
+      return { ...clip, status };
+    });
+
+    return { updatedCount, errors };
+  }
 }
 
 export const clipsStore = new ClipsStore();

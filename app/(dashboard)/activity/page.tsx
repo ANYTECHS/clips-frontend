@@ -1,9 +1,27 @@
 "use client";
 
-import ActivityFeed from "@/components/wallet/ActivityFeed";
+import dynamic from "next/dynamic";
 import { useAutoStellarWallet } from "@/app/hooks/useAutoStellarWallet";
 import { AlertCircle, Activity } from "lucide-react";
 import Skeleton from "@/components/ui/Skeleton";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const ActivityFeed = dynamic(() => import("@/components/wallet/ActivityFeed"), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-2 animate-pulse">
+      {Array.from({ length: 5 }).map((_item, i) => (
+        <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-surface-hover/50">
+          <div className="w-8 h-8 rounded-lg bg-white/5 shrink-0" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-3/4 bg-white/5 rounded" />
+            <div className="h-3 w-1/2 bg-white/5 rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  ),
+});
 
 export default function ActivityPage() {
   const { publicKey, status, network, error } = useAutoStellarWallet();
@@ -57,7 +75,7 @@ export default function ActivityPage() {
 
               {/* Transactions Skeleton List */}
               <div className="space-y-2">
-                {[...Array(5)].map((_, i) => (
+                {[...Array(5)].map((_item, i) => (
                   <div key={i} className="flex items-center gap-3 p-3 rounded-xl border border-border bg-surface-hover/50">
                     <Skeleton className="w-8 h-8 rounded-lg shrink-0" />
                     <div className="flex-1 space-y-2">

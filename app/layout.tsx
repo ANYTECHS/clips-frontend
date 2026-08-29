@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import dynamic from "next/dynamic";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
@@ -8,9 +9,7 @@ import { NetworkProvider } from "@/app/context/NetworkContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { I18nProvider } from "@/app/lib/i18n/I18nProvider";
-import CookieConsent from "@/components/CookieConsent";
 import RateLimitToast from "@/components/RateLimitToast";
-import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
 import ResourceHints from "@/components/ResourceHints";
@@ -18,6 +17,16 @@ import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 import FontPreload from "@/components/FontPreload";
 import DataSyncProvider from "@/components/DataSyncProvider";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"), {
+  ssr: false,
+});
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const CookieConsent = dynamic(() => import("@/components/CookieConsent"), {
+  ssr: false,
+});
 
 /**
  * Inter font configuration with performance optimizations:

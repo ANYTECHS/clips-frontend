@@ -3,6 +3,20 @@ import { auth } from "@/app/lib/auth";
 import { clipsStore } from "./clipsStore";
 import type { ApiResponse } from "../types";
 import { getClipsQuerySchema, bulkClipIdsBodySchema } from "../schemas/index";
+import { parseFieldSelection, pickFields } from "@/app/lib/fieldSelection";
+import type { Clip } from "./clipsStore";
+
+const CLIP_FIELD_CONFIG = {
+  allowedFields: [
+    "id", "userId", "projectId", "title", "thumbnail", "score", "scoreKey",
+    "duration", "style", "status", "resolution", "videoUrl", "createdAt",
+    "scoreBreakdown", "tags", "shareId",
+  ] as (keyof Clip & string)[],
+  defaultFields: [
+    "id", "title", "thumbnail", "score", "scoreKey", "duration",
+    "style", "status", "createdAt", "tags",
+  ] as (keyof Clip & string)[],
+};
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -29,6 +43,14 @@ export async function GET(request: NextRequest) {
   }
 
   const { page, pageSize, status, style, virality } = queryValidation.data;
+
+  const fieldResult = parseFieldSelection(searchParams.get("fields"), CLIP_FIELD_CONFIG);
+  if (!fieldResult.ok) {
+    return NextResponse.json(
+      { error: fieldResult.error },
+      { status: 400 }
+    );
+  }
 
   // 1. Fetch user's clips. "archived" is a lifecycle state, not a clip status,
   //    so it selects a different set rather than filtering the default one.
@@ -57,9 +79,11 @@ export async function GET(request: NextRequest) {
   const endIndex = startIndex + pageSize;
   const paginatedClips = userClips.slice(startIndex, endIndex);
 
-  const body: ApiResponse<{ clips: typeof paginatedClips, total: number }> = {
+  const selectedClips = paginatedClips.map(clip => pickFields(clip, fieldResult.fields));
+
+  const body: ApiResponse<{ clips: typeof selectedClips, total: number }> = {
     data: {
-      clips: paginatedClips,
+      clips: selectedClips,
       total
     },
     error: null

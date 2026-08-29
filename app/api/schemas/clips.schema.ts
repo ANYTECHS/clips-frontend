@@ -80,9 +80,30 @@ export const createClipBodySchema = z.object({
   virality: z.enum(["high", "medium", "low"]).optional(),
 });
 
+export const bulkUpdateTagsBodySchema = z.object({
+  clipIds: z
+    .array(z.string().min(1))
+    .min(1, "At least one clip ID is required")
+    .max(100, "At most 100 clips can be modified in one request"),
+  tags: z
+    .array(tagSchema)
+    .max(TAGS_MAX_PER_CLIP, `Maximum ${TAGS_MAX_PER_CLIP} tags per clip`),
+  mode: z.enum(["set", "add", "remove"]).default("set"),
+});
+
+export const bulkUpdateStatusBodySchema = z.object({
+  clipIds: z
+    .array(z.string().min(1))
+    .min(1, "At least one clip ID is required")
+    .max(100, "At most 100 clips can be modified in one request"),
+  status: z.enum(["pending", "listed", "history"]),
+});
+
 export type GetClipsQuery = z.infer<typeof getClipsQuerySchema>;
 export type UpdateClipBody = z.infer<typeof updateClipBodySchema>;
 export type BulkClipIdsBody = z.infer<typeof bulkClipIdsBodySchema>;
 export type PostClipBody = z.infer<typeof postClipBodySchema>;
 export type MintClipBody = z.infer<typeof mintClipBodySchema>;
 export type CreateClipBody = z.infer<typeof createClipBodySchema>;
+export type BulkUpdateTagsBody = z.infer<typeof bulkUpdateTagsBodySchema>;
+export type BulkUpdateStatusBody = z.infer<typeof bulkUpdateStatusBodySchema>;

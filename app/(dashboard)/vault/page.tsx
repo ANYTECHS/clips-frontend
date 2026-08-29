@@ -1,10 +1,23 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import VaultSidebar from "@/components/vault/VaultSidebar";
 import NFTGrid from "@/components/vault/NFTGrid";
-import MintConfigForm from "@/components/projects/MintConfigForm";
 import { ChevronRight } from "lucide-react";
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const MintConfigForm = dynamic(() => import("@/components/projects/MintConfigForm"), {
+  ssr: false,
+  loading: () => (
+    <div className="space-y-4 animate-pulse">
+      <div className="h-10 bg-white/5 rounded-xl" />
+      <div className="h-20 bg-white/5 rounded-xl" />
+      <div className="h-10 bg-white/5 rounded-xl" />
+      <div className="h-10 bg-white/5 rounded-xl" />
+    </div>
+  ),
+});
 
 export default function VaultPage() {
   const [loading, setLoading] = useState(true);

@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import dynamic from "next/dynamic";
 import { useParams, useRouter } from "next/navigation";
 import {
   AlertCircle,
@@ -11,8 +12,6 @@ import {
   Clock,
   Download,
   Loader2,
-  Pause,
-  Play,
   RefreshCw,
   Sparkles,
   Upload,
@@ -28,6 +27,17 @@ import {
   SIZES_TRANSFORM_PREVIEW,
 } from "@/app/lib/imageUtils";
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const ComparisonPlayer = dynamic(() => import("@/components/transform/ComparisonPlayer"), {
+  ssr: false,
+  loading: () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-pulse">
+      <div className="aspect-video bg-white/5 rounded-2xl" />
+      <div className="aspect-video bg-white/5 rounded-2xl" />
+    </div>
+  ),
+});
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function formatEta(seconds: number | null | undefined): string {
@@ -40,71 +50,6 @@ function formatEta(seconds: number | null | undefined): string {
 
 function styleLabel(style: string): string {
   return style.charAt(0).toUpperCase() + style.slice(1);
-}
-
-// ─── Side-by-side video player ────────────────────────────────────────────────
-
-interface ComparisonPlayerProps {
-  originalSrc: string;
-  transformedSrc: string;
-}
-
-function ComparisonPlayer({ originalSrc, transformedSrc }: ComparisonPlayerProps) {
-  const origRef = useRef<HTMLVideoElement>(null);
-  const transRef = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
-
-  const toggle = () => {
-    const orig = origRef.current;
-    const trans = transRef.current;
-    if (!orig || !trans) return;
-    if (playing) {
-      orig.pause();
-      trans.pause();
-    } else {
-      orig.play().catch(() => {});
-      trans.play().catch(() => {});
-    }
-    setPlaying(!playing);
-  };
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Original</span>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            ref={origRef}
-            src={originalSrc}
-            className="w-full rounded-2xl border border-white/10 bg-black aspect-video object-contain"
-            playsInline
-            loop
-          />
-        </div>
-        <div className="space-y-2">
-          <span className="text-[11px] font-bold text-brand uppercase tracking-wider">Transformed</span>
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-          <video
-            ref={transRef}
-            src={transformedSrc}
-            className="w-full rounded-2xl border border-brand/20 bg-black aspect-video object-contain"
-            playsInline
-            loop
-          />
-        </div>
-      </div>
-      <div className="flex justify-center">
-        <button
-          onClick={toggle}
-          className="flex items-center gap-2 px-6 py-2.5 rounded-full bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all"
-        >
-          {playing ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-          {playing ? "Pause" : "Play"} Both
-        </button>
-      </div>
-    </div>
-  );
 }
 
 // ─── Page ──────────────────────────────────────────────────────────────────────
