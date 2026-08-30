@@ -42,6 +42,8 @@ import { useWallet } from "@/components/wallet/WalletProvider";
 import { useTransactionHistory, PAGE_SIZE } from "@/app/hooks/useTransactionHistory";
 import { formatTxTimestamp, type Transaction, type TxFilter, type TxStatus, type TxDirection } from "@/app/lib/txHistory";
 import { sanitize } from "@/app/lib/sanitize";
+import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
+import { useRenderTiming } from "@/app/hooks/useRenderTiming";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -278,15 +280,15 @@ function Pagination({ currentPage, totalPages, onPrev, onNext, isLoading }: Pagi
   );
 }
 
-import { useVirtualizer } from "@tanstack/react-virtual";
-
 function VirtualTransactionList({ transactions, isLoading }: { transactions: Transaction[], isLoading: boolean }) {
   const parentRef = useRef<HTMLDivElement>(null);
 
-  const rowVirtualizer = useVirtualizer({
+  useRenderTiming("TransactionHistoryViewer", [transactions.length, isLoading]);
+
+  const rowVirtualizer = useSimpleVirtualizer({
     count: transactions.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 72,
+    estimateSize: 72,
     overscan: 5,
   });
 

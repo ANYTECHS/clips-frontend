@@ -1,11 +1,13 @@
 "use client";
 
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, memo } from "react";
 import Image from "next/image";
 import { Check, Edit2, Play, Sparkles, BarChart3 } from "lucide-react";
 import ScoreBreakdownTooltip, { ScoreBreakdown } from "./ScoreBreakdownTooltip";
 import ExportDropdown from "./ExportDropdown";
 import { getBlurPlaceholder, DEFAULT_BLUR_PLACEHOLDER, type ImageLoadingState } from "@/app/lib/imageUtils";
+import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
+import { useRenderTiming } from "@/app/hooks/useRenderTiming";
 
 export interface Clip {
   id: string;
@@ -52,7 +54,7 @@ export interface ClipGridProps {
  * @param props - ClipGridProps containing clips data, selection handlers, and UI state
  * @returns A responsive grid of clip cards with selection controls
  */
-export default function ClipGrid({
+function ClipGrid({
   clips,
   selectedIds,
   onSelect,
@@ -75,6 +77,10 @@ export default function ClipGrid({
 }: ClipGridProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [imageStates, setImageStates] = useState<Record<string, ImageLoadingState>>({});
+  const [cols, setCols] = useState(4);
+  const gridRef = useRef<HTMLDivElement>(null);
+
+  useRenderTiming("ClipGrid", [clips.length, loading]);
 
   useEffect(() => {
     if (!hasMore || loadingNextPage) return;
@@ -85,6 +91,31 @@ export default function ClipGrid({
     if (loadMoreRef.current) observer.observe(loadMoreRef.current);
     return () => observer.disconnect();
   }, [hasMore, loadingNextPage, onLoadMore]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width < 640) setCols(1);
+      else if (width < 1024) setCols(2);
+      else if (width < 1280) setCols(3);
+      else setCols(4);
+    };
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const chunks = [];
+  for (let i = 0; i < clips.length; i += cols) {
+    chunks.push(clips.slice(i, i + cols));
+  }
+
+  const virtualizer = useSimpleVirtualizer({
+    count: chunks.length,
+    estimateSize: 400,
+    overscan: 2,
+    containerRef: gridRef,
+  });
 
   const handleKeyDown = (e: React.KeyboardEvent, id: string) => {
     if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(id); }
@@ -121,34 +152,6 @@ export default function ClipGrid({
       </div>
     );
   }
-
-  const [cols, setCols] = useState(4);
-  const gridRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      if (width < 640) setCols(1);
-      else if (width < 1024) setCols(2);
-      else if (width < 1280) setCols(3);
-      else setCols(4);
-    };
-    handleResize();
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-
-  const chunks = [];
-  for (let i = 0; i < clips.length; i += cols) {
-    chunks.push(clips.slice(i, i + cols));
-  }
-
-  const { useWindowVirtualizer } = require("@tanstack/react-virtual");
-  const virtualizer = useWindowVirtualizer({
-    count: chunks.length,
-    estimateSize: () => 400,
-    overscan: 2,
-  });
 
   return (
     <div className="space-y-6">
@@ -277,3 +280,5 @@ export default function ClipGrid({
     </div>
   );
 }
+
+export default memo(ClipGrid);

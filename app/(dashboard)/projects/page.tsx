@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect } from "react";
+import React, { useState, useMemo, useCallback, useEffect, startTransition } from "react";
 import dynamic from "next/dynamic";
 import ProjectFilters from "@/components/projects/ProjectFilters";
 import {
@@ -14,7 +14,6 @@ import {
   Clock,
   Sparkles,
 } from "lucide-react";
-import dynamic from "next/dynamic";
 import type { Clip } from "@/components/projects/ClipGrid";
 
 const ClipGrid = dynamic(() => import("@/components/projects/ClipGrid"), {
@@ -192,8 +191,13 @@ export default function ProjectsPage() {
   );
   const recommendedIds = useClipRanking(clipScores, RECOMMENDATION_THRESHOLD);
 
+  // Bulk-selection updates can re-render every card in the grid, so they run
+  // as a transition (#render-scheduling): React can interrupt/deprioritize
+  // this render in favor of more urgent updates like scrolling or typing.
   const handleAutoSelect = useCallback(() => {
-    setSelectedIds(recommendedIds);
+    startTransition(() => {
+      setSelectedIds(recommendedIds);
+    });
   }, [recommendedIds]);
 
   const handleToggleRecommendations = useCallback(() => {
@@ -218,12 +222,14 @@ export default function ProjectsPage() {
   }, [setSelectedIds]);
 
   const handleSelectAll = useCallback(() => {
-    setSelectedIds(prev => {
-      if (prev.length === fetchedClips.length) {
-        return [];
-      } else {
-        return fetchedClips.map(c => c.id);
-      }
+    startTransition(() => {
+      setSelectedIds(prev => {
+        if (prev.length === fetchedClips.length) {
+          return [];
+        } else {
+          return fetchedClips.map(c => c.id);
+        }
+      });
     });
   }, [fetchedClips, setSelectedIds]);
 
@@ -233,7 +239,9 @@ export default function ProjectsPage() {
 
   const handleSelectByScore = useCallback((minScore: number) => {
     const ids = fetchedClips.filter(c => c.score >= minScore).map(c => c.id);
-    setSelectedIds(ids);
+    startTransition(() => {
+      setSelectedIds(ids);
+    });
     showToast(`Selected ${ids.length} clip${ids.length !== 1 ? "s" : ""} with score ≥ ${minScore}`, "success");
   }, [fetchedClips, showToast, setSelectedIds]);
 

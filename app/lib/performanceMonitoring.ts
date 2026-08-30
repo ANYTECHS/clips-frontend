@@ -59,6 +59,10 @@ export const CUSTOM_METRIC_THRESHOLDS: Record<string, [number, number]> = {
   // app/hooks/useMemoryMonitor.ts.
   "memory.heapUsedRatio": [0.7, 0.9],
   "cdn.asset.resolve": [100, 500],
+  // Heavy-component render timing (#render-optimization) — good is one
+  // 60fps frame budget, poor is a noticeably janky commit.
+  "render.ClipGrid": [16, 50],
+  "render.TransactionHistoryViewer": [16, 50],
 };
 
 /**
