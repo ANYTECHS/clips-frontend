@@ -13,6 +13,8 @@ import StatCard from "@/components/dashboard/StatCard";
 import { Download, Eye, Clock, BarChart3, AlertCircle } from "lucide-react";
 import analytics from "@/app/lib/analytics";
 import type { AnalyticsData } from "@/app/lib/serverData";
+import ApiUsagePanel from "./ApiUsagePanel";
+import RateLimitMonitoringPanel from "./RateLimitMonitoringPanel";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -273,6 +275,9 @@ export default function AnalyticsPageClient({
             </div>
           </>
         )}
+
+        <ApiUsagePanel />
+        <RateLimitMonitoringPanel />
       </div>
     </div>
   );

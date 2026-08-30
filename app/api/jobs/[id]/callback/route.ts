@@ -32,6 +32,7 @@ import { parseJsonRequest } from "../../shared/jsonBody";
 import { consumeNonce } from "../../shared/nonceCache";
 import { z } from "zod";
 import { logger } from "@/app/lib/logger";
+import { triggerWebhookEvent } from "@/app/lib/webhooks/dispatcher";
 
 const TIMESTAMP_TOLERANCE_SECONDS = 60;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -126,6 +127,13 @@ export async function POST(
     ...(update.errorCode ? { errorCode: update.errorCode } : {}),
     ...(update.errorMessage ? { errorMessage: update.errorMessage } : {}),
   });
+
+  if (update.status === "complete") {
+    void triggerWebhookEvent(job.userId, "job.completed", {
+      jobId,
+      momentsFound: update.momentsFound ?? job.momentsFound,
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

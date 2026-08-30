@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
-import { applyRateLimit } from "@/app/lib/serverRateLimit";
+import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
+import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
 import { clipsStore } from "@/app/api/clips/clipsStore";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { earningsStore } from "@/app/api/earnings/earningsStore";
@@ -53,8 +54,8 @@ function deriveProjectTitle(job: { id: string; filename?: string }): string {
  * intentionally stays cheap per request rather than trying to page through
  * a user's full history.
  */
-export async function GET(request: NextRequest) {
-  const rateLimited = await applyRateLimit(request, { limit: 30, windowMs: 60_000 });
+async function handleGet(request: NextRequest) {
+  const rateLimited = await applyCustomRateLimit(request, "/api/search");
   if (rateLimited) return rateLimited;
 
   const authResult = await requireAuth();
@@ -120,3 +121,5 @@ export async function GET(request: NextRequest) {
     error: null,
   });
 }
+
+export const GET = withApiAnalytics("/api/search", handleGet);
