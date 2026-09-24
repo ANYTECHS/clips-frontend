@@ -15,6 +15,7 @@ import {
   SIZES_TRIM_TIMELINE,
 } from "@/app/lib/imageUtils";
 import { useWillChange } from "@/app/hooks/useWillChange";
+import { useAutoSave } from "@/app/hooks/useAutoSave";
 
 export interface ClipEdits {
   trimStart: number;
@@ -65,6 +66,12 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     trimEnd: 100,
     captionStyle: clip.style,
     aspectRatio: clip.resolution === "1080x1920" ? "9:16" : "16:9",
+  });
+  const [draftConflict, setDraftConflict] = useState(false);
+  const handleDraftConflict = useCallback(() => setDraftConflict(true), []);
+  const autosave = useAutoSave(`clip-editor:${clip.id}`, edits, {
+    onRecover: setEdits,
+    onConflict: handleDraftConflict,
   });
 
   const [captionLoading, setCaptionLoading] = useState(false);
@@ -141,6 +148,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
   };
 
   const handleSave = () => {
+    autosave.saveNow();
     onSave(clip.id, {
       ...edits,
       captions: segments.length
@@ -228,7 +236,32 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
             ))}
           </div>
 
-          <div className="p-6 flex-1 overflow-y-auto">
+        <div className="p-6 flex-1 overflow-y-auto">
+          <div className="mb-4 flex items-center justify-between gap-3 text-xs text-white/50" aria-live="polite">
+            <span>
+              {autosave.status === "saving" && "Saving draft..."}
+              {autosave.status === "saved" && "Draft saved"}
+              {autosave.status === "unsaved" && "Unsaved changes"}
+              {autosave.status === "recovered" && "Recovered saved draft"}
+              {autosave.status === "conflict" && "Draft conflict detected"}
+              {autosave.status === "error" && "Draft could not be saved"}
+            </span>
+            <button type="button" onClick={autosave.saveNow} className="text-brand hover:underline">
+              Save now
+            </button>
+          </div>
+          {draftConflict && (
+            <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
+              <span>A newer local draft was recovered for this clip.</span>
+              <button type="button" onClick={() => setDraftConflict(false)} className="font-semibold hover:underline">
+                Keep recovered draft
+              </button>
+            </div>
+          )}
+            <div className="mb-4 flex items-center justify-between text-xs text-white/50" aria-live="polite">
+              <span>{autosave.status === "saving" ? "Saving draft..." : autosave.status === "unsaved" ? "Unsaved changes" : autosave.status === "recovered" ? "Recovered draft" : autosave.status === "error" ? "Draft save failed" : "All changes saved"}</span>
+              <button type="button" onClick={autosave.saveNow} className="font-semibold text-brand">Save now</button>
+            </div>
             <div className="flex items-center justify-between mb-6">
               <h2 id="editor-title" className="text-xl font-bold text-white">
                 {activeTab === "edit" ? "Edit Clip" : "Captions"}

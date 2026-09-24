@@ -17,6 +17,8 @@ import {
   Share2,
   BarChart3,
   CreditCard,
+  Plug,
+  Tags,
 } from "lucide-react";
 import PlanUsage from "@/components/dashboard/PlanUsage";
 import { useRoutePrefetch } from "@/app/hooks/useRoutePrefetch";
@@ -34,6 +36,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Earnings", href: "/earnings", icon: DollarSign },
   { label: "Referral", href: "/referral", icon: Share2 },
   { label: "Analytics", href: "/analytics", icon: BarChart3 },
+  { label: "Integrations", href: "/integrations", icon: Plug },
+  { label: "Categories", href: "/categories", icon: Tags },
   { label: "Vault", href: "/vault", icon: Layers },
   { label: "Wallet", href: "/wallet", icon: Wallet },
   { label: "Activity", href: "/activity", icon: Activity },
