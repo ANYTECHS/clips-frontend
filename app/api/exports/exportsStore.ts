@@ -1,6 +1,6 @@
 export type ExportFormat = "mp4" | "webm";
 export type ExportAspectRatio = "9:16" | "1:1" | "16:9";
-export type ExportQuality = "720p" | "1080p";
+export type ExportQuality = "source" | "720p" | "1080p";
 export type ExportStatus = "queued" | "processing" | "complete" | "error";
 
 export interface ClipExport {
@@ -11,6 +11,8 @@ export interface ClipExport {
   format: ExportFormat;
   aspectRatio: ExportAspectRatio;
   quality: ExportQuality;
+  targetResolution?: string;
+  targetBitrateKbps?: number;
   status: ExportStatus;
   objectKey: string;
   downloadUrl?: string;

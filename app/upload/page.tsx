@@ -124,7 +124,7 @@ function formatBytes(bytes: number): string {
 
 export default function UploadPage() {
   const router = useRouter();
-  const { progresses, results, isUploading, upload, cancelFile, cancelAll } =
+  const { progresses, results, isUploading, upload, retryFile, cancelFile, cancelAll } =
     useUploadProgress();
 
   const [files, setFiles] = useState<File[]>([]);
@@ -401,6 +401,20 @@ export default function UploadPage() {
                         aria-label={`Cancel upload of ${file.name}`}
                       >
                         <XCircle className="w-4 h-4" aria-hidden />
+                      </button>
+                    )}
+
+                    {prog.status === "error" && !isUploading && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void retryFile(file);
+                        }}
+                        className="rounded-lg border border-brand/30 px-2 py-1 text-xs font-semibold text-brand hover:bg-brand/10 transition-colors"
+                        aria-label={`Retry upload of ${file.name}`}
+                      >
+                        Retry
                       </button>
                     )}
 

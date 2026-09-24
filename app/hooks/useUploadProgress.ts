@@ -15,6 +15,9 @@ import { UPLOAD_CONCURRENCY } from "@/app/lib/constants";
 import { shouldChunk, uploadFileInChunks } from "@/app/lib/chunkedUpload";
 import { startMeasure } from "@/app/lib/performanceMonitoring";
 
+const UPLOAD_STALL_TIMEOUT_MS = 45_000;
+const UPLOAD_MAX_ATTEMPTS = 2;
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 /** Per-file progress state */
@@ -24,7 +27,7 @@ export type FileProgress = {
   /** Lifecycle status of this file's upload */
   status: "idle" | "uploading" | "done" | "error" | "cancelled";
   /** Human-readable error message when status === "error" */
-  error?: string;
+  error?: string | undefined;
 };
 
 /** Metadata returned on a successful upload */
@@ -75,6 +78,7 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
         formData.append("files", file);
 
         xhr.open("POST", "/api/upload");
+        xhr.timeout = UPLOAD_STALL_TIMEOUT_MS;
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -121,6 +125,13 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
           reject(new Error(msg));
         };
 
+        xhr.ontimeout = () => {
+          xhrMap.current.delete(file.name);
+          const msg = "Upload timed out because progress stalled. Retry the upload.";
+          setFileProgress(file.name, { status: "error", error: msg });
+          reject(new Error(msg));
+        };
+
         xhr.onabort = () => {
           xhrMap.current.delete(file.name);
           setFileProgress(file.name, { status: "cancelled" });
@@ -154,16 +165,35 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
       });
 
       try {
+        let stallTimer: ReturnType<typeof setTimeout> | null = null;
+        let stalled = false;
+        const armStallTimer = () => {
+          if (stallTimer) clearTimeout(stallTimer);
+          stallTimer = setTimeout(() => {
+            stalled = true;
+            controller.abort();
+          }, UPLOAD_STALL_TIMEOUT_MS);
+        };
+        armStallTimer();
         const result = await uploadFileInChunks(file, {
           signal: controller.signal,
-          onProgress: (percent) =>
-            setFileProgress(file.name, { percent, status: "uploading" }),
+          onProgress: (percent) => {
+            armStallTimer();
+            setFileProgress(file.name, { percent, status: "uploading" });
+          },
         });
+        if (stallTimer) clearTimeout(stallTimer);
         setFileProgress(file.name, { percent: 100, status: "done" });
         endMeasure({ outcome: "success" });
         return result;
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
+          if (stalled) {
+            const msg = "Upload timed out because progress stalled. Retry the upload.";
+            setFileProgress(file.name, { status: "error", error: msg });
+            endMeasure({ outcome: "timeout" });
+            throw new Error(msg);
+          }
           setFileProgress(file.name, { status: "cancelled" });
           endMeasure({ outcome: "cancelled" });
           throw err;
@@ -173,6 +203,7 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
         endMeasure({ outcome: "error" });
         throw new Error(msg);
       } finally {
+        if (stallTimer) clearTimeout(stallTimer);
         abortMap.current.delete(file.name);
       }
     },
@@ -212,7 +243,13 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
             // Large files go through the resumable chunked path; small ones
             // keep the cheaper single-request upload.
             const send = shouldChunk(current) ? uploadFileChunked : uploadFile;
-            const result = await send(current).catch(() => null);
+            let result: UploadResult | null = null;
+            for (let attempt = 1; attempt <= UPLOAD_MAX_ATTEMPTS && !result; attempt++) {
+              result = await send(current).catch(() => null);
+              if (!result && attempt < UPLOAD_MAX_ATTEMPTS) {
+                setFileProgress(current.name, { percent: 0, status: "uploading", error: undefined });
+              }
+            }
             if (result) successful.push(result);
           }
         };
@@ -260,5 +297,24 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
     abortMap.current.clear();
   }, []);
 
-  return { progresses, results, isUploading, upload, cancelFile, cancelAll };
+  const retryFile = useCallback(
+    async (file: File): Promise<UploadResult | null> => {
+      if (isUploading) return null;
+      setIsUploading(true);
+      setFileProgress(file.name, { percent: 0, status: "uploading", error: undefined });
+      try {
+        const send = shouldChunk(file) ? uploadFileChunked : uploadFile;
+        const result = await send(file);
+        setResults((prev) => [...prev.filter((r) => r.name !== file.name), result]);
+        return result;
+      } catch {
+        return null;
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [isUploading, setFileProgress, uploadFile, uploadFileChunked],
+  );
+
+  return { progresses, results, isUploading, upload, retryFile, cancelFile, cancelAll };
 }
