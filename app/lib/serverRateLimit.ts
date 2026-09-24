@@ -63,7 +63,8 @@ class InMemoryStorageAdapter implements StorageAdapter {
 
   async incr(key: string): Promise<number> {
     const entry = this.map.get(key);
-    if (!entry) {
+    const now = Date.now();
+    if (!entry || now >= entry.resetAt) {
       this.map.set(key, { count: 1, resetAt: Date.now() + 60000 });
       return 1;
     }
@@ -145,6 +146,8 @@ export async function applyRateLimit(
   const storage = getAdapter();
   const windowSeconds = Math.ceil(windowMs / 1000);
 
+  await storage.get(key);
+
   // Use Redis atomic increment with TTL
   const count = await storage.incr(key);
   
@@ -153,19 +156,30 @@ export async function applyRateLimit(
     await storage.expire(key, windowSeconds);
   }
 
+  const rawAfterIncrement = await storage.get(key);
+  const resetAt = parseResetAt(rawAfterIncrement, windowMs);
   const remaining = Math.max(0, limit - count);
 
   if (count > limit) {
-    const retryAfter = windowSeconds;
+    const retryAfter = Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
     return NextResponse.json(
-      { error: "Too many requests", code: "RATE_LIMITED" },
+      {
+        error: "Too many requests",
+        code: "RATE_LIMITED",
+        rateLimit: {
+          limit,
+          remaining: 0,
+          resetAt,
+          retryAfter,
+        },
+      },
       {
         status: 429,
         headers: {
           "X-RateLimit-Limit": String(limit),
           "X-RateLimit-Remaining": "0",
           "Retry-After": String(retryAfter),
-          "X-RateLimit-Reset": String(Math.ceil((Date.now() + windowMs) / 1000)),
+          "X-RateLimit-Reset": String(Math.ceil(resetAt / 1000)),
         },
       }
     );
@@ -198,7 +212,7 @@ export async function getRateLimitHeaders(
     };
   }
 
-  const entry = JSON.parse(raw) as { count: number; resetAt: number };
+  const entry = parseBucketEntry(raw, windowMs);
   const now = Date.now();
   if (now >= entry.resetAt) {
     const resetEpoch = Math.ceil((now + windowMs) / 1000);
@@ -214,6 +228,27 @@ export async function getRateLimitHeaders(
     "X-RateLimit-Remaining": String(Math.max(0, limit - entry.count)),
     "X-RateLimit-Reset": String(Math.ceil(entry.resetAt / 1000)),
   };
+}
+
+function parseBucketEntry(raw: string | null, windowMs: number): BucketEntry {
+  if (!raw) return { count: 0, resetAt: Date.now() + windowMs };
+
+  try {
+    const parsed = JSON.parse(raw) as Partial<BucketEntry>;
+    if (typeof parsed.count === "number" && typeof parsed.resetAt === "number") {
+      return { count: parsed.count, resetAt: parsed.resetAt };
+    }
+  } catch {}
+
+  const count = Number(raw);
+  return {
+    count: Number.isFinite(count) ? count : 0,
+    resetAt: Date.now() + windowMs,
+  };
+}
+
+function parseResetAt(raw: string | null, windowMs: number): number {
+  return parseBucketEntry(raw, windowMs).resetAt;
 }
 
 /** Derives a bucketing key from the request. Uses forwarded IP or fallback. */

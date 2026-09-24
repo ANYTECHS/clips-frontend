@@ -1,40 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { PROTECTED_ROUTES } from "@/app/lib/authRedirect";
-
-const AUTH_ROUTES = ["/login", "/signup"];
-
-function isProtectedRoute(pathname: string): boolean {
-  return PROTECTED_ROUTES.some((route) => pathname.startsWith(route));
-}
-
-function isAuthRoute(pathname: string): boolean {
-  return AUTH_ROUTES.some((route) => pathname === route);
-}
-
-function getRedirectTarget(
-  pathname: string,
-  hasToken: boolean,
-  onboardingStep?: number
-): string | null {
-  if (!hasToken && isProtectedRoute(pathname)) {
-    return "/login";
-  }
-
-  if (hasToken && (isAuthRoute(pathname) || pathname === "/")) {
-    const step = onboardingStep || 3;
-    if (step === 1 || step === 2) {
-      return "/onboarding";
-    }
-    return "/dashboard";
-  }
-
-  if (hasToken && pathname === "/onboarding" && (onboardingStep || 3) > 2) {
-    return "/dashboard";
-  }
-
-  return null;
-}
+import { getMiddlewareRedirectTarget } from "@/app/lib/authRedirect";
 
 let authMiddleware: ((request: NextRequest) => ReturnType<typeof NextResponse.next>) | null =
   null;
@@ -51,7 +17,7 @@ async function getAuthMiddleware() {
       : undefined;
     const hasToken = !!session;
 
-    const redirectTarget = getRedirectTarget(pathname, hasToken, onboardingStep);
+    const redirectTarget = getMiddlewareRedirectTarget(pathname, hasToken, onboardingStep);
 
     if (redirectTarget) {
       return NextResponse.redirect(new URL(redirectTarget, request.url));

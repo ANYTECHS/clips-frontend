@@ -100,6 +100,34 @@ describe("/api/auth/passkey/register", () => {
     expect(json).toMatchObject({ challenge: expect.any(String) });
   });
 
+  it("GET uses Safari-compatible platform authenticator options", async () => {
+    const { generateRegistrationOptions } = await import("@simplewebauthn/server");
+
+    passkeyStore.addCredential("user-123", {
+      credentialId: "existing-cred-id",
+      publicKey: "AQID",
+      userId: "user-123",
+      counter: 0,
+      transports: ["internal"],
+      createdAt: new Date().toISOString(),
+    });
+
+    const req = makeRequest("GET", undefined, {
+      "user-agent": "Mozilla/5.0 Version/17.0 Safari/605.1.15",
+    });
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(generateRegistrationOptions).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        authenticatorSelection: expect.objectContaining({
+          authenticatorAttachment: "platform",
+        }),
+        excludeCredentials: [expect.not.objectContaining({ transports: expect.anything() })],
+      }),
+    );
+  });
+
   it("GET returns 401 when not authenticated", async () => {
     const { auth } = await import("@/app/lib/auth");
     (auth as jest.Mock).mockResolvedValueOnce(null);
@@ -196,6 +224,23 @@ describe("/api/auth/passkey/authenticate", () => {
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json).toMatchObject({ challenge: expect.any(String) });
+  });
+
+  it("GET omits credential transports for Safari authentication", async () => {
+    const { generateAuthenticationOptions } = await import("@simplewebauthn/server");
+    seedCredential();
+
+    const req = makeRequest("GET", undefined, {
+      "user-agent": "Mozilla/5.0 Version/17.0 Safari/605.1.15",
+    });
+    const res = await GET(req);
+
+    expect(res.status).toBe(200);
+    expect(generateAuthenticationOptions).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        allowCredentials: [expect.not.objectContaining({ transports: expect.anything() })],
+      }),
+    );
   });
 
   it("GET returns 404 when user has no passkeys", async () => {

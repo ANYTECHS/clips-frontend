@@ -7,7 +7,12 @@ describe("useGlobalSearch (issue #798)", () => {
     global.fetch = jest.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        data: { clips: [{ type: "clip", id: "1", title: "Clip #01", href: "/projects" }], projects: [], earnings: [] },
+        data: {
+          clips: [{ type: "clip", id: "1", title: "Clip #01", href: "/projects", relevance: 90, matchType: "prefix" }],
+          projects: [],
+          earnings: [],
+          suggestions: ["Clip #01"],
+        },
         error: null,
       }),
     }) as unknown as typeof fetch;
@@ -48,6 +53,6 @@ describe("useGlobalSearch (issue #798)", () => {
     jest.advanceTimersByTime(300);
 
     await waitFor(() => expect(result.current.error).not.toBeNull());
-    expect(result.current.results).toEqual({ clips: [], projects: [], earnings: [] });
+    expect(result.current.results).toEqual({ clips: [], projects: [], earnings: [], suggestions: [] });
   });
 });

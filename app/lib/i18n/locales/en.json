@@ -1,4 +1,9 @@
 {
+  "dashboard": {
+    "welcome": "Welcome back, {name}",
+    "subtitle": "Your AI engine is active and ready for clip generation & style transformations.",
+    "quick_upload": "Quick Upload"
+  },
   "wallet": {
     "connect": "Connect Wallet",
     "disconnect": "Disconnect",

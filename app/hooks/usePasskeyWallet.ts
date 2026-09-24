@@ -6,6 +6,10 @@ import {
   startAuthentication,
   browserSupportsWebAuthn,
 } from "@simplewebauthn/browser";
+import {
+  getWebAuthnCompatibility,
+  type WebAuthnCompatibility,
+} from "@/app/lib/webauthnCompatibility";
 
 /** State container tracking WebAuthn registration, cryptographic identifiers, and errors */
 export interface PasskeyWalletState {
@@ -21,6 +25,8 @@ export interface PasskeyWalletState {
   isAuthenticating: boolean;
   /** Localized error message */
   error: string | null;
+  /** Browser compatibility details used for Safari and fallback handling */
+  compatibility: WebAuthnCompatibility | null;
 }
 
 /**
@@ -38,27 +44,46 @@ export function usePasskeyWallet(): PasskeyWalletState & {
     isRegistering: false,
     isAuthenticating: false,
     error: null,
+    compatibility: null,
   });
 
   useEffect(() => {
-    const supported = browserSupportsWebAuthn();
+    const compatibility = getWebAuthnCompatibility({
+      webAuthnSupported: browserSupportsWebAuthn(),
+    });
     const savedId = typeof window !== "undefined" ? localStorage.getItem("clipcash_passkey_id") : null;
     
     setState((p) => ({
       ...p,
-      isSupported: supported,
+      isSupported: compatibility.isSupported,
       credentialId: savedId,
+      compatibility,
     }));
+  }, []);
+
+  const getCompatibility = useCallback(() => {
+    const compatibility = getWebAuthnCompatibility({
+      webAuthnSupported: browserSupportsWebAuthn(),
+    });
+
+    setState((p) => ({
+      ...p,
+      isSupported: compatibility.isSupported,
+      compatibility,
+    }));
+
+    return compatibility;
   }, []);
 
   /**
    * Register a new passkey.
    */
   const register = useCallback(async (username?: string): Promise<boolean> => {
-    if (!browserSupportsWebAuthn()) {
+    const compatibility = getCompatibility();
+    if (!compatibility.isSupported) {
       setState((p) => ({
         ...p,
-        error: "Passkeys are not supported in this browser.",
+        error: compatibility.fallbackMessage ?? "Passkeys are not supported in this browser.",
       }));
       return false;
     }
@@ -124,19 +149,24 @@ export function usePasskeyWallet(): PasskeyWalletState & {
         }
       }
 
+      if (compatibility.isSafari && message === "Passkey registration failed.") {
+        message = compatibility.fallbackMessage ?? "Safari could not complete passkey registration.";
+      }
+
       setState((p) => ({ ...p, isRegistering: false, error: message }));
       return false;
     }
-  }, []);
+  }, [getCompatibility]);
 
   /**
    * Authenticate with an existing passkey.
    */
   const authenticate = useCallback(async (): Promise<boolean> => {
-    if (!browserSupportsWebAuthn()) {
+    const compatibility = getCompatibility();
+    if (!compatibility.isSupported) {
       setState((p) => ({
         ...p,
-        error: "Passkeys are not supported in this browser.",
+        error: compatibility.fallbackMessage ?? "Passkeys are not supported in this browser.",
       }));
       return false;
     }
@@ -198,10 +228,14 @@ export function usePasskeyWallet(): PasskeyWalletState & {
         }
       }
 
+      if (compatibility.isSafari && message === "Passkey authentication failed.") {
+        message = compatibility.fallbackMessage ?? "Safari could not complete passkey authentication.";
+      }
+
       setState((p) => ({ ...p, isAuthenticating: false, error: message }));
       return false;
     }
-  }, []);
+  }, [getCompatibility]);
 
   const reset = useCallback(() => {
     if (typeof window !== "undefined") {

@@ -16,6 +16,8 @@ export interface SearchResult {
   id: string;
   title: string;
   subtitle?: string;
+  relevance: number;
+  matchType: "exact" | "prefix" | "substring" | "fuzzy";
   /** Client-side route to navigate to when this result is selected. */
   href: string;
 }
@@ -24,6 +26,7 @@ export interface SearchResponse {
   clips: SearchResult[];
   projects: SearchResult[];
   earnings: SearchResult[];
+  suggestions: string[];
 }
 
 const ALL_TYPES = ["clips", "projects", "earnings"] as const;
@@ -33,9 +36,78 @@ const RESULTS_PER_TYPE = 10;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function matches(query: string, ...fields: Array<string | undefined>): boolean {
-  const q = query.toLowerCase();
-  return fields.some((field) => field?.toLowerCase().includes(q));
+interface MatchScore {
+  matched: boolean;
+  relevance: number;
+  matchType: SearchResult["matchType"];
+}
+
+function normalize(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function levenshtein(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
+
+  const previous = Array.from({ length: b.length + 1 }, (_, index) => index);
+  const current = Array(b.length + 1).fill(0);
+
+  for (let i = 1; i <= a.length; i++) {
+    current[0] = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      current[j] = Math.min(
+        current[j - 1] + 1,
+        previous[j] + 1,
+        previous[j - 1] + cost,
+      );
+    }
+    previous.splice(0, previous.length, ...current);
+  }
+
+  return previous[b.length];
+}
+
+function scoreField(query: string, field?: string): MatchScore {
+  const q = normalize(query);
+  const value = normalize(field ?? "");
+  if (!q || !value) return { matched: false, relevance: 0, matchType: "fuzzy" };
+
+  if (value === q) return { matched: true, relevance: 100, matchType: "exact" };
+  if (value.startsWith(q)) return { matched: true, relevance: 90, matchType: "prefix" };
+  if (value.includes(q)) return { matched: true, relevance: 75, matchType: "substring" };
+
+  const queryWords = q.split(" ");
+  const fieldWords = value.split(" ");
+  const typoMatches = queryWords.filter((queryWord) =>
+    fieldWords.some((fieldWord) => {
+      const distance = levenshtein(queryWord, fieldWord);
+      const maxDistance = queryWord.length <= 4 ? 1 : 2;
+      return distance <= maxDistance;
+    }),
+  );
+
+  if (typoMatches.length === queryWords.length) {
+    return {
+      matched: true,
+      relevance: Math.max(45, 70 - queryWords.length * 5),
+      matchType: "fuzzy",
+    };
+  }
+
+  return { matched: false, relevance: 0, matchType: "fuzzy" };
+}
+
+function bestMatch(query: string, ...fields: Array<string | undefined>): MatchScore {
+  return fields.reduce<MatchScore>(
+    (best, field) => {
+      const candidate = scoreField(query, field);
+      return candidate.relevance > best.relevance ? candidate : best;
+    },
+    { matched: false, relevance: 0, matchType: "fuzzy" },
+  );
 }
 
 function deriveProjectTitle(job: { id: string; filename?: string }): string {
@@ -71,7 +143,7 @@ async function handleGet(request: NextRequest) {
       : ALL_TYPES,
   );
 
-  const empty: SearchResponse = { clips: [], projects: [], earnings: [] };
+  const empty: SearchResponse = { clips: [], projects: [], earnings: [], suggestions: [] };
   if (!q) {
     return NextResponse.json({ data: empty, error: null });
   }
@@ -83,41 +155,65 @@ async function handleGet(request: NextRequest) {
   ]);
 
   const clipResults: SearchResult[] = clips
-    .filter((clip) => matches(q, clip.title))
+    .map((clip) => ({ clip, match: bestMatch(q, clip.title, clip.style, ...(clip.tags ?? [])) }))
+    .filter(({ match }) => match.matched)
+    .sort((a, b) => b.match.relevance - a.match.relevance)
     .slice(0, RESULTS_PER_TYPE)
-    .map((clip) => ({
+    .map(({ clip, match }) => ({
       type: "clip" as const,
       id: clip.id,
       title: clip.title,
       subtitle: clip.style,
+      relevance: match.relevance,
+      matchType: match.matchType,
       href: "/projects",
     }));
 
   const projectResults: SearchResult[] = jobs
     .map((job) => ({ job, title: deriveProjectTitle(job) }))
-    .filter(({ title }) => matches(q, title))
+    .map(({ job, title }) => ({ job, title, match: bestMatch(q, title, job.status) }))
+    .filter(({ match }) => match.matched)
+    .sort((a, b) => b.match.relevance - a.match.relevance)
     .slice(0, RESULTS_PER_TYPE)
-    .map(({ job, title }) => ({
+    .map(({ job, title, match }) => ({
       type: "project" as const,
       id: job.id,
       title,
       subtitle: job.status,
+      relevance: match.relevance,
+      matchType: match.matchType,
       href: `/dashboard/transform/${job.id}`,
     }));
 
   const earningResults: SearchResult[] = transactions
-    .filter((tx) => matches(q, tx.description))
+    .map((tx) => ({ tx, match: bestMatch(q, tx.description, tx.platform, tx.status) }))
+    .filter(({ match }) => match.matched)
+    .sort((a, b) => b.match.relevance - a.match.relevance)
     .slice(0, RESULTS_PER_TYPE)
-    .map((tx) => ({
+    .map(({ tx, match }) => ({
       type: "earning" as const,
       id: tx.id,
       title: tx.description,
       subtitle: `$${tx.amount.toFixed(2)} · ${tx.status}`,
+      relevance: match.relevance,
+      matchType: match.matchType,
       href: "/earnings",
     }));
 
+  const suggestions = [
+    ...clips.map((clip) => clip.title),
+    ...jobs.map(deriveProjectTitle),
+    ...transactions.map((tx) => tx.description),
+  ]
+    .map((title) => ({ title, match: scoreField(q, title) }))
+    .filter(({ match }) => match.matched && match.matchType !== "exact")
+    .sort((a, b) => b.match.relevance - a.match.relevance)
+    .map(({ title }) => title)
+    .filter((title, index, all) => all.indexOf(title) === index)
+    .slice(0, 5);
+
   return NextResponse.json({
-    data: { clips: clipResults, projects: projectResults, earnings: earningResults },
+    data: { clips: clipResults, projects: projectResults, earnings: earningResults, suggestions },
     error: null,
   });
 }

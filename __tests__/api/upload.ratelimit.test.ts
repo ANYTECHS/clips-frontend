@@ -193,6 +193,21 @@ describe("applyRateLimit — serverRateLimit", () => {
     expect(retryAfter).toBeLessThanOrEqual(60);
   });
 
+  it("returns rate limit status in the 429 body", async () => {
+    const req = makeReq("5.6.7.9");
+    const opts = { limit: 1, windowMs: 60_000 };
+    await applyRateLimit(req, opts);
+    const res = await applyRateLimit(req, opts);
+    const body = await res?.json();
+
+    expect(body.rateLimit).toMatchObject({
+      limit: 1,
+      remaining: 0,
+      retryAfter: expect.any(Number),
+      resetAt: expect.any(Number),
+    });
+  });
+
   it("uses separate buckets per IP", async () => {
     const opts = { limit: 1, windowMs: 60_000 };
     await applyRateLimit(makeReq("10.0.0.1"), opts);
@@ -208,6 +223,18 @@ describe("applyRateLimit — serverRateLimit", () => {
     await applyRateLimit(req, opts); // 429
     jest.advanceTimersByTime(1001);
     expect(await applyRateLimit(req, opts)).toBeNull(); // window reset
+    jest.useRealTimers();
+  });
+
+  it("resets bucket at the exact window boundary", async () => {
+    jest.useFakeTimers();
+    const req = makeReq("6.7.8.10");
+    const opts = { limit: 1, windowMs: 1000 };
+    await applyRateLimit(req, opts);
+    const limited = await applyRateLimit(req, opts);
+    expect(limited?.status).toBe(429);
+    jest.advanceTimersByTime(1000);
+    expect(await applyRateLimit(req, opts)).toBeNull();
     jest.useRealTimers();
   });
 

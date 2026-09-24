@@ -7,6 +7,7 @@ import { auth } from "@/app/lib/auth";
 import { logger } from "@/app/lib/logger";
 import { checkCsrf } from "@/app/lib/csrf";
 import { parseRequestJson } from "@/app/lib/parseRequestJson";
+import { isSafariUserAgent } from "@/app/lib/webauthnCompatibility";
 import { passkeyStore } from "../passkeyStore";
 
 function getWebAuthnConfig(request: NextRequest) {
@@ -31,6 +32,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { rpID } = getWebAuthnConfig(request);
+    const isSafari = isSafariUserAgent(request.headers.get("user-agent"));
     const credentials = passkeyStore.getCredentials(userId);
 
     if (credentials.length === 0) {
@@ -46,7 +48,7 @@ export async function GET(request: NextRequest) {
       allowCredentials: credentials.map((cred) => ({
         id: cred.credentialId,
         // WebAuthn transports types are incomplete - use as any
-        transports: cred.transports as any,
+        ...(isSafari ? {} : { transports: cred.transports as any }),
       })),
     });
 
@@ -101,6 +103,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { rpID, expectedOrigin } = getWebAuthnConfig(request);
+    const isSafari = isSafariUserAgent(request.headers.get("user-agent"));
 
     const verification = await verifyAuthenticationResponse({
       response: body,
@@ -112,7 +115,7 @@ export async function POST(request: NextRequest) {
         publicKey: Buffer.from(credential.publicKey, "base64url"),
         counter: credential.counter,
         // WebAuthn transports types are incomplete - use as any
-        transports: credential.transports as any,
+        ...(isSafari ? {} : { transports: credential.transports as any }),
       },
     });
 

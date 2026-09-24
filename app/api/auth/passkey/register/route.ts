@@ -7,6 +7,7 @@ import { auth } from "@/app/lib/auth";
 import { logger } from "@/app/lib/logger";
 import { checkCsrf } from "@/app/lib/csrf";
 import { parseRequestJson } from "@/app/lib/parseRequestJson";
+import { isSafariUserAgent } from "@/app/lib/webauthnCompatibility";
 import { passkeyStore } from "../passkeyStore";
 
 function getWebAuthnConfig(request: NextRequest) {
@@ -41,6 +42,7 @@ export async function GET(request: NextRequest) {
     }
 
     const { rpID } = getWebAuthnConfig(request);
+    const isSafari = isSafariUserAgent(request.headers.get("user-agent"));
     const existingCreds = passkeyStore.getCredentials(userId);
 
     const options = await generateRegistrationOptions({
@@ -53,9 +55,10 @@ export async function GET(request: NextRequest) {
       excludeCredentials: existingCreds.map((cred) => ({
         id: cred.credentialId,
         // WebAuthn transports types are incomplete - use as any
-        transports: cred.transports as any,
+        ...(isSafari ? {} : { transports: cred.transports as any }),
       })),
       authenticatorSelection: {
+        ...(isSafari ? { authenticatorAttachment: "platform" as const } : {}),
         residentKey: "preferred",
         userVerification: "preferred",
       },
