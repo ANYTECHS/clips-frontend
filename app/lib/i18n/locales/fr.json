@@ -1,6 +1,7 @@
 {
   "dashboard": {
     "welcome": "Bon retour, {name}",
+    "open_menu": "Ouvrir le menu de navigation",
     "subtitle": "Votre moteur IA est actif et prêt pour la génération de clips et les transformations de style.",
     "quick_upload": "Téléversement rapide"
   },

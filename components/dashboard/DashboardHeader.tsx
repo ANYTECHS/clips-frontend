@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, memo, useEffect, useCallback, useRef } from "react";
-import { CloudUpload, Bell, Check } from "lucide-react";
+import { CloudUpload, Bell, Check, Menu } from "lucide-react";
 import { useUserStore, selectUserName } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
 import { sanitize } from "@/app/lib/sanitize";
@@ -97,17 +97,37 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
   const unreadCount = notifications.length;
 
   return (
-    <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl px-6 py-5 bg-surface/50 border border-white/5 relative">
-      <div>
-        <h1 className="text-3xl font-bold leading-tight text-white">
-          {t("dashboard.welcome", { name: sanitize(userName) })}
-        </h1>
-        <p className="mt-1 text-zinc-400 text-sm">
-          {t("dashboard.subtitle")}
-        </p>
+    // Stacks until `lg`, not `md` (Issue #1070). The sidebar only becomes
+    // static at `lg`, so between 768px and 1023px this row had the full-width
+    // heading and the action cluster competing for a ~720px line and
+    // overlapping. The two breakpoints have to agree.
+    <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl px-4 sm:px-6 py-5 bg-surface/50 border border-white/5 relative">
+      <div className="flex items-start gap-3 min-w-0">
+        {/* The only way to reach the sidebar below `lg`. `onMenuClick` was
+            accepted as a prop and never rendered, so on every tablet the
+            sidebar sat off-canvas with nothing to open it. */}
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            aria-label={t("dashboard.open_menu")}
+            className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-surface text-gray-300 transition-colors hover:bg-input hover:text-white"
+          >
+            <Menu className="w-5 h-5" aria-hidden="true" />
+          </button>
+        )}
+
+        <div className="min-w-0">
+          <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-white truncate">
+            {t("dashboard.welcome", { name: sanitize(userName) })}
+          </h1>
+          <p className="mt-1 text-zinc-400 text-sm">
+            {t("dashboard.subtitle")}
+          </p>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
         {/* Notification Bell */}
         <div className="relative" ref={popoverRef}>
           <button
@@ -127,7 +147,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
 
           {/* Notifications Popover */}
           {isOpen && (
-            <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl border border-white/10 bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
+            <div className="absolute right-0 mt-3 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-surface/80">
                 <span className="text-xs font-bold text-white uppercase tracking-wider">
                   {t("notifications.title")}

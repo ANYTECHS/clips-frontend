@@ -148,7 +148,7 @@ const DashboardSidebar = memo(function DashboardSidebar({ isOpen, onClose }: Das
           <button
             type="button"
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-muted hover:text-white hover:bg-surface-hover transition-colors"
+            className="lg:hidden flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:text-white hover:bg-surface-hover transition-colors"
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" aria-hidden="true" />

@@ -1,6 +1,7 @@
 {
   "dashboard": {
     "welcome": "Welcome back, {name}",
+    "open_menu": "Open navigation menu",
     "subtitle": "Your AI engine is active and ready for clip generation & style transformations.",
     "quick_upload": "Quick Upload"
   },
