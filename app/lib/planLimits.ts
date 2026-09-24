@@ -1,5 +1,5 @@
 export type UserPlan = "free" | "pro" | "enterprise";
-export type ExportQuality = "720p" | "1080p";
+export type ExportQuality = "source" | "720p" | "1080p";
 
 const MAX_EXPORT_QUALITY: Record<UserPlan, ExportQuality> = {
   free: "720p",
@@ -8,6 +8,7 @@ const MAX_EXPORT_QUALITY: Record<UserPlan, ExportQuality> = {
 };
 
 const QUALITY_RANK: Record<ExportQuality, number> = {
+  source: 2,
   "720p": 1,
   "1080p": 2,
 };

@@ -117,6 +117,7 @@ export default function ProjectsPage() {
 
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState(false);
+  const [keepDuplicates, setKeepDuplicates] = useState(false);
   const [editingClip, setEditingClip] = useState<Clip | null>(null);
   const [previewClip, setPreviewClip] = useState<Clip | null>(null);
 
@@ -132,6 +133,7 @@ export default function ProjectsPage() {
       if (vaultFilter !== "all") params.append("status", vaultFilter);
       if (captionsStyle !== "All Styles") params.append("style", captionsStyle);
       viralityLevels.forEach(v => params.append("virality", v));
+      if (keepDuplicates) params.append("keepDuplicates", "true");
       
       const res = await fetch(`/api/clips?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch clips");
@@ -150,7 +152,7 @@ export default function ProjectsPage() {
       setLoading(false);
       setLoadingNextPage(false);
     }
-  }, [vaultFilter, captionsStyle, viralityLevels, PAGE_SIZE]);
+  }, [vaultFilter, captionsStyle, viralityLevels, keepDuplicates, PAGE_SIZE]);
 
   useEffect(() => {
     fetchClips(1);
@@ -166,7 +168,7 @@ export default function ProjectsPage() {
     if (currentPage !== 1) {
       updateFilters({ page: 1 });
     }
-  }, [captionsStyle, viralityLevels, vaultFilter, updateFilters, currentPage]);
+  }, [captionsStyle, viralityLevels, vaultFilter, keepDuplicates, updateFilters, currentPage]);
 
   const handleLoadMore = useCallback(() => {
     if (fetchedClips.length < totalClips && !loadingNextPage) {
@@ -470,6 +472,15 @@ export default function ProjectsPage() {
         {/* Main Content Area */}
         <div className="flex-1 flex flex-col min-h-0 px-4 sm:px-6 lg:px-10 xl:px-16 min-w-0">
           <div className="flex-1 flex flex-col min-h-0 w-full max-w-[1400px] mx-auto pt-6">
+            <label className="mb-4 inline-flex w-fit items-center gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                checked={keepDuplicates}
+                onChange={(event) => setKeepDuplicates(event.target.checked)}
+                className="h-4 w-4 accent-brand"
+              />
+              Keep duplicate clips
+            </label>
             <div key={vaultFilter} className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500">
               <ClipGrid
                 clips={fetchedClips}

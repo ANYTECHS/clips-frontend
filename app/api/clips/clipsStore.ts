@@ -30,6 +30,16 @@ export interface Clip {
   shareId?: string | null;
 }
 
+export function clipFingerprint(clip: Clip): string {
+  return [
+    clip.videoUrl,
+    clip.duration,
+    clip.resolution,
+    clip.score,
+    clip.title.toLowerCase().replace(/\s+/g, " ").trim(),
+  ].join("|");
+}
+
 class ClipsStore {
   private clips: Clip[] = [];
 
@@ -63,7 +73,7 @@ class ClipsStore {
    * Soft-deleted clips are never returned — callers that need them (a restore
    * flow, or a purge job) must go through `getDeletedClipsForUser`.
    */
-  getClipsForUser(userId: string, options: { includeArchived?: boolean } = {}): Clip[] {
+  getClipsForUser(userId: string, options: { includeArchived?: boolean; keepDuplicates?: boolean } = {}): Clip[] {
     const existing = this.clips.filter(c => c.userId === userId);
 
     // If no clips exist for this user, duplicate the seed pool for them
@@ -75,16 +85,34 @@ class ClipsStore {
         projectId: `${userId}-proj-${(idx % 3) + 1}`,
       }));
       this.clips.push(...newClips);
-      return newClips;
+      return options.keepDuplicates ? newClips : this.dedupeClips(newClips, userId);
     }
 
-    return existing.filter(clip => {
+    const visible = existing.filter(clip => {
       if (clip.deletedAt) return false;
       // Archived clips are hidden from the default library, the Vault, and
       // Analytics; only the Archived filter asks for them.
       if (clip.archivedAt && !options.includeArchived) return false;
       return true;
     });
+    return options.keepDuplicates ? visible : this.dedupeClips(visible, userId);
+  }
+
+  private dedupeClips(clips: Clip[], userId: string): Clip[] {
+    const seen = new Set<string>();
+    const unique: Clip[] = [];
+
+    for (const clip of clips) {
+      const fingerprint = clipFingerprint(clip);
+      if (seen.has(fingerprint)) {
+        console.info("[clips] duplicate clip hidden", { userId, clipId: clip.id, fingerprint });
+        continue;
+      }
+      seen.add(fingerprint);
+      unique.push(clip);
+    }
+
+    return unique;
   }
 
   /** Archived clips only — backs the "Archived" tab. */

@@ -44,6 +44,7 @@ async function handleGet(request: NextRequest) {
   }
 
   const { page, pageSize, status, style, virality } = queryValidation.data;
+  const keepDuplicates = searchParams.get("keepDuplicates") === "true";
 
   const fieldResult = parseFieldSelection(searchParams.get("fields"), CLIP_FIELD_CONFIG);
   if (!fieldResult.ok) {
@@ -58,7 +59,7 @@ async function handleGet(request: NextRequest) {
   let userClips =
     status === "archived"
       ? clipsStore.getArchivedClipsForUser(session.user.id)
-      : clipsStore.getClipsForUser(session.user.id);
+      : clipsStore.getClipsForUser(session.user.id, { keepDuplicates });
 
   // 2. Filter
   if (status && status !== "all" && status !== "archived") {
