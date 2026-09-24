@@ -21,16 +21,12 @@ export interface Clip {
   resolution: string;
   videoUrl: string;
   createdAt: string;
+  platform?: "youtube" | "instagram" | "tiktok" | "twitter";
   scoreBreakdown?: ScoreBreakdown;
-  /** Tags for organizing clips by topic, campaign, or style. Max 10 tags per clip. */
   tags?: string[];
-  /** Set by a soft delete. Excluded from every read path once present. */
   deletedAt?: string | null;
-  /** Set by archiving. Surfaced only under the "Archived" filter. */
   archivedAt?: string | null;
-  /** Transformation history for the clip. */
   transformations?: unknown[];
-  /** Share link ID if the clip has been shared. */
   shareId?: string | null;
 }
 
