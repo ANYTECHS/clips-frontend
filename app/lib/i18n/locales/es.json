@@ -1,4 +1,9 @@
 {
+  "dashboard": {
+    "welcome": "Bienvenido de nuevo, {name}",
+    "subtitle": "Tu motor de IA está activo y listo para la generación de clips y transformaciones de estilo.",
+    "quick_upload": "Subida Rápida"
+  },
   "wallet": {
     "connect": "Conectar Cartera",
     "disconnect": "Desconectar",

@@ -38,11 +38,25 @@ export default function ProcessingPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotificationSent(true);
 
-      // Call sendNotification from notifications.ts
+      // Browser push notification
       sendNotification("Your clips are ready!");
       notifyClipsReady(momentsFound, "/projects");
+
+      // In-app server-side notification (shown in the DashboardHeader bell)
+      fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "job_complete",
+          title: "Your clips are ready!",
+          message: `Found ${momentsFound} viral moment${momentsFound !== 1 ? "s" : ""} from your video`,
+          payload: { jobId: jobId ?? id },
+        }),
+      }).catch(() => {
+        // Non-critical: swallow errors so we don't block the success UI
+      });
     }
-  }, [status, notificationSent, momentsFound, router]);
+  }, [status, notificationSent, momentsFound, router, jobId, id]);
 
   const handleCancel = () => {
     resetProcess();

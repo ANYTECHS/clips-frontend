@@ -5,6 +5,7 @@ import { CloudUpload, Bell, Check } from "lucide-react";
 import { useUserStore, selectUserName } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
 import { sanitize } from "@/app/lib/sanitize";
+import { useI18n } from "@/app/lib/i18n/I18nProvider";
 
 interface NotificationItem {
   id: string;
@@ -22,6 +23,7 @@ interface NotificationItem {
  */
 const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
   const userName = useUserStore(selectUserName);
+  const { t } = useI18n();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -98,10 +100,10 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
     <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl px-6 py-5 bg-surface/50 border border-white/5 relative">
       <div>
         <h1 className="text-3xl font-bold leading-tight text-white">
-          Welcome back, {sanitize(userName)}
+          {t("dashboard.welcome", { name: sanitize(userName) })}
         </h1>
         <p className="mt-1 text-zinc-400 text-sm">
-          Your AI engine is active and ready for clip generation & style transformations.
+          {t("dashboard.subtitle")}
         </p>
       </div>
 
@@ -112,7 +114,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
             type="button"
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
-            aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ""}`}
+            aria-label={`${t("notifications.title")} ${unreadCount > 0 ? `(${unreadCount} ${t("notifications.unread_count", { count: unreadCount })})` : ""}`}
             className="relative p-2.5 rounded-xl border border-white/10 bg-surface hover:bg-input text-gray-300 hover:text-white transition-colors"
           >
             <Bell className="w-5 h-5" aria-hidden="true" />
@@ -128,7 +130,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
             <div className="absolute right-0 mt-3 w-80 sm:w-96 rounded-2xl border border-white/10 bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
               <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-surface/80">
                 <span className="text-xs font-bold text-white uppercase tracking-wider">
-                  Notifications
+                  {t("notifications.title")}
                 </span>
                 {unreadCount > 0 && (
                   <button
@@ -136,7 +138,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
                     onClick={handleMarkAllRead}
                     className="text-[11px] font-semibold text-brand hover:underline"
                   >
-                    Mark all read
+                    {t("notifications.mark_all_read")}
                   </button>
                 )}
               </div>
@@ -144,7 +146,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
               <div className="max-h-80 overflow-y-auto divide-y divide-white/5">
                 {notifications.length === 0 ? (
                   <div className="p-6 text-center text-xs text-zinc-400">
-                    No new notifications
+                    {t("notifications.no_notifications")}
                   </div>
                 ) : (
                   notifications.map((item) => (
@@ -163,7 +165,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
                       <button
                         type="button"
                         onClick={() => handleMarkAsRead(item.id)}
-                        aria-label="Mark as read"
+                        aria-label={t("notifications.mark_as_read")}
                         className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-brand transition-colors shrink-0"
                       >
                         <Check className="w-4 h-4" />
@@ -181,10 +183,10 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
         <button
           type="button"
           className="inline-flex items-center gap-2 rounded-xl bg-[#00E68A] px-5 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(0,230,138,0.35)] transition hover:brightness-95"
-          aria-label="Quick upload video"
+          aria-label={t("dashboard.quick_upload")}
         >
           <CloudUpload className="h-4 w-4" aria-hidden="true" />
-          Quick Upload
+          {t("dashboard.quick_upload")}
         </button>
       </div>
     </header>
@@ -192,3 +194,4 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
 });
 
 export default DashboardHeader;
+
