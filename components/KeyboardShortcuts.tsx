@@ -205,7 +205,8 @@ export default function KeyboardShortcuts() {
                 searchResults &&
                 searchResults.clips.length === 0 &&
                 searchResults.projects.length === 0 &&
-                searchResults.earnings.length === 0 && (
+                searchResults.earnings.length === 0 &&
+                searchResults.suggestions.length === 0 && (
                   <div className="p-8 text-center text-white/50">
                     No results for &ldquo;{commandSearch}&rdquo;
                   </div>
@@ -258,7 +259,7 @@ function SearchResultsSection({ loading, results, onSelect }: SearchResultsSecti
     { label: "Earnings", items: results.earnings },
   ].filter((group) => group.items.length > 0);
 
-  if (groups.length === 0) return null;
+  if (groups.length === 0 && results.suggestions.length === 0) return null;
 
   return (
     <div className="p-2 border-t border-white/10">
@@ -280,10 +281,30 @@ function SearchResultsSection({ loading, results, onSelect }: SearchResultsSecti
                   <span className="block text-white/40 text-xs truncate">{sanitize(item.subtitle)}</span>
                 )}
               </span>
+              <span className="shrink-0 text-[10px] text-white/40">
+                {item.relevance}%
+              </span>
             </button>
           ))}
         </div>
       ))}
+      {results.suggestions.length > 0 && (
+        <div className="mt-2 border-t border-white/10 pt-2">
+          <div className="px-3 py-1 text-[11px] font-semibold text-white/40 uppercase tracking-wider">
+            Suggestions
+          </div>
+          <div className="flex flex-wrap gap-2 px-3 py-2">
+            {results.suggestions.map((suggestion) => (
+              <span
+                key={suggestion}
+                className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-xs text-white/70"
+              >
+                {sanitize(suggestion)}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

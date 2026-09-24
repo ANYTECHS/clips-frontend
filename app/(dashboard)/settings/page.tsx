@@ -11,8 +11,12 @@ import LocaleSwitcher from "@/components/LocaleSwitcher";
 import PrivacySettings from "@/components/settings/PrivacySettings";
 import {
   getStoredPermission,
+  getNotificationSettingsInstructions,
+  getNotificationSettingsUrl,
   requestNotificationPermission,
+  syncNotificationPermission,
   storePermission,
+  watchNotificationPermission,
 } from "@/app/lib/notifications";
 import Skeleton from "@/components/ui/Skeleton";
 import TrustlineManager from "@/components/wallet/TrustlineManager";
@@ -126,6 +130,7 @@ export default function SettingsPage() {
     isSupported: passkeySupported,
     isRegistering: passkeyRegistering,
     error: passkeyError,
+    compatibility: passkeyCompatibility,
     register: registerPasskey,
     reset: resetPasskey,
   } = usePasskeyWallet();
@@ -135,13 +140,9 @@ export default function SettingsPage() {
   const isStellarConnected = isConnected && walletType === "stellar";
 
   useEffect(() => {
-    // Get notification permissions
     const stored = getStoredPermission();
-    if (stored) {
-      setPermission(stored);
-    } else if ("Notification" in window) {
-      setPermission(Notification.permission);
-    }
+    setPermission(stored ?? syncNotificationPermission());
+    return watchNotificationPermission(setPermission);
   }, []);
 
   const handleEnableNotifications = async () => {
@@ -149,6 +150,9 @@ export default function SettingsPage() {
     try {
       const result = await requestNotificationPermission();
       setPermission(result);
+      if (result === "denied") {
+        showToast(getNotificationSettingsInstructions(), "error");
+      }
     } catch (error) {
       console.error("Error requesting notification permission:", error);
     } finally {
@@ -160,6 +164,9 @@ export default function SettingsPage() {
     storePermission("denied");
     setPermission("denied");
   };
+
+  const notificationSettingsUrl = getNotificationSettingsUrl();
+  const notificationSettingsInstructions = getNotificationSettingsInstructions();
 
   const handleImportKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -432,12 +439,19 @@ export default function SettingsPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {permission === "granted"
                           ? "You will receive updates when clip rendering is complete"
-                          : "Authorize browser notifications to receive background alerts"}
+                          : permission === "denied"
+                            ? "Enable notifications in your browser settings to receive render alerts"
+                            : "Get alerts when your clip rendering finishes in the background"}
                       </p>
+                      {permission === "denied" && (
+                        <p className="text-[11px] text-yellow-300 mt-2 max-w-md">
+                          {notificationSettingsInstructions}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div>
+                  <div className="flex flex-wrap gap-2">
                     {permission === "granted" ? (
                       <button
                         onClick={handleDisableNotifications}
@@ -449,12 +463,22 @@ export default function SettingsPage() {
                     ) : (
                       <button
                         onClick={handleEnableNotifications}
-                        disabled={notificationsLoading || permission === "denied"}
+                        disabled={notificationsLoading}
                         className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all disabled:opacity-50 cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
                         {notificationsLoading ? "Enabling..." : "Enable System Notifications"}
                       </button>
+                    )}
+                    {permission === "denied" && notificationSettingsUrl && (
+                      <a
+                        href={notificationSettingsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-yellow-500/20 bg-yellow-500/5 hover:bg-yellow-500/15 text-yellow-300 text-xs font-bold transition-all"
+                      >
+                        Open Browser Settings
+                      </a>
                     )}
                   </div>
                 </div>
@@ -536,6 +560,11 @@ export default function SettingsPage() {
                         <p className="text-xs text-muted-foreground mt-0.5">
                           Use biometrics or hardware security key to authenticate your wallet.
                         </p>
+                        {passkeyCompatibility?.isSafari && (
+                          <p className="text-[11px] text-yellow-300 mt-2 max-w-md">
+                            Safari works best with HTTPS and iCloud Keychain, Touch ID, Face ID, or a security key enabled.
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -554,7 +583,8 @@ export default function SettingsPage() {
                   {!passkeySupported ? (
                     <div className="mt-4 p-3 bg-yellow-500/5 border border-yellow-500/15 rounded-xl">
                       <p className="text-xs text-yellow-300 leading-relaxed">
-                        Your browser does not support WebAuthn passkeys. Try Chrome, Safari, or Edge on a device with biometric authentication.
+                        {passkeyCompatibility?.fallbackMessage ??
+                          "Your browser does not support WebAuthn passkeys. Try Chrome, Safari, or Edge on a device with biometric authentication."}
                       </p>
                     </div>
                   ) : (

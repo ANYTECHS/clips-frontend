@@ -31,7 +31,7 @@ describe("GET /api/search (issue #798)", () => {
     const json = await res.json();
 
     expect(res.status).toBe(200);
-    expect(json.data).toEqual({ clips: [], projects: [], earnings: [] });
+    expect(json.data).toEqual({ clips: [], projects: [], earnings: [], suggestions: [] });
   });
 
   it("finds a clip by (case-insensitive, partial) title", async () => {
@@ -48,6 +48,8 @@ describe("GET /api/search (issue #798)", () => {
       type: "clip",
       title: expect.stringContaining("The Big Reveal Hook"),
       href: "/projects",
+      relevance: expect.any(Number),
+      matchType: expect.any(String),
     });
     expect(json.data.projects).toEqual([]);
     expect(json.data.earnings).toEqual([]);
@@ -136,7 +138,23 @@ describe("GET /api/search (issue #798)", () => {
     const res = await searchGET(req("?q=zzz_no_such_thing_zzz"));
     const json = await res.json();
 
-    expect(json.data).toEqual({ clips: [], projects: [], earnings: [] });
+    expect(json.data).toEqual({ clips: [], projects: [], earnings: [], suggestions: [] });
+  });
+
+  it("finds clips with fuzzy typo matching and returns suggestions", async () => {
+    const userId = "search-user-fuzzy";
+    mockGetServerSession.mockResolvedValue({ user: { id: userId } });
+    clipsStore.getClipsForUser(userId);
+
+    const res = await searchGET(req("?q=big+reval&types=clips"));
+    const json = await res.json();
+
+    expect(json.data.clips).toHaveLength(1);
+    expect(json.data.clips[0]).toMatchObject({
+      title: expect.stringContaining("The Big Reveal Hook"),
+      matchType: "fuzzy",
+    });
+    expect(json.data.suggestions).toContainEqual(expect.stringContaining("The Big Reveal Hook"));
   });
 
   it("scopes results to the authenticated user only", async () => {

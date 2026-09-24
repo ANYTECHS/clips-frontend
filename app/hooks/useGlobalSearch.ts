@@ -13,7 +13,7 @@ export interface UseGlobalSearchResult {
   error: string | null;
 }
 
-const EMPTY: SearchResponse = { clips: [], projects: [], earnings: [] };
+const EMPTY: SearchResponse = { clips: [], projects: [], earnings: [], suggestions: [] };
 
 // Simple in-memory cache for search results
 const searchCache = new Map<string, { data: SearchResponse; timestamp: number }>();
@@ -45,7 +45,8 @@ export function useGlobalSearch(query: string): UseGlobalSearchResult {
     }
 
     // Check cache first
-    const cached = searchCache.get(trimmed);
+    const cacheKey = trimmed.toLowerCase();
+    const cached = searchCache.get(cacheKey);
     const now = Date.now();
     if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
       setResults(cached.data);
@@ -79,7 +80,7 @@ export function useGlobalSearch(query: string): UseGlobalSearchResult {
         const data = body.data ?? EMPTY;
         
         // Cache the results
-        searchCache.set(trimmed, { data, timestamp: now });
+        searchCache.set(cacheKey, { data, timestamp: now });
         
         // Clean up old cache entries
         searchCache.forEach((value, key) => {

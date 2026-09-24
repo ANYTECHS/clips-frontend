@@ -9,13 +9,23 @@ const NOTIFICATION_PERMISSION_KEY = "clipcash_notification_permission";
 
 export type NotificationPermissionState = "granted" | "denied" | "default";
 
+type PermissionChangeListener = (permission: NotificationPermissionState) => void;
+
+function isNotificationPermission(value: string | null): value is NotificationPermissionState {
+  return value === "granted" || value === "denied" || value === "default";
+}
+
+export function isNotificationSupported(): boolean {
+  return typeof window !== "undefined" && "Notification" in window;
+}
+
 /**
  * Get stored notification permission preference
  */
 export function getStoredPermission(): NotificationPermissionState | null {
   if (typeof window === "undefined") return null;
   const stored = localStorage.getItem(NOTIFICATION_PERMISSION_KEY);
-  return stored as NotificationPermissionState | null;
+  return isNotificationPermission(stored) ? stored : null;
 }
 
 /**
@@ -26,32 +36,111 @@ export function storePermission(permission: NotificationPermissionState) {
   localStorage.setItem(NOTIFICATION_PERMISSION_KEY, permission);
 }
 
+export function getCurrentPermission(): NotificationPermissionState {
+  if (!isNotificationSupported()) return "denied";
+  return Notification.permission as NotificationPermissionState;
+}
+
+export function syncNotificationPermission(): NotificationPermissionState {
+  const current = getCurrentPermission();
+  storePermission(current);
+  return current;
+}
+
+export function getNotificationSettingsUrl(userAgent?: string): string | null {
+  const ua =
+    userAgent ??
+    (typeof navigator !== "undefined" ? navigator.userAgent : "");
+
+  if (/Edg\//.test(ua)) return "edge://settings/content/notifications";
+  if (/Chrome\//.test(ua) && !/Chromium|OPR\//.test(ua)) {
+    return "chrome://settings/content/notifications";
+  }
+  if (/Firefox\//.test(ua)) return "about:preferences#privacy";
+
+  return null;
+}
+
+export function getNotificationSettingsInstructions(userAgent?: string): string {
+  const ua =
+    userAgent ??
+    (typeof navigator !== "undefined" ? navigator.userAgent : "");
+
+  if (/Safari\//.test(ua) && !/Chrome|Chromium|Edg|OPR\//.test(ua)) {
+    return "Open Safari Settings, choose Websites, then Notifications, and allow ClipCash.";
+  }
+
+  return "Open your browser site settings, find Notifications, and allow ClipCash.";
+}
+
+export function watchNotificationPermission(
+  onChange: PermissionChangeListener
+): () => void {
+  if (typeof window === "undefined") return () => {};
+
+  let cancelled = false;
+  let permissionStatus: PermissionStatus | null = null;
+
+  const notify = () => {
+    onChange(syncNotificationPermission());
+  };
+
+  const onVisibilityChange = () => {
+    if (document.visibilityState === "visible") notify();
+  };
+
+  window.addEventListener("focus", notify);
+  document.addEventListener("visibilitychange", onVisibilityChange);
+
+  if ("permissions" in navigator && "query" in navigator.permissions) {
+    navigator.permissions
+      .query({ name: "notifications" as PermissionName })
+      .then((status) => {
+        if (cancelled) return;
+        permissionStatus = status;
+        status.addEventListener("change", notify);
+      })
+      .catch(() => {});
+  }
+
+  return () => {
+    cancelled = true;
+    window.removeEventListener("focus", notify);
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    permissionStatus?.removeEventListener("change", notify);
+  };
+}
+
 /**
  * Request notification permission from the user
  * Returns the permission state
  */
 export async function requestNotificationPermission(): Promise<NotificationPermissionState> {
-  if (typeof window === "undefined" || !("Notification" in window)) {
+  if (!isNotificationSupported()) {
     return "denied";
   }
 
-  // Check if permission already stored and still valid
-  const stored = getStoredPermission();
-  if (stored && stored === Notification.permission) {
-    return stored;
+  const current = getCurrentPermission();
+  if (current === "granted" || current === "denied") {
+    storePermission(current);
+    return current;
   }
 
-  const permission = await Notification.requestPermission();
-  storePermission(permission as NotificationPermissionState);
-  return permission as NotificationPermissionState;
+  try {
+    const permission = (await Notification.requestPermission()) as NotificationPermissionState;
+    storePermission(permission);
+    return permission;
+  } catch (error) {
+    logger.warn("Notification permission request failed:", error);
+    return syncNotificationPermission();
+  }
 }
 
 /**
  * Check if notifications are supported and permitted
  */
 export function canSendNotification(): boolean {
-  if (typeof window === "undefined") return false;
-  if (!("Notification" in window)) return false;
+  if (!isNotificationSupported()) return false;
 
   // Check stored preference first
   const stored = getStoredPermission();

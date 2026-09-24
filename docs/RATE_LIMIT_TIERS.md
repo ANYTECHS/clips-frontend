@@ -66,3 +66,18 @@ Every call to `applyCustomRateLimit` is recorded via
 Aggregated counts (by route and by plan tier) are available at
 `GET /api/analytics/rate-limits` (requires an authenticated session) and
 rendered in the Analytics dashboard's "Rate Limit Monitoring" panel.
+
+## Reset and status
+
+In-memory buckets reset as soon as `Date.now()` reaches the bucket's `resetAt`
+timestamp, including the exact window boundary. A `429` response includes:
+
+- `X-RateLimit-Limit`
+- `X-RateLimit-Remaining`
+- `X-RateLimit-Reset`
+- `Retry-After`
+- `rateLimit` JSON body with `limit`, `remaining`, `resetAt`, and `retryAfter`
+
+Client-side throttling in `app/lib/rateLimiter.ts` dispatches the same retry
+status through the `rate-limit-exceeded` event so `RateLimitToast` can display
+the live recovery countdown.

@@ -37,8 +37,12 @@ jest.mock("@/components/SocialRecoveryConfig", () => ({
 
 jest.mock("@/app/lib/notifications", () => ({
   getStoredPermission: () => "default",
+  getNotificationSettingsInstructions: () => "Open browser settings.",
+  getNotificationSettingsUrl: () => null,
   requestNotificationPermission: jest.fn(),
+  syncNotificationPermission: () => "default",
   storePermission: jest.fn(),
+  watchNotificationPermission: () => jest.fn(),
 }));
 
 describe("SettingsPage", () => {
