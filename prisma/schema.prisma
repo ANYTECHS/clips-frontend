@@ -27,6 +27,63 @@ model User {
   notifications Notification[]
 }
 
+/// Outcome of a moderation check on one piece of content (Issue #1063).
+///
+/// Rows are never updated in place once a decision is final — a review or an
+/// appeal appends a new decision referencing the previous one, so the full
+/// history of how a piece of content was judged stays reconstructable.
+model ModerationDecision {
+  id           String    @id @default(cuid())
+  /// Identifier of the content in the clips backend.
+  contentId    String
+  contentType  String    @default("clip") // clip | caption | thumbnail
+  userId       String
+  /// pending | approved | flagged | rejected
+  status       String
+  /// Which policy categories fired, and at what confidence.
+  categories   Json?
+  /// 0–1 confidence from the automated provider, null for human decisions.
+  score        Float?
+  /// automated | manual | appeal
+  source       String    @default("automated")
+  /// Provider that produced an automated decision, for auditability.
+  provider     String?
+  /// Reviewer's note, or the provider's reason string.
+  reason       String?
+  /// Set when a human made or overrode the call.
+  reviewerId   String?
+  /// Decision this one supersedes, forming the chain.
+  supersedesId String?
+  createdAt    DateTime  @default(now())
+
+  appeals ModerationAppeal[]
+
+  @@index([contentId])
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
+/// A creator's challenge to a decision (Issue #1063).
+model ModerationAppeal {
+  id           String    @id @default(cuid())
+  decisionId   String
+  userId       String
+  /// The creator's argument, in their own words.
+  statement    String
+  /// open | upheld | overturned
+  status       String    @default("open")
+  /// Reviewer's response, shown back to the creator.
+  resolution   String?
+  reviewerId   String?
+  createdAt    DateTime  @default(now())
+  resolvedAt   DateTime?
+
+  decision ModerationDecision @relation(fields: [decisionId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([userId])
+}
+
 model Notification {
   id        String    @id @default(cuid())
   userId    String
