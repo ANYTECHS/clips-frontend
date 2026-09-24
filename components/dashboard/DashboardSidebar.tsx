@@ -127,6 +127,7 @@ const DashboardSidebar = memo(function DashboardSidebar({ isOpen, onClose }: Das
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         ].join(" ")}
         aria-label="Sidebar navigation"
+        data-tour="sidebar-nav"
       >
         {/* Logo / branding */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-border shrink-0">

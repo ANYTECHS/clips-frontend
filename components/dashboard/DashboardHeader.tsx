@@ -129,7 +129,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
 
       <div className="flex flex-wrap items-center gap-3 sm:gap-4">
         {/* Notification Bell */}
-        <div className="relative" ref={popoverRef}>
+        <div className="relative" ref={popoverRef} data-tour="notifications">
           <button
             type="button"
             onClick={() => setIsOpen(!isOpen)}
@@ -198,10 +198,13 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
           )}
         </div>
 
-        <PlanUsage compact />
+        <span data-tour="plan-usage">
+          <PlanUsage compact />
+        </span>
 
         <button
           type="button"
+          data-tour="quick-upload"
           className="inline-flex items-center gap-2 rounded-xl bg-[#00E68A] px-5 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(0,230,138,0.35)] transition hover:brightness-95"
           aria-label={t("dashboard.quick_upload")}
         >
