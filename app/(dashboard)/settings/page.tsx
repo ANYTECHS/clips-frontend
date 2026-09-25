@@ -9,8 +9,7 @@ import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import PrivacySettings from "@/components/settings/PrivacySettings";
-import WebhookSettings from "@/components/settings/WebhookSettings";
-import ApiSettings from "@/components/settings/ApiSettings";
+import MonthlyReportSetting from "@/components/settings/MonthlyReportSetting";
 import {
   getStoredPermission,
   getNotificationSettingsInstructions,
@@ -485,6 +484,9 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Monthly earnings report email — Issue #820 */}
+              <MonthlyReportSetting />
 
               <PrivacySettings />
 

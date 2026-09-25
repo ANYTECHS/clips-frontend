@@ -25,8 +25,17 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   notifications Notification[]
-  webhooks      Webhook[]
-  apiKeys       ApiKey[]
+
+  /**
+   * Opt-in to the monthly earnings report email (Issue #820).
+   *
+   * Defaults to false: this mail carries a full transaction export, so it is
+   * opt-in rather than opt-out — a creator has to ask for their financial
+   * records to be posted to their inbox every month.
+   */
+  monthlyEarningsReport   Boolean   @default(false)
+  /** Last successful send, used to skip a month the cron re-runs. */
+  earningsReportSentAt    DateTime?
 }
 
 model Notification {
@@ -43,72 +52,27 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-model Webhook {
-  id          String            @id @default(cuid())
-  userId      String
-  url         String
-  events      String[]
-  secret      String
-  description String?
-  active      Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+/**
+ * Delivery log for scheduled earnings reports (Issue #820).
+ *
+ * Doubles as the idempotency record. Vercel Cron delivers at least once, and a
+ * retry after a partial failure must not email a creator their report twice —
+ * the unique (userId, period) pair makes the second attempt a no-op.
+ */
+model EarningsReportDelivery {
+  id        String   @id @default(cuid())
+  userId    String
+  /** Reported month as `YYYY-MM`. */
+  period    String
+  /** queued | sent | failed | skipped */
+  status    String   @default("queued")
+  recipient String
+  rowCount  Int      @default(0)
+  totalCents Int     @default(0)
+  error     String?
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
 
-  user       User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  deliveries WebhookDelivery[]
-
-  @@index([userId])
-}
-
-model WebhookDelivery {
-  id          String   @id @default(cuid())
-  webhookId   String
-  eventType   String
-  payload     Json
-  statusCode  Int?
-  response    String?
-  attempt     Int      @default(1)
-  success     Boolean  @default(false)
-  deliveredAt DateTime?
-  nextRetryAt DateTime?
-  createdAt   DateTime @default(now())
-
-  webhook Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
-
-  @@index([webhookId])
-  @@index([deliveredAt])
-}
-
-model ApiKey {
-  id          String   @id @default(cuid())
-  userId      String
-  name        String
-  key         String   @unique
-  scopes      String[]
-  lastUsedAt  DateTime?
-  expiresAt   DateTime?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  usages  ApiUsage[]
-
-  @@index([userId])
-  @@index([key])
-}
-
-model ApiUsage {
-  id          String   @id @default(cuid())
-  apiKeyId    String
-  endpoint    String
-  method      String
-  statusCode  Int
-  responseTime Int
-  createdAt   DateTime @default(now())
-
-  apiKey ApiKey @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
-
-  @@index([apiKeyId])
-  @@index([createdAt])
+  @@unique([userId, period])
+  @@index([period])
 }
