@@ -1,4 +1,6 @@
 import type { AnimeTransformOptions } from "@/app/lib/animeTransform";
+import type { TemplateSettings } from "@/app/api/schemas/templates.schema";
+import type { CaptionSegment, CaptionStyle } from "@/app/api/schemas/captions.schema";
 import { logger } from "@/app/lib/logger";
 import { getCircuitBreaker } from "@/app/lib/circuitBreaker";
 import { withRetry } from "@/app/lib/retryUtils";
@@ -61,7 +63,17 @@ export interface DispatchJobPayload {
    * Optional: fine-grained tuning options for anime transformations.
    * Only populated when transformStyle === "anime".
    */
-  transformOptions?: AnimeTransformOptions;
+  transformOptions?: AnimeTransformOptions | Record<string, unknown>;
+  /**
+   * Optional saved template that should be applied to the resulting clip.
+   * Resolved server-side from the templates store, never trusted from the
+   * client as a free-form settings object.
+   */
+  clipTemplate?: {
+    id: string;
+    version: number;
+    settings: TemplateSettings;
+  };
   /** Job type discriminator for the AI backend. */
   jobType?: "clip" | "transform" | "transcode" | "caption";
   /** Transcode export settings when jobType === "transcode". */
@@ -72,6 +84,13 @@ export interface DispatchJobPayload {
     targetResolution?: string;
     targetBitrateKbps?: number;
     outputObjectKey: string;
+    /** Optional caption burn-in instructions for the transcoder. */
+    captionOptions?: {
+      format: "vtt" | "srt";
+      segments: CaptionSegment[];
+      style: CaptionStyle;
+      burnIntoExport: boolean;
+    };
   };
 }
 
@@ -185,8 +204,7 @@ export async function dispatchJob(payload: DispatchJobPayload): Promise<Dispatch
         maxDelayMs: 4_000,
         // Don't retry client-side errors (4xx except 429)
         shouldAbort: (err) =>
-          err instanceof Error &&
-          (err as Error & { nonRetryable?: boolean }).nonRetryable === true,
+          err instanceof Error && (err as Error & { nonRetryable?: boolean }).nonRetryable === true,
         onRetry: (attempt, err) => {
           const message = err instanceof Error ? err.message : String(err);
           logger.warn(
@@ -196,9 +214,7 @@ export async function dispatchJob(payload: DispatchJobPayload): Promise<Dispatch
         },
       }),
     () => {
-      logger.warn(
-        `[aiBackend] Circuit open — job ${payload.jobId} queued for later dispatch`
-      );
+      logger.warn(`[aiBackend] Circuit open — job ${payload.jobId} queued for later dispatch`);
       return DISPATCH_FALLBACK;
     }
   );

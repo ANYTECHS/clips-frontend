@@ -13,3 +13,4 @@ export * from "./billing.schema";
 export * from "./projects.schema";
 export * from "./batch.schema";
 export * from "./webhooks.schema";
+export * from "./templates.schema";

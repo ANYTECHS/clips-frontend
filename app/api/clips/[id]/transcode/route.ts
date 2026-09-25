@@ -10,6 +10,7 @@ import { isExportQualityAllowed } from "@/app/lib/planLimits";
 import { buildExportObjectKey } from "@/app/lib/cloudStorage";
 import { prisma } from "@/app/lib/prisma";
 import { clipsStore } from "@/app/api/clips/clipsStore";
+import { captionsStore } from "@/app/api/captions/captionsStore";
 import { exportsStore } from "@/app/api/exports/exportsStore";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { transcodeBodySchema } from "@/app/api/schemas/index";
@@ -42,10 +43,7 @@ function exportTargets(quality: "source" | "720p" | "1080p", sourceResolution: s
  *
  * Dispatch an asynchronous transcoding job for the clip.
  */
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const rateLimited = await applyRateLimit(request, { limit: 20, windowMs: 60_000 });
   if (rateLimited) return rateLimited;
 
@@ -71,7 +69,7 @@ export async function POST(
   if (!bodyValidation.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: bodyValidation.error.issues },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -86,14 +84,24 @@ export async function POST(
         error: "Plan restriction",
         message: "Free plan supports 720p exports only. Upgrade to Pro for 1080p.",
       },
-      { status: 403 },
+      { status: 403 }
     );
   }
 
   const clip = clipsStore.getClipById(userId, clipId);
+  const captionRecord = captionsStore.get(clipId, userId);
+  const captionOptions =
+    captionRecord?.burnIntoExport && captionRecord.segments.length > 0
+      ? {
+          format: "vtt" as const,
+          segments: captionRecord.segments,
+          style: captionRecord.style,
+          burnIntoExport: true,
+        }
+      : undefined;
   const { targetResolution, targetBitrateKbps } = exportTargets(
     quality,
-    clip?.resolution ?? "1080x1920",
+    clip?.resolution ?? "1080x1920"
   );
 
   const jobId = `transcode_${randomUUID().replace(/-/g, "")}`;
@@ -144,13 +152,12 @@ export async function POST(
       targetResolution,
       targetBitrateKbps,
       outputObjectKey: objectKey,
+      ...(captionOptions ? { captionOptions } : {}),
     },
   });
 
   if (!dispatchResult.dispatched) {
-    logger.warn(
-      `[transcode] Dispatch failed for job ${jobId}: ${dispatchResult.reason}`,
-    );
+    logger.warn(`[transcode] Dispatch failed for job ${jobId}: ${dispatchResult.reason}`);
   }
 
   const body: ApiResponse<{
@@ -164,6 +171,7 @@ export async function POST(
     targetBitrateKbps: number;
     status: string;
     dispatched: boolean;
+    captionsBurnedIn: boolean;
   }> = {
     data: {
       exportId: exportRecord.id,
@@ -176,6 +184,7 @@ export async function POST(
       targetBitrateKbps,
       status: "queued",
       dispatched: dispatchResult.dispatched,
+      captionsBurnedIn: Boolean(captionOptions),
     },
     error: null,
   };

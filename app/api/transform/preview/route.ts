@@ -30,23 +30,27 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { checkCsrf } from "@/app/lib/csrf";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { validateAnimeOptions } from "@/app/lib/animeTransform";
+import { clipsStore } from "@/app/api/clips/clipsStore";
+import { TRANSFORM_STYLES } from "@/app/lib/transformStyles";
 import { logger } from "@/app/lib/logger";
 import { randomUUID } from "crypto";
 
 // ─── Validation ───────────────────────────────────────────────────────────────
 
-const PREVIEW_SUPPORTED_STYLES = ["anime"] as const;
+const PREVIEW_SUPPORTED_STYLES: readonly string[] = TRANSFORM_STYLES.map((style) => style.name);
 
 interface PreviewRequestBody {
   clipId: string;
   style: string;
+  intensity: number;
   transformOptions: unknown;
 }
 
 function validatePreviewBody(
-  raw: unknown,
+  raw: unknown
 ): { valid: true; data: PreviewRequestBody } | { valid: false; error: string } {
   if (!raw || typeof raw !== "object") {
     return { valid: false, error: "Request body must be a JSON object." };
@@ -56,10 +60,7 @@ function validatePreviewBody(
   if (typeof b.clipId !== "string" || !b.clipId.trim()) {
     return { valid: false, error: "clipId is required." };
   }
-  if (
-    typeof b.style !== "string" ||
-    !(PREVIEW_SUPPORTED_STYLES as readonly string[]).includes(b.style.toLowerCase())
-  ) {
+  if (typeof b.style !== "string" || !PREVIEW_SUPPORTED_STYLES.includes(b.style.toLowerCase())) {
     return {
       valid: false,
       error: `style must be one of: ${PREVIEW_SUPPORTED_STYLES.join(", ")}.`,
@@ -69,11 +70,17 @@ function validatePreviewBody(
     return { valid: false, error: "transformOptions is required." };
   }
 
+  const intensity = b.intensity === undefined ? 70 : Number(b.intensity);
+  if (!Number.isFinite(intensity) || intensity < 0 || intensity > 100) {
+    return { valid: false, error: "intensity must be a number between 0 and 100." };
+  }
+
   return {
     valid: true,
     data: {
       clipId: b.clipId.trim(),
       style: b.style.toLowerCase(),
+      intensity: Math.round(intensity),
       transformOptions: b.transformOptions,
     },
   };
@@ -82,6 +89,9 @@ function validatePreviewBody(
 // ─── Handler ──────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
+  const rateLimited = await applyRateLimit(request, { limit: 60, windowMs: 60_000 });
+  if (rateLimited) return rateLimited;
+
   const csrfError = checkCsrf(request);
   if (csrfError) return csrfError;
 
@@ -101,17 +111,36 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: bodyValidation.error }, { status: 400 });
   }
 
-  const { clipId, style, transformOptions: rawOptions } = bodyValidation.data;
-
-  // Validate anime-specific options
-  const optionsValidation = validateAnimeOptions(rawOptions);
-  if (!optionsValidation.valid) {
-    return NextResponse.json(
-      { error: optionsValidation.errors.join(" ") },
-      { status: 422 },
-    );
+  const { clipId, style, intensity, transformOptions: rawOptions } = bodyValidation.data;
+  const clip = clipsStore.getClipById(userId, clipId);
+  if (!clip) {
+    return NextResponse.json({ error: "Clip not found" }, { status: 403 });
   }
-  const transformOptions = optionsValidation.data!;
+
+  const styleMeta = TRANSFORM_STYLES.find((candidate) => candidate.name === style);
+  if (!styleMeta) {
+    return NextResponse.json({ error: "Unsupported style" }, { status: 400 });
+  }
+
+  // Anime keeps its specialised controls. Other styles accept arbitrary
+  // backend tuning keys but always receive the common intensity slider value.
+  let transformOptions: unknown;
+  if (style === "anime") {
+    const optionsValidation = validateAnimeOptions(rawOptions);
+    if (!optionsValidation.valid) {
+      return NextResponse.json({ error: optionsValidation.errors.join(" ") }, { status: 422 });
+    }
+    transformOptions = {
+      ...optionsValidation.data,
+      colorIntensity: intensity,
+    };
+  } else {
+    const extraOptions =
+      rawOptions && typeof rawOptions === "object" ? (rawOptions as Record<string, unknown>) : {};
+    transformOptions = { ...extraOptions, intensity };
+  }
+
+  const estimatedSeconds = styleMeta.avgDurationSeconds;
 
   // ── Forward to AI backend ────────────────────────────────────────────────
   const baseUrl = process.env.NEXT_PUBLIC_AI_API_URL;
@@ -119,9 +148,15 @@ export async function POST(request: NextRequest) {
   if (!baseUrl) {
     // No backend configured — return a placeholder preview so the UI still
     // shows something during local development.
-    logger.warn("[transform/preview] NEXT_PUBLIC_AI_API_URL not set; returning placeholder preview.");
+    logger.warn(
+      "[transform/preview] NEXT_PUBLIC_AI_API_URL not set; returning placeholder preview."
+    );
     return NextResponse.json({
-      previewUrl: `/styles/anime-preview-placeholder.jpg`,
+      previewUrl: styleMeta.thumbnail,
+      sourceUrl: clip.thumbnail,
+      estimatedSeconds,
+      intensity,
+      style,
     });
   }
 
@@ -141,36 +176,45 @@ export async function POST(request: NextRequest) {
         clipId,
         userId,
         style,
+        intensity,
         transformOptions,
+        sourceUrl: clip.thumbnail,
+        estimatedSeconds,
         // Ask the backend for a single representative frame, not a full clip
         mode: "frame",
       }),
       // The preview must arrive quickly — hard 8-second timeout leaves 2 s
       // of network margin within the 10-second client-side budget.
-      signal: AbortSignal.timeout(8_000),
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(8_000)]),
     });
 
     if (!res.ok) {
       const text = await res.text().catch(() => "(no body)");
       logger.error(
-        `[transform/preview] Backend returned ${res.status} for preview ${previewJobId}: ${text}`,
+        `[transform/preview] Backend returned ${res.status} for preview ${previewJobId}: ${text}`
       );
       return NextResponse.json(
         { error: "Preview generation failed. Try again in a moment." },
-        { status: 502 },
+        { status: 502 }
       );
     }
 
-    const data = (await res.json()) as { previewUrl?: string };
+    const data = (await res.json()) as {
+      previewUrl?: string;
+      estimatedSeconds?: number;
+    };
     if (!data.previewUrl) {
       logger.error(`[transform/preview] Backend response missing previewUrl for ${previewJobId}`);
-      return NextResponse.json(
-        { error: "Preview URL missing from AI response." },
-        { status: 502 },
-      );
+      return NextResponse.json({ error: "Preview URL missing from AI response." }, { status: 502 });
     }
 
-    return NextResponse.json({ previewUrl: data.previewUrl });
+    return NextResponse.json({
+      previewUrl: data.previewUrl,
+      sourceUrl: clip.thumbnail,
+      estimatedSeconds: data.estimatedSeconds ?? estimatedSeconds,
+      intensity,
+      style,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     logger.error(`[transform/preview] Request failed for ${previewJobId}: ${message}`);
@@ -179,13 +223,13 @@ export async function POST(request: NextRequest) {
     if (err instanceof Error && err.name === "TimeoutError") {
       return NextResponse.json(
         { error: "Preview timed out. The AI backend may be under load — try again shortly." },
-        { status: 504 },
+        { status: 504 }
       );
     }
 
     return NextResponse.json(
       { error: "Unable to generate preview. Please try again." },
-      { status: 502 },
+      { status: 502 }
     );
   }
 }
