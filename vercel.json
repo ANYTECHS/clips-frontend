@@ -1,8 +1,8 @@
 {
   "framework": "nextjs",
-
-  "regions": ["iad1"],
-
+  "regions": [
+    "iad1"
+  ],
   "functions": {
     "app/api/upload/route.ts": {
       "memory": 3008,
@@ -37,7 +37,6 @@
       "maxDuration": 15
     }
   },
-
   "crons": [
     {
       "path": "/api/cron/requeue-stalled-jobs",
@@ -46,20 +45,29 @@
     {
       "path": "/api/cron/cleanup-old-jobs",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/cron/earnings-reports",
+      "schedule": "0 6 1 * *"
     }
   ],
-
   "headers": [
     {
       "source": "/api/metrics",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     },
     {
       "source": "/api/health/(.*)",
       "headers": [
-        { "key": "Cache-Control", "value": "no-store" }
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
       ]
     }
   ]

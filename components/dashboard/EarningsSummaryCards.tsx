@@ -76,7 +76,7 @@ const EarningsSummaryCards = memo(function EarningsSummaryCards() {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+    <div data-tour="earnings-summary" className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
       {/* Total Fiat Card */}
       <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col gap-2 relative overflow-hidden group">
         <div className="absolute inset-0 bg-gradient-to-br from-brand/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />

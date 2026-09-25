@@ -58,7 +58,10 @@ export default function WalletInfoCard() {
 
   return (
     <>
-      <div className="bg-surface border border-border rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div
+        data-tour="wallet-info"
+        className="bg-surface border border-border rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+      >
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-brand/10 flex items-center justify-center shrink-0">
             <Wallet className="w-5 h-5 text-brand" aria-hidden="true" />

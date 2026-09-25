@@ -1,6 +1,7 @@
 // For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
 import storybook from "eslint-plugin-storybook";
 import unusedImports from "eslint-plugin-unused-imports";
+import simpleImportSort from "eslint-plugin-simple-import-sort";
 
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
@@ -123,6 +124,7 @@ const eslintConfig = defineConfig([
     files: ["**/*.{ts,tsx,js,jsx}"],
     plugins: {
       "unused-imports": unusedImports,
+      "simple-import-sort": simpleImportSort,
     },
     rules: {
       // Remove unused imports via plugin
@@ -131,6 +133,17 @@ const eslintConfig = defineConfig([
         "warn",
         { "vars": "all", "varsIgnorePattern": "^_", "args": "after-used", "argsIgnorePattern": "^_" }
       ],
+      // ── Import standards (Issue #944) ──────────────────────────────────
+      //
+      // Ordering is `warn`, not `error`. The codebase predates the standard by
+      // hundreds of files, so erroring would make `npm run lint` fail on every
+      // PR regardless of what it touched — a signal nobody can act on, which
+      // gets muted and then ignored. `--fix` resolves every one of these
+      // automatically, so the backlog clears as files are edited, and
+      // lint-staged fixes each file on the way past.
+      "simple-import-sort/imports": "warn",
+      "simple-import-sort/exports": "warn",
+
       // Enforce TypeScript naming conventions
       "@typescript-eslint/naming-convention": [
         "error",
@@ -140,6 +153,41 @@ const eslintConfig = defineConfig([
         { "selector": "variableLike", "format": ["camelCase", "UPPER_CASE"] },
         { "selector": "typeLike", "format": ["PascalCase"] },
         { "selector": "function", "format": ["camelCase", "PascalCase"] }
+      ],
+    },
+  },
+  {
+    // ── Path aliases over deep relative paths (Issue #944) ────────────────
+    //
+    // `../../components/x` is unreadable, breaks the moment a file moves, and
+    // makes two files importing the same module look like they import
+    // different ones. `@/*` is already configured in tsconfig.json — this
+    // makes it the rule rather than a convention half the codebase follows.
+    //
+    // Only paths climbing two or more levels are banned. A single `./` or
+    // `../` inside a feature folder is genuinely clearer than an absolute
+    // path, and rewriting those would make colocated files harder to read,
+    // not easier.
+    //
+    // `warn` for the same reason as the ordering rules above.
+    files: [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "hooks/**/*.{ts,tsx}",
+      "stories/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-imports": [
+        "warn",
+        {
+          patterns: [
+            {
+              group: ["../../*"],
+              message:
+                "Use the '@/' path alias instead of climbing two or more directories. See docs/IMPORT_STANDARDS.md.",
+            },
+          ],
+        },
       ],
     },
   },
