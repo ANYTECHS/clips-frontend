@@ -3,12 +3,14 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useWallet } from "@/components/WalletProvider";
 import WalletConnectButton from "@/components/WalletConnectButton";
-import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun, TimerOff, Lock, Download, Fingerprint } from "lucide-react";
+import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun, TimerOff, Lock, Download, Fingerprint, Monitor } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import PrivacySettings from "@/components/settings/PrivacySettings";
+import WebhookSettings from "@/components/settings/WebhookSettings";
+import ApiSettings from "@/components/settings/ApiSettings";
 import {
   getStoredPermission,
   getNotificationSettingsInstructions,
@@ -47,7 +49,7 @@ const SocialRecoveryConfig = dynamic(
 
 export default function SettingsPage() {
   const { showToast } = useToast();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
   const { user, setUser, isLoading: authLoading } = useAuth();
   const [walletNetwork, setWalletNetwork] = useState<"testnet" | "mainnet">(
     user?.walletNetwork ?? "testnet"
@@ -486,6 +488,10 @@ export default function SettingsPage() {
 
               <PrivacySettings />
 
+              <WebhookSettings />
+
+              <ApiSettings />
+
               {/* Language / Locale Settings */}
               <div className="space-y-4">
                 <h2 className="text-lg font-extrabold text-white">Language</h2>
@@ -511,30 +517,43 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <h2 className="text-lg font-extrabold text-white">Appearance</h2>
 
-                <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
+                <div className="bg-surface border border-white/5 rounded-2xl p-6">
+                  <div className="flex items-start gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
-                      {theme === 'dark' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
+                      {resolvedTheme === 'dark' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
                     </div>
                     <div>
-                      <p className="font-bold text-white">Dark Mode</p>
+                      <p className="font-bold text-white">Theme</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Switch between light and dark themes
+                        Choose your preferred color scheme
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={toggleTheme}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${theme === 'dark' ? "bg-brand" : "bg-white/10"
-                      }`}
-                    aria-label="Toggle Dark Mode"
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === 'dark' ? "translate-x-6" : "translate-x-1"
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { value: "light" as const, label: "Light", icon: Sun },
+                      { value: "dark" as const, label: "Dark", icon: Moon },
+                      { value: "system" as const, label: "System", icon: Monitor },
+                    ]).map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => setTheme(option.value)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                          theme === option.value
+                            ? "bg-brand text-black border-brand"
+                            : "bg-white/5 text-white border-white/10 hover:border-white/20"
                         }`}
-                    />
-                  </button>
+                        aria-label={`Set theme to ${option.label}`}
+                      >
+                        <option.icon className="w-4 h-4" />
+                        {option.label}
+                        {option.value === "system" && (
+                          <span className="text-[10px] opacity-70">({resolvedTheme})</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 

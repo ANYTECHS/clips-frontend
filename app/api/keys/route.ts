@@ -3,12 +3,12 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/app/lib/prisma";
 import { z } from "zod";
+import crypto from "crypto";
 
-const webhookSchema = z.object({
-  url: z.string().url(),
-  events: z.array(z.string()),
-  secret: z.string().min(16),
-  description: z.string().optional(),
+const apiKeySchema = z.object({
+  name: z.string().min(1).max(100),
+  scopes: z.array(z.string()),
+  expiresAt: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -18,15 +18,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const webhooks = await prisma.webhook.findMany({
+    const apiKeys = await prisma.apiKey.findMany({
       where: { userId: session.user.id },
       orderBy: { createdAt: "desc" },
+      include: {
+        _count: {
+          select: { usages: true },
+        },
+      },
     });
 
-    return NextResponse.json({ webhooks });
+    return NextResponse.json({ apiKeys });
   } catch (error) {
-    console.error("Error fetching webhooks:", error);
-    return NextResponse.json({ error: "Failed to fetch webhooks" }, { status: 500 });
+    console.error("Error fetching API keys:", error);
+    return NextResponse.json({ error: "Failed to fetch API keys" }, { status: 500 });
   }
 }
 
@@ -38,25 +43,28 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const validatedData = webhookSchema.parse(body);
+    const validatedData = apiKeySchema.parse(body);
 
-    const webhook = await prisma.webhook.create({
+    // Generate API key
+    const key = `ck_${crypto.randomBytes(32).toString('hex')}`;
+
+    const apiKey = await prisma.apiKey.create({
       data: {
         userId: session.user.id,
-        url: validatedData.url,
-        events: validatedData.events,
-        secret: validatedData.secret,
-        description: validatedData.description,
+        name: validatedData.name,
+        key,
+        scopes: validatedData.scopes,
+        expiresAt: validatedData.expiresAt ? new Date(validatedData.expiresAt) : null,
         active: true,
       },
     });
 
-    return NextResponse.json({ webhook }, { status: 201 });
+    return NextResponse.json({ apiKey }, { status: 201 });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
     }
-    console.error("Error creating webhook:", error);
-    return NextResponse.json({ error: "Failed to create webhook" }, { status: 500 });
+    console.error("Error creating API key:", error);
+    return NextResponse.json({ error: "Failed to create API key" }, { status: 500 });
   }
 }
