@@ -166,6 +166,11 @@ export const authOptions: NextAuthConfig = {
     jwt: jwtCallback,
     session: sessionCallback,
   },
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 10 * 60,
+  },
   /** Custom route mappings overriding core fallback display interface links. */
   pages: {
     signIn: "/login",

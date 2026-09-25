@@ -15,6 +15,28 @@ import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { transcodeBodySchema } from "@/app/api/schemas/index";
 import type { ApiResponse } from "@/app/api/types";
 
+function parseResolution(value: string): { width: number; height: number } | null {
+  const match = /^(\d+)x(\d+)$/.exec(value);
+  if (!match) return null;
+  return { width: Number(match[1]), height: Number(match[2]) };
+}
+
+function exportTargets(quality: "source" | "720p" | "1080p", sourceResolution: string) {
+  const source = parseResolution(sourceResolution);
+  const targetHeight = quality === "720p" ? 720 : quality === "1080p" ? 1080 : source?.height;
+  if (!source || !targetHeight) {
+    return { targetResolution: quality, targetBitrateKbps: quality === "720p" ? 5_000 : 8_000 };
+  }
+
+  const scale = Math.min(1, targetHeight / source.height);
+  const width = Math.round(source.width * scale);
+  const height = Math.round(source.height * scale);
+  const pixels = width * height;
+  const targetBitrateKbps = Math.max(5_000, Math.round((pixels / (1920 * 1080)) * 8_000));
+
+  return { targetResolution: `${width}x${height}`, targetBitrateKbps };
+}
+
 /**
  * POST /api/clips/:id/transcode
  *
@@ -68,6 +90,12 @@ export async function POST(
     );
   }
 
+  const clip = clipsStore.getClipById(userId, clipId);
+  const { targetResolution, targetBitrateKbps } = exportTargets(
+    quality,
+    clip?.resolution ?? "1080x1920",
+  );
+
   const jobId = `transcode_${randomUUID().replace(/-/g, "")}`;
   const exportRecord = exportsStore.createExport({
     clipId,
@@ -76,6 +104,8 @@ export async function POST(
     format,
     aspectRatio,
     quality,
+    targetResolution,
+    targetBitrateKbps,
     objectKey: "",
   });
 
@@ -111,6 +141,8 @@ export async function POST(
       format,
       aspectRatio,
       quality,
+      targetResolution,
+      targetBitrateKbps,
       outputObjectKey: objectKey,
     },
   });
@@ -128,6 +160,8 @@ export async function POST(
     format: string;
     aspectRatio: string;
     quality: string;
+    targetResolution: string;
+    targetBitrateKbps: number;
     status: string;
     dispatched: boolean;
   }> = {
@@ -138,6 +172,8 @@ export async function POST(
       format,
       aspectRatio,
       quality,
+      targetResolution,
+      targetBitrateKbps,
       status: "queued",
       dispatched: dispatchResult.dispatched,
     },

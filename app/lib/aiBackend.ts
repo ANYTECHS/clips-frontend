@@ -68,7 +68,9 @@ export interface DispatchJobPayload {
   transcodeOptions?: {
     format: "mp4" | "webm";
     aspectRatio: "9:16" | "1:1" | "16:9";
-    quality: "720p" | "1080p";
+    quality: "source" | "720p" | "1080p";
+    targetResolution?: string;
+    targetBitrateKbps?: number;
     outputObjectKey: string;
   };
 }

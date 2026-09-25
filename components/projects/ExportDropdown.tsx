@@ -7,7 +7,7 @@ import analytics from "@/app/lib/analytics";
 export interface ExportOptions {
   format: "mp4" | "webm";
   aspectRatio: "9:16" | "1:1" | "16:9";
-  quality: "720p" | "1080p";
+  quality: "source" | "720p" | "1080p";
 }
 
 interface ExportDropdownProps {
@@ -18,7 +18,7 @@ interface ExportDropdownProps {
 
 const FORMATS: ExportOptions["format"][] = ["mp4", "webm"];
 const ASPECT_RATIOS: ExportOptions["aspectRatio"][] = ["9:16", "1:1", "16:9"];
-const QUALITIES: ExportOptions["quality"][] = ["720p", "1080p"];
+const QUALITIES: ExportOptions["quality"][] = ["source", "720p", "1080p"];
 
 /**
  * Dropdown menu for exporting video clips with format, aspect ratio, and quality options.
@@ -39,7 +39,7 @@ export default function ExportDropdown({
   const [options, setOptions] = useState<ExportOptions>({
     format: "mp4",
     aspectRatio: "9:16",
-    quality: "720p",
+    quality: "source",
   });
   const ref = useRef<HTMLDivElement>(null);
 
@@ -54,7 +54,7 @@ export default function ExportDropdown({
   }, []);
 
   const isQualityDisabled = (quality: ExportOptions["quality"]) =>
-    userPlan === "free" && quality === "1080p";
+    userPlan === "free" && quality !== "720p";
 
   const handleExport = async (e: React.MouseEvent) => {
     e.stopPropagation();

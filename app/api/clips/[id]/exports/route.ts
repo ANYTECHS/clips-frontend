@@ -64,6 +64,8 @@ export async function GET(
         format: exp.format,
         aspectRatio: exp.aspectRatio,
         quality: exp.quality,
+        targetResolution: exp.targetResolution ?? null,
+        targetBitrateKbps: exp.targetBitrateKbps ?? null,
         status,
         downloadUrl: status === "complete" ? downloadUrl : null,
         errorMessage: status === "error" ? errorMessage : null,
