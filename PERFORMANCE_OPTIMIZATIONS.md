@@ -32,7 +32,7 @@ const inter = Inter({
 - `adjustFontFallback: "Arial"` - Smooth visual transition on font swap
 
 #### Resource Hints
-- **File**: `app/components/FontPreload.tsx`
+- **File**: `app/components/font-preload.tsx`
 - `preconnect`: Establishes early TLS connection to fonts.googleapis.com and fonts.gstatic.com
 - `dns-prefetch`: Fallback for older browsers
 
@@ -78,7 +78,7 @@ GET /api/projects
 ```
 
 #### ETag & Conditional Requests
-- **File**: `app/lib/cacheHeaders.ts`
+- **File**: `app/lib/cache-headers.ts`
 - `generateETag()`: Creates hash of content for validation
 - `Vary: Accept-Encoding`: Ensures cache respects compression variations
 - Supports 304 Not Modified responses for zero-byte transfers
@@ -90,7 +90,7 @@ GET /api/projects
 
 ### Configuration
 
-See `CACHE_STRATEGIES` in `app/lib/cacheHeaders.ts`:
+See `CACHE_STRATEGIES` in `app/lib/cache-headers.ts`:
 - `immutable`: For content-hashed assets (1 year)
 - `static`: For rarely-changing media (24h + 7d stale)
 - `api`: For data endpoints (1m + 5m stale)
@@ -107,7 +107,7 @@ See `CACHE_STRATEGIES` in `app/lib/cacheHeaders.ts`:
 ### Implementation
 
 #### Prefetch Strategies
-**File**: `app/lib/prefetch/prefetchStrategies.ts`
+**File**: `app/lib/prefetch/prefetch-strategies.ts`
 
 Three complementary prefetch types:
 
@@ -148,7 +148,7 @@ Hover targets:
 **Route-based in layout:**
 ```typescript
 'use client';
-import { usePrefetchRoute } from '@/app/lib/prefetch/usePrefetch';
+import { usePrefetchRoute } from '@/app/lib/prefetch/use-prefetch';
 
 export default function Layout() {
   usePrefetchRoute('/dashboard');
@@ -159,7 +159,7 @@ export default function Layout() {
 **Hover-based on links:**
 ```typescript
 'use client';
-import { usePrefetchOnHover } from '@/app/lib/prefetch/usePrefetch';
+import { usePrefetchOnHover } from '@/app/lib/prefetch/use-prefetch';
 
 export default function ProjectsList() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -192,7 +192,7 @@ export default function ProjectsList() {
 - The browser cannot distinguish truly critical assets from optional extras.
 
 ### Critical resources
-**File**: `app/lib/resourcePriority.ts`
+**File**: `app/lib/resource-priority.ts`
 
 The app now defines a single priority list for the assets that matter immediately:
 
@@ -200,7 +200,7 @@ The app now defines a single priority list for the assets that matter immediatel
 2. Critical font preload for the first text render (`Inter`)
 3. Low-noise secondary assets like the favicon are intentionally lower priority
 
-These values are fed into the shared document hints rendered by `components/ResourceHints.tsx`.
+These values are fed into the shared document hints rendered by `components/resource-hints.tsx`.
 
 ### Priority hints
 - `high`: preconnect or preload immediately in the head
@@ -210,7 +210,7 @@ These values are fed into the shared document hints rendered by `components/Reso
 This keeps the browser's network scheduler aligned with real user impact rather than a flat, all-at-once request queue.
 
 ### Testing
-- Unit coverage lives in `__tests__/lib/resourcePriority.test.ts`.
+- Unit coverage lives in `__tests__/lib/resource-priority.test.ts`.
 - The tests assert the critical landing origin is included and ordered before lower-priority assets.
 
 ## 5. Service Worker Caching
@@ -359,7 +359,7 @@ For maximum benefit with CDN:
 
 ## Monitoring
 
-Metrics tracked in `app/lib/performanceMonitoring.ts`:
+Metrics tracked in `app/lib/performance-monitoring.ts`:
 - Web Vitals (LCP, CLS, INP, FCP, TTFB)
 - Custom metrics (cache hit rate, prefetch effectiveness)
 - Sentry integration for alert on budget breaches
