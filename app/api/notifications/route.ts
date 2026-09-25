@@ -1,18 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { notificationStore } from "./notificationStore";
 import type { NotificationType } from "./notificationStore";
+import { paginateItems, parsePaginationParams } from "../pagination";
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId = searchParams.get("userId") || "default_user";
 
-    const notifications = await notificationStore.getUnread(userId);
+    const unread = await notificationStore.getUnread(userId);
+    const { items: notifications, meta } = paginateItems(
+      unread,
+      parsePaginationParams(searchParams, 50)
+    );
 
     return NextResponse.json({
       success: true,
       data: notifications,
-      unreadCount: notifications.length,
+      unreadCount: unread.length,
+      meta,
     });
   } catch (error) {
     return NextResponse.json(
@@ -25,7 +31,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId = "default_user", type, title, message, payload } = body as {
+    const {
+      userId = "default_user",
+      type,
+      title,
+      message,
+      payload,
+    } = body as {
       userId?: string;
       type: NotificationType;
       title: string;

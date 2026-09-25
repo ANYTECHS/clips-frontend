@@ -51,6 +51,10 @@ jobs:
         run: npm ci
       - name: Formatting check
         run: npm run format:check
+      - name: Complexity check
+        run: COMPLEXITY_BASELINE=129 npm run complexity
+      - name: Migration check
+        run: npm run migrate:test
       - name: Unit tests
         run: echo "E2E PR — unit coverage validated on sibling PRs."
       - name: Check for changeset

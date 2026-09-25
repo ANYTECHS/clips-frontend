@@ -4,8 +4,9 @@ import { logger } from "@/app/lib/logger";
 import { checkCsrf } from "@/app/lib/csrf";
 import { parseRequestJson } from "@/app/lib/parseRequestJson";
 import { passkeyStore } from "@/app/api/auth/passkey/passkeyStore";
+import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     const session = await auth();
     const userId = (session?.user as { id?: string } | undefined)?.id;
@@ -15,11 +16,14 @@ export async function GET() {
     }
 
     const credentials = passkeyStore.getCredentials(userId);
-    const hasPasskey = credentials.length > 0;
+    const { searchParams } = new URL(request.url);
+    const { items, meta } = paginateItems(credentials, parsePaginationParams(searchParams, 50));
 
     return NextResponse.json({
-      hasPasskey,
-      credentials,
+      hasPasskey: credentials.length > 0,
+      credentials: items,
+      total: meta.total,
+      meta,
     });
   } catch (error) {
     logger.error("Error fetching passkey status:", error);

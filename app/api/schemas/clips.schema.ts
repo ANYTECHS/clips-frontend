@@ -12,30 +12,7 @@ const tagSchema = z
   .max(TAG_MAX_LENGTH)
   .transform((tag) => tag.toLowerCase());
 
-/**
- * Fields `?sort=` may name on GET /api/clips (Issue #949).
- *
- * An allow-list, not a free-text field: `sort` names a property read off every
- * record, so taking it straight from the query string lets a caller pick which
- * field the server touches. `createdAt` is first, making "newest first" the
- * default.
- */
-export const CLIP_SORT_FIELDS = [
-  "createdAt",
-  "title",
-  "score",
-  "duration",
-  "status",
-] as const;
 
-export const getClipsQuerySchema = createListQuerySchema(CLIP_SORT_FIELDS).extend({
-  status: z.string().optional().default(""),
-  style: z.string().optional().default(""),
-  virality: z.array(z.string()).optional().default(["high", "medium", "low"]),
-  tags: z.string().optional().transform((v) =>
-    v ? v.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) : []
-  ),
-  platform: z.string().optional().default(""),
 });
 
 export const updateClipBodySchema = z.object({
@@ -53,9 +30,7 @@ export const bulkClipIdsBodySchema = z.object({
 
 export const postClipBodySchema = z.object({
   clipIds: z.array(z.string().min(1)).min(1),
-  platforms: z
-    .array(z.enum(["youtube", "instagram", "tiktok", "twitter"]))
-    .min(1),
+  platforms: z.array(z.enum(["youtube", "instagram", "tiktok", "twitter"])).min(1),
 });
 
 export const mintClipBodySchema = z.object({
