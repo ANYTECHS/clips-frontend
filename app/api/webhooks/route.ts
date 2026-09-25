@@ -1,72 +1,62 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/app/lib/auth";
-import { checkCsrf } from "@/app/lib/csrf";
-import { parseRequestJson } from "@/app/lib/parseRequestJson";
-import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
-import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
-import { createWebhookBodySchema } from "@/app/api/schemas/index";
-import { webhookStore } from "@/app/lib/webhooks/webhookStore";
-import type { WebhookEndpoint } from "@/app/lib/webhooks/types";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { prisma } from "@/app/lib/prisma";
+import { z } from "zod";
 
-/** Never expose the signing secret after creation — only used to verify deliveries. */
-function toPublicEndpoint(endpoint: WebhookEndpoint) {
-  const { secret: _secret, ...publicEndpoint } = endpoint;
-  return publicEndpoint;
-}
-
-async function handleGet(request: NextRequest) {
-  const rateLimited = await applyCustomRateLimit(request, "/api/webhooks");
-  if (rateLimited) return rateLimited;
-
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const endpoints = webhookStore.listForUser(session.user.id).map(toPublicEndpoint);
-  return NextResponse.json({ data: endpoints, error: null });
-}
-
-async function handlePost(request: NextRequest) {
-  const rateLimited = await applyCustomRateLimit(request, "/api/webhooks");
-  if (rateLimited) return rateLimited;
-
-  const csrfError = checkCsrf(request);
-  if (csrfError) return csrfError;
-
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  const parsed = await parseRequestJson(request);
-  if (!parsed.ok) return parsed.response;
-
-  const validation = createWebhookBodySchema.safeParse(parsed.body);
-  if (!validation.success) {
-    return NextResponse.json(
-      { error: "Validation failed", issues: validation.error.issues },
-      { status: 400 }
-    );
-  }
-
-  const endpoint = webhookStore.create({
-    userId: session.user.id,
-    url: validation.data.url,
-    events: validation.data.events,
-  });
-
-  // The signing secret is only ever returned here — store it now, it cannot
-  // be retrieved again (only rotated by deleting and recreating the webhook).
-  return NextResponse.json({ data: endpoint, error: null }, { status: 201 });
-}
-
-export const GET = withApiAnalytics("/api/webhooks", handleGet, async () => {
-  const session = await auth();
-  return session?.user?.id;
+const webhookSchema = z.object({
+  url: z.string().url(),
+  events: z.array(z.string()),
+  secret: z.string().min(16),
+  description: z.string().optional(),
 });
 
-export const POST = withApiAnalytics("/api/webhooks", handlePost, async () => {
-  const session = await auth();
-  return session?.user?.id;
-});
+export async function GET(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const webhooks = await prisma.webhook.findMany({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return NextResponse.json({ webhooks });
+  } catch (error) {
+    console.error("Error fetching webhooks:", error);
+    return NextResponse.json({ error: "Failed to fetch webhooks" }, { status: 500 });
+  }
+}
+
+export async function POST(req: NextRequest) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const validatedData = webhookSchema.parse(body);
+
+    const webhook = await prisma.webhook.create({
+      data: {
+        userId: session.user.id,
+        url: validatedData.url,
+        events: validatedData.events,
+        secret: validatedData.secret,
+        description: validatedData.description,
+        active: true,
+      },
+    });
+
+    return NextResponse.json({ webhook }, { status: 201 });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
+    }
+    console.error("Error creating webhook:", error);
+    return NextResponse.json({ error: "Failed to create webhook" }, { status: 500 });
+  }
+}

@@ -15,6 +15,7 @@ import analytics from "@/app/lib/analytics";
 import type { AnalyticsData } from "@/app/lib/serverData";
 import ApiUsagePanel from "./ApiUsagePanel";
 import RateLimitMonitoringPanel from "./RateLimitMonitoringPanel";
+import AdvancedAnalyticsPanel from "./AdvancedAnalyticsPanel";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -276,6 +277,7 @@ export default function AnalyticsPageClient({
           </>
         )}
 
+        <AdvancedAnalyticsPanel />
         <ApiUsagePanel />
         <RateLimitMonitoringPanel />
       </div>

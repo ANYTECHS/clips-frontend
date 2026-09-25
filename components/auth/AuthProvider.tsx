@@ -28,7 +28,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 AuthContext.displayName = "AuthContext";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
+  const { data: session, status, update } = useSession();
 
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [storageLoaded, setStorageLoaded] = useState(false);
@@ -42,6 +42,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isLoading = status === "loading" || !storageLoaded;
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    let lastRefresh = 0;
+    const refreshSession = () => {
+      const now = Date.now();
+      if (now - lastRefresh < 10 * 60 * 1000) return;
+      lastRefresh = now;
+      void update();
+    };
+    const warnBeforeExpiry = () => {
+      const expiresAt = session?.expires ? new Date(session.expires).getTime() : 0;
+      if (expiresAt && expiresAt - Date.now() < 5 * 60 * 1000) {
+        window.dispatchEvent(new CustomEvent("clipcash:session-expiring"));
+      }
+    };
+    const onActivity = () => {
+      refreshSession();
+      warnBeforeExpiry();
+    };
+
+    window.addEventListener("click", onActivity);
+    window.addEventListener("keydown", onActivity);
+    window.addEventListener("visibilitychange", onActivity);
+    refreshSession();
+
+    return () => {
+      window.removeEventListener("click", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      window.removeEventListener("visibilitychange", onActivity);
+    };
+  }, [status, session?.expires, update]);
 
   // Sync NextAuth session -> local state
   useEffect(() => {
@@ -62,6 +95,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (stored && !stored.id.startsWith("mock")) {
           clearClipcashUser();
           setUserState(null);
+          sessionStorage.setItem(
+            "clipcash:logout-recovery",
+            JSON.stringify({ path: window.location.pathname + window.location.search, savedAt: Date.now() }),
+          );
           signOut({ redirect: false });
         }
       });
@@ -76,6 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setUserState(null);
     await clearClipcashUser();
+    sessionStorage.setItem(
+      "clipcash:logout-recovery",
+      JSON.stringify({ path: window.location.pathname + window.location.search, savedAt: Date.now() }),
+    );
     await signOut({ redirect: false });
   }, []);
 

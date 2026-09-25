@@ -79,6 +79,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
+        <meta name="theme-color" content="#080C0B" />
         <FontPreload />
         <ResourceHints />
       </head>

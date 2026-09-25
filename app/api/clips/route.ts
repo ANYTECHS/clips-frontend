@@ -114,7 +114,7 @@ async function handleGet(request: NextRequest) {
   let userClips =
     status === "archived"
       ? clipsStore.getArchivedClipsForUser(session.user.id)
-      : clipsStore.getClipsForUser(session.user.id);
+      : clipsStore.getClipsForUser(session.user.id, { keepDuplicates });
 
   // 2. Filter
   if (status && status !== "all" && status !== "archived") {
