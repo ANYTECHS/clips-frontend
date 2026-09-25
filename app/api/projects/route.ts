@@ -4,6 +4,7 @@ import { clipsStore } from "@/app/api/clips/clipsStore";
 import { projectsStore } from "./projectsStore";
 import type { ApiResponse } from "../types";
 import { parseFieldSelection, pickFields } from "@/app/lib/fieldSelection";
+import { paginateItems, parsePaginationParams } from "../pagination";
 
 type ProjectResponse = {
   id: string;
@@ -16,10 +17,19 @@ type ProjectResponse = {
 
 const PROJECT_FIELD_CONFIG = {
   allowedFields: [
-    "id", "name", "thumbnailUrl", "videoUrl", "clipCount", "createdAt",
+    "id",
+    "name",
+    "thumbnailUrl",
+    "videoUrl",
+    "clipCount",
+    "createdAt",
   ] as (keyof ProjectResponse & string)[],
   defaultFields: [
-    "id", "name", "thumbnailUrl", "clipCount", "createdAt",
+    "id",
+    "name",
+    "thumbnailUrl",
+    "clipCount",
+    "createdAt",
   ] as (keyof ProjectResponse & string)[],
 };
 
@@ -35,31 +45,34 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const fieldResult = parseFieldSelection(searchParams.get("fields"), PROJECT_FIELD_CONFIG);
   if (!fieldResult.ok) {
-    return NextResponse.json(
-      { error: fieldResult.error },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: fieldResult.error }, { status: 400 });
   }
 
   const projects = projectsStore.getProjectsForUser(userId);
-  clipsStore.getClipsForUser(userId);
+  const userClips = clipsStore.getClipsForUser(userId);
 
   const allProjects: ProjectResponse[] = projects.map((p) => ({
     id: p.id,
     name: p.name,
     thumbnailUrl: p.thumbnailUrl,
     videoUrl: p.videoUrl,
-    clipCount: clipsStore.getClipsForProject(userId, p.id).length,
+    clipCount: userClips.filter((clip) => clip.projectId === p.id).length,
     createdAt: p.createdAt,
   }));
 
-  const selectedProjects = allProjects.map((p) => pickFields(p, fieldResult.fields));
+  const { items: pagedProjects, meta } = paginateItems(
+    allProjects,
+    parsePaginationParams(searchParams, 50)
+  );
+  const selectedProjects = pagedProjects.map((p) => pickFields(p, fieldResult.fields));
 
-  const body: ApiResponse<{ projects: typeof selectedProjects }> = {
+  const body: ApiResponse<{ projects: typeof selectedProjects; total: number }> = {
     data: {
       projects: selectedProjects,
+      total: meta.total ?? allProjects.length,
     },
     error: null,
+    meta,
   };
 
   return NextResponse.json(body);

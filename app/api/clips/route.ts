@@ -6,16 +6,38 @@ import { getClipsQuerySchema, bulkClipIdsBodySchema } from "../schemas/index";
 import { parseFieldSelection, pickFields } from "@/app/lib/fieldSelection";
 import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
 import type { Clip } from "./clipsStore";
+import { paginateItems, parsePaginationParams } from "../pagination";
 
 const CLIP_FIELD_CONFIG = {
   allowedFields: [
-    "id", "userId", "projectId", "title", "thumbnail", "score", "scoreKey",
-    "duration", "style", "status", "resolution", "videoUrl", "createdAt",
-    "scoreBreakdown", "tags", "shareId",
+    "id",
+    "userId",
+    "projectId",
+    "title",
+    "thumbnail",
+    "score",
+    "scoreKey",
+    "duration",
+    "style",
+    "status",
+    "resolution",
+    "videoUrl",
+    "createdAt",
+    "scoreBreakdown",
+    "tags",
+    "shareId",
   ] as (keyof Clip & string)[],
   defaultFields: [
-    "id", "title", "thumbnail", "score", "scoreKey", "duration",
-    "style", "status", "createdAt", "tags",
+    "id",
+    "title",
+    "thumbnail",
+    "score",
+    "scoreKey",
+    "duration",
+    "style",
+    "status",
+    "createdAt",
+    "tags",
   ] as (keyof Clip & string)[],
 };
 
@@ -26,11 +48,11 @@ async function handleGet(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  
+
   // Validate query parameters with Zod
   const queryValidation = getClipsQuerySchema.safeParse({
-    page: searchParams.get("page"),
-    pageSize: searchParams.get("pageSize"),
+    page: searchParams.get("page") ?? undefined,
+    pageSize: searchParams.get("pageSize") ?? undefined,
     status: searchParams.get("status"),
     style: searchParams.get("style"),
     virality: searchParams.getAll("virality"),
@@ -43,15 +65,13 @@ async function handleGet(request: NextRequest) {
     );
   }
 
-  const { page, pageSize, status, style, virality } = queryValidation.data;
+  const { status, style, virality } = queryValidation.data;
+  const { page, pageSize } = parsePaginationParams(searchParams);
   const keepDuplicates = searchParams.get("keepDuplicates") === "true";
 
   const fieldResult = parseFieldSelection(searchParams.get("fields"), CLIP_FIELD_CONFIG);
   if (!fieldResult.ok) {
-    return NextResponse.json(
-      { error: fieldResult.error },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: fieldResult.error }, { status: 400 });
   }
 
   // 1. Fetch user's clips. "archived" is a lifecycle state, not a clip status,
@@ -63,32 +83,27 @@ async function handleGet(request: NextRequest) {
 
   // 2. Filter
   if (status && status !== "all" && status !== "archived") {
-    userClips = userClips.filter(c => c.status === status);
+    userClips = userClips.filter((c) => c.status === status);
   }
-  
+
   if (style && style !== "All Styles") {
-    userClips = userClips.filter(c => c.style === style);
+    userClips = userClips.filter((c) => c.style === style);
   }
-  
+
   if (virality.length > 0 && virality.length < 3) {
-    userClips = userClips.filter(c => virality.includes(c.scoreKey));
+    userClips = userClips.filter((c) => virality.includes(c.scoreKey));
   }
 
-  const total = userClips.length;
+  const { items: paginatedClips, meta } = paginateItems(userClips, { page, pageSize });
+  const selectedClips = paginatedClips.map((clip) => pickFields(clip, fieldResult.fields));
 
-  // 3. Paginate
-  const startIndex = (page - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedClips = userClips.slice(startIndex, endIndex);
-
-  const selectedClips = paginatedClips.map(clip => pickFields(clip, fieldResult.fields));
-
-  const body: ApiResponse<{ clips: typeof selectedClips, total: number }> = {
+  const body: ApiResponse<{ clips: typeof selectedClips; total: number }> = {
     data: {
       clips: selectedClips,
-      total
+      total: meta.total,
     },
-    error: null
+    error: null,
+    meta,
   };
 
   return NextResponse.json(body);
@@ -124,7 +139,7 @@ export async function DELETE(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: parsed.error.issues },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -135,10 +150,7 @@ export async function DELETE(request: NextRequest) {
 
   const unowned = clipsStore.findUnownedClipIds(session.user.id, clipIds);
   if (unowned.length > 0) {
-    return NextResponse.json(
-      { error: "One or more clips do not belong to you" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "One or more clips do not belong to you" }, { status: 403 });
   }
 
   const deletedCount = clipsStore.softDeleteClips(session.user.id, clipIds);

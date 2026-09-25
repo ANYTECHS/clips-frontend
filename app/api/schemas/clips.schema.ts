@@ -11,20 +11,48 @@ const tagSchema = z
   .transform((tag) => tag.toLowerCase());
 
 export const getClipsQuerySchema = z.object({
-  page: z.string().optional().default("1").transform((v) => parseInt(v, 10)),
-  pageSize: z.string().optional().default("20").transform((v) => parseInt(v, 10)),
+  page: z
+    .string()
+    .regex(/^\d+$/)
+    .optional()
+    .default("1")
+    .transform(Number)
+    .refine((value) => Number.isSafeInteger(value) && value >= 1),
+  pageSize: z
+    .string()
+    .regex(/^\d+$/)
+    .optional()
+    .default("20")
+    .transform(Number)
+    .refine((value) => Number.isSafeInteger(value) && value >= 1 && value <= 100),
   status: z.string().optional().default(""),
   style: z.string().optional().default(""),
   virality: z.array(z.string()).optional().default(["high", "medium", "low"]),
-  tags: z.string().optional().transform((v) =>
-    v ? v.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean) : []
-  ),
+  tags: z
+    .string()
+    .optional()
+    .transform((v) =>
+      v
+        ? v
+            .split(",")
+            .map((t) => t.trim().toLowerCase())
+            .filter(Boolean)
+        : []
+    ),
   q: z.string().optional().default(""),
   dateFrom: z.string().optional().default(""),
   dateTo: z.string().optional().default(""),
   platform: z.string().optional().default(""),
-  durationMin: z.string().optional().default("").transform((v) => v ? Number(v) : undefined),
-  durationMax: z.string().optional().default("").transform((v) => v ? Number(v) : undefined),
+  durationMin: z
+    .string()
+    .optional()
+    .default("")
+    .transform((v) => (v ? Number(v) : undefined)),
+  durationMax: z
+    .string()
+    .optional()
+    .default("")
+    .transform((v) => (v ? Number(v) : undefined)),
 });
 
 export const updateClipBodySchema = z.object({
@@ -42,9 +70,7 @@ export const bulkClipIdsBodySchema = z.object({
 
 export const postClipBodySchema = z.object({
   clipIds: z.array(z.string().min(1)).min(1),
-  platforms: z
-    .array(z.enum(["youtube", "instagram", "tiktok", "twitter"]))
-    .min(1),
+  platforms: z.array(z.enum(["youtube", "instagram", "tiktok", "twitter"])).min(1),
 });
 
 export const mintClipBodySchema = z.object({

@@ -7,10 +7,12 @@ import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
 import { createWebhookBodySchema } from "@/app/api/schemas/index";
 import { webhookStore } from "@/app/lib/webhooks/webhookStore";
 import type { WebhookEndpoint } from "@/app/lib/webhooks/types";
+import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
 
 /** Never expose the signing secret after creation — only used to verify deliveries. */
 function toPublicEndpoint(endpoint: WebhookEndpoint) {
-  const { secret: _secret, ...publicEndpoint } = endpoint;
+  const { secret, ...publicEndpoint } = endpoint;
+  void secret;
   return publicEndpoint;
 }
 
@@ -23,8 +25,10 @@ async function handleGet(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const { searchParams } = new URL(request.url);
   const endpoints = webhookStore.listForUser(session.user.id).map(toPublicEndpoint);
-  return NextResponse.json({ data: endpoints, error: null });
+  const { items, meta } = paginateItems(endpoints, parsePaginationParams(searchParams, 50));
+  return NextResponse.json({ data: items, error: null, meta });
 }
 
 async function handlePost(request: NextRequest) {

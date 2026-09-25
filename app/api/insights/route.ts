@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
 
 /* ---------- types ---------- */
 
@@ -62,11 +63,19 @@ export async function GET(req: NextRequest) {
 
   const cached = cache.get(userId);
   if (cached && cached.expiresAt > now) {
-    return NextResponse.json(cached.data);
+    const { items, meta } = paginateItems(
+      cached.data,
+      parsePaginationParams(req.nextUrl.searchParams, 50)
+    );
+    return NextResponse.json({ data: items, error: null, meta });
   }
 
   const insights = generateMockInsights();
   cache.set(userId, { data: insights, expiresAt: now + 60 * 60 * 1000 });
+  const { items, meta } = paginateItems(
+    insights,
+    parsePaginationParams(req.nextUrl.searchParams, 50)
+  );
 
-  return NextResponse.json(insights);
+  return NextResponse.json({ data: items, error: null, meta });
 }

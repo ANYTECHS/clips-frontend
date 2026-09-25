@@ -1,6 +1,11 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import type { ApiResponse } from "@/app/api/types";
-import { TRANSFORM_STYLES, type TransformStyle, type TransformStyleVariants } from "@/app/lib/transformStyles";
+import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
+import {
+  TRANSFORM_STYLES,
+  type TransformStyle,
+  type TransformStyleVariants,
+} from "@/app/lib/transformStyles";
 
 export type { TransformStyle, TransformStyleVariants };
 
@@ -16,9 +21,16 @@ export type { TransformStyle, TransformStyleVariants };
  * catalogue itself lives in app/lib/transformStyles.ts (issue #802) so new
  * styles can be added without touching this handler.
  */
-export async function GET(): Promise<NextResponse<ApiResponse<TransformStyle[]>>> {
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<ApiResponse<TransformStyle[]>>> {
+  const { items, meta } = paginateItems(
+    TRANSFORM_STYLES,
+    parsePaginationParams(new URL(request.url).searchParams, 100)
+  );
+
   return NextResponse.json(
-    { data: TRANSFORM_STYLES, error: null },
-    { headers: { "Cache-Control": "public, max-age=3600" } },
+    { data: items, error: null, meta },
+    { headers: { "Cache-Control": "public, max-age=3600" } }
   );
 }

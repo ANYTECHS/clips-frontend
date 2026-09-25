@@ -27,13 +27,21 @@ const eslintConfig = defineConfig([
     rules: {
       "no-console": ["warn", { allow: ["warn", "error"] }],
       "no-eval": "error",
+      complexity: ["warn", 10],
+      "max-depth": ["warn", 4],
+      "max-lines-per-function": ["warn", { max: 80, skipBlankLines: true, skipComments: true }],
       "react/no-danger": "error",
       "@typescript-eslint/no-explicit-any": "error",
     },
   },
   {
     // Exclude test files from no-console
-    files: ["**/*.test.{ts,tsx,js,jsx}", "**/*.spec.{ts,tsx,js,jsx}", "**/__tests__/**", "**/__mocks__/**"],
+    files: [
+      "**/*.test.{ts,tsx,js,jsx}",
+      "**/*.spec.{ts,tsx,js,jsx}",
+      "**/__tests__/**",
+      "**/__mocks__/**",
+    ],
     rules: {
       "no-console": "off",
     },
@@ -41,11 +49,17 @@ const eslintConfig = defineConfig([
   {
     files: ["app/**/*.ts", "app/**/*.tsx"],
     rules: {
-      "no-magic-numbers": ["warn", {
-        ignore: [0, 1, 2, 3, 5, 8, -1, 100, 1000, 1024, 60, 24, 7, 12, 200, 201, 204, 301, 302, 400, 401, 403, 404, 429, 500, 502, 503],
-        ignoreArrayIndexes: true,
-        ignoreDefaultValues: true,
-      }],
+      "no-magic-numbers": [
+        "warn",
+        {
+          ignore: [
+            0, 1, 2, 3, 5, 8, -1, 100, 1000, 1024, 60, 24, 7, 12, 200, 201, 204, 301, 302, 400, 401,
+            403, 404, 429, 500, 502, 503,
+          ],
+          ignoreArrayIndexes: true,
+          ignoreDefaultValues: true,
+        },
+      ],
     },
   },
   {
@@ -55,11 +69,14 @@ const eslintConfig = defineConfig([
         "error",
         {
           selector: "ExportNamedDeclaration > FunctionDeclaration[id.name=/^mock/]",
-          message: "Functions starting with 'mock' must not be exported from production source files. Move them to __tests__/mocks/ or __mocks__/.",
+          message:
+            "Functions starting with 'mock' must not be exported from production source files. Move them to __tests__/mocks/ or __mocks__/.",
         },
         {
-          selector: "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.name=/^mock/]",
-          message: "Variables/constants starting with 'mock' must not be exported from production source files. Move them to __tests__/mocks/ or __mocks__/.",
+          selector:
+            "ExportNamedDeclaration > VariableDeclaration > VariableDeclarator[id.name=/^mock/]",
+          message:
+            "Variables/constants starting with 'mock' must not be exported from production source files. Move them to __tests__/mocks/ or __mocks__/.",
         },
       ],
     },
@@ -73,7 +90,8 @@ const eslintConfig = defineConfig([
           patterns: [
             {
               group: ["**/mockApi*", "**/mockApi/**"],
-              message: "Store files must not import from mockApi directly. Use the ./api barrel export instead.",
+              message:
+                "Store files must not import from mockApi directly. Use the ./api barrel export instead.",
             },
           ],
         },
@@ -119,6 +137,14 @@ const eslintConfig = defineConfig([
     },
   },
   {
+    // Node scripts use CommonJS.
+    files: ["scripts/**/*.js"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+      "no-console": "off",
+    },
+  },
+  {
     // Global stylistic and cleanup rules
     files: ["**/*.{ts,tsx,js,jsx}"],
     plugins: {
@@ -129,17 +155,17 @@ const eslintConfig = defineConfig([
       "unused-imports/no-unused-imports": "error",
       "unused-imports/no-unused-vars": [
         "warn",
-        { "vars": "all", "varsIgnorePattern": "^_", "args": "after-used", "argsIgnorePattern": "^_" }
+        { vars: "all", varsIgnorePattern: "^_", args: "after-used", argsIgnorePattern: "^_" },
       ],
       // Enforce TypeScript naming conventions
       "@typescript-eslint/naming-convention": [
         "error",
-        { "selector": "default", "format": ["camelCase"] },
-        { "selector": "import", "format": ["camelCase", "PascalCase"] },
-        { "selector": "objectLiteralProperty", "format": null },
-        { "selector": "variableLike", "format": ["camelCase", "UPPER_CASE"] },
-        { "selector": "typeLike", "format": ["PascalCase"] },
-        { "selector": "function", "format": ["camelCase", "PascalCase"] }
+        { selector: "default", format: ["camelCase"] },
+        { selector: "import", format: ["camelCase", "PascalCase"] },
+        { selector: "objectLiteralProperty", format: null },
+        { selector: "variableLike", format: ["camelCase", "UPPER_CASE"] },
+        { selector: "typeLike", format: ["PascalCase"] },
+        { selector: "function", format: ["camelCase", "PascalCase"] },
       ],
     },
   },

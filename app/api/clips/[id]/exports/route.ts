@@ -5,16 +5,14 @@ import { exportsStore } from "@/app/api/exports/exportsStore";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { buildObjectUrl } from "@/app/lib/cloudStorage";
 import type { ApiResponse } from "@/app/api/types";
+import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
 
 /**
  * GET /api/clips/:id/exports
  *
  * List all export versions for a clip with status and download URLs.
  */
-export async function GET(
-  _request: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
@@ -28,9 +26,14 @@ export async function GET(
   }
 
   const exports = exportsStore.getExportsForClip(clipId, userId);
+  const { searchParams } = new URL(request.url);
+  const { items: pageExports, meta } = paginateItems(
+    exports,
+    parsePaginationParams(searchParams, 50)
+  );
 
   const synced = await Promise.all(
-    exports.map(async (exp) => {
+    pageExports.map(async (exp) => {
       const job = await jobStore.get(exp.jobId);
       let status = exp.status;
       let downloadUrl = exp.downloadUrl;
@@ -72,12 +75,13 @@ export async function GET(
         createdAt: exp.createdAt,
         completedAt: completedAt ?? null,
       };
-    }),
+    })
   );
 
-  const body: ApiResponse<{ exports: typeof synced }> = {
-    data: { exports: synced },
+  const body: ApiResponse<{ exports: typeof synced; total: number }> = {
+    data: { exports: synced, total: meta.total },
     error: null,
+    meta,
   };
 
   return NextResponse.json(body);
