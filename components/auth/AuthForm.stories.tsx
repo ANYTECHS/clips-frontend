@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { AuthForm } from './AuthForm';
+import AuthForm from './AuthForm';
 
 const meta: Meta<typeof AuthForm> = {
   title: 'Auth/AuthForm',

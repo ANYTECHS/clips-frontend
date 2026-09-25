@@ -1,0 +1,32 @@
+name: Bug report
+description: Something is broken or behaves unexpectedly.
+labels: ["bug", "needs triage"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What did you expect to happen instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Go to /dashboard
+        2. Click …
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / screenshots
+      description: Browser console, server output or screenshots. Remove any secrets or tokens first.
+      render: text
+  - type: input
+    id: env
+    attributes:
+      label: Environment
+      placeholder: "Chrome 128 / macOS, Node 22, commit abc123"

@@ -6,11 +6,121 @@ This document explains the non-obvious design decisions in ClipCash. It is aimed
 
 ## Table of Contents
 
+0. [System Overview](#0-system-overview)
 1. [Job Pipeline](#1-job-pipeline)
 2. [Wallet Architecture](#2-wallet-architecture)
 3. [Authentication Flow](#3-authentication-flow)
 4. [State Management](#4-state-management)
 5. [Client vs Server Boundaries](#5-client-vs-server-boundaries)
+6. [Data Flow](#6-data-flow)
+7. [Key Design Decisions](#7-key-design-decisions)
+8. [Technology Choices](#8-technology-choices)
+9. [Keeping This Document Current](#9-keeping-this-document-current)
+
+---
+
+## 0. System Overview
+
+ClipCash is a single Next.js 16 (App Router) application. It serves both the React UI and a set of API routes under `app/api/`. Heavy video work is not done here: uploads go to S3-compatible storage and are processed by a separate **AI backend service**, which reports progress back via signed callbacks. Payouts and NFTs live on the **Stellar** network, which the browser talks to directly through `@stellar/stellar-sdk`.
+
+### 0.1 System Context
+
+```mermaid
+flowchart LR
+    User([Creator's browser])
+
+    subgraph App["ClipCash — Next.js app (this repo)"]
+        UI["React UI<br/>app/**/page.tsx, components/"]
+        MW["middleware.ts<br/>auth + onboarding redirects"]
+        API["API routes<br/>app/api/**/route.ts"]
+    end
+
+    subgraph Data["Stateful services"]
+        PG[(PostgreSQL<br/>Prisma)]
+        Redis[(Redis<br/>jobs, rate limits, sessions)]
+        S3[(S3 / R2 / GCS<br/>video objects)]
+    end
+
+    subgraph External["External services"]
+        AI["AI backend<br/>clip detection & transforms"]
+        Scan["Virus scanner<br/>ClamAV / VirusTotal / Cloudmersive"]
+        OAuth["OAuth providers<br/>Google, Apple"]
+        Stellar["Stellar Horizon<br/>+ Soroban RPC"]
+        Sentry["Sentry"]
+        Analytics["Analytics<br/>GA4 / Plausible / custom"]
+    end
+
+    User -->|HTTPS| MW --> UI
+    User -->|fetch / XHR / SSE| API
+    API --> PG
+    API --> Redis
+    API --> S3
+    API --> Scan
+    API -->|POST /jobs, Bearer| AI
+    AI -->|signed callback| API
+    API --> OAuth
+    User -->|sign & submit tx| Stellar
+    UI -.->|errors| Sentry
+    API -.->|errors| Sentry
+    UI -.->|events, consent-gated| Analytics
+```
+
+### 0.2 Application Layers
+
+```mermaid
+flowchart TB
+    subgraph Client["Browser"]
+        Pages["Route components<br/>app/(dashboard)/, app/upload/, …"]
+        Comps["Presentational components<br/>components/"]
+        Hooks["Hooks<br/>app/hooks/, hooks/"]
+        Stores["Zustand stores<br/>app/store/"]
+        DL["Data layer<br/>app/lib/data-layer/<br/>cache · dedupe · offline queue"]
+        Wallet["Wallet libs<br/>embeddedWallet, secureStorage,<br/>multiWalletStorage"]
+    end
+
+    subgraph Server["Node.js runtime"]
+        Edge["middleware.ts"]
+        Routes["app/api/**/route.ts"]
+        Shared["Shared server libs<br/>apiMiddleware, rateLimitTiers, csrf,<br/>circuitBreaker, logger, cloudStorage,<br/>virusScan, aiBackend, prisma"]
+    end
+
+    Pages --> Comps
+    Pages --> Hooks --> Stores --> DL
+    Hooks --> Wallet
+    DL -->|HTTP| Routes
+    Edge --> Routes
+    Routes --> Shared
+```
+
+### 0.3 Directory Map
+
+| Path | Responsibility |
+| --- | --- |
+| `app/` | App Router routes: pages, layouts, `loading.tsx`, `error.tsx` |
+| `app/(dashboard)/` | Authenticated dashboard routes that share a layout |
+| `app/api/` | HTTP API routes (one `route.ts` per endpoint) |
+| `app/lib/` | Framework-agnostic logic: auth, storage, crypto, rate limiting, data layer, i18n |
+| `app/store/` | Zustand stores for shared client state |
+| `app/hooks/`, `hooks/` | React hooks wrapping stores, APIs and browser features |
+| `app/workers/` | Web Workers (clip ranking, blur placeholders) kept off the main thread |
+| `components/` | Reusable UI components, each with a Storybook story |
+| `prisma/` | Database schema and migrations |
+| `middleware.ts` | Route protection and onboarding redirects |
+| `deploy/` | Dockerfile, Kubernetes manifests, Grafana dashboards |
+| `stories/`, `.storybook/` | Storybook configuration and page-level stories |
+| `__tests__/`, `tests/` | Jest unit/integration tests and Playwright E2E tests |
+
+### 0.4 Deployment Topology
+
+The same build runs on three supported targets:
+
+| Target | Config | Notes |
+| --- | --- | --- |
+| Vercel | `vercel.json` | Per-route memory and duration limits. The SSE stream route gets 300 s. Vercel Cron runs `/api/cron/requeue-stalled-jobs` every 5 min and `/api/cron/cleanup-old-jobs` daily. |
+| Fly.io | `fly.toml`, `deploy/Dockerfile` | Single region (`iad`), near the default S3 region. |
+| Kubernetes | `deploy/k8s/` | HPA on CPU/memory and queue depth, a PodDisruptionBudget, CronJobs in place of Vercel Cron, and a ServiceMonitor for Prometheus scraping of `/api/metrics`. |
+
+Every target runs more than one instance, so any state that must be shared between requests lives in Redis or Postgres, never in process memory. See [SCALING.md](../SCALING.md).
 
 ---
 
@@ -622,3 +732,135 @@ function ClientComponent({ data }) {
   // Only client-side logic here
 }
 ```
+
+---
+
+## 6. Data Flow
+
+### 6.1 Page Load (read path)
+
+```mermaid
+sequenceDiagram
+    participant B as Browser
+    participant MW as middleware.ts
+    participant P as Page / Server Component
+    participant H as Hook + Zustand store
+    participant DL as Data layer (getJson)
+    participant API as /api/* route
+    participant DB as Postgres / Redis
+
+    B->>MW: GET /dashboard
+    MW->>MW: auth() → session? onboardingStep?
+    alt no session or onboarding incomplete
+        MW-->>B: 307 → /login or /onboarding
+    else ok
+        MW->>P: continue
+        P-->>B: HTML + RSC payload (route skeleton streams first)
+    end
+    B->>H: component mounts → store.fetch()
+    H->>DL: getJson("/api/dashboard/stats")
+    alt fresh cache hit (< NEXT_PUBLIC_DATA_CACHE_TTL_MS)
+        DL-->>H: cached data
+    else identical request already in flight
+        DL-->>H: shared promise (deduplicated)
+    else miss
+        DL->>API: fetch
+        API->>DB: query
+        DB-->>API: rows
+        API-->>DL: JSON { data, meta }
+        DL-->>H: data (and caches it)
+    end
+    H-->>B: re-render
+```
+
+If the network is down, the data layer serves stale cache for up to `NEXT_PUBLIC_DATA_STALE_TTL_MS`, and `OfflineBanner` tells the user.
+
+### 6.2 User Action (write path)
+
+1. A component calls a store action, which calls `mutate()` from `app/lib/data-layer`.
+2. **Online:** the request goes straight to the API route. On success, `invalidation.ts` evicts the affected cache keys, so the next read is fresh.
+3. **Offline:** the mutation is appended to the persisted **mutation queue** (`mutation-queue.ts`). When connectivity returns, `startAutomaticSync()` replays it with exponential backoff (`NEXT_PUBLIC_DATA_SYNC_*`). `SyncStatusIndicator` and `OfflineBanner` show its progress.
+4. Auth requests (`/auth/*`, `/api/auth/*`) are never cached or queued. See `isSensitiveUrl()` in `data-layer/client.ts`.
+
+### 6.3 Inside an API Route
+
+```
+request
+  → middleware.ts             (session + onboarding redirect; pages only)
+  → route.ts handler
+      → auth()                (NextAuth session → userId)
+      → rate limit            (rateLimitTiers / endpointRateLimits, Redis-backed)
+      → CSRF check            (csrf.ts, state-changing methods)
+      → zod validation        (app/api/schemas*)
+      → service / repository  (projectService, dashboardService, prisma, job store)
+      → external call         (wrapped in circuitBreaker + retry + timeout)
+  → apiResponse / errorResponse (consistent envelope and error codes, see docs/API_ERROR_CODES.md)
+```
+
+`withApiMiddleware()` in `app/lib/apiMiddleware.ts` wraps the timeout, auth and error-classification steps for routes that use it.
+
+### 6.4 Video Processing
+
+This is covered in detail in [§1 Job Pipeline](#1-job-pipeline). In short: browser → `/api/upload` → quarantine in S3 → virus scan → promote → Redis job record → AI backend → signed callbacks update Redis → the SSE stream pushes progress to the browser.
+
+### 6.5 Wallet and On-chain Actions
+
+Keys never reach the server. The browser either creates an embedded keypair, encrypted at rest with AES-GCM in `secureStorage`, or connects an extension wallet such as Freighter. It builds and signs Stellar transactions locally and submits them to Horizon/Soroban. The server only helps with read-only price data (`/api/prices`) and optional fee sponsorship (`app/api/lib/feeSponsorship.ts`). See [§2 Wallet Architecture](#2-wallet-architecture).
+
+---
+
+## 7. Key Design Decisions
+
+Each decision records the context, the choice, and what we gave up. If you reverse one, update its entry. Don't delete it.
+
+| # | Decision | Why | Trade-off |
+| --- | --- | --- | --- |
+| D1 | **One Next.js app for both UI and API (a "backend for frontend")** | A single deploy, one set of types shared end-to-end, no CORS. The heavy work is already in the separate AI service. | API routes scale together with the UI. CPU-heavy endpoints get their own limits in `vercel.json`. |
+| D2 | **Offload video processing to an external AI backend** | Serverless functions have short time limits and small memory. Video inference needs GPUs. | We need a callback protocol (Bearer + timestamp + nonce) and a stalled-job requeue cron. |
+| D3 | **Quarantine-then-promote uploads** | Unscanned files must never be reachable at their final key. | Each upload costs an extra S3 copy and delete, and scanning adds latency. |
+| D4 | **Redis as the job store, with an in-memory fallback in dev** | Several instances must see the same job state, and SSE polling needs fast reads. | Redis becomes a production dependency. The memory store is dev-only. |
+| D5 | **SSE for progress, with a polling fallback** | One-way server→client updates without WebSocket infrastructure. SSE works through most proxies. | A long-lived connection per job, so the stream route needs `maxDuration: 300`. |
+| D6 | **Non-custodial wallets, with keys only in the browser** | We never hold user funds or keys, which avoids custodial liability. | Recovery is the user's responsibility, so we added Shamir-based social recovery (§2.5). |
+| D7 | **NextAuth v5 with JWT sessions** | Stateless sessions that middleware can read without a DB round-trip. | Revocation is not immediate. The JWT carries `onboardingStep`, which must be refreshed when it changes. |
+| D8 | **Zustand for shared client state, URL params for filters** | Very little boilerplate and works outside React. URL state makes views shareable. | There is no built-in devtools time travel, and cross-store invalidation is manual (§4.5). |
+| D9 | **A custom data layer instead of React Query/SWR** | We needed offline mutation replay with encrypted persistence and sensitive-URL exclusion, which the off-the-shelf libraries don't provide together. | We own the caching code and its tests (`app/lib/data-layer/*.test.ts`). |
+| D10 | **Circuit breakers around external services** | Stops a failing AI backend or scanner from causing cascading timeouts. `/api/health/circuit-breakers` exposes their state. | Some requests fail fast while a breaker is `OPEN`. |
+| D11 | **Storybook as the only component demo environment** | Keeps internal demos out of production routes (see `AGENTS.md`). | UI work needs a story as well as the component. |
+
+---
+
+## 8. Technology Choices
+
+| Area | Choice | Why this over the alternatives |
+| --- | --- | --- |
+| Framework | **Next.js 16 (App Router)**, React 19 | Server Components and streaming `loading.tsx`, with API routes in the same codebase. First-class support on Vercel. |
+| Language | **TypeScript** (strict) | Types are shared between API routes and the UI. See [TYPESCRIPT_STANDARDS.md](TYPESCRIPT_STANDARDS.md). |
+| Styling | **Tailwind CSS v4** | Design tokens live in `globals.css`. No runtime CSS-in-JS cost, which matters with RSC. |
+| Client state | **Zustand** | Small bundle, no provider tree, and stores can be read outside React (e.g. from the data layer). |
+| Validation | **zod** | Runtime validation of request bodies, with the TS types inferred from the same schema. |
+| Auth | **NextAuth (Auth.js) v5**, **SimpleWebAuthn** | OAuth providers and JWT sessions out of the box. WebAuthn adds passkey sign-in. |
+| Database | **PostgreSQL + Prisma** | Relational user and notification data. Prisma gives typed queries and migrations. |
+| Cache / queue | **Redis (ioredis)** | Shared job state, rate-limit counters and session sharing across instances. |
+| Object storage | **AWS SDK v3 S3 client** | One client covers AWS S3, Cloudflare R2 and GCS (S3 interop) via `CLOUD_STORAGE_ENDPOINT`. |
+| Blockchain | **Stellar (`@stellar/stellar-sdk`)**, Soroban | Low, predictable fees for creator payouts. Soroban contracts handle NFT minting. |
+| Key handling | **Web Crypto API**, `bip39`, `secrets.js-grempe` | Native AES-GCM/PBKDF2 without extra crypto dependencies. Shamir's secret sharing for recovery. |
+| Sanitization | **DOMPurify** | A well-audited HTML sanitizer, used via `app/lib/sanitize.ts`. |
+| Monitoring | **Sentry** | Error tracking on both client and server with release tagging. |
+| Testing | **Jest** + Testing Library, **Playwright**, **Vitest** (Storybook), **Stryker** | Unit/integration, E2E and visual regression, component tests in stories, and mutation testing. |
+| Component docs | **Storybook 10** (`@storybook/nextjs-vite`) | Fast Vite builds with Next.js mocks, plus autodocs and a11y checks. See [STORYBOOK.md](../STORYBOOK.md). |
+| Releases | **Changesets** | Per-PR changelog entries and semver bumps. |
+
+---
+
+## 9. Keeping This Document Current
+
+This document is part of the code, so update it in the same PR as the change it describes:
+
+- **New external service, datastore or deploy target** → update the diagrams in §0 and the table in §8.
+- **Change to a request or data path** (new cache, new queue, new middleware step) → update §6.
+- **Reversing or adding an architectural decision** → add or amend a row in §7. Keep reversed rows and note what replaced them.
+- **New environment variable** → document it in [ENVIRONMENT_VARIABLES.md](ENVIRONMENT_VARIABLES.md) and `.env.example`.
+
+The PR template has an "Architecture docs updated" checkbox, and reviewers should ask for this update when a PR changes any of the above.
+
+Diagrams use [Mermaid](https://mermaid.js.org/), which GitHub renders inline. Edit them as text and preview them on GitHub or at https://mermaid.live.

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { TrustlineManager } from './TrustlineManager';
+import TrustlineManager from './TrustlineManager';
 
 const meta: Meta<typeof TrustlineManager> = {
   title: 'Wallet/TrustlineManager',
