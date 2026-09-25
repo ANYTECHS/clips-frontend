@@ -19,6 +19,7 @@ import {
   CreditCard,
   Plug,
   Tags,
+  Sparkles,
 } from "lucide-react";
 import PlanUsage from "@/components/dashboard/PlanUsage";
 import { useRoutePrefetch } from "@/app/hooks/useRoutePrefetch";
@@ -32,6 +33,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Projects", href: "/projects", icon: Video },
+  { label: "Brand Kit", href: "/brand-kit", icon: Sparkles },
   { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Earnings", href: "/earnings", icon: DollarSign },
   { label: "Referral", href: "/referral", icon: Share2 },
