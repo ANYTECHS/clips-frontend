@@ -3,6 +3,16 @@ import { auth } from "@/app/lib/auth";
 import { clipsStore } from "./clipsStore";
 import type { ApiResponse } from "../types";
 import { getClipsQuerySchema, bulkClipIdsBodySchema } from "../schemas/index";
+import {
+  applySort,
+  containsAll,
+  matchesQuery,
+  paginate,
+  parseRange,
+  withinDateRange,
+  withinRange,
+  type SortOrder,
+} from "@/app/api/lib/listQuery";
 import { parseFieldSelection, pickFields } from "@/app/lib/fieldSelection";
 import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
 import type { Clip } from "./clipsStore";
@@ -41,6 +51,28 @@ const CLIP_FIELD_CONFIG = {
   ] as (keyof Clip & string)[],
 };
 
+/** Fields `?q=` searches. */
+const CLIP_SEARCH_FIELDS = ["title", "style", "tags"] as const;
+
+/**
+ * Converts a stored `mm:ss` (or `hh:mm:ss`) duration to seconds.
+ *
+ * `durationMin`/`durationMax` are numeric seconds, but the store keeps
+ * duration as a display string. Returning `null` for anything unparseable
+ * means such a clip simply does not match a duration filter, rather than
+ * being coerced to 0 and matching every `durationMax`.
+ */
+function durationToSeconds(duration: unknown): number | null {
+  if (typeof duration !== "string") return null;
+
+  const parts = duration.split(":").map((p) => Number(p));
+  if (parts.some((p) => !Number.isFinite(p))) return null;
+
+  if (parts.length === 2) return parts[0]! * 60 + parts[1]!;
+  if (parts.length === 3) return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
+  return null;
+}
+
 async function handleGet(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
@@ -49,13 +81,10 @@ async function handleGet(request: NextRequest) {
 
   const { searchParams } = new URL(request.url);
 
-  // Validate query parameters with Zod
-  const queryValidation = getClipsQuerySchema.safeParse({
-    page: searchParams.get("page") ?? undefined,
-    pageSize: searchParams.get("pageSize") ?? undefined,
-    status: searchParams.get("status"),
-    style: searchParams.get("style"),
+
     virality: searchParams.getAll("virality"),
+    tags: searchParams.get("tags") ?? undefined,
+    platform: searchParams.get("platform") ?? undefined,
   });
 
   if (!queryValidation.success) {
@@ -65,9 +94,7 @@ async function handleGet(request: NextRequest) {
     );
   }
 
-  const { status, style, virality } = queryValidation.data;
-  const { page, pageSize } = parsePaginationParams(searchParams);
-  const keepDuplicates = searchParams.get("keepDuplicates") === "true";
+
 
   const fieldResult = parseFieldSelection(searchParams.get("fields"), CLIP_FIELD_CONFIG);
   if (!fieldResult.ok) {
@@ -94,13 +121,7 @@ async function handleGet(request: NextRequest) {
     userClips = userClips.filter((c) => virality.includes(c.scoreKey));
   }
 
-  const { items: paginatedClips, meta } = paginateItems(userClips, { page, pageSize });
-  const selectedClips = paginatedClips.map((clip) => pickFields(clip, fieldResult.fields));
 
-  const body: ApiResponse<{ clips: typeof selectedClips; total: number }> = {
-    data: {
-      clips: selectedClips,
-      total: meta.total,
     },
     error: null,
     meta,

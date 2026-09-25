@@ -25,6 +25,7 @@ import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 import DegradedModeBanner from "@/app/components/DegradedModeBanner";
 import { useServiceHealth } from "@/app/hooks/useServiceHealth";
 import { warmCriticalData } from "@/app/lib/cache/warmCriticalData";
+import TutorialProvider from "@/components/tutorial/TutorialProvider";
 
 // ─── Sidebar context ──────────────────────────────────────────────────────────
 
@@ -71,6 +72,9 @@ export default function DashboardShell({
 
   return (
     <SidebarContext.Provider value={sidebarContext}>
+      {/* Wraps the whole shell so a tour can spotlight the sidebar and the
+          header, not just page content (Issue #1065). */}
+      <TutorialProvider autoStart="dashboard">
       <div className="flex min-h-screen bg-background text-white font-sans overflow-hidden">
         <BackgroundOrbs variant="default" />
 
@@ -98,6 +102,7 @@ export default function DashboardShell({
           {children}
         </main>
       </div>
+      </TutorialProvider>
     </SidebarContext.Provider>
   );
 }
