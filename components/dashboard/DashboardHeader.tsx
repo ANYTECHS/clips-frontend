@@ -6,6 +6,7 @@ import { useUserStore, selectUserName } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
 import { sanitize } from "@/app/lib/sanitize";
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
+import LanguageSwitcher from "@/components/common/LanguageSwitcher";
 
 interface NotificationItem {
   id: string;
@@ -177,6 +178,8 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
             </div>
           )}
         </div>
+
+        <LanguageSwitcher />
 
         <PlanUsage compact />
 

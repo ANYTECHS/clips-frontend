@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Archive, Download, Share2, Sparkles, Trash2, Undo2, Redo2 } from "lucide-react";
+import { Archive, Download, Share2, Sparkles, Trash2, Undo2, Redo2, Columns } from "lucide-react";
 
 export interface SelectionFooterProps {
   count: number;
@@ -21,6 +21,7 @@ export interface SelectionFooterProps {
   onArchive?: (selectedIds: string[]) => void;
   isArchiving?: boolean;
   archiveError?: string | null;
+  onCompare?: (selectedIds: string[]) => void;
 }
 
 const PLATFORMS = ["youtube", "instagram", "tiktok", "twitter"];
@@ -43,6 +44,7 @@ export default function SelectionFooter({
   onArchive,
   isArchiving,
   archiveError,
+  onCompare,
 }: SelectionFooterProps) {
   const [showPlatformPicker, setShowPlatformPicker] = useState(false);
   const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
@@ -107,6 +109,23 @@ export default function SelectionFooter({
 
         {/* Right Side: Actions */}
         <div className="flex items-center gap-2 pr-1 w-full sm:w-auto">
+          {onCompare && (
+            <button
+              onClick={() => onCompare(selectedIds)}
+              disabled={count < 2 || count > 4}
+              title={
+                count < 2
+                  ? "Select at least 2 clips to compare"
+                  : count > 4
+                  ? "Maximum 4 clips can be compared at once"
+                  : "Compare clips side-by-side"
+              }
+              className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold text-brand bg-brand/10 hover:bg-brand/20 border border-brand/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Columns className="w-4 h-4" />
+              <span>Compare ({count})</span>
+            </button>
+          )}
           <button className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
             <Download className="w-4 h-4" />
             <span className="hidden sm:inline">Export</span>

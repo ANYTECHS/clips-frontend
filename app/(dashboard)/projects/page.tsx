@@ -26,11 +26,6 @@ const ClipGrid = dynamic(() => import("@/components/projects/ClipGrid"), {
   )
 });
 import SelectionFooter from "@/components/projects/SelectionFooter";
-const ClipEditorModal = dynamic(() => import("@/components/projects/ClipEditorModal"), { ssr: false });
-const ClipPreviewModal = dynamic(() => import("@/components/projects/ClipPreviewModal"), { ssr: false });
-const BatchTransformModal = dynamic(() => import("@/components/transform/BatchTransformModal").then(mod => mod.BatchTransformModal), { ssr: false });
-const BatchTransformQueue = dynamic(() => import("@/components/transform/BatchTransformQueue").then(mod => mod.BatchTransformQueue), { ssr: false });
-
 import type { ClipEdits } from "@/components/projects/ClipEditorModal";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
@@ -40,13 +35,14 @@ import { useBatchTransform } from "@/app/hooks/useBatchTransform";
 import { useClipRanking } from "@/app/hooks/useClipRanking";
 import { useUserStore, selectUserPlan } from "@/app/store/userStore";
 
-// Code-split the modals (#921): each one is only mounted once the user takes
-// an action (edit, preview, transform), so their code has no reason to be in
-// the initial bundle for a page whose default view is just the clip grid.
+// Code-split modals
 const ClipEditorModal = dynamic(() => import("@/components/projects/ClipEditorModal"), {
   ssr: false,
 });
 const ClipPreviewModal = dynamic(() => import("@/components/projects/ClipPreviewModal"), {
+  ssr: false,
+});
+const ClipComparisonView = dynamic(() => import("@/components/projects/ClipComparisonView"), {
   ssr: false,
 });
 const BatchTransformModal = dynamic(
@@ -79,6 +75,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true);
   const [isMinting, setIsMinting] = useState(false);
   const [showTransformModal, setShowTransformModal] = useState(false);
+  const [comparingClips, setComparingClips] = useState<Clip[] | null>(null);
 
   const {
     batch: transformBatch,
@@ -524,11 +521,27 @@ export default function ProjectsPage() {
               onArchive={handleArchive}
               isArchiving={isArchiving}
               archiveError={archiveError}
+              onCompare={(ids) => {
+                const selected = fetchedClips.filter((c) => ids.includes(c.id));
+                setComparingClips(selected);
+              }}
             />
           </div>
         </div>
       </div>
       {ToastEl}
+      {comparingClips && comparingClips.length >= 2 && (
+        <ClipComparisonView
+          clips={comparingClips}
+          onClose={() => setComparingClips(null)}
+          onSelectWinner={(winnerId) => {
+            const winner = fetchedClips.find((c) => c.id === winnerId);
+            if (winner) {
+              showToast(`Winner selected: ${winner.title}`);
+            }
+          }}
+        />
+      )}
       {editingClip && (
         <ClipEditorModal
           clip={editingClip}
