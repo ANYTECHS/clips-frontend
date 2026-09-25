@@ -4,11 +4,9 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { prisma } from "@/app/lib/prisma";
 import { z } from "zod";
 
-const updateWebhookSchema = z.object({
-  url: z.string().url().optional(),
-  events: z.array(z.string()).optional(),
-  secret: z.string().min(16).optional(),
-  description: z.string().optional(),
+const updateApiKeySchema = z.object({
+  name: z.string().min(1).max(100).optional(),
+  scopes: z.array(z.string()).optional(),
   active: z.boolean().optional(),
 });
 
@@ -22,27 +20,27 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const webhook = await prisma.webhook.findFirst({
+    const apiKey = await prisma.apiKey.findFirst({
       where: {
         id: params.id,
         userId: session.user.id,
       },
       include: {
-        deliveries: {
+        usages: {
           orderBy: { createdAt: "desc" },
-          take: 20,
+          take: 50,
         },
       },
     });
 
-    if (!webhook) {
-      return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+    if (!apiKey) {
+      return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ webhook });
+    return NextResponse.json({ apiKey });
   } catch (error) {
-    console.error("Error fetching webhook:", error);
-    return NextResponse.json({ error: "Failed to fetch webhook" }, { status: 500 });
+    console.error("Error fetching API key:", error);
+    return NextResponse.json({ error: "Failed to fetch API key" }, { status: 500 });
   }
 }
 
@@ -57,9 +55,9 @@ export async function PATCH(
     }
 
     const body = await req.json();
-    const validatedData = updateWebhookSchema.parse(body);
+    const validatedData = updateApiKeySchema.parse(body);
 
-    const webhook = await prisma.webhook.updateMany({
+    const apiKey = await prisma.apiKey.updateMany({
       where: {
         id: params.id,
         userId: session.user.id,
@@ -67,21 +65,21 @@ export async function PATCH(
       data: validatedData,
     });
 
-    if (webhook.count === 0) {
-      return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+    if (apiKey.count === 0) {
+      return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
 
-    const updatedWebhook = await prisma.webhook.findUnique({
+    const updatedApiKey = await prisma.apiKey.findUnique({
       where: { id: params.id },
     });
 
-    return NextResponse.json({ webhook: updatedWebhook });
+    return NextResponse.json({ apiKey: updatedApiKey });
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
     }
-    console.error("Error updating webhook:", error);
-    return NextResponse.json({ error: "Failed to update webhook" }, { status: 500 });
+    console.error("Error updating API key:", error);
+    return NextResponse.json({ error: "Failed to update API key" }, { status: 500 });
   }
 }
 
@@ -95,20 +93,20 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const webhook = await prisma.webhook.deleteMany({
+    const apiKey = await prisma.apiKey.deleteMany({
       where: {
         id: params.id,
         userId: session.user.id,
       },
     });
 
-    if (webhook.count === 0) {
-      return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+    if (apiKey.count === 0) {
+      return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting webhook:", error);
-    return NextResponse.json({ error: "Failed to delete webhook" }, { status: 500 });
+    console.error("Error deleting API key:", error);
+    return NextResponse.json({ error: "Failed to delete API key" }, { status: 500 });
   }
 }
