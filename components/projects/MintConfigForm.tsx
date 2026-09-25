@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { calculateStellarMintCost, formatXlm } from "@/app/lib/mintUtils";
 
 interface MintConfigFormProps {
@@ -9,176 +9,342 @@ interface MintConfigFormProps {
     description: string;
     creatorRoyalty: string;
     listingPrice: string;
-  }) => Promise<any>;
+  }) => Promise<unknown>;
 }
 
-/**
- * Form for configuring NFT minting parameters on Stellar.
- * Validates collection name, description, royalty percentage, and listing price.
- * Displays estimated minting cost in XLM.
- *
- * @param props.onSubmit - Async callback receiving the validated form data
- */
-export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
-  const [collectionName, setCollectionName] = useState("");
-  const [description, setDescription] = useState("");
-  const [creatorRoyalty, setCreatorRoyalty] = useState("");
-  const [listingPrice, setListingPrice] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [touched, setTouched] = useState<Record<string, boolean>>({});
+type FormField =
+  | "collectionName"
+  | "description"
+  | "creatorRoyalty"
+  | "listingPrice";
 
-  const clipCount = 1; // Defaulting to 1 for simplicity in this form. In a real app this might be dynamic.
+type FormValues = Record<FormField, string>;
+type FormErrors = Partial<Record<FormField, string>>;
+
+const INITIAL_VALUES: FormValues = {
+  collectionName: "",
+  description: "",
+  creatorRoyalty: "",
+  listingPrice: "",
+};
+
+function validateForm(values: FormValues): FormErrors {
+  const errors: FormErrors = {};
+
+  const collectionName = values.collectionName.trim();
+  const description = values.description.trim();
+  const royaltyText = values.creatorRoyalty.trim();
+  const listingPriceText = values.listingPrice.trim();
+
+  if (!collectionName) {
+    errors.collectionName = "Collection name is required.";
+  } else if (collectionName.length < 3) {
+    errors.collectionName = "Must be at least 3 characters.";
+  } else if (collectionName.length > 100) {
+    errors.collectionName = "Must be fewer than 100 characters.";
+  }
+
+  if (!description) {
+    errors.description = "Description is required.";
+  } else if (description.length < 10) {
+    errors.description = "Description must be at least 10 characters.";
+  } else if (description.length > 2_000) {
+    errors.description = "Description must be fewer than 2,000 characters.";
+  }
+
+  if (!royaltyText) {
+    errors.creatorRoyalty = "Royalty percentage is required.";
+  } else {
+    const royalty = Number(royaltyText);
+
+    if (!Number.isFinite(royalty)) {
+      errors.creatorRoyalty = "Royalty must be a valid number.";
+    } else if (royalty < 0 || royalty > 50) {
+      errors.creatorRoyalty = "Royalty must be between 0 and 50.";
+    }
+  }
+
+  if (!listingPriceText) {
+    errors.listingPrice = "Listing price is required.";
+  } else {
+    const price = Number(listingPriceText);
+
+    if (!Number.isFinite(price)) {
+      errors.listingPrice = "Listing price must be a valid number.";
+    } else if (price < 0) {
+      errors.listingPrice = "Listing price cannot be negative.";
+    }
+  }
+
+  return errors;
+}
+
+export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
+  const [values, setValues] = useState<FormValues>(INITIAL_VALUES);
+  const [errors, setErrors] = useState<FormErrors>({});
+  const [touched, setTouched] = useState<
+    Partial<Record<FormField, boolean>>
+  >({});
+  const [submitAttempted, setSubmitAttempted] = useState(false);
+  const [serverError, setServerError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const clipCount = 1;
   const { totalCost } = calculateStellarMintCost(clipCount);
 
-  const handleBlur = (field: string) => {
-    setTouched((prev) => ({ ...prev, [field]: true }));
+  const visibleErrors = useMemo(() => {
+    const result: FormErrors = {};
+
+    for (const field of Object.keys(errors) as FormField[]) {
+      if (submitAttempted || touched[field]) {
+        result[field] = errors[field];
+      }
+    }
+
+    return result;
+  }, [errors, submitAttempted, touched]);
+
+  const updateField = (field: FormField, value: string) => {
+    setValues((current) => ({
+      ...current,
+      [field]: value,
+    }));
+
+    setServerError(null);
+
+    if (submitAttempted || touched[field]) {
+      const nextValues = {
+        ...values,
+        [field]: value,
+      };
+
+      setErrors(validateForm(nextValues));
+    }
   };
 
-  const validate = () => {
-    if (!collectionName) return "Collection name is required.";
-    if (collectionName.length < 3) return "Must be at least 3 characters.";
-    if (!description) return "Description is required.";
-    if (!creatorRoyalty) return "Royalty % is required.";
-    
-    const royaltyNum = parseFloat(creatorRoyalty);
-    if (isNaN(royaltyNum) || royaltyNum < 0 || royaltyNum > 50) return "Must be between 0 and 50.";
-    
-    if (!listingPrice) return "Listing price is required.";
-    return null;
+  const handleBlur = (field: FormField) => {
+    setTouched((current) => ({
+      ...current,
+      [field]: true,
+    }));
+
+    setErrors(validateForm(values));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setTouched({ collectionName: true, description: true, creatorRoyalty: true, listingPrice: true });
-    
-    const validationError = validate();
-    if (validationError) {
-      setError(validationError);
+  const focusFirstInvalidField = (formErrors: FormErrors) => {
+    const firstInvalidField = (
+      ["collectionName", "description", "creatorRoyalty", "listingPrice"] as FormField[]
+    ).find((field) => formErrors[field]);
+
+    if (!firstInvalidField) return;
+
+    window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>(`[name="${firstInvalidField}"]`)
+        ?.focus();
+    });
+  };
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+
+    setSubmitAttempted(true);
+    setServerError(null);
+
+    const nextErrors = validateForm(values);
+    setErrors(nextErrors);
+
+    if (Object.keys(nextErrors).length > 0) {
+      focusFirstInvalidField(nextErrors);
       return;
     }
 
     setIsSubmitting(true);
-    setError(null);
+
     try {
       await onSubmit({
-        collectionName,
-        description,
-        creatorRoyalty,
-        listingPrice,
+        collectionName: values.collectionName.trim(),
+        description: values.description.trim(),
+        creatorRoyalty: values.creatorRoyalty.trim(),
+        listingPrice: values.listingPrice.trim(),
       });
-      // The parent handles success states
-    } catch (err: any) {
-      setError(err.message || "Something went wrong");
+    } catch (error) {
+      setServerError(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong while submitting the form.",
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const getFieldError = (field: string) => {
-    if (!touched[field]) return null;
-    if (field === "collectionName") {
-      if (!collectionName) return "Collection name is required.";
-      if (collectionName.length < 3) return "Must be at least 3 characters.";
-    }
-    if (field === "description" && !description) return "Description is required.";
-    if (field === "creatorRoyalty") {
-      if (!creatorRoyalty) return "Royalty % is required.";
-      const num = parseFloat(creatorRoyalty);
-      if (isNaN(num) || num < 0 || num > 50) return "Must be between 0 and 50.";
-    }
-    if (field === "listingPrice" && !listingPrice) return "Listing price is required.";
-    return null;
+  const fieldClass = (field: FormField) =>
+    `w-full rounded-xl border px-4 py-2 text-white outline-none transition-colors ${
+      visibleErrors[field]
+        ? "border-red-500 bg-red-500/5 focus:border-red-400"
+        : "border-white/10 bg-input focus:border-brand/50"
+    }`;
+
+  const renderError = (field: FormField) => {
+    const message = visibleErrors[field];
+
+    if (!message) return null;
+
+    return (
+      <p id={`${field}-error`} role="alert" className="text-xs text-red-400">
+        {message}
+      </p>
+    );
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      {error && (
-        <div className="bg-red-500/10 border border-red-500 text-red-500 p-3 rounded-lg text-sm mb-4">
-          {error}
+    <form onSubmit={handleSubmit} noValidate className="space-y-4">
+      {serverError && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-500 bg-red-500/10 p-3 text-sm text-red-400"
+        >
+          {serverError}
         </div>
       )}
 
       <div className="space-y-1">
-        <label className="text-sm font-medium text-white/80">Collection Name</label>
+        <label
+          htmlFor="collectionName"
+          className="text-sm font-medium text-white/80"
+        >
+          Collection Name
+        </label>
+
         <input
+          id="collectionName"
           name="collectionName"
           type="text"
-          value={collectionName}
-          onChange={(e) => setCollectionName(e.target.value)}
+          value={values.collectionName}
+          onChange={(event) =>
+            updateField("collectionName", event.target.value)
+          }
           onBlur={() => handleBlur("collectionName")}
-          className="w-full bg-input border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-brand/50"
+          aria-invalid={Boolean(visibleErrors.collectionName)}
+          aria-describedby={
+            visibleErrors.collectionName ? "collectionName-error" : undefined
+          }
+          className={fieldClass("collectionName")}
           placeholder="e.g. My Awesome Clips"
         />
-        {getFieldError("collectionName") && (
-          <p className="text-red-500 text-xs">{getFieldError("collectionName")}</p>
-        )}
+
+        {renderError("collectionName")}
       </div>
 
       <div className="space-y-1">
-        <label className="text-sm font-medium text-white/80">Description</label>
+        <label
+          htmlFor="description"
+          className="text-sm font-medium text-white/80"
+        >
+          Description
+        </label>
+
         <textarea
+          id="description"
           name="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
+          value={values.description}
+          onChange={(event) =>
+            updateField("description", event.target.value)
+          }
           onBlur={() => handleBlur("description")}
-          className="w-full bg-input border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-brand/50"
+          aria-invalid={Boolean(visibleErrors.description)}
+          aria-describedby={
+            visibleErrors.description ? "description-error" : undefined
+          }
+          className={fieldClass("description")}
           placeholder="Describe your collection..."
           rows={3}
         />
-        {getFieldError("description") && (
-          <p className="text-red-500 text-xs">{getFieldError("description")}</p>
-        )}
+
+        {renderError("description")}
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-1">
-          <label className="text-sm font-medium text-white/80">Creator Royalty (%)</label>
+          <label
+            htmlFor="creatorRoyalty"
+            className="text-sm font-medium text-white/80"
+          >
+            Creator Royalty (%)
+          </label>
+
           <input
+            id="creatorRoyalty"
             name="creatorRoyalty"
             type="number"
-            value={creatorRoyalty}
-            onChange={(e) => setCreatorRoyalty(e.target.value)}
+            min="0"
+            max="50"
+            step="0.01"
+            value={values.creatorRoyalty}
+            onChange={(event) =>
+              updateField("creatorRoyalty", event.target.value)
+            }
             onBlur={() => handleBlur("creatorRoyalty")}
-            className="w-full bg-input border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-brand/50"
+            aria-invalid={Boolean(visibleErrors.creatorRoyalty)}
+            aria-describedby={
+              visibleErrors.creatorRoyalty
+                ? "creatorRoyalty-error"
+                : undefined
+            }
+            className={fieldClass("creatorRoyalty")}
             placeholder="e.g. 10"
           />
-          {getFieldError("creatorRoyalty") && (
-            <p className="text-red-500 text-xs">{getFieldError("creatorRoyalty")}</p>
-          )}
+
+          {renderError("creatorRoyalty")}
         </div>
 
         <div className="space-y-1">
-          <label className="text-sm font-medium text-white/80">Listing Price</label>
+          <label
+            htmlFor="listingPrice"
+            className="text-sm font-medium text-white/80"
+          >
+            Listing Price
+          </label>
+
           <input
+            id="listingPrice"
             name="listingPrice"
             type="number"
+            min="0"
             step="0.01"
-            value={listingPrice}
-            onChange={(e) => setListingPrice(e.target.value)}
+            value={values.listingPrice}
+            onChange={(event) =>
+              updateField("listingPrice", event.target.value)
+            }
             onBlur={() => handleBlur("listingPrice")}
-            className="w-full bg-input border border-white/10 rounded-xl px-4 py-2 text-white focus:outline-none focus:border-brand/50"
+            aria-invalid={Boolean(visibleErrors.listingPrice)}
+            aria-describedby={
+              visibleErrors.listingPrice ? "listingPrice-error" : undefined
+            }
+            className={fieldClass("listingPrice")}
             placeholder="e.g. 0.5"
           />
-          {getFieldError("listingPrice") && (
-            <p className="text-red-500 text-xs">{getFieldError("listingPrice")}</p>
-          )}
+
+          {renderError("listingPrice")}
         </div>
       </div>
 
-      <div className="bg-white/5 border border-white/10 p-4 rounded-xl mt-4">
-        <div className="flex justify-between items-center text-sm">
+      <div className="mt-4 rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-center justify-between text-sm">
           <span className="text-white/60">Estimated Mint Fee</span>
-          <span className="font-mono text-brand font-bold">{formatXlm(totalCost)}</span>
+          <span className="font-mono font-bold text-brand">
+            {formatXlm(totalCost)}
+          </span>
         </div>
       </div>
 
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full bg-brand hover:bg-brand-hover text-black font-bold py-3 rounded-xl transition-all disabled:opacity-50"
+        className="w-full rounded-xl bg-brand py-3 font-bold text-black transition-all hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {isSubmitting ? "Minting..." : error && error.includes("went wrong") ? "Retry Minting" : "Mint Collection"}
+        {isSubmitting ? "Minting..." : "Mint Collection"}
       </button>
     </form>
   );
