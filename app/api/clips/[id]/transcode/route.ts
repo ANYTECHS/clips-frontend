@@ -75,7 +75,7 @@ export async function POST(
     );
   }
 
-  const { format, aspectRatio, quality } = bodyValidation.data;
+  const { format, aspectRatio, quality, platform } = bodyValidation.data;
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   const plan = user?.plan ?? "free";
@@ -93,7 +93,7 @@ export async function POST(
   const clip = clipsStore.getClipById(userId, clipId);
   const { targetResolution, targetBitrateKbps } = exportTargets(
     quality,
-    clip?.resolution ?? "1080x1920",
+    clip?.resolution ?? (platform === "youtube" ? "1920x1080" : "1080x1920"),
   );
 
   const jobId = `transcode_${randomUUID().replace(/-/g, "")}`;
@@ -104,6 +104,7 @@ export async function POST(
     format,
     aspectRatio,
     quality,
+    platform,
     targetResolution,
     targetBitrateKbps,
     objectKey: "",
@@ -141,6 +142,7 @@ export async function POST(
       format,
       aspectRatio,
       quality,
+      platform,
       targetResolution,
       targetBitrateKbps,
       outputObjectKey: objectKey,

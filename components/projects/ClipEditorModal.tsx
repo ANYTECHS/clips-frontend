@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
-import { X, Crop, Type, MonitorPlay, Smartphone, Loader2, Sparkles } from "lucide-react";
+import { X, Crop, Type, MonitorPlay, Smartphone, Loader2, Sparkles, Music2 } from "lucide-react";
 import type { Clip } from "./ClipGrid";
+import AudioLibrary, { type AudioPlacement } from "./AudioLibrary";
 import {
   CAPTION_LANGUAGES,
   type CaptionSegment,
@@ -22,6 +23,7 @@ export interface ClipEdits {
   trimEnd: number;
   captionStyle: string;
   aspectRatio: "16:9" | "9:16" | "1:1";
+  audio?: AudioPlacement[];
   captions?: {
     segments: CaptionSegment[];
     style: CaptionStyle;
@@ -56,7 +58,7 @@ const POSITIONS: { id: CaptionStyle["position"]; label: string }[] = [
   { id: "bottom", label: "Bottom" },
 ];
 
-type EditorTab = "edit" | "captions";
+type EditorTab = "edit" | "audio" | "captions";
 
 export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorModalProps) {
   const panelRef = useWillChange<HTMLDivElement>("transform, opacity");
@@ -67,6 +69,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     captionStyle: clip.style,
     aspectRatio: clip.resolution === "1080x1920" ? "9:16" : "16:9",
   });
+  const [audioPlacements, setAudioPlacements] = useState<AudioPlacement[]>([]);
   const [draftConflict, setDraftConflict] = useState(false);
   const handleDraftConflict = useCallback(() => setDraftConflict(true), []);
   const autosave = useAutoSave(`clip-editor:${clip.id}`, edits, {
@@ -154,6 +157,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
       captions: segments.length
         ? { segments, style: captionStyle, language, burnIntoExport }
         : undefined,
+      audio: audioPlacements,
     });
   };
 
@@ -221,7 +225,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
 
         <div className="w-full md:w-[380px] flex flex-col max-h-[80vh]">
           <div className="flex border-b border-white/10">
-            {(["edit", "captions"] as EditorTab[]).map((tab) => (
+            {(["edit", "audio", "captions"] as EditorTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -231,7 +235,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                     : "text-white/50 hover:text-white"
                 }`}
               >
-                {tab}
+                {tab === "audio" ? <span className="flex items-center justify-center gap-1"><Music2 className="h-3.5 w-3.5" />Audio</span> : tab}
               </button>
             ))}
           </div>
@@ -384,6 +388,8 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                   </div>
                 </div>
               </div>
+            ) : activeTab === "audio" ? (
+              <AudioLibrary placements={audioPlacements} onPlacementsChange={setAudioPlacements} />
             ) : (
               <div className="space-y-6">
                 <div className="space-y-2">
