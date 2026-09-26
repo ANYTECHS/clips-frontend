@@ -8,6 +8,7 @@ Thanks for wanting to contribute — we appreciate it! This document explains ho
 - Environment variables
 - Running tests & Storybook
 - Code standards & security
+- CSS naming conventions (BEM)
 - Pull request guidelines
 - Issue triage
 
@@ -97,6 +98,42 @@ When you're ready to release a new version:
 - Never commit secrets or private keys. `.env.local` is ignored by git.
 - Use native Web Crypto APIs for local encryption when applicable (see project docs).
 
+## CSS naming conventions (BEM)
+We use **BEM** (Block, Element, Modifier) for all CSS class names to keep styles predictable and collision-free. This applies to custom CSS, CSS Modules, and any non-utility class names (Tailwind utility classes are exempt).
+
+### Format
+```
+block__element--modifier
+```
+- **Block**: standalone component, e.g. `card`, `navbar`, `clip-player`
+- **Element**: part of a block, joined with `__`, e.g. `card__title`, `navbar__logo`
+- **Modifier**: variation/state, joined with `--`, e.g. `card--featured`, `button--disabled`
+
+### Rules
+- Use lowercase `kebab-case` for multi-word names: `clip-player__play-button`.
+- Elements and modifiers are always scoped to their block — never use bare element names like `title` or `button`.
+- Do not nest elements (`block__element__sub`); create a new block instead.
+- Avoid chaining modifiers (`block--a--b`); compose with separate classes.
+- Keep class names semantic, not presentational (`card__title`, not `card__big-text`).
+
+### Examples
+```html
+<!-- Good -->
+<div class="card card--featured">
+  <h2 class="card__title">Clip</h2>
+  <button class="card__action card__action--primary">Play</button>
+</div>
+
+<!-- Bad -->
+<div class="featuredCard">
+  <h2 class="cardTitle">Clip</h2>
+  <button class="primaryActionButton">Play</button>
+</div>
+```
+
+### Linting
+A Stylelint rule enforces the BEM pattern for custom class names. Run `npm run lint` (or `npm run lint:css` if configured) before opening a PR; violations must be fixed rather than disabled inline unless there is a documented exception.
+
 ## Pull request guidelines
 - Branch naming
   - Feature branches: `feature/<short-description>` or `feature/<issue-number>-short-description`
@@ -116,6 +153,7 @@ When you're ready to release a new version:
   - Add tests where applicable
   - Run `npm run test` and `npm run build` locally
   - Confirm Storybook builds if you changed UI components
+  - Confirm new/renamed CSS classes follow the BEM convention above
 
 - Required checks
   - At minimum, ensure lint and unit tests pass locally. The repository uses a Storybook GitHub Actions workflow for Storybook deployment; other CI checks (lint/tests) may be added — ensure your branch satisfies the repository's configured checks before merging.
