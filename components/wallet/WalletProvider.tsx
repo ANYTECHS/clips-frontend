@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { secureStorage } from "@/app/lib/secureStorage";
+import { truncateAddress } from "@/app/lib/stringUtils";
 
 const STORAGE_KEY = "clipcash_wallet";
 
@@ -259,7 +260,5 @@ export function useWallet(): WalletContextValue {
   return ctx;
 }
 
-export function truncateAddress(address: string): string {
-  if (address.length <= 12) return address;
-  return `${address.slice(0, 6)}...${address.slice(-4)}`;
-}
+// Re-export truncateAddress from stringUtils for backward compatibility
+export { truncateAddress } from "@/app/lib/stringUtils";

@@ -34,7 +34,8 @@
  */
 
 import { WalletStorage, WalletStorageError } from "./walletStorage";
-import { getStellarNetwork, NETWORK_CONFIGS, StellarNetwork } from "./networkConfig";
+import { logger } from "@/app/lib/logger";
+import { NETWORK_CONFIGS } from "@/app/lib/networkConfig";
 import { withRetry, withFallback } from "./retryUtils";
 
 export type { StellarNetwork };
@@ -352,12 +353,5 @@ export function getEmbeddedWallet(userId: string): EmbeddedWallet | null {
   };
 }
 
-/**
- * Truncate a Stellar public key for display: GABCD...WXYZ
- * @param publicKey - Complete address identifier mapping string.
- * @returns Formatted representation target text.
- */
-export function truncateStellarAddress(publicKey: string): string {
-  if (publicKey.length < 10) return publicKey;
-  return `${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
-}
+// Re-export truncateStellarAddress from stringUtils for backward compatibility
+export { truncateStellarAddress } from "./stringUtils";

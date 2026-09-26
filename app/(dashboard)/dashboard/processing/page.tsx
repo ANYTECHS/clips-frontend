@@ -11,9 +11,9 @@ import { ProcessStatus } from "@/app/store/types";
 function formatTimeRemaining(seconds: number | null): string {
   if (seconds === null) return "Calculating…";
   if (seconds <= 0) return "Almost done…";
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m} minute${m > 1 ? "s" : ""} ${s} seconds` : `${s} seconds`;
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return minutes > 0 ? `${minutes} minute${minutes > 1 ? "s" : ""} ${remainingSeconds} seconds` : `${remainingSeconds} seconds`;
 }
 
 export default function ProcessingPage() {
