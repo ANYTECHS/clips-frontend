@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import DashboardSidebar from "./DashboardSidebar";
 
 // Mock next/navigation for Storybook — @storybook/nextjs-vite handles useRouter,

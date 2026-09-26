@@ -1,4 +1,5 @@
 import type { CaptionSegment, CaptionStyle } from "@/app/api/schemas/captions.schema";
+import { segmentsToSrt, segmentsToVtt } from "@/app/lib/subtitles";
 
 export type CaptionStatus = "queued" | "processing" | "complete" | "error";
 
@@ -19,51 +20,16 @@ export interface ClipCaptions {
   updatedAt: string;
 }
 
-function segmentsToSrt(segments: CaptionSegment[]): string {
-  return segments
-    .map((seg, i) => {
-      const start = msToSrtTime(seg.startMs);
-      const end = msToSrtTime(seg.endMs);
-      return `${i + 1}\n${start} --> ${end}\n${seg.text}\n`;
-    })
-    .join("\n");
-}
-
-function segmentsToVtt(segments: CaptionSegment[]): string {
-  const cues = segments
-    .map((seg) => {
-      const start = msToVttTime(seg.startMs);
-      const end = msToVttTime(seg.endMs);
-      return `${start} --> ${end}\n${seg.text}`;
-    })
-    .join("\n\n");
-  return `WEBVTT\n\n${cues}\n`;
-}
-
-function msToSrtTime(ms: number): string {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  const msRem = ms % 1000;
-  return `${pad(h)}:${pad(m)}:${pad(s)},${String(msRem).padStart(3, "0")}`;
-}
-
-function msToVttTime(ms: number): string {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
-  const msRem = ms % 1000;
-  return `${pad(h)}:${pad(m)}:${pad(s)}.${String(msRem).padStart(3, "0")}`;
-}
-
-function pad(n: number): string {
-  return String(n).padStart(2, "0");
-}
-
-const DEFAULT_STYLE: CaptionStyle = {
+export const DEFAULT_CAPTION_STYLE: CaptionStyle = {
   fontStyle: "bold",
+  fontFamily: "inter",
+  fontSize: 48,
+  color: "#FFFFFF",
+  backgroundColor: "#000000",
   position: "bottom",
 };
+
+const DEFAULT_STYLE: CaptionStyle = DEFAULT_CAPTION_STYLE;
 
 const MOCK_SEGMENTS: CaptionSegment[] = [
   { id: "1", text: "Welcome to the show!", startMs: 0, endMs: 2200 },
@@ -88,6 +54,11 @@ class CaptionsStore {
     const now = new Date().toISOString();
 
     const segments = data.segments ?? existing?.segments ?? [];
+    const style: CaptionStyle = {
+      ...DEFAULT_STYLE,
+      ...(existing?.style ?? {}),
+      ...(data.style ?? {}),
+    };
     const record: ClipCaptions = {
       clipId: data.clipId,
       userId: data.userId,
@@ -96,7 +67,7 @@ class CaptionsStore {
       language: data.language ?? existing?.language ?? "auto",
       detectedLanguage: data.detectedLanguage ?? existing?.detectedLanguage,
       segments,
-      style: data.style ?? existing?.style ?? DEFAULT_STYLE,
+      style,
       srtContent: segments.length ? segmentsToSrt(segments) : existing?.srtContent,
       vttContent: segments.length ? segmentsToVtt(segments) : existing?.vttContent,
       burnIntoExport: data.burnIntoExport ?? existing?.burnIntoExport ?? true,
@@ -126,7 +97,7 @@ class CaptionsStore {
     clipId: string,
     userId: string,
     segments: CaptionSegment[],
-    detectedLanguage?: string,
+    detectedLanguage?: string
   ): ClipCaptions {
     return this.upsert({
       clipId,

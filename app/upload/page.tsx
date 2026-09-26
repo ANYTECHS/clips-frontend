@@ -11,6 +11,7 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useUploadProgress,
@@ -24,9 +25,11 @@ import {
   Loader2,
   XCircle,
   Film,
+  LayoutTemplate,
 } from "lucide-react";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 import SharedProgressBar from "@/components/ui/ProgressBar";
+import { sanitize } from "@/app/lib/sanitize";
 import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST } from "@/app/lib/constants";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -38,6 +41,17 @@ const ALLOWED_MIME_TYPES = [
   "video/x-msvideo",
   "video/x-matroska",
 ];
+
+interface UploadTemplateOption {
+  id: string;
+  name: string;
+  isPreset: boolean;
+  settings: {
+    aspectRatio: "9:16" | "1:1" | "16:9";
+    durationSeconds: number;
+    style: string;
+  };
+}
 
 /**
  * Known video magic-byte signatures — mirrors the server-side check so we can
@@ -124,14 +138,46 @@ function formatBytes(bytes: number): string {
 
 export default function UploadPage() {
   const router = useRouter();
+  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [templates, setTemplates] = useState<UploadTemplateOption[]>([]);
   const { progresses, results, isUploading, upload, retryFile, cancelFile, cancelAll } =
-    useUploadProgress();
+    useUploadProgress(undefined, templateId);
 
   const [files, setFiles] = useState<File[]>([]);
   const [dragOver, setDragOver] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const didRedirect = useRef(false);
+
+  // ── Load templates and honour /upload?template=<id> ───────────────────────
+
+  useEffect(() => {
+    let cancelled = false;
+    const requested = new URLSearchParams(window.location.search).get("template");
+
+    void fetch("/api/templates")
+      .then(async (res) => {
+        if (!res.ok) return { data: null };
+        return (await res.json()) as { data: { templates: UploadTemplateOption[] } | null };
+      })
+      .then((body) => {
+        if (cancelled) return;
+        const options = body.data?.templates ?? [];
+        setTemplates(options);
+        if (requested && options.some((template) => template.id === requested)) {
+          setTemplateId(requested);
+        }
+      })
+      .catch(() => {
+        /* Template selection is optional; uploads continue without one. */
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const selectedTemplate = templates.find((template) => template.id === templateId) ?? null;
 
   // ── Redirect on first successful job ──────────────────────────────────────
 
@@ -272,6 +318,48 @@ export default function UploadPage() {
             Each file is scanned and processed independently.
           </p>
         </div>
+
+        {/* Template selection */}
+        <section
+          aria-label="Apply a template"
+          className="mb-6 rounded-2xl border border-white/10 bg-white/[0.03] p-4"
+        >
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <LayoutTemplate className="h-4 w-4 text-brand" aria-hidden />
+              <label htmlFor="upload-template" className="text-sm font-bold text-white">
+                Apply a template
+              </label>
+            </div>
+            <Link href="/templates" className="text-xs font-semibold text-brand hover:underline">
+              Manage templates
+            </Link>
+          </div>
+
+          <select
+            id="upload-template"
+            value={templateId ?? ""}
+            disabled={isUploading}
+            onChange={(e) => setTemplateId(e.target.value || null)}
+            className="mt-3 w-full rounded-xl border border-white/10 bg-input px-3 py-2 text-sm text-white disabled:opacity-50"
+          >
+            <option value="">No template — use defaults</option>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {sanitize(template.name)}
+                {template.isPreset ? " (preset)" : ""}
+              </option>
+            ))}
+          </select>
+
+          {selectedTemplate && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              {selectedTemplate.settings.aspectRatio} ·{" "}
+              {selectedTemplate.settings.durationSeconds}s ·{" "}
+              {sanitize(selectedTemplate.settings.style)}
+            </p>
+          )}
+        </section>
 
         {/* Drop zone */}
         <div
