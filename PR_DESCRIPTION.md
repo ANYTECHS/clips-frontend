@@ -20,14 +20,14 @@
 - Updated AI backend callback schema and job store payload processing.
 - Created `ScoreBreakdownTooltip` component showing mini bars for hook, retention, emotional, and trending sub-scores.
 - Made tooltip keyboard accessible (`tabIndex={0}`, focus/blur triggers, ARIA attributes).
-- Added Storybook story in `components/projects/ScoreBreakdownTooltip.stories.tsx`.
+- Added Storybook story in `components/projects/score-breakdown-tooltip.stories.tsx`.
 
 ### Task 4: Add StellarWalletProvider and EmbeddedWalletProvider Components
 - Closes #810 [FEAT] Add StellarWalletProvider and EmbeddedWalletProvider Components
 - Created `EmbeddedWalletProvider` exposing `{ wallet, isLoading, error }` context and `useEmbeddedWallet` hook.
 - Updated `StellarWalletProvider` to call `CryptoSaltInitializer` on mount and wrap children in `EmbeddedWalletProvider`.
 - Ensured SSR safety on both providers.
-- Created comprehensive unit tests in `__tests__/components/StellarWalletProvider.test.tsx` verifying wallet creation and retrieval.
+- Created comprehensive unit tests in `__tests__/components/stellar-wallet-provider.test.tsx` verifying wallet creation and retrieval.
 
 ## Code Review Checklist (additions)
 

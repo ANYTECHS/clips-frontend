@@ -6,7 +6,7 @@ This implementation adds URL-based filter state persistence for the Projects and
 ## Implementation Summary
 
 ### 1. Core Hook: `useFilterQueryState`
-**Location:** `hooks/useFilterQueryState.ts`
+**Location:** `hooks/use-filter-query-state.ts`
 
 A reusable custom hook that manages filter state in URL query parameters.
 
@@ -49,7 +49,7 @@ const { filters, updateFilters, resetFilters } = useFilterQueryState({
 
 ### 3. Earnings Page Implementation
 **Location:** `app/earnings/page.tsx`
-**Component:** `components/dashboard/EarningsTable.tsx`
+**Component:** `components/dashboard/earnings-table.tsx`
 
 **Filters Persisted:**
 - `search` - Search term (string)
@@ -105,7 +105,7 @@ const { filters, updateFilters, resetFilters } = useFilterQueryState({
 ## Testing
 
 ### Test Files Created
-1. `__tests__/hooks/useFilterQueryState.test.tsx` - Hook unit tests
+1. `__tests__/hooks/use-filter-query-state.test.tsx` - Hook unit tests
 2. `__tests__/projects/projects-filters.test.tsx` - Projects page integration tests
 3. `__tests__/earnings/earnings-filters.test.tsx` - Earnings page integration tests
 

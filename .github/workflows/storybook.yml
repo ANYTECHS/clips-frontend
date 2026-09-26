@@ -17,6 +17,28 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Storybook loads next.config.ts, which runs validateRequiredEnv() and fails
+    # the build when required variables are missing. Stories never call these
+    # services, so non-secret placeholders are enough.
+    env:
+      GOOGLE_CLIENT_ID: storybook
+      GOOGLE_CLIENT_SECRET: storybook
+      APPLE_ID: storybook
+      APPLE_TEAM_ID: storybook
+      APPLE_KEY_ID: storybook
+      APPLE_PRIVATE_KEY: storybook
+      NEXTAUTH_SECRET: storybook
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_SENTRY_DSN: https://examplePublicKey@o0.ingest.sentry.io/0
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+      NEXT_PUBLIC_AI_API_URL: http://localhost:3000
+      AI_BACKEND_CALLBACK_SECRET: storybook
+      CLOUD_STORAGE_PROVIDER: s3
+      CLOUD_STORAGE_BUCKET: storybook
+      CLOUD_STORAGE_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: storybook
+      AWS_SECRET_ACCESS_KEY: storybook
+      REDIS_URL: redis://localhost:6379
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,7 +46,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           cache: 'npm'
 
       - name: Install dependencies

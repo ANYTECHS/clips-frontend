@@ -26,6 +26,8 @@ For a deep dive into each system — upload quarantine, AES-GCM wallet encryptio
 
 For the current security posture, threat model, and reporting process, see **[docs/SECURITY.md](docs/SECURITY.md)**.
 
+For the full HTTP API reference — every endpoint, request/response examples, authentication, and error shapes — see **[docs/API.md](docs/API.md)**. A machine-readable OpenAPI 3.1 spec is available at **[docs/openapi.yaml](docs/openapi.yaml)**.
+
 ---
 
 ## Quick Start
@@ -50,9 +52,82 @@ Open [http://localhost:3000](http://localhost:3000). The app runs fully offline 
 
 ---
 
+## API Documentation
+
+The HTTP API is documented in **[docs/API.md](docs/API.md)** and described by an OpenAPI 3.1 spec at **[docs/openapi.yaml](docs/openapi.yaml)**.
+
+### Authentication
+
+Most endpoints require an authenticated session. Callers authenticate in one of two ways:
+
+- **Browser session cookie** — set by NextAuth after an OAuth sign-in (`/api/auth/*`). Sent automatically by the browser.
+- **Bearer token** — send `Authorization: Bearer <token>` for server-to-server calls (e.g. the AI backend calling back into the app).
+
+Endpoints that are called by the AI backend additionally require the shared secret header `x-callback-secret: <AI_BACKEND_CALLBACK_SECRET>`.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/upload` | Session | Upload a source video (multipart). Returns a job id. |
+| `GET` | `/api/jobs` | Session | List the caller's jobs. |
+| `GET` | `/api/jobs/[id]` | Session | Fetch a single job's status and metadata. |
+| `GET` | `/api/jobs/[id]/stream` | Session | SSE stream of job progress (polling fallback available). |
+| `POST` | `/api/jobs/[id]/callback` | Callback secret | AI backend reports job completion/failure. |
+| `GET` | `/api/auth/session` | Public | Current session (NextAuth). |
+| `POST` | `/api/auth/signin` | Public | Begin OAuth sign-in. |
+| `POST` | `/api/auth/signout` | Session | End the current session. |
+
+### Example: upload a video
+
+```bash
+curl -X POST http://localhost:3000/api/upload \
+  -H "Cookie: next-auth.session-token=<token>" \
+  -F "file=@clip.mp4"
+```
+
+```json
+{ "jobId": "job_01H...", "status": "queued" }
+```
+
+### Example: fetch a job
+
+```bash
+curl http://localhost:3000/api/jobs/job_01H... \
+  -H "Cookie: next-auth.session-token=<token>"
+```
+
+```json
+{
+  "id": "job_01H...",
+  "status": "completed",
+  "clips": [{ "id": "clip_1", "url": "https://.../clip_1.mp4" }]
+}
+```
+
+### Error responses
+
+All errors share a consistent JSON shape:
+
+```json
+{ "error": "Unauthorized", "message": "Authentication required" }
+```
+
+| Status | Meaning |
+|---|---|
+| `400` | Malformed request (missing/invalid fields) |
+| `401` | Missing or invalid authentication |
+| `403` | Authenticated but not permitted (e.g. bad callback secret) |
+| `404` | Resource not found |
+| `413` | Upload exceeds the size limit |
+| `429` | Rate limit exceeded |
+| `500` | Unexpected server error |
+
+---
+
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in the values. The table below lists every variable; required ones will cause the server to fail or the feature to be silently broken if omitted.
+Copy `.env.example` to `.env.local` and fill in the values. The most common variables are summarised below. The **complete reference**, with required/optional status, defaults, examples and security notes, is in **[docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)**.
 
 ### Auth
 
@@ -271,14 +346,6 @@ stories/                  # Storybook stories
 
 ## Contributing
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, the Changesets versioning workflow, branch naming conventions, PR checklist, and issue triage guidelines.
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for onboarding, local setup, contribution guidelines, the code review process, good first issues and where to ask questions. Browse the component library with `npm run storybook`; see [STORYBOOK.md](STORYBOOK.md) for how it is deployed.
 
-Key rules from [AGENTS.md](AGENTS.md):
-- All user-controlled strings rendered in the UI must be sanitized with the `sanitize` utility at `app/lib/sanitize.ts`.
-- Never use `dangerouslySetInnerHTML` without explicit DOMPurify sanitization.
-- Component demos belong in **Storybook**, not in public App Router pages.
-
-## Handsoff notes
-
-<!-- handsoff-issue-1121 -->
-- #1121: Consolidate API Calls
+/* … truncated 5008 chars — edit only what you need near the top … */

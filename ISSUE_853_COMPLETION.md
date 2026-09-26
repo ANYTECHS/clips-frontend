@@ -26,7 +26,7 @@ Successfully implemented comprehensive database connection pooling for Prisma to
 **Files:**
 - `app/lib/prisma.ts` - Metrics functions
 - `app/api/health/database/route.ts` - Health endpoint
-- `app/lib/prismaMiddleware.ts` - Pool exhaustion detection
+- `app/lib/prisma-middleware.ts` - Pool exhaustion detection
 
 ### ✅ Implement connection timeout handling
 **Implementation:**
@@ -36,7 +36,7 @@ Successfully implemented comprehensive database connection pooling for Prisma to
 - Error logging for timeout events
 
 **Files:**
-- `app/lib/prismaMiddleware.ts` - Timeout middleware
+- `app/lib/prisma-middleware.ts` - Timeout middleware
 - `app/lib/prisma.ts` - Middleware integration
 
 ### ✅ Add connection pool metrics to logging
@@ -49,7 +49,7 @@ Successfully implemented comprehensive database connection pooling for Prisma to
 
 **Files:**
 - `app/lib/prisma.ts` - Event listeners
-- `app/lib/prismaMiddleware.ts` - Query logging
+- `app/lib/prisma-middleware.ts` - Query logging
 
 ### ✅ Test connection pool under load
 **Implementation:**
@@ -62,7 +62,7 @@ Successfully implemented comprehensive database connection pooling for Prisma to
 **Files:**
 - `scripts/test-connection-pool.ts` - Load test script
 - `__tests__/lib/prisma.test.ts` - Unit tests
-- `__tests__/lib/prismaMiddleware.test.ts` - Middleware tests
+- `__tests__/lib/prisma-middleware.test.ts` - Middleware tests
 - `__tests__/api/health-database.test.ts` - API tests
 
 ## Technical Implementation
@@ -75,7 +75,7 @@ Successfully implemented comprehensive database connection pooling for Prisma to
    - Health checks
    - Graceful shutdown
 
-2. **Middleware** (`app/lib/prismaMiddleware.ts`)
+2. **Middleware** (`app/lib/prisma-middleware.ts`)
    - Timeout handling
    - Slow query detection
    - Pool exhaustion detection
@@ -204,12 +204,12 @@ Response:
 ## Files Created (10 files)
 
 ### Implementation
-1. ✅ `app/lib/prismaMiddleware.ts` - Timeout and monitoring middleware
+1. ✅ `app/lib/prisma-middleware.ts` - Timeout and monitoring middleware
 2. ✅ `app/api/health/database/route.ts` - Health check endpoint
 
 ### Testing
 3. ✅ `__tests__/lib/prisma.test.ts` - Core pooling tests
-4. ✅ `__tests__/lib/prismaMiddleware.test.ts` - Middleware tests
+4. ✅ `__tests__/lib/prisma-middleware.test.ts` - Middleware tests
 5. ✅ `__tests__/api/health-database.test.ts` - API endpoint tests
 6. ✅ `scripts/test-connection-pool.ts` - Load testing script
 

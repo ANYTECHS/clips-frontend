@@ -19,6 +19,9 @@ import {
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
 import { logger } from "@/app/lib/logger";
+import { templatesStore } from "@/app/api/templates/templatesStore";
+import { getTemplateScope } from "@/app/api/templates/templateScope";
+import type { TemplateSettings } from "@/app/api/schemas/templates.schema";
 import {
   fail,
   guardChunkRequest,
@@ -37,6 +40,7 @@ export async function POST(request: NextRequest) {
     size?: number;
     type?: string;
     totalChunks?: number;
+    templateId?: string;
   };
   try {
     body = await request.json();
@@ -65,6 +69,26 @@ export async function POST(request: NextRequest) {
   });
   if (validationError) {
     return fail(validationError, 400, "VALIDATION_FAILED");
+  }
+
+  let clipTemplate: {
+    id: string;
+    version: number;
+    settings: TemplateSettings;
+  } | undefined;
+  const rawTemplateId =
+    typeof body.templateId === "string" ? body.templateId.trim() : "";
+  if (rawTemplateId) {
+    const scope = (await getTemplateScope()) ?? { userId, teamId: null };
+    const resolved = templatesStore.getSettings(rawTemplateId, scope);
+    if (!resolved) {
+      return fail("Template not found", 404, "NOT_FOUND");
+    }
+    clipTemplate = {
+      id: rawTemplateId,
+      version: resolved.version,
+      settings: resolved.settings,
+    };
   }
 
   const scopedSession = scopeSession(userId, sessionId);
@@ -109,6 +133,9 @@ export async function POST(request: NextRequest) {
       ...({ objectKey: result.objectKey } as object),
       ...({ contentType: result.type } as object),
       ...({ filename: result.name } as object),
+      ...(clipTemplate
+        ? ({ templateId: clipTemplate.id, templateVersion: clipTemplate.version } as object)
+        : {}),
     });
 
     await dispatchJob({
@@ -118,6 +145,7 @@ export async function POST(request: NextRequest) {
       contentType: result.type,
       filename: result.name,
       callbackUrl: `${callbackBase}/api/jobs/${result.jobId}/callback`,
+      ...(clipTemplate ? { clipTemplate } : {}),
     });
 
     logger.info(`[Upload] Chunked session ${sessionId} completed as ${result.jobId}`);

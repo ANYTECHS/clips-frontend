@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { secureStorage } from "@/app/lib/secureStorage";
+import { truncateAddress } from "@/app/lib/stringUtils";
 import { createSelectableContext } from "@/app/lib/createSelectableContext";
 
 const STORAGE_KEY = "clipcash_wallet";
@@ -281,6 +282,8 @@ function useWalletActionsContext(): WalletActions {
   return ctx;
 }
 
+// Re-export truncateAddress from stringUtils for backward compatibility
+export { truncateAddress } from "@/app/lib/stringUtils";
 /**
  * Full wallet state + actions, kept for existing call sites. Re-renders on
  * every wallet state change, same as before this file was split — prefer

@@ -20,12 +20,30 @@ const ClipGrid = dynamic(() => import("@/components/projects/ClipGrid"), {
   loading: () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
       {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
-        <div key={i} className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 animate-pulse h-64" />
+        <div
+          key={i}
+          className="rounded-2xl overflow-hidden border border-white/10 bg-white/5 animate-pulse h-64"
+        />
       ))}
     </div>
-  )
+  ),
 });
 import SelectionFooter from "@/components/projects/SelectionFooter";
+const ClipEditorModal = dynamic(() => import("@/components/projects/ClipEditorModal"), {
+  ssr: false,
+});
+const ClipPreviewModal = dynamic(() => import("@/components/projects/ClipPreviewModal"), {
+  ssr: false,
+});
+const BatchTransformModal = dynamic(
+  () => import("@/components/transform/BatchTransformModal").then((mod) => mod.BatchTransformModal),
+  { ssr: false }
+);
+const BatchTransformQueue = dynamic(
+  () => import("@/components/transform/BatchTransformQueue").then((mod) => mod.BatchTransformQueue),
+  { ssr: false }
+);
+
 import type { ClipEdits } from "@/components/projects/ClipEditorModal";
 import { X } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
@@ -47,11 +65,11 @@ const ClipComparisonView = dynamic(() => import("@/components/projects/ClipCompa
 });
 const BatchTransformModal = dynamic(
   () => import("@/components/transform/BatchTransformModal").then((m) => m.BatchTransformModal),
-  { ssr: false },
+  { ssr: false }
 );
 const BatchTransformQueue = dynamic(
   () => import("@/components/transform/BatchTransformQueue").then((m) => m.BatchTransformQueue),
-  { ssr: false },
+  { ssr: false }
 );
 
 const RECOMMENDATION_THRESHOLD = 90;
@@ -59,19 +77,19 @@ const RECOMMENDATION_THRESHOLD = 90;
 export default function ProjectsPage() {
   const { showToast, ToastEl } = useToast();
   const userPlan = useUserStore(selectUserPlan);
-  const { 
-    state: selectedIds, 
-    set: setSelectedIds, 
-    undo, 
-    redo, 
-    canUndo, 
-    canRedo, 
-    clear 
+  const {
+    state: selectedIds,
+    set: setSelectedIds,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    clear,
   } = useUndoRedo<string[]>([], 50, {
     undoMessage: "Selection undone",
-    redoMessage: "Selection redone"
+    redoMessage: "Selection redone",
   });
-  
+
   const [loading, setLoading] = useState(true);
   const [isMinting, setIsMinting] = useState(false);
   const [showTransformModal, setShowTransformModal] = useState(false);
@@ -119,37 +137,40 @@ export default function ProjectsPage() {
   const [previewClip, setPreviewClip] = useState<Clip | null>(null);
 
   // Fetch clips from API
-  const fetchClips = useCallback(async (page: number, append = false) => {
-    try {
-      if (page === 1) setLoading(true);
-      else setLoadingNextPage(true);
-      
-      const params = new URLSearchParams();
-      params.append("page", page.toString());
-      params.append("pageSize", PAGE_SIZE.toString());
-      if (vaultFilter !== "all") params.append("status", vaultFilter);
-      if (captionsStyle !== "All Styles") params.append("style", captionsStyle);
-      viralityLevels.forEach(v => params.append("virality", v));
-      if (keepDuplicates) params.append("keepDuplicates", "true");
-      
-      const res = await fetch(`/api/clips?${params.toString()}`);
-      if (!res.ok) throw new Error("Failed to fetch clips");
-      
-      const { data } = await res.json();
-      
-      if (append) {
-        setFetchedClips(prev => [...prev, ...data.clips]);
-      } else {
-        setFetchedClips(data.clips);
+  const fetchClips = useCallback(
+    async (page: number, append = false) => {
+      try {
+        if (page === 1) setLoading(true);
+        else setLoadingNextPage(true);
+
+        const params = new URLSearchParams();
+        params.append("page", page.toString());
+        params.append("pageSize", PAGE_SIZE.toString());
+        if (vaultFilter !== "all") params.append("status", vaultFilter);
+        if (captionsStyle !== "All Styles") params.append("style", captionsStyle);
+        viralityLevels.forEach((v) => params.append("virality", v));
+        if (keepDuplicates) params.append("keepDuplicates", "true");
+
+        const res = await fetch(`/api/clips?${params.toString()}`);
+        if (!res.ok) throw new Error("Failed to fetch clips");
+
+        const { data } = await res.json();
+
+        if (append) {
+          setFetchedClips((prev) => [...prev, ...data.clips]);
+        } else {
+          setFetchedClips(data.clips);
+        }
+        setTotalClips(data.total);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "An error occurred");
+      } finally {
+        setLoading(false);
+        setLoadingNextPage(false);
       }
-      setTotalClips(data.total);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
-      setLoading(false);
-      setLoadingNextPage(false);
-    }
-  }, [vaultFilter, captionsStyle, viralityLevels, keepDuplicates, PAGE_SIZE]);
+    },
+    [vaultFilter, captionsStyle, viralityLevels, keepDuplicates, PAGE_SIZE]
+  );
 
   useEffect(() => {
     fetchClips(1);
@@ -176,9 +197,11 @@ export default function ProjectsPage() {
   }, [fetchedClips.length, totalClips, loadingNextPage, currentPage, updateFilters, fetchClips]);
 
   const activeFilterCount = useMemo(() => {
-    return (captionsStyle !== "All Styles" ? 1 : 0) + 
-           (viralityLevels.length < 3 ? 1 : 0) + 
-           (vaultFilter !== "pending" ? 1 : 0);
+    return (
+      (captionsStyle !== "All Styles" ? 1 : 0) +
+      (viralityLevels.length < 3 ? 1 : 0) +
+      (vaultFilter !== "pending" ? 1 : 0)
+    );
   }, [captionsStyle, viralityLevels, vaultFilter]);
 
   // Clips that score at or above the recommendation threshold. Ranking runs
@@ -186,7 +209,7 @@ export default function ProjectsPage() {
   // main thread.
   const clipScores = useMemo(
     () => fetchedClips.map((c) => ({ id: c.id, score: c.score })),
-    [fetchedClips],
+    [fetchedClips]
   );
   const recommendedIds = useClipRanking(clipScores, RECOMMENDATION_THRESHOLD);
 
@@ -200,33 +223,37 @@ export default function ProjectsPage() {
   }, [recommendedIds]);
 
   const handleToggleRecommendations = useCallback(() => {
-    setAiRecommendations(prev => !prev);
+    setAiRecommendations((prev) => !prev);
   }, []);
 
-  const handleViralityToggle = useCallback((level: string) => {
-    const next = viralityLevels.includes(level)
-      ? viralityLevels.filter(l => l !== level)
-      : [...viralityLevels, level];
-    updateFilters({ virality: next });
-  }, [viralityLevels, updateFilters]);
+  const handleViralityToggle = useCallback(
+    (level: string) => {
+      const next = viralityLevels.includes(level)
+        ? viralityLevels.filter((l) => l !== level)
+        : [...viralityLevels, level];
+      updateFilters({ virality: next });
+    },
+    [viralityLevels, updateFilters]
+  );
 
   const handleResetFilters = useCallback(() => {
     resetFilters();
   }, [resetFilters]);
 
-  const handleSelect = useCallback((id: string) => {
-    setSelectedIds(prev =>
-      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
-    );
-  }, [setSelectedIds]);
+  const handleSelect = useCallback(
+    (id: string) => {
+      setSelectedIds((prev) => (prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]));
+    },
+    [setSelectedIds]
+  );
 
   const handleSelectAll = useCallback(() => {
     startTransition(() => {
-      setSelectedIds(prev => {
+      setSelectedIds((prev) => {
         if (prev.length === fetchedClips.length) {
           return [];
         } else {
-          return fetchedClips.map(c => c.id);
+          return fetchedClips.map((c) => c.id);
         }
       });
     });
@@ -236,35 +263,50 @@ export default function ProjectsPage() {
     setSelectedIds([]);
   }, [setSelectedIds]);
 
-  const handleSelectByScore = useCallback((minScore: number) => {
-    const ids = fetchedClips.filter(c => c.score >= minScore).map(c => c.id);
-    startTransition(() => {
-      setSelectedIds(ids);
-    });
-    showToast(`Selected ${ids.length} clip${ids.length !== 1 ? "s" : ""} with score ≥ ${minScore}`, "success");
-  }, [fetchedClips, showToast, setSelectedIds]);
+  const handleSelectByScore = useCallback(
+    (minScore: number) => {
+      const ids = fetchedClips.filter((c) => c.score >= minScore).map((c) => c.id);
+      startTransition(() => {
+        setSelectedIds(ids);
+      });
+      showToast(
+        `Selected ${ids.length} clip${ids.length !== 1 ? "s" : ""} with score ≥ ${minScore}`,
+        "success"
+      );
+    },
+    [fetchedClips, showToast, setSelectedIds]
+  );
 
-  const handleEdit = useCallback((id: string) => {
-    const clip = fetchedClips.find(c => c.id === id);
-    if (clip) setEditingClip(clip);
-  }, [fetchedClips]);
+  const handleEdit = useCallback(
+    (id: string) => {
+      const clip = fetchedClips.find((c) => c.id === id);
+      if (clip) setEditingClip(clip);
+    },
+    [fetchedClips]
+  );
 
-  const handleSaveEdits = useCallback(async (id: string, edits: ClipEdits) => {
-    if (edits.captions) {
-      try {
-        await fetch(`/api/clips/${id}/captions`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            segments: edits.captions.segments,
-            style: edits.captions.style,
-            language: edits.captions.language,
-            burnIntoExport: edits.captions.burnIntoExport,
-          }),
-        });
-      } catch {
-        showToast("Failed to save captions", "error");
-        return;
+  const handleSaveEdits = useCallback(
+    async (id: string, edits: ClipEdits) => {
+      if (edits.captions) {
+        try {
+          const res = await fetch(`/api/clips/${id}/captions`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              segments: edits.captions.segments,
+              style: edits.captions.style,
+              language: edits.captions.language,
+              burnIntoExport: edits.captions.burnIntoExport,
+            }),
+          });
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(body.error || "Failed to save captions");
+          }
+        } catch {
+          showToast("Failed to save captions", "error");
+          return;
+        }
       }
     }
     // Persist trim, color, and volume edits alongside captions
@@ -287,23 +329,26 @@ export default function ProjectsPage() {
     setEditingClip(null);
   }, [showToast]);
 
-  const handlePreview = useCallback((id: string) => {
-    const clip = fetchedClips.find(c => c.id === id);
-    if (clip) setPreviewClip(clip);
-  }, [fetchedClips]);
+  const handlePreview = useCallback(
+    (id: string) => {
+      const clip = fetchedClips.find((c) => c.id === id);
+      if (clip) setPreviewClip(clip);
+    },
+    [fetchedClips]
+  );
 
   const handleMint = useCallback(async () => {
     if (selectedIds.length === 0) return;
-    
+
     setIsMinting(true);
     try {
       const res = await fetch("/api/clips/mint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipIds: selectedIds })
+        body: JSON.stringify({ clipIds: selectedIds }),
       });
       if (!res.ok) throw new Error("Failed to mint clips");
-      
+
       showToast(`Successfully queued ${selectedIds.length} clip(s) for minting!`, "success");
       setSelectedIds([]); // Clear selection after successful mint
     } catch (error) {
@@ -327,110 +372,122 @@ export default function ProjectsPage() {
       if (!transformSubmitError) {
         showToast(
           `Started ${selectedIds.length} AI transform job${selectedIds.length !== 1 ? "s" : ""}`,
-          "success",
+          "success"
         );
         setSelectedIds([]);
       }
     },
-    [selectedIds, startTransformBatch, transformSubmitError, showToast, setSelectedIds],
+    [selectedIds, startTransformBatch, transformSubmitError, showToast, setSelectedIds]
   );
 
-  const handlePost = useCallback(async (clipIds: string[], platforms: string[]) => {
-    setIsPosting(true);
-    setPostError(null);
-    try {
-      const res = await fetch("/api/clips/post", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipIds, platforms }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Posting failed");
-      if (Array.isArray(data.failed) && data.failed.length > 0) {
-        setPostError(`${data.failed.length} post${data.failed.length > 1 ? "s" : ""} failed`);
-        data.failed.forEach((f: unknown) => console.warn(f));
+  const handlePost = useCallback(
+    async (clipIds: string[], platforms: string[]) => {
+      setIsPosting(true);
+      setPostError(null);
+      try {
+        const res = await fetch("/api/clips/post", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clipIds, platforms }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Posting failed");
+        if (Array.isArray(data.failed) && data.failed.length > 0) {
+          setPostError(`${data.failed.length} post${data.failed.length > 1 ? "s" : ""} failed`);
+          data.failed.forEach((f: unknown) => console.warn(f));
+        }
+        if (Array.isArray(data.posted) && data.posted.length > 0) {
+          showToast(
+            `Posted ${data.posted.length} clip${data.posted.length > 1 ? "s" : ""} successfully`,
+            "success"
+          );
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Posting failed";
+        setPostError(msg);
+        showToast(msg, "error");
+      } finally {
+        setIsPosting(false);
       }
-      if (Array.isArray(data.posted) && data.posted.length > 0) {
-        showToast(`Posted ${data.posted.length} clip${data.posted.length > 1 ? "s" : ""} successfully`, "success");
+    },
+    [showToast]
+  );
+
+  const handleDelete = useCallback(
+    async (clipIds: string[]) => {
+      setIsDeleting(true);
+      setDeleteError(null);
+
+      // Optimistic update: remove the clips from the grid immediately instead
+      // of waiting on the round trip, and restore the exact previous list if
+      // the request fails.
+      const idSet = new Set(clipIds);
+      const previousClips = fetchedClips;
+      const previousTotal = totalClips;
+      setFetchedClips((prev) => prev.filter((c) => !idSet.has(c.id)));
+      setTotalClips((prev) => Math.max(0, prev - clipIds.length));
+      setSelectedIds([]);
+
+      try {
+        const res = await fetch("/api/clips", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clipIds }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Delete failed");
+
+        const count = data?.data?.deletedCount ?? clipIds.length;
+        showToast(`Deleted ${count} clip${count !== 1 ? "s" : ""}`, "success");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Delete failed";
+        setDeleteError(msg);
+        showToast(msg, "error");
+        // Roll back to the pre-optimistic state.
+        setFetchedClips(previousClips);
+        setTotalClips(previousTotal);
+      } finally {
+        setIsDeleting(false);
       }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Posting failed";
-      setPostError(msg);
-      showToast(msg, "error");
-    } finally {
-      setIsPosting(false);
-    }
-  }, [showToast]);
+    },
+    [fetchedClips, totalClips, setSelectedIds, showToast]
+  );
 
-  const handleDelete = useCallback(async (clipIds: string[]) => {
-    setIsDeleting(true);
-    setDeleteError(null);
+  const handleArchive = useCallback(
+    async (clipIds: string[]) => {
+      setIsArchiving(true);
+      setArchiveError(null);
 
-    // Optimistic update: remove the clips from the grid immediately instead
-    // of waiting on the round trip, and restore the exact previous list if
-    // the request fails.
-    const idSet = new Set(clipIds);
-    const previousClips = fetchedClips;
-    const previousTotal = totalClips;
-    setFetchedClips((prev) => prev.filter((c) => !idSet.has(c.id)));
-    setTotalClips((prev) => Math.max(0, prev - clipIds.length));
-    setSelectedIds([]);
+      const idSet = new Set(clipIds);
+      const previousClips = fetchedClips;
+      const previousTotal = totalClips;
+      setFetchedClips((prev) => prev.filter((c) => !idSet.has(c.id)));
+      setTotalClips((prev) => Math.max(0, prev - clipIds.length));
+      setSelectedIds([]);
 
-    try {
-      const res = await fetch("/api/clips", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipIds }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Delete failed");
+      try {
+        const res = await fetch("/api/clips/archive", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clipIds }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Archive failed");
 
-      const count = data?.data?.deletedCount ?? clipIds.length;
-      showToast(`Deleted ${count} clip${count !== 1 ? "s" : ""}`, "success");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Delete failed";
-      setDeleteError(msg);
-      showToast(msg, "error");
-      // Roll back to the pre-optimistic state.
-      setFetchedClips(previousClips);
-      setTotalClips(previousTotal);
-    } finally {
-      setIsDeleting(false);
-    }
-  }, [fetchedClips, totalClips, setSelectedIds, showToast]);
-
-  const handleArchive = useCallback(async (clipIds: string[]) => {
-    setIsArchiving(true);
-    setArchiveError(null);
-
-    const idSet = new Set(clipIds);
-    const previousClips = fetchedClips;
-    const previousTotal = totalClips;
-    setFetchedClips((prev) => prev.filter((c) => !idSet.has(c.id)));
-    setTotalClips((prev) => Math.max(0, prev - clipIds.length));
-    setSelectedIds([]);
-
-    try {
-      const res = await fetch("/api/clips/archive", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ clipIds }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Archive failed");
-
-      const count = data?.data?.archivedCount ?? clipIds.length;
-      showToast(`Archived ${count} clip${count !== 1 ? "s" : ""}`, "success");
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : "Archive failed";
-      setArchiveError(msg);
-      showToast(msg, "error");
-      setFetchedClips(previousClips);
-      setTotalClips(previousTotal);
-    } finally {
-      setIsArchiving(false);
-    }
-  }, [fetchedClips, totalClips, setSelectedIds, showToast]);
+        const count = data?.data?.archivedCount ?? clipIds.length;
+        showToast(`Archived ${count} clip${count !== 1 ? "s" : ""}`, "success");
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Archive failed";
+        setArchiveError(msg);
+        showToast(msg, "error");
+        setFetchedClips(previousClips);
+        setTotalClips(previousTotal);
+      } finally {
+        setIsArchiving(false);
+      }
+    },
+    [fetchedClips, totalClips, setSelectedIds, showToast]
+  );
 
   return (
     <>
@@ -443,9 +500,11 @@ export default function ProjectsPage() {
       )}
 
       {/* Mobile Filter Drawer */}
-      <div className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-background border-r border-white/5 py-10 pl-8 transition-transform duration-300 lg:hidden ${
-        mobileFiltersOpen ? "translate-x-0" : "-translate-x-full"
-      }`}>
+      <div
+        className={`fixed inset-y-0 left-0 z-50 w-[300px] max-w-[85vw] bg-background border-r border-white/5 py-10 pl-8 transition-transform duration-300 lg:hidden ${
+          mobileFiltersOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
         <button
           onClick={() => setMobileFiltersOpen(false)}
           className="absolute top-4 right-4 p-2 text-muted-foreground hover:text-white transition-colors"
@@ -494,7 +553,10 @@ export default function ProjectsPage() {
               />
               Keep duplicate clips
             </label>
-            <div key={vaultFilter} className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500">
+            <div
+              key={vaultFilter}
+              className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500"
+            >
               <ClipGrid
                 clips={fetchedClips}
                 selectedIds={selectedIds}
@@ -517,9 +579,9 @@ export default function ProjectsPage() {
                 userPlan={userPlan}
               />
             </div>
-            
+
             {/* Docked Actions Footer - Single instance with all required props */}
-            <SelectionFooter 
+            <SelectionFooter
               count={selectedIds.length}
               selectedIds={selectedIds}
               onMint={handleMint}
@@ -565,16 +627,12 @@ export default function ProjectsPage() {
           onSave={handleSaveEdits}
         />
       )}
-      {previewClip && (
-        <ClipPreviewModal
-          clip={previewClip}
-          onClose={() => setPreviewClip(null)}
-        />
-      )}
+      {previewClip && <ClipPreviewModal clip={previewClip} onClose={() => setPreviewClip(null)} />}
       {/* Batch Transform Modal */}
       {showTransformModal && (
         <BatchTransformModal
           clipCount={selectedIds.length}
+          previewClipId={selectedIds.length === 1 ? selectedIds[0] : null}
           isSubmitting={isTransformSubmitting}
           submitError={transformSubmitError}
           onConfirm={handleTransformConfirm}

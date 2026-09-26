@@ -15,8 +15,11 @@ import {
   Download,
 } from "lucide-react";
 import type { Clip } from "./ClipGrid";
+import AudioLibrary, { type AudioPlacement } from "./AudioLibrary";
 import {
   CAPTION_LANGUAGES,
+  DEFAULT_CAPTION_STYLE,
+  captionFontFamilies,
   type CaptionSegment,
   type CaptionStyle,
 } from "@/app/api/schemas/captions.schema";
@@ -253,6 +256,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     colorFilter: "none",
     audioVolume: 100,
   });
+  const [audioPlacements, setAudioPlacements] = useState<AudioPlacement[]>([]);
   const [draftConflict, setDraftConflict] = useState(false);
   const handleDraftConflict = useCallback(() => setDraftConflict(true), []);
   const autosave = useAutoSave(`clip-editor:${clip.id}`, edits, {
@@ -266,10 +270,10 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
   const [captionLoading, setCaptionLoading] = useState(false);
   const [captionGenerating, setCaptionGenerating] = useState(false);
   const [captionStatus, setCaptionStatus] = useState<string | null>(null);
+  const [captionError, setCaptionError] = useState<string | null>(null);
   const [segments, setSegments] = useState<CaptionSegment[]>([]);
   const [captionStyle, setCaptionStyle] = useState<CaptionStyle>({
-    fontStyle: "bold",
-    position: "bottom",
+    ...DEFAULT_CAPTION_STYLE,
   });
   const [language, setLanguage] = useState("auto");
   const [burnIntoExport, setBurnIntoExport] = useState(true);
@@ -284,7 +288,9 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
       if (!data) return;
       setCaptionStatus(data.status);
       if (data.segments?.length) setSegments(data.segments);
-      if (data.style) setCaptionStyle(data.style);
+      if (data.style) {
+        setCaptionStyle({ ...DEFAULT_CAPTION_STYLE, ...data.style });
+      }
       if (data.language) setLanguage(data.language);
       setBurnIntoExport(data.burnIntoExport ?? true);
     } finally {
@@ -293,8 +299,23 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
   }, [clip.id]);
 
   useEffect(() => {
-    if (activeTab === "captions") loadCaptions();
+    if (activeTab !== "captions") return undefined;
+    void Promise.resolve().then(() => loadCaptions());
+    return undefined;
   }, [activeTab, loadCaptions]);
+
+  useEffect(() => {
+    if (
+      activeTab !== "captions" ||
+      (captionStatus !== "queued" && captionStatus !== "processing")
+    ) {
+      return undefined;
+    }
+    const timeout = setTimeout(() => {
+      void Promise.resolve().then(() => loadCaptions());
+    }, 2500);
+    return () => clearTimeout(timeout);
+  }, [activeTab, captionStatus, loadCaptions]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -313,20 +334,24 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
 
   const handleGenerateCaptions = async () => {
     setCaptionGenerating(true);
+    setCaptionError(null);
     try {
       const res = await fetch(`/api/clips/${clip.id}/captions`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ language }),
       });
-      if (res.ok) {
-        setCaptionStatus("queued");
-        if (captionsPollTimeoutRef.current) clearTimeout(captionsPollTimeoutRef.current);
-        captionsPollTimeoutRef.current = setTimeout(() => {
-          captionsPollTimeoutRef.current = null;
-          loadCaptions();
-        }, 1500);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setCaptionError(sanitize(body.error ?? "Caption generation failed"));
+        return;
       }
+      setCaptionStatus("queued");
+      if (captionsPollTimeoutRef.current) clearTimeout(captionsPollTimeoutRef.current);
+      captionsPollTimeoutRef.current = setTimeout(() => {
+        captionsPollTimeoutRef.current = null;
+        loadCaptions();
+      }, 1500);
     } finally {
       setCaptionGenerating(false);
     }
@@ -339,6 +364,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
       captions: segments.length
         ? { segments, style: captionStyle, language, burnIntoExport }
         : undefined,
+      audio: audioPlacements,
     });
 
     // Trigger export with the current edits applied at source quality
@@ -412,7 +438,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
           >
             <Image
               src={clip.thumbnail}
-              alt={clip.title}
+              alt={sanitize(clip.title)}
               fill
               sizes={SIZES_EDITOR_PREVIEW}
               placeholder="blur"
@@ -423,8 +449,8 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="text-white/50 font-medium">Preview Area</span>
             </div>
-            <div className={captionPreviewClass()}>
-              <span>{previewText}</span>
+            <div className={captionPreviewClass()} style={captionPreviewStyle}>
+              <span>{sanitize(previewText)}</span>
             </div>
           </div>
           {/* Volume indicator */}
@@ -440,7 +466,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
         <div className="w-full md:w-[380px] flex flex-col max-h-[90vh]">
           {/* Tabs */}
           <div className="flex border-b border-white/10">
-            {(["edit", "captions"] as EditorTab[]).map((tab) => (
+            {(["edit", "audio", "captions"] as EditorTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -450,7 +476,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                     : "text-white/50 hover:text-white"
                 }`}
               >
-                {tab}
+                {tab === "audio" ? <span className="flex items-center justify-center gap-1"><Music2 className="h-3.5 w-3.5" />Audio</span> : tab}
               </button>
             ))}
           </div>
@@ -537,7 +563,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                       { id: "1:1", icon: Crop, label: "Square" },
                     ].map((format) => {
                       const isActive = edits.aspectRatio === format.id;
-                      const Icon = format.icon;
+                      const formatIcon = format.icon;
                       return (
                         <button
                           key={format.id}
@@ -553,7 +579,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                               : "bg-white/5 border-transparent text-white/70 hover:bg-white/10"
                           }`}
                         >
-                          <Icon className="w-5 h-5 mb-1" />
+                          {React.createElement(formatIcon, { className: "w-5 h-5 mb-1" })}
                           <span className="text-xs font-bold">{format.id}</span>
                           <span className="text-[10px] opacity-70">{format.label}</span>
                         </button>
@@ -677,6 +703,8 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                   </div>
                 </div>
               </div>
+            ) : activeTab === "audio" ? (
+              <AudioLibrary placements={audioPlacements} onPlacementsChange={setAudioPlacements} />
             ) : (
               /* ── Captions tab ── */
               <div className="space-y-6">
@@ -714,6 +742,12 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                   </p>
                 )}
 
+                {captionError && (
+                  <p role="alert" className="text-xs text-red-400">
+                    {sanitize(captionError)}
+                  </p>
+                )}
+
                 {captionLoading ? (
                   <div className="flex justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-brand" />
@@ -739,6 +773,60 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <label
+                        className="text-sm font-medium text-white/90"
+                        htmlFor="caption-font-family"
+                      >
+                        Font Family
+                      </label>
+                      <select
+                        id="caption-font-family"
+                        value={captionStyle.fontFamily ?? "inter"}
+                        onChange={(e) =>
+                          setCaptionStyle((style) => ({
+                            ...style,
+                            fontFamily: e.target.value as CaptionStyle["fontFamily"],
+                          }))
+                        }
+                        className="w-full bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-sm text-white"
+                      >
+                        {captionFontFamilies.map((font) => (
+                          <option key={font} value={font} className="bg-[#111]">
+                            {font.charAt(0).toUpperCase() + font.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <label className="space-y-1 text-sm font-medium text-white/90">
+                        Text color
+                        <input
+                          type="color"
+                          value={captionStyle.color ?? "#FFFFFF"}
+                          onChange={(e) =>
+                            setCaptionStyle((style) => ({ ...style, color: e.target.value }))
+                          }
+                          className="h-9 w-full cursor-pointer rounded-lg border border-white/10 bg-white/5"
+                        />
+                      </label>
+                      <label className="space-y-1 text-sm font-medium text-white/90">
+                        Background
+                        <input
+                          type="color"
+                          value={captionStyle.backgroundColor ?? "#000000"}
+                          onChange={(e) =>
+                            setCaptionStyle((style) => ({
+                              ...style,
+                              backgroundColor: e.target.value,
+                            }))
+                          }
+                          className="h-9 w-full cursor-pointer rounded-lg border border-white/10 bg-white/5"
+                        />
+                      </label>
                     </div>
 
                     <div className="space-y-2">
@@ -783,6 +871,23 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                             </span>
                           </div>
                         ))}
+                      </div>
+
+                      <div className="flex gap-2 pt-1">
+                        <a
+                          href={`/api/clips/${encodeURIComponent(clip.id)}/captions/download?format=srt`}
+                          className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/5"
+                          download
+                        >
+                          Download SRT
+                        </a>
+                        <a
+                          href={`/api/clips/${encodeURIComponent(clip.id)}/captions/download?format=vtt`}
+                          className="rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-white/80 hover:bg-white/5"
+                          download
+                        >
+                          Download VTT
+                        </a>
                       </div>
                     </div>
 

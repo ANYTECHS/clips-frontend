@@ -40,10 +40,10 @@ All acceptance criteria have been successfully implemented.
 | Event | Location | Status |
 |-------|----------|--------|
 | User signs up | `components/AuthForm.tsx` | ✅ Implemented |
-| User uploads video | `components/dashboard/DashboardHeader.tsx` | ✅ Implemented |
-| User mints NFT | `components/vault/NFTCard.tsx` | ✅ Implemented |
+| User uploads video | `components/dashboard/dashboard-header.tsx` | ✅ Implemented |
+| User mints NFT | `components/vault/nft-card.tsx` | ✅ Implemented |
 | User exports earnings | `app/earnings/page.tsx` | ✅ Implemented |
-| User connects wallet | `components/WalletProvider.tsx` | ✅ Implemented |
+| User connects wallet | `components/wallet-provider.tsx` | ✅ Implemented |
 
 ### ✅ 5. Configurable Provider
 **Location**: `.env.example`
@@ -79,7 +79,7 @@ Automatically redacts:
 
 ### New Files
 1. `app/lib/analytics.ts` - Core analytics utility (370 lines)
-2. `app/components/AnalyticsProvider.tsx` - Auto page tracking component
+2. `app/components/analytics-provider.tsx` - Auto page tracking component
 3. `app/lib/analytics.test.ts` - Comprehensive test suite
 4. `ANALYTICS.md` - Complete documentation
 5. `ANALYTICS_IMPLEMENTATION_SUMMARY.md` - This file
@@ -87,11 +87,11 @@ Automatically redacts:
 ### Modified Files
 1. `app/layout.tsx` - Added AnalyticsProvider
 2. `components/AuthForm.tsx` - Added signup tracking
-3. `components/dashboard/DashboardHeader.tsx` - Added video upload tracking
-4. `components/vault/NFTCard.tsx` - Added NFT mint tracking
+3. `components/dashboard/dashboard-header.tsx` - Added video upload tracking
+4. `components/vault/nft-card.tsx` - Added NFT mint tracking
 5. `app/earnings/page.tsx` - Added earnings export tracking
-6. `components/WalletConnectButton.tsx` - Added wallet connection UI tracking
-7. `components/WalletProvider.tsx` - Added wallet connection tracking
+6. `components/wallet-connect-button.tsx` - Added wallet connection UI tracking
+7. `components/wallet-provider.tsx` - Added wallet connection tracking
 8. `.env.example` - Added analytics configuration
 
 ---
