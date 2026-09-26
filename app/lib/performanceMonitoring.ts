@@ -19,7 +19,30 @@
  */
 
 import * as Sentry from "@sentry/nextjs";
+
 import analytics from "@/app/lib/analytics";
+import {
+  CDN_PURGE_GOOD_THRESHOLD_MS,
+  CDN_PURGE_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  CLS_GOOD_THRESHOLD,
+  CLS_NEEDS_IMPROVEMENT_THRESHOLD,
+  DASHBOARD_LOAD_GOOD_THRESHOLD_MS,
+  DASHBOARD_LOAD_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  FCP_GOOD_THRESHOLD_MS,
+  FCP_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  LCP_GOOD_THRESHOLD_MS,
+  LCP_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  MEMORY_HEAP_USED_RATIO_GOOD_THRESHOLD,
+  MEMORY_HEAP_USED_RATIO_NEEDS_IMPROVEMENT_THRESHOLD,
+  RENDER_GOOD_THRESHOLD_MS,
+  RENDER_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  TTFB_GOOD_THRESHOLD_MS,
+  TTFB_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  UPLOAD_CHUNK_GOOD_THRESHOLD_MS,
+  UPLOAD_CHUNK_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  UPLOAD_TOTAL_GOOD_THRESHOLD_MS,
+  UPLOAD_TOTAL_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+} from "@/app/lib/constants";
 import { logger } from "@/app/lib/logger";
 
 // ─── Thresholds ───────────────────────────────────────────────────────────────
@@ -40,29 +63,38 @@ export type WebVitalName = "LCP" | "CLS" | "INP" | "FCP" | "TTFB";
  * @see https://web.dev/articles/defining-core-web-vitals-thresholds
  */
 export const WEB_VITAL_THRESHOLDS: Record<WebVitalName, [number, number]> = {
-  LCP: [2500, 4000],
-  CLS: [0.1, 0.25],
+  LCP: [LCP_GOOD_THRESHOLD_MS, LCP_NEEDS_IMPROVEMENT_THRESHOLD_MS],
+  CLS: [CLS_GOOD_THRESHOLD, CLS_NEEDS_IMPROVEMENT_THRESHOLD],
   INP: [200, 500],
-  FCP: [1800, 3000],
-  TTFB: [800, 1800],
+  FCP: [FCP_GOOD_THRESHOLD_MS, FCP_NEEDS_IMPROVEMENT_THRESHOLD_MS],
+  TTFB: [TTFB_GOOD_THRESHOLD_MS, TTFB_NEEDS_IMPROVEMENT_THRESHOLD_MS],
 };
 
 /** Budgets for app-specific metrics, in milliseconds unless noted otherwise. */
 export const CUSTOM_METRIC_THRESHOLDS: Record<string, [number, number]> = {
-  "dashboard.load": [1000, 3000],
-  "upload.total": [30_000, 120_000],
-  "upload.chunk": [5_000, 15_000],
+  "dashboard.load": [
+    DASHBOARD_LOAD_GOOD_THRESHOLD_MS,
+    DASHBOARD_LOAD_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  ],
+  "upload.total": [UPLOAD_TOTAL_GOOD_THRESHOLD_MS, UPLOAD_TOTAL_NEEDS_IMPROVEMENT_THRESHOLD_MS],
+  "upload.chunk": [UPLOAD_CHUNK_GOOD_THRESHOLD_MS, UPLOAD_CHUNK_NEEDS_IMPROVEMENT_THRESHOLD_MS],
   // CDN health metrics
   "cdn.probe": [200, 1_000],
-  "cdn.purge": [500, 2_000],
+  "cdn.purge": [CDN_PURGE_GOOD_THRESHOLD_MS, CDN_PURGE_NEEDS_IMPROVEMENT_THRESHOLD_MS],
   // Heap usage ratio (usedJSHeapSize / jsHeapSizeLimit), unitless 0-1 — see
   // app/hooks/useMemoryMonitor.ts.
-  "memory.heapUsedRatio": [0.7, 0.9],
+  "memory.heapUsedRatio": [
+    MEMORY_HEAP_USED_RATIO_GOOD_THRESHOLD,
+    MEMORY_HEAP_USED_RATIO_NEEDS_IMPROVEMENT_THRESHOLD,
+  ],
   "cdn.asset.resolve": [100, 500],
   // Heavy-component render timing (#render-optimization) — good is one
   // 60fps frame budget, poor is a noticeably janky commit.
-  "render.ClipGrid": [16, 50],
-  "render.TransactionHistoryViewer": [16, 50],
+  "render.ClipGrid": [RENDER_GOOD_THRESHOLD_MS, RENDER_NEEDS_IMPROVEMENT_THRESHOLD_MS],
+  "render.TransactionHistoryViewer": [
+    RENDER_GOOD_THRESHOLD_MS,
+    RENDER_NEEDS_IMPROVEMENT_THRESHOLD_MS,
+  ],
 };
 
 /**
@@ -73,8 +105,7 @@ export const CUSTOM_METRIC_THRESHOLDS: Record<string, [number, number]> = {
  * the rating meaningless.
  */
 export function rateMetric(name: string, value: number): MetricRating {
-  const thresholds =
-    WEB_VITAL_THRESHOLDS[name as WebVitalName] ?? CUSTOM_METRIC_THRESHOLDS[name];
+  const thresholds = WEB_VITAL_THRESHOLDS[name as WebVitalName] ?? CUSTOM_METRIC_THRESHOLDS[name];
   if (!thresholds) return "good";
 
   const [good, needsImprovement] = thresholds;
@@ -178,7 +209,7 @@ function reportBudgetBreach(metric: PerformanceMetric): void {
 export function reportMetric(
   name: string,
   value: number,
-  attributes?: PerformanceMetric["attributes"],
+  attributes?: PerformanceMetric["attributes"]
 ): PerformanceMetric | null {
   if (typeof window === "undefined") return null;
 
@@ -213,9 +244,7 @@ export function reportWebVital(vital: {
 
   return reportMetric(vital.name, vital.value, {
     ...(vital.id ? { id: vital.id } : {}),
-    ...(typeof window !== "undefined"
-      ? { path: window.location.pathname }
-      : {}),
+    ...(typeof window !== "undefined" ? { path: window.location.pathname } : {}),
   });
 }
 
@@ -228,7 +257,7 @@ export function reportWebVital(vital: {
 export async function measure<T>(
   name: string,
   operation: () => T | Promise<T>,
-  attributes?: PerformanceMetric["attributes"],
+  attributes?: PerformanceMetric["attributes"]
 ): Promise<T> {
   const start = now();
   try {
@@ -247,7 +276,7 @@ export async function measure<T>(
  */
 export function startMeasure(
   name: string,
-  attributes?: PerformanceMetric["attributes"],
+  attributes?: PerformanceMetric["attributes"]
 ): (extraAttributes?: PerformanceMetric["attributes"]) => number {
   const start = now();
   let settled = false;
@@ -263,7 +292,5 @@ export function startMeasure(
 
 /** High-resolution clock where available, wall clock otherwise. */
 function now(): number {
-  return typeof performance !== "undefined" && performance.now
-    ? performance.now()
-    : Date.now();
+  return typeof performance !== "undefined" && performance.now ? performance.now() : Date.now();
 }

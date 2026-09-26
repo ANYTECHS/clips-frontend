@@ -11,6 +11,26 @@
  * real authenticated user a stable, reproducible ledger.
  */
 
+import {
+  EARNINGS_AMOUNT_RNG_INCREMENT,
+  EARNINGS_AMOUNT_RNG_MODULUS,
+  EARNINGS_AMOUNT_RNG_MULTIPLIER,
+  EARNINGS_AMOUNT_SPREAD_USD,
+  EARNINGS_CRYPTO_AMOUNT_DECIMALS,
+  EARNINGS_CRYPTO_AMOUNT_JITTER,
+  EARNINGS_DATE_RNG_INCREMENT,
+  EARNINGS_DATE_RNG_MODULUS,
+  EARNINGS_DATE_RNG_MULTIPLIER,
+  EARNINGS_FAILED_EVERY_NTH_TRANSACTION,
+  EARNINGS_HISTORY_SPREAD_DAYS,
+  EARNINGS_MIN_AMOUNT_USD,
+  EARNINGS_PENDING_EVERY_NTH_TRANSACTION,
+  EARNINGS_SEED_TRANSACTION_COUNT,
+  EARNINGS_TX_ID_USER_PREFIX_LENGTH,
+  EARNINGS_USD_PER_CRYPTO_UNIT,
+  MS_PER_DAY,
+} from "@/app/lib/constants";
+
 import type { EarningTransaction } from "./types";
 
 // ─── Store interface ──────────────────────────────────────────────────────────
@@ -72,31 +92,44 @@ function seedTransactions(userId: string): EarningTransaction[] {
   const transactions: EarningTransaction[] = [];
   const now = Date.now();
 
-  for (let i = 0; i < 55; i++) {
-    const deterministicRand = ((seed * (i + 1) * 9301 + 49297) % 233280) / 233280;
-    const deterministicRand2 = ((seed * (i + 7) * 4451 + 12301) % 100003) / 100003;
+  for (let i = 0; i < EARNINGS_SEED_TRANSACTION_COUNT; i++) {
+    const deterministicRand =
+      ((seed * (i + 1) * EARNINGS_AMOUNT_RNG_MULTIPLIER + EARNINGS_AMOUNT_RNG_INCREMENT) %
+        EARNINGS_AMOUNT_RNG_MODULUS) /
+      EARNINGS_AMOUNT_RNG_MODULUS;
+    const deterministicRand2 =
+      ((seed * (i + 7) * EARNINGS_DATE_RNG_MULTIPLIER + EARNINGS_DATE_RNG_INCREMENT) %
+        EARNINGS_DATE_RNG_MODULUS) /
+      EARNINGS_DATE_RNG_MODULUS;
 
     const platform = platforms[i % platforms.length];
     const type = types[i % types.length];
     // ~10% pending, ~6% failed, rest completed — gives realistic tax-ready data
     const status =
-      i % 10 === 0 ? "pending" : i % 17 === 0 ? "failed" : "completed";
-    const amount = parseFloat((10 + deterministicRand * 290).toFixed(2));
+      i % EARNINGS_PENDING_EVERY_NTH_TRANSACTION === 0
+        ? "pending"
+        : i % EARNINGS_FAILED_EVERY_NTH_TRANSACTION === 0
+          ? "failed"
+          : "completed";
+    const amount = parseFloat(
+      (EARNINGS_MIN_AMOUNT_USD + deterministicRand * EARNINGS_AMOUNT_SPREAD_USD).toFixed(2)
+    );
     // Spread across the last 13 months so trend calculation has two full periods
-    const daysAgo = Math.floor(deterministicRand2 * 395);
-    const date = new Date(now - daysAgo * 86_400_000)
-      .toISOString()
-      .split("T")[0];
+    const daysAgo = Math.floor(deterministicRand2 * EARNINGS_HISTORY_SPREAD_DAYS);
+    const date = new Date(now - daysAgo * MS_PER_DAY).toISOString().split("T")[0];
     const hasCrypto = type === "mint" || type === "royalty";
 
     transactions.push({
-      id: `TX-${userId.slice(0, 4).toUpperCase()}-${String(i + 1).padStart(5, "0")}`,
+      id: `TX-${userId.slice(0, EARNINGS_TX_ID_USER_PREFIX_LENGTH).toUpperCase()}-${String(i + 1).padStart(5, "0")}`,
       date,
       description: `${platform} ${type} #${i + 1}`,
       amount,
       ...(hasCrypto && {
         cryptoAmount: parseFloat(
-          (amount / 2000 + deterministicRand * 0.05).toFixed(4)
+          (
+            amount / EARNINGS_USD_PER_CRYPTO_UNIT +
+            deterministicRand * EARNINGS_CRYPTO_AMOUNT_JITTER
+          ).toFixed(EARNINGS_CRYPTO_AMOUNT_DECIMALS)
         ),
         cryptoCurrency: cryptoCurrencies[i % cryptoCurrencies.length],
       }),
@@ -108,7 +141,5 @@ function seedTransactions(userId: string): EarningTransaction[] {
   }
 
   // Sort descending by date (newest first)
-  return transactions.sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-  );
+  return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 }

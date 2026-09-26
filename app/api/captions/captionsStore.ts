@@ -1,4 +1,5 @@
 import type { CaptionSegment, CaptionStyle } from "@/app/api/schemas/captions.schema";
+import { MS_PER_HOUR, MS_PER_MINUTE } from "@/app/lib/constants";
 
 export type CaptionStatus = "queued" | "processing" | "complete" | "error";
 
@@ -41,17 +42,17 @@ function segmentsToVtt(segments: CaptionSegment[]): string {
 }
 
 function msToSrtTime(ms: number): string {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
+  const h = Math.floor(ms / MS_PER_HOUR);
+  const m = Math.floor((ms % MS_PER_HOUR) / MS_PER_MINUTE);
+  const s = Math.floor((ms % MS_PER_MINUTE) / 1000);
   const msRem = ms % 1000;
   return `${pad(h)}:${pad(m)}:${pad(s)},${String(msRem).padStart(3, "0")}`;
 }
 
 function msToVttTime(ms: number): string {
-  const h = Math.floor(ms / 3600000);
-  const m = Math.floor((ms % 3600000) / 60000);
-  const s = Math.floor((ms % 60000) / 1000);
+  const h = Math.floor(ms / MS_PER_HOUR);
+  const m = Math.floor((ms % MS_PER_HOUR) / MS_PER_MINUTE);
+  const s = Math.floor((ms % MS_PER_MINUTE) / 1000);
   const msRem = ms % 1000;
   return `${pad(h)}:${pad(m)}:${pad(s)}.${String(msRem).padStart(3, "0")}`;
 }
@@ -126,7 +127,7 @@ class CaptionsStore {
     clipId: string,
     userId: string,
     segments: CaptionSegment[],
-    detectedLanguage?: string,
+    detectedLanguage?: string
   ): ClipCaptions {
     return this.upsert({
       clipId,

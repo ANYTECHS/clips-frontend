@@ -1,4 +1,17 @@
-import { sanitize } from "@/app/lib/sanitize";
+import {
+  HEX_PAIR_LENGTH,
+  LUMINANCE_COEFFICIENT_B,
+  LUMINANCE_COEFFICIENT_G,
+  LUMINANCE_COEFFICIENT_R,
+  RGB_CHANNEL_MAX,
+  SRGB_GAMMA_EXPONENT,
+  SRGB_GAMMA_OFFSET,
+  SRGB_GAMMA_SCALE,
+  SRGB_LINEAR_SLOPE_DIVISOR,
+  SRGB_LINEARIZATION_THRESHOLD,
+  WCAG_AA_MIN_CONTRAST_RATIO,
+  WCAG_CONTRAST_OFFSET,
+} from "@/app/lib/constants";
 
 export interface BrandAsset {
   id: string;
@@ -67,15 +80,21 @@ export interface BrandComplianceReport {
  */
 function getLuminance(hex: string): number {
   const cleanHex = hex.replace("#", "");
-  const r = parseInt(cleanHex.substring(0, 2), 16) / 255;
-  const g = parseInt(cleanHex.substring(2, 4), 16) / 255;
-  const b = parseInt(cleanHex.substring(4, 6), 16) / 255;
+  const r = parseInt(cleanHex.substring(0, HEX_PAIR_LENGTH), 16) / RGB_CHANNEL_MAX;
+  const g =
+    parseInt(cleanHex.substring(HEX_PAIR_LENGTH, HEX_PAIR_LENGTH * 2), 16) / RGB_CHANNEL_MAX;
+  const b =
+    parseInt(cleanHex.substring(HEX_PAIR_LENGTH * 2, HEX_PAIR_LENGTH * 3), 16) / RGB_CHANNEL_MAX;
 
   const a = [r, g, b].map((v) => {
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+    return v <= SRGB_LINEARIZATION_THRESHOLD
+      ? v / SRGB_LINEAR_SLOPE_DIVISOR
+      : Math.pow((v + SRGB_GAMMA_OFFSET) / SRGB_GAMMA_SCALE, SRGB_GAMMA_EXPONENT);
   });
 
-  return a[0] * 0.2126 + a[1] * 0.7152 + a[2] * 0.0722;
+  return (
+    a[0] * LUMINANCE_COEFFICIENT_R + a[1] * LUMINANCE_COEFFICIENT_G + a[2] * LUMINANCE_COEFFICIENT_B
+  );
 }
 
 /**
@@ -87,10 +106,10 @@ export function getContrastRatio(hex1: string, hex2: string): number {
     const lum2 = getLuminance(hex2);
     const brightest = Math.max(lum1, lum2);
     const darkest = Math.min(lum1, lum2);
-    const ratio = (brightest + 0.05) / (darkest + 0.05);
+    const ratio = (brightest + WCAG_CONTRAST_OFFSET) / (darkest + WCAG_CONTRAST_OFFSET);
     return parseFloat(ratio.toFixed(2));
   } catch {
-    return 4.5; // fallback standard
+    return WCAG_AA_MIN_CONTRAST_RATIO; // fallback standard
   }
 }
 
@@ -98,7 +117,7 @@ export function getContrastRatio(hex1: string, hex2: string): number {
  * Check if contrast ratio meets WCAG AA standard (>= 4.5:1 for normal text)
  */
 export function meetsWCAG_AA(ratio: number): boolean {
-  return ratio >= 4.5;
+  return ratio >= WCAG_AA_MIN_CONTRAST_RATIO;
 }
 
 /**
@@ -114,11 +133,9 @@ export function validateBrandCompliance(
   }
 ): BrandComplianceReport {
   const issues: string[] = [];
-  const contrastRatio = getContrastRatio(
-    brandKit.palette.textColor,
-    brandKit.palette.background
-  );
-  const passesWCAG = contrastRatio >= (brandKit.guidelines.minContrastRatio || 4.5);
+  const contrastRatio = getContrastRatio(brandKit.palette.textColor, brandKit.palette.background);
+  const passesWCAG =
+    contrastRatio >= (brandKit.guidelines.minContrastRatio || WCAG_AA_MIN_CONTRAST_RATIO);
 
   if (!passesWCAG) {
     issues.push(
@@ -127,14 +144,13 @@ export function validateBrandCompliance(
   }
 
   if (brandKit.guidelines.requireWatermark && !brandKit.watermark.logoUrl) {
-    issues.push("Guidelines require a watermark logo, but no logo has been uploaded or configured.");
+    issues.push(
+      "Guidelines require a watermark logo, but no logo has been uploaded or configured."
+    );
   }
 
   if (clipEdits) {
-    if (
-      brandKit.guidelines.requireWatermark &&
-      clipEdits.hasWatermark === false
-    ) {
+    if (brandKit.guidelines.requireWatermark && clipEdits.hasWatermark === false) {
       issues.push("Brand guidelines strictly require watermark branding on all clip exports.");
     }
 
