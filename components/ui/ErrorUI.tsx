@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
 import * as Sentry from "@sentry/nextjs";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { useEffect } from "react";
+
+import { FAILURE_MESSAGES } from "@/app/lib/errorMessages";
 
 export default function ErrorUI({
   error,
@@ -26,10 +28,7 @@ export default function ErrorUI({
       </div>
       <div className="space-y-2">
         <h2 className="text-2xl font-bold text-foreground">Something went wrong</h2>
-        <p className="text-sm text-muted-foreground max-w-md">
-          An unexpected error occurred. Please try again, or contact support if
-          the problem persists.
-        </p>
+        <p className="text-sm text-muted-foreground max-w-md">{FAILURE_MESSAGES.unexpected}</p>
       </div>
       {errorId && (
         <p className="text-xs text-muted-foreground">

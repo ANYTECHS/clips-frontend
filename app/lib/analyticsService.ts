@@ -1,4 +1,4 @@
-import { type Platform, type ClipMetric } from "./types"; // We will define this inline
+// We will define this inline
 
 export type AnalyticsPlatform = "YouTube" | "TikTok" | "Instagram" | "Twitch";
 export type AnalyticsClipMetric = {
@@ -32,7 +32,10 @@ export async function getAnalyticsData(
   const count = 40;
 
   for (let i = 0; i < count; i++) {
-    const p = platform && platform !== "all" as any ? platform : platforms[Math.floor(Math.random() * platforms.length)];
+    const p =
+      platform && platform !== ("all" as any)
+        ? platform
+        : platforms[Math.floor(Math.random() * platforms.length)];
     const views = Math.floor(Math.random() * 50000) + 1000;
     clips.push({
       clipId: `CLIP-${String(i + 1).padStart(3, "0")}`,
@@ -46,7 +49,9 @@ export async function getAnalyticsData(
 
   const totalViews = clips.reduce((s, m) => s + m.views, 0);
   const totalWatchTime = clips.reduce((s, m) => s + m.watchTimeMinutes, 0);
-  const avgEngagement = clips.length ? clips.reduce((s, m) => s + m.engagementRate, 0) / clips.length : 0;
+  const avgEngagement = clips.length
+    ? clips.reduce((s, m) => s + m.engagementRate, 0) / clips.length
+    : 0;
 
   const byPlatform: Record<string, { views: number; engagement: number; count: number }> = {};
   clips.forEach((m) => {

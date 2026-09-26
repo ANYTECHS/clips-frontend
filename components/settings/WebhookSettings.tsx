@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Copy, Check, ExternalLink, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
+import { AlertCircle,CheckCircle, Clock, Plus, Trash2, XCircle } from "lucide-react";
+import React, { useEffect,useState } from "react";
+
+import { logger } from "@/app/lib/logger";
 import { useToast } from "@/hooks/useToast";
 
 interface Webhook {
@@ -65,7 +67,7 @@ export default function WebhookSettings() {
       const data = await response.json();
       setWebhooks(data.webhooks || []);
     } catch (error) {
-      console.error("Error fetching webhooks:", error);
+      logger.error("Error fetching webhooks:", error);
       showToast("Failed to load webhooks", "error");
     } finally {
       setLoading(false);
@@ -78,7 +80,7 @@ export default function WebhookSettings() {
       const data = await response.json();
       setDeliveries(data.deliveries || []);
     } catch (error) {
-      console.error("Error fetching deliveries:", error);
+      logger.error("Error fetching deliveries:", error);
     }
   };
 
@@ -98,7 +100,7 @@ export default function WebhookSettings() {
       setFormData({ url: "", events: [], secret: "", description: "" });
       fetchWebhooks();
     } catch (error) {
-      console.error("Error creating webhook:", error);
+      logger.error("Error creating webhook:", error);
       showToast("Failed to create webhook", "error");
     }
   };
@@ -115,7 +117,7 @@ export default function WebhookSettings() {
       }
       fetchWebhooks();
     } catch (error) {
-      console.error("Error deleting webhook:", error);
+      logger.error("Error deleting webhook:", error);
       showToast("Failed to delete webhook", "error");
     }
   };
@@ -129,7 +131,7 @@ export default function WebhookSettings() {
       });
       fetchWebhooks();
     } catch (error) {
-      console.error("Error toggling webhook:", error);
+      logger.error("Error toggling webhook:", error);
       showToast("Failed to update webhook", "error");
     }
   };
@@ -216,7 +218,9 @@ export default function WebhookSettings() {
                       </span>
                     </div>
                     {webhook.description && (
-                      <p className="text-xs text-muted-foreground truncate">{webhook.description}</p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {webhook.description}
+                      </p>
                     )}
                     <div className="flex flex-wrap gap-1 mt-2">
                       {webhook.events.slice(0, 3).map((event) => (
@@ -273,10 +277,7 @@ export default function WebhookSettings() {
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {deliveries.map((delivery) => (
-                <div
-                  key={delivery.id}
-                  className="p-3 rounded-lg bg-white/5 border border-white/10"
-                >
+                <div key={delivery.id} className="p-3 rounded-lg bg-white/5 border border-white/10">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       {getDeliveryStatusIcon(delivery)}
@@ -360,7 +361,9 @@ export default function WebhookSettings() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white mb-2">Description (optional)</label>
+                <label className="block text-xs font-bold text-white mb-2">
+                  Description (optional)
+                </label>
                 <input
                   type="text"
                   value={formData.description}

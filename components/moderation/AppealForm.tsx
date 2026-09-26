@@ -8,10 +8,12 @@
  * appeals a reviewer cannot act on.
  */
 
-import { useCallback, useState } from "react";
 import { Send } from "lucide-react";
-import { CATEGORY_LABELS } from "@/app/lib/moderation/types";
+import { useCallback, useState } from "react";
+
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import type { CategoryScores, ModerationCategory } from "@/app/lib/moderation/types";
+import { CATEGORY_LABELS } from "@/app/lib/moderation/types";
 
 /** Matches the server's `AppealSchema`, so the client rejects early. */
 const MIN_STATEMENT = 20;
@@ -66,12 +68,12 @@ export default function AppealForm({
         setSubmitted(true);
         onSubmitted?.();
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not submit your appeal.");
+        setError(safeErrorMessage(err, FAILURE_MESSAGES.submitAppeal, "submit appeal"));
       } finally {
         setSubmitting(false);
       }
     },
-    [decisionId, statement, onSubmitted],
+    [decisionId, statement, onSubmitted]
   );
 
   if (submitted) {

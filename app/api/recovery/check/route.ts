@@ -15,9 +15,12 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+
+import { logger } from "@/app/lib/logger";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
-import { getRecoveryRepository } from "../shared/recoveryStore";
 import { combineShares } from "@/app/lib/shamirRecovery";
+
+import { getRecoveryRepository } from "../shared/recoveryStore";
 
 export async function GET(request: NextRequest): Promise<NextResponse> {
   // Rate limit: 30 status checks per minute per IP
@@ -59,9 +62,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
 
   if (isRecoverable) {
     // Collect the minimum number of shares needed to reconstruct the secret
-    const shareIds = approvedGuardians
-      .slice(0, session.threshold)
-      .map((g) => g.shareId);
+    const shareIds = approvedGuardians.slice(0, session.threshold).map((g) => g.shareId);
 
     const shareValues: string[] = [];
     for (const shareId of shareIds) {
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       try {
         encryptedBackup = combineShares(shareValues.slice(0, session.threshold));
       } catch (err) {
-        console.error("[recovery/check] Failed to combine shares:", err);
+        logger.error("[recovery/check] Failed to combine shares:", err);
         return NextResponse.json(
           { error: "Failed to reconstruct backup. Contact support." },
           { status: 500 }

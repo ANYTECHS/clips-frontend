@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { HelpCircle, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 
 export default function HelpBanner() {
   return (

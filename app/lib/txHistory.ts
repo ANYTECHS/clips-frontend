@@ -18,6 +18,16 @@
  * - Wallet addresses are not logged in full (only first 6 + last 4 chars).
  */
 
+import {
+  ADDRESS_PREFIX_LENGTH,
+  ADDRESS_SUFFIX_LENGTH,
+  CONFIRMATIONS_DISPLAY_LIMIT,
+  LAMPORTS_PER_SOL,
+  MIN_ADDRESS_LENGTH_FOR_PARTIAL,
+  SMALL_ETH_AMOUNT_THRESHOLD,
+  SOL_DECIMALS,
+  WEI_PER_ETH,
+} from "@/app/lib/constants";
 import { logger } from "@/app/lib/logger";
 
 // ─── Public types ──────────────────────────────────────────────────────────────
@@ -27,16 +37,16 @@ export type TxStatus = "pending" | "confirmed" | "failed";
 export type TxChain = "ethereum" | "solana";
 
 export interface Transaction {
-  id: string;             // tx hash / signature
+  id: string; // tx hash / signature
   chain: TxChain;
   direction: TxDirection;
   status: TxStatus;
-  timestamp: number;      // Unix ms
+  timestamp: number; // Unix ms
   fromAddress: string;
   toAddress: string;
-  amount: string;         // human-readable, e.g. "0.005"
-  assetSymbol: string;    // "ETH" | "SOL" | token symbol
-  fee?: string;           // gas / transaction fee in native units
+  amount: string; // human-readable, e.g. "0.005"
+  assetSymbol: string; // "ETH" | "SOL" | token symbol
+  fee?: string; // gas / transaction fee in native units
   blockConfirmations?: number;
   memo?: string;
   explorerUrl: string;
@@ -49,7 +59,8 @@ export type TxFilter = "all" | "sent" | "received";
 export class TxHistoryError extends Error {
   constructor(
     message: string,
-    public readonly code: "RATE_LIMITED" | "NETWORK_ERROR" | "INVALID_ADDRESS" | "API_ERROR" | "UNKNOWN",
+    public readonly code:
+      "RATE_LIMITED" | "NETWORK_ERROR" | "INVALID_ADDRESS" | "API_ERROR" | "UNKNOWN"
   ) {
     super(message);
     this.name = "TxHistoryError";
@@ -65,12 +76,12 @@ const requestLog = new Map<string, number[]>();
 
 function checkRateLimit(address: string): void {
   const now = Date.now();
-  const key = address.slice(0, 6);              // don't store full address
+  const key = address.slice(0, ADDRESS_PREFIX_LENGTH); // don't store full address
   const timestamps = (requestLog.get(key) ?? []).filter((t) => now - t < RATE_LIMIT_WINDOW_MS);
   if (timestamps.length >= RATE_LIMIT_MAX) {
     throw new TxHistoryError(
       "Rate limit exceeded. Please wait a moment before retrying.",
-      "RATE_LIMITED",
+      "RATE_LIMITED"
     );
   }
   timestamps.push(now);
@@ -104,16 +115,13 @@ function setCached(key: string, data: Transaction[]): void {
 
 export function clearTxCache(address: string): void {
   for (const key of cache.keys()) {
-    if (key.startsWith(address.slice(0, 6))) cache.delete(key);
+    if (key.startsWith(address.slice(0, ADDRESS_PREFIX_LENGTH))) cache.delete(key);
   }
 }
 
 // ─── Retry helper ──────────────────────────────────────────────────────────────
 
-async function withRetry<T>(
-  fn: () => Promise<T>,
-  maxAttempts = 3,
-): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, maxAttempts = 3): Promise<T> {
   let lastErr: unknown;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -135,22 +143,28 @@ async function withRetry<T>(
 
 /** Partial address for safe logging — never logs full address */
 function safeAddr(addr: string): string {
-  if (addr.length <= 10) return "***";
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  if (addr.length <= MIN_ADDRESS_LENGTH_FOR_PARTIAL) return "***";
+  return `${addr.slice(0, ADDRESS_PREFIX_LENGTH)}…${addr.slice(-ADDRESS_SUFFIX_LENGTH)}`;
 }
 
 function truncateForDisplay(addr: string): string {
   if (!addr) return "";
-  return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
+  return `${addr.slice(0, ADDRESS_PREFIX_LENGTH)}…${addr.slice(-ADDRESS_SUFFIX_LENGTH)}`;
 }
 
 // ─── Ethereum (Etherscan) ──────────────────────────────────────────────────────
 
 /** Etherscan base URLs by chainId (hex string) */
 const ETHERSCAN_URLS: Record<string, { api: string; explorer: string }> = {
-  "0x1":    { api: "https://api.etherscan.io/api",                 explorer: "https://etherscan.io/tx/" },
-  "0xaa36a7":{ api: "https://api-sepolia.etherscan.io/api",         explorer: "https://sepolia.etherscan.io/tx/" },
-  "0x5":    { api: "https://api-goerli.etherscan.io/api",           explorer: "https://goerli.etherscan.io/tx/" },
+  "0x1": { api: "https://api.etherscan.io/api", explorer: "https://etherscan.io/tx/" },
+  "0xaa36a7": {
+    api: "https://api-sepolia.etherscan.io/api",
+    explorer: "https://sepolia.etherscan.io/tx/",
+  },
+  "0x5": {
+    api: "https://api-goerli.etherscan.io/api",
+    explorer: "https://goerli.etherscan.io/tx/",
+  },
 };
 
 const DEFAULT_ETHERSCAN = ETHERSCAN_URLS["0x1"];
@@ -164,25 +178,25 @@ interface EtherscanTx {
   hash: string;
   from: string;
   to: string;
-  value: string;        // in Wei
+  value: string; // in Wei
   gasUsed: string;
   gasPrice: string;
-  timeStamp: string;    // Unix seconds as string
+  timeStamp: string; // Unix seconds as string
   confirmations: string;
-  txreceipt_status: string;  // "0" | "1"
-  isError: string;           // "0" | "1"
+  txreceipt_status: string; // "0" | "1"
+  isError: string; // "0" | "1"
 }
 
 function weiToEth(wei: string): string {
   const val = BigInt(wei || "0");
-  const eth = Number(val) / 1e18;
-  return eth.toFixed(eth < 0.001 ? 8 : 5);
+  const eth = Number(val) / WEI_PER_ETH;
+  return eth.toFixed(eth < SMALL_ETH_AMOUNT_THRESHOLD ? 8 : 5);
 }
 
 async function fetchEthereumTxs(
   address: string,
   chainId: string | null,
-  page: number,
+  page: number
 ): Promise<Transaction[]> {
   const cacheKey = `eth:${address}:${chainId}:${page}`;
   const cached = getCached(cacheKey);
@@ -202,7 +216,7 @@ async function fetchEthereumTxs(
     throw new TxHistoryError(`Etherscan request failed: ${res.status}`, "API_ERROR");
   }
 
-  const json = await res.json() as {
+  const json = (await res.json()) as {
     status: string;
     message: string;
     result: EtherscanTx[] | string;
@@ -223,17 +237,15 @@ async function fetchEthereumTxs(
   const txs: Transaction[] = raw.map((tx) => {
     const from = tx.from.toLowerCase();
     const to = (tx.to ?? "").toLowerCase();
-    const direction: TxDirection = from === lowerAddress && to === lowerAddress
-      ? "self"
-      : from === lowerAddress
-      ? "outgoing"
-      : "incoming";
+    const direction: TxDirection =
+      from === lowerAddress && to === lowerAddress
+        ? "self"
+        : from === lowerAddress
+          ? "outgoing"
+          : "incoming";
 
-    const status: TxStatus = tx.isError === "1"
-      ? "failed"
-      : tx.txreceipt_status === "0"
-      ? "pending"
-      : "confirmed";
+    const status: TxStatus =
+      tx.isError === "1" ? "failed" : tx.txreceipt_status === "0" ? "pending" : "confirmed";
 
     const confirmations = parseInt(tx.confirmations, 10);
     const gasFeeWei = (BigInt(tx.gasUsed || "0") * BigInt(tx.gasPrice || "0")).toString();
@@ -249,7 +261,7 @@ async function fetchEthereumTxs(
       amount: weiToEth(tx.value),
       assetSymbol: "ETH",
       fee: weiToEth(gasFeeWei),
-      blockConfirmations: confirmations < 10 ? confirmations : undefined,
+      blockConfirmations: confirmations < CONFIRMATIONS_DISPLAY_LIMIT ? confirmations : undefined,
       explorerUrl: `${explorer}${tx.hash}`,
     };
   });
@@ -264,14 +276,14 @@ interface SolscanTx {
   signature: string;
   blockTime: number;
   status: "Success" | "Fail";
-  fee: number;           // in lamports
-  lamport?: number;      // net lamport change (may be absent)
+  fee: number; // in lamports
+  lamport?: number; // net lamport change (may be absent)
   signer: string[];
   slot: number;
 }
 
 function lamportsToSol(lamports: number): string {
-  return (lamports / 1e9).toFixed(9).replace(/\.?0+$/, "");
+  return (lamports / LAMPORTS_PER_SOL).toFixed(SOL_DECIMALS).replace(/\.?0+$/, "");
 }
 
 function getSolscanExplorerUrl(sig: string, _cluster?: string): string {
@@ -279,10 +291,7 @@ function getSolscanExplorerUrl(sig: string, _cluster?: string): string {
   return `https://solscan.io/tx/${sig}`;
 }
 
-async function fetchSolanaTxs(
-  address: string,
-  page: number,
-): Promise<Transaction[]> {
+async function fetchSolanaTxs(address: string, page: number): Promise<Transaction[]> {
   const cacheKey = `sol:${address}:${page}`;
   const cached = getCached(cacheKey);
   if (cached) return cached;
@@ -300,14 +309,17 @@ async function fetchSolanaTxs(
   });
 
   if (res.status === 429) {
-    throw new TxHistoryError("Rate limit exceeded by Solscan API. Please wait a moment.", "RATE_LIMITED");
+    throw new TxHistoryError(
+      "Rate limit exceeded by Solscan API. Please wait a moment.",
+      "RATE_LIMITED"
+    );
   }
 
   if (!res.ok) {
     throw new TxHistoryError(`Solscan request failed: ${res.status}`, "API_ERROR");
   }
 
-  const raw = await res.json() as SolscanTx[];
+  const raw = (await res.json()) as SolscanTx[];
 
   if (!Array.isArray(raw)) {
     setCached(cacheKey, []);
@@ -357,7 +369,7 @@ export async function fetchTransactionHistory(
   walletType: WalletType,
   address: string,
   chainId: string | null,
-  page: number,
+  page: number
 ): Promise<Transaction[]> {
   if (!address) {
     throw new TxHistoryError("No wallet address provided.", "INVALID_ADDRESS");

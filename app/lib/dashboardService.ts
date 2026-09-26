@@ -1,25 +1,28 @@
-import { auth } from "@/app/lib/auth";
-import { requireAuth } from "@/app/api/jobs/shared/authGuard";
-import { earningsStore } from "@/app/api/earnings/earningsStore";
-import { projectsStore } from "@/app/api/projects/projectsStore";
 import { clipsStore } from "@/app/api/clips/clipsStore";
-import type { NextResponse } from "next/server";
+import { earningsStore } from "@/app/api/earnings/earningsStore";
+import { requireAuth } from "@/app/api/jobs/shared/authGuard";
+import { projectsStore } from "@/app/api/projects/projectsStore";
+import { auth } from "@/app/lib/auth";
 import type {
+  ClipsStats,
   DashboardStats,
   EarningsStats,
-  ClipsStats,
   PlatformsStats,
-  RevenuePoint,
   Project,
+  RevenuePoint,
 } from "@/app/store/types";
 
-export async function getDashboardDataServer(): Promise<{
-  stats: DashboardStats;
-  revenueTrend: RevenuePoint[];
-  recentProjects: Project[];
-} | { error: string }> {
+export async function getDashboardDataServer(): Promise<
+  | {
+      stats: DashboardStats;
+      revenueTrend: RevenuePoint[];
+      recentProjects: Project[];
+    }
+  | { error: string }
+> {
   const authResult = await requireAuth();
-  if (authResult instanceof Response) { // requireAuth returns NextResponse on failure
+  if (authResult instanceof Response) {
+    // requireAuth returns NextResponse on failure
     return { error: "Unauthorized" };
   }
   const { userId } = authResult as { userId: string };
@@ -86,11 +89,11 @@ export async function getDashboardDataServer(): Promise<{
   clipsStore.getClipsForUser(userId); // ensure cache/side effects
   const totalClipsNum = userProjects.reduce(
     (acc, p) => acc + clipsStore.getClipsForProject(userId, p.id).length,
-    0,
+    0
   );
 
   const currentPeriodProjects = userProjects.filter(
-    (p) => new Date(p.createdAt).getTime() >= now.getTime() - thirtyDaysMs,
+    (p) => new Date(p.createdAt).getTime() >= now.getTime() - thirtyDaysMs
   );
   const priorPeriodProjects = userProjects.filter((p) => {
     const t = new Date(p.createdAt).getTime();
@@ -99,11 +102,11 @@ export async function getDashboardDataServer(): Promise<{
 
   const currentClipsSum = currentPeriodProjects.reduce(
     (acc, p) => acc + clipsStore.getClipsForProject(userId, p.id).length,
-    0,
+    0
   );
   const priorClipsSum = priorPeriodProjects.reduce(
     (acc, p) => acc + clipsStore.getClipsForProject(userId, p.id).length,
-    0,
+    0
   );
 
   let clipsTrend = 0;

@@ -1,8 +1,10 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Globe, Check, ChevronDown, Sparkles, Languages } from "lucide-react";
+import { Check, ChevronDown, Globe, Sparkles } from "lucide-react";
+import React, { useCallback,useEffect, useRef, useState } from "react";
+
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
+
 import CommunityTranslationModal from "./CommunityTranslationModal";
 
 interface LanguageSwitcherProps {
@@ -31,20 +33,21 @@ export default function LanguageSwitcher({
   }, []);
 
   // Keyboard navigation
-  const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setIsOpen(false);
-      }
-    },
-    []
-  );
+  const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Escape") {
+      setIsOpen(false);
+    }
+  }, []);
 
   const currentConfig = locales.find((l) => l.value === locale) || locales[0];
 
   return (
     <>
-      <div className={`relative inline-block text-left ${className}`} ref={dropdownRef} onKeyDown={handleKeyDown}>
+      <div
+        className={`relative inline-block text-left ${className}`}
+        ref={dropdownRef}
+        onKeyDown={handleKeyDown}
+      >
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
@@ -118,9 +121,7 @@ export default function LanguageSwitcher({
                       <span className="text-base leading-none">{item.flag || "🌐"}</span>
                       <div className="text-left">
                         <div className="flex items-center gap-1.5">
-                          <span className="font-medium">
-                            {item.nativeName || item.label}
-                          </span>
+                          <span className="font-medium">{item.nativeName || item.label}</span>
                           {item.direction === "rtl" && (
                             <span className="rounded bg-white/10 px-1 py-0.5 text-[9px] font-semibold text-zinc-300">
                               RTL
@@ -133,9 +134,7 @@ export default function LanguageSwitcher({
                           )}
                         </div>
                         {item.nativeName && item.nativeName !== item.label && (
-                          <span className="text-[10px] text-zinc-500 block">
-                            {item.label}
-                          </span>
+                          <span className="text-[10px] text-zinc-500 block">{item.label}</span>
                         )}
                       </div>
                     </div>

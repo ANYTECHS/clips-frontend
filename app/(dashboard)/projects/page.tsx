@@ -1,20 +1,10 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect, startTransition } from "react";
 import dynamic from "next/dynamic";
-import ProjectFilters from "@/components/projects/ProjectFilters";
-import {
-  FolderOpen,
-  Plus,
-  Search,
-  Filter,
-  Grid,
-  List,
-  MoreVertical,
-  Clock,
-  Sparkles,
-} from "lucide-react";
+import React, { startTransition,useCallback, useEffect, useMemo, useState } from "react";
+
 import type { Clip } from "@/components/projects/ClipGrid";
+import ProjectFilters from "@/components/projects/ProjectFilters";
 
 const ClipGrid = dynamic(() => import("@/components/projects/ClipGrid"), {
   loading: () => (
@@ -46,12 +36,17 @@ const BatchTransformQueue = dynamic(
 
 import type { ClipEdits } from "@/components/projects/ClipEditorModal";
 import { X } from "lucide-react";
-import { useToast } from "@/hooks/useToast";
-import { useUndoRedo } from "@/hooks/useUndoRedo";
-import { useFilterQueryState } from "@/hooks/useFilterQueryState";
+
 import { useBatchTransform } from "@/app/hooks/useBatchTransform";
 import { useClipRanking } from "@/app/hooks/useClipRanking";
-import { useUserStore, selectUserPlan } from "@/app/store/userStore";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
+import { logger } from "@/app/lib/logger";
+import { selectUserPlan,useUserStore } from "@/app/store/userStore";
+import type { ClipEdits } from "@/components/projects/ClipEditorModal";
+import SelectionFooter from "@/components/projects/SelectionFooter";
+import { useFilterQueryState } from "@/hooks/useFilterQueryState";
+import { useToast } from "@/hooks/useToast";
+import { useUndoRedo } from "@/hooks/useUndoRedo";
 
 // Code-split modals
 const ClipEditorModal = dynamic(() => import("@/components/projects/ClipEditorModal"), {
@@ -352,7 +347,7 @@ export default function ProjectsPage() {
       showToast(`Successfully queued ${selectedIds.length} clip(s) for minting!`, "success");
       setSelectedIds([]); // Clear selection after successful mint
     } catch (error) {
-      console.error("Minting failed", error);
+      logger.error("Minting failed", error);
       const errorMessage = error instanceof Error ? error.message : "Failed to mint clips";
       showToast(errorMessage, "error");
     } finally {

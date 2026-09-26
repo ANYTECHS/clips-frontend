@@ -1,20 +1,28 @@
-import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
-import { checkCsrf } from "@/app/lib/csrf";
-import { applyRateLimit } from "@/app/lib/serverRateLimit";
-import { requireAuth } from "@/app/api/jobs/shared/authGuard";
-import { parseRequestJson } from "@/app/lib/parseRequestJson";
-import { dispatchJob } from "@/app/lib/aiBackend";
-import { logger } from "@/app/lib/logger";
-import { isExportQualityAllowed } from "@/app/lib/planLimits";
-import { buildExportObjectKey } from "@/app/lib/cloudStorage";
-import { prisma } from "@/app/lib/prisma";
+import { NextRequest, NextResponse } from "next/server";
+
 import { clipsStore } from "@/app/api/clips/clipsStore";
 import { captionsStore } from "@/app/api/captions/captionsStore";
 import { exportsStore } from "@/app/api/exports/exportsStore";
+import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { transcodeBodySchema } from "@/app/api/schemas/index";
 import type { ApiResponse } from "@/app/api/types";
+import { dispatchJob } from "@/app/lib/aiBackend";
+import { buildExportObjectKey } from "@/app/lib/cloudStorage";
+import {
+  BITRATE_720P_KBPS,
+  BITRATE_1080P_KBPS,
+  RESOLUTION_720P_HEIGHT,
+  RESOLUTION_1080P_HEIGHT,
+  RESOLUTION_1080P_WIDTH,
+} from "@/app/lib/constants";
+import { checkCsrf } from "@/app/lib/csrf";
+import { logger } from "@/app/lib/logger";
+import { parseRequestJson } from "@/app/lib/parseRequestJson";
+import { isExportQualityAllowed } from "@/app/lib/planLimits";
+import { prisma } from "@/app/lib/prisma";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
 
 function parseResolution(value: string): { width: number; height: number } | null {
   const match = /^(\d+)x(\d+)$/.exec(value);
@@ -24,16 +32,27 @@ function parseResolution(value: string): { width: number; height: number } | nul
 
 function exportTargets(quality: "source" | "720p" | "1080p", sourceResolution: string) {
   const source = parseResolution(sourceResolution);
-  const targetHeight = quality === "720p" ? 720 : quality === "1080p" ? 1080 : source?.height;
+  const targetHeight =
+    quality === "720p"
+      ? RESOLUTION_720P_HEIGHT
+      : quality === "1080p"
+        ? RESOLUTION_1080P_HEIGHT
+        : source?.height;
   if (!source || !targetHeight) {
-    return { targetResolution: quality, targetBitrateKbps: quality === "720p" ? 5_000 : 8_000 };
+    return {
+      targetResolution: quality,
+      targetBitrateKbps: quality === "720p" ? BITRATE_720P_KBPS : BITRATE_1080P_KBPS,
+    };
   }
 
   const scale = Math.min(1, targetHeight / source.height);
   const width = Math.round(source.width * scale);
   const height = Math.round(source.height * scale);
   const pixels = width * height;
-  const targetBitrateKbps = Math.max(5_000, Math.round((pixels / (1920 * 1080)) * 8_000));
+  const targetBitrateKbps = Math.max(
+    BITRATE_720P_KBPS,
+    Math.round((pixels / (RESOLUTION_1080P_WIDTH * RESOLUTION_1080P_HEIGHT)) * BITRATE_1080P_KBPS)
+  );
 
   return { targetResolution: `${width}x${height}`, targetBitrateKbps };
 }

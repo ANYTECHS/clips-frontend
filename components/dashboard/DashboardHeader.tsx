@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, memo, useEffect, useCallback, useRef } from "react";
-import { CloudUpload, Bell, Check, Menu } from "lucide-react";
-import { useUserStore, selectUserName } from "@/app/store";
-import PlanUsage from "@/components/dashboard/PlanUsage";
-import { sanitize } from "@/app/lib/sanitize";
+import { Bell, Check, CloudUpload, Menu } from "lucide-react";
+import React, { memo, useCallback, useEffect, useRef,useState } from "react";
+
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
-import LanguageSwitcher from "@/components/common/LanguageSwitcher";
+import { sanitize } from "@/app/lib/sanitize";
+import { selectUserName,useUserStore } from "@/app/store";
+import PlanUsage from "@/components/dashboard/PlanUsage";
 
 interface NotificationItem {
   id: string;
@@ -22,7 +22,11 @@ interface NotificationItem {
  * Polls notifications every 15 seconds and supports mark-as-read with optimistic updates.
  * Memoized to prevent re-renders from parent layout state changes.
  */
-const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuClick?: () => void }) {
+const DashboardHeader = memo(function DashboardHeader({
+  onMenuClick,
+}: {
+  onMenuClick?: () => void;
+}) {
   const userName = useUserStore(selectUserName);
   const { t } = useI18n();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -71,7 +75,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
     setNotifications([]);
 
     const results = await Promise.allSettled(
-      ids.map((id) => fetch(`/api/notifications/${id}/read`, { method: "PATCH" })),
+      ids.map((id) => fetch(`/api/notifications/${id}/read`, { method: "PATCH" }))
     );
     const failedIds = ids.filter((_, i) => {
       const result = results[i];
@@ -122,9 +126,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
           <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-white truncate">
             {t("dashboard.welcome", { name: sanitize(userName) })}
           </h1>
-          <p className="mt-1 text-zinc-400 text-sm">
-            {t("dashboard.subtitle")}
-          </p>
+          <p className="mt-1 text-zinc-400 text-sm">{t("dashboard.subtitle")}</p>
         </div>
       </div>
 
@@ -176,9 +178,7 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
                       className="p-4 hover:bg-white/5 transition-colors flex items-start justify-between gap-3"
                     >
                       <div className="space-y-1 text-left">
-                        <p className="text-xs font-bold text-white">
-                          {sanitize(item.title)}
-                        </p>
+                        <p className="text-xs font-bold text-white">{sanitize(item.title)}</p>
                         <p className="text-[11px] text-zinc-400 leading-snug">
                           {sanitize(item.message)}
                         </p>
@@ -218,4 +218,3 @@ const DashboardHeader = memo(function DashboardHeader({ onMenuClick }: { onMenuC
 });
 
 export default DashboardHeader;
-

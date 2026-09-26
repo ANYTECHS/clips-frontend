@@ -17,8 +17,10 @@
  * ```
  */
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback,useEffect, useRef, useState } from "react";
+
 import type { AnimeTransformOptions } from "@/app/lib/animeTransform";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -91,11 +93,11 @@ export function useAnimePreview({
       if (currentRequestId !== requestIdRef.current) return;
 
       if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? `Preview request failed (HTTP ${res.status})`);
       }
 
-      const data = await res.json() as { previewUrl?: string };
+      const data = (await res.json()) as { previewUrl?: string };
       if (!data.previewUrl) throw new Error("No preview URL in response");
 
       if (currentRequestId === requestIdRef.current) {
@@ -105,9 +107,7 @@ export function useAnimePreview({
       if (currentRequestId !== requestIdRef.current) return;
       // AbortError means the request was deliberately cancelled — not an error
       if (err instanceof DOMException && err.name === "AbortError") return;
-      setError(
-        err instanceof Error ? err.message : "Unable to generate preview",
-      );
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.generatePreview, "generate preview"));
     } finally {
       if (currentRequestId === requestIdRef.current) {
         setIsLoading(false);

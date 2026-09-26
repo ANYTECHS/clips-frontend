@@ -1,30 +1,29 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import Image from "next/image";
 import {
-  Sparkles,
-  Plus,
-  Trash2,
-  Check,
-  Upload,
   AlertTriangle,
-  ShieldCheck,
-  Type,
-  Palette,
-  Image as ImageIcon,
-  Sliders,
+  Check,
   Eye,
-  Save,
+  Image as ImageIcon,
   Loader2,
+  Palette,
+  Plus,
+  Save,
+  ShieldCheck,
+  Sliders,
+  Sparkles,
+  Trash2,
+  Type,
+  Upload,
 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo,useRef, useState } from "react";
+
 import {
-  type BrandKit,
   type BrandComplianceReport,
+  type BrandKit,
   validateBrandCompliance,
-  getContrastRatio,
-  meetsWCAG_AA,
 } from "@/app/lib/brandKit";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { sanitize } from "@/app/lib/sanitize";
 
@@ -110,7 +109,7 @@ export default function BrandKitManager() {
         }
       }
     } catch {
-      setError("Failed to load brand kits.");
+      setError(FAILURE_MESSAGES.loadBrandKits);
     } finally {
       setLoading(false);
     }
@@ -132,10 +131,7 @@ export default function BrandKitManager() {
   }, [currentKit]);
 
   // Update selected kit local field
-  const handleUpdateField = <K extends keyof BrandKit>(
-    field: K,
-    value: BrandKit[K]
-  ) => {
+  const handleUpdateField = <K extends keyof BrandKit>(field: K, value: BrandKit[K]) => {
     if (!currentKit) return;
     const updated = { ...currentKit, [field]: value };
     setSelectedKit(updated);
@@ -144,7 +140,7 @@ export default function BrandKitManager() {
 
   const handleUpdateNested = <
     K extends "palette" | "typography" | "watermark" | "guidelines",
-    F extends keyof BrandKit[K]
+    F extends keyof BrandKit[K],
   >(
     section: K,
     field: F,
@@ -184,7 +180,7 @@ export default function BrandKitManager() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Error saving brand kit");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.saveBrandKit, "save brand kit"));
     } finally {
       setSaving(false);
     }
@@ -208,7 +204,7 @@ export default function BrandKitManager() {
         );
       }
     } catch {
-      setError("Failed to set active brand kit.");
+      setError(FAILURE_MESSAGES.activateBrandKit);
     }
   };
 
@@ -229,7 +225,7 @@ export default function BrandKitManager() {
         setNewKitName("");
       }
     } catch {
-      setError("Failed to create brand kit.");
+      setError(FAILURE_MESSAGES.createBrandKit);
     }
   };
 
@@ -249,7 +245,7 @@ export default function BrandKitManager() {
         }
       }
     } catch {
-      setError("Failed to delete brand kit.");
+      setError(FAILURE_MESSAGES.deleteBrandKit);
     }
   };
 
@@ -272,7 +268,7 @@ export default function BrandKitManager() {
         handleUpdateNested("watermark", "logoUrl", json.asset.url);
       }
     } catch {
-      setError("Failed to upload logo.");
+      setError(FAILURE_MESSAGES.uploadLogo);
     }
   };
 
@@ -314,9 +310,7 @@ export default function BrandKitManager() {
                 ({brandKits.length} kits in workspace)
               </span>
             </h1>
-            <p className="text-xs text-zinc-400">
-              {t("brand_kit.subtitle")}
-            </p>
+            <p className="text-xs text-zinc-400">{t("brand_kit.subtitle")}</p>
           </div>
         </div>
 
@@ -375,20 +369,14 @@ export default function BrandKitManager() {
         {/* Auto-Apply Card */}
         <div className="p-4 rounded-2xl bg-[#121316] border border-white/10 flex items-center justify-between">
           <div className="pr-4">
-            <span className="text-xs font-bold text-white block">
-              {t("brand_kit.auto_apply")}
-            </span>
-            <span className="text-[11px] text-zinc-400">
-              {t("brand_kit.auto_apply_desc")}
-            </span>
+            <span className="text-xs font-bold text-white block">{t("brand_kit.auto_apply")}</span>
+            <span className="text-[11px] text-zinc-400">{t("brand_kit.auto_apply_desc")}</span>
           </div>
           <label className="relative inline-flex items-center cursor-pointer shrink-0">
             <input
               type="checkbox"
               checked={currentKit.autoApplyToNewClips}
-              onChange={(e) =>
-                handleUpdateField("autoApplyToNewClips", e.target.checked)
-              }
+              onChange={(e) => handleUpdateField("autoApplyToNewClips", e.target.checked)}
               className="sr-only peer"
             />
             <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand" />
@@ -415,8 +403,7 @@ export default function BrandKitManager() {
               </span>
               <span className="text-xs font-mono font-bold">
                 Contrast: {compliance.contrastRatio}:1 (
-                {compliance.passesWCAG ? "WCAG AA Pass" : "Fail"}
-                )
+                {compliance.passesWCAG ? "WCAG AA Pass" : "Fail"})
               </span>
             </div>
             <p className="text-[11px] mt-0.5 truncate">
@@ -463,11 +450,10 @@ export default function BrandKitManager() {
         {activeTab === "colors" && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-white mb-1">
-                {t("brand_kit.colors")}
-              </h3>
+              <h3 className="text-sm font-bold text-white mb-1">{t("brand_kit.colors")}</h3>
               <p className="text-xs text-zinc-400">
-                Define the brand palette used across clip captions, highlights, backgrounds, and watermarks.
+                Define the brand palette used across clip captions, highlights, backgrounds, and
+                watermarks.
               </p>
             </div>
 
@@ -490,22 +476,17 @@ export default function BrandKitManager() {
                     }}
                     className="p-3 rounded-xl border border-white/10 hover:border-brand/40 bg-white/5 text-left transition"
                   >
-                    <span className="text-xs font-bold text-white block mb-1.5">
-                      {preset.name}
-                    </span>
+                    <span className="text-xs font-bold text-white block mb-1.5">{preset.name}</span>
                     <div className="flex gap-1.5">
-                      {[
-                        preset.primary,
-                        preset.secondary,
-                        preset.accent,
-                        preset.background,
-                      ].map((col, idx) => (
-                        <div
-                          key={idx}
-                          className="w-4 h-4 rounded-full border border-white/20"
-                          style={{ backgroundColor: col }}
-                        />
-                      ))}
+                      {[preset.primary, preset.secondary, preset.accent, preset.background].map(
+                        (col, idx) => (
+                          <div
+                            key={idx}
+                            className="w-4 h-4 rounded-full border border-white/20"
+                            style={{ backgroundColor: col }}
+                          />
+                        )
+                      )}
                     </div>
                   </button>
                 ))}
@@ -534,17 +515,13 @@ export default function BrandKitManager() {
                       <input
                         type="color"
                         value={hexValue}
-                        onChange={(e) =>
-                          handleUpdateNested("palette", key as any, e.target.value)
-                        }
+                        onChange={(e) => handleUpdateNested("palette", key as any, e.target.value)}
                         className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0"
                       />
                       <input
                         type="text"
                         value={hexValue}
-                        onChange={(e) =>
-                          handleUpdateNested("palette", key as any, e.target.value)
-                        }
+                        onChange={(e) => handleUpdateNested("palette", key as any, e.target.value)}
                         className="flex-1 rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-xs font-mono text-white focus:outline-none focus:border-brand"
                       />
                     </div>
@@ -581,9 +558,7 @@ export default function BrandKitManager() {
                       : "bg-rose-500/20 text-rose-300"
                   }`}
                 >
-                  {compliance.contrastRatio}:1 (
-                  {compliance.passesWCAG ? "PASS" : "FAIL"}
-                  )
+                  {compliance.contrastRatio}:1 ({compliance.passesWCAG ? "PASS" : "FAIL"})
                 </span>
               </div>
             </div>
@@ -594,9 +569,7 @@ export default function BrandKitManager() {
         {activeTab === "logos" && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-white mb-1">
-                {t("brand_kit.logos")}
-              </h3>
+              <h3 className="text-sm font-bold text-white mb-1">{t("brand_kit.logos")}</h3>
               <p className="text-xs text-zinc-400">
                 Upload your creator watermark to automatically brand every exported clip.
               </p>
@@ -618,9 +591,7 @@ export default function BrandKitManager() {
                   className="w-full h-44 rounded-2xl border-2 border-dashed border-white/20 hover:border-brand/50 bg-white/[0.01] hover:bg-brand/5 transition flex flex-col items-center justify-center p-4 text-center cursor-pointer"
                 >
                   <Upload className="w-6 h-6 text-brand mb-2" />
-                  <span className="text-xs font-bold text-white">
-                    {t("brand_kit.upload_logo")}
-                  </span>
+                  <span className="text-xs font-bold text-white">{t("brand_kit.upload_logo")}</span>
                   <span className="text-[10px] text-zinc-400 mt-1">
                     PNG, SVG, or WebP with transparent background
                   </span>
@@ -644,9 +615,7 @@ export default function BrandKitManager() {
                       <button
                         key={pos.id}
                         type="button"
-                        onClick={() =>
-                          handleUpdateNested("watermark", "position", pos.id as any)
-                        }
+                        onClick={() => handleUpdateNested("watermark", "position", pos.id as any)}
                         className={`p-2.5 rounded-xl border text-xs font-medium transition ${
                           currentKit.watermark.position === pos.id
                             ? "bg-brand/10 border-brand text-brand font-bold"
@@ -662,9 +631,7 @@ export default function BrandKitManager() {
                 {/* Opacity Slider */}
                 <div>
                   <div className="flex items-center justify-between text-xs mb-1">
-                    <span className="text-zinc-300">
-                      {t("brand_kit.watermark_opacity")}
-                    </span>
+                    <span className="text-zinc-300">{t("brand_kit.watermark_opacity")}</span>
                     <span className="font-mono text-white">
                       {Math.round(currentKit.watermark.opacity * 100)}%
                     </span>
@@ -676,11 +643,7 @@ export default function BrandKitManager() {
                     step={0.05}
                     value={currentKit.watermark.opacity}
                     onChange={(e) =>
-                      handleUpdateNested(
-                        "watermark",
-                        "opacity",
-                        parseFloat(e.target.value)
-                      )
+                      handleUpdateNested("watermark", "opacity", parseFloat(e.target.value))
                     }
                     className="w-full accent-brand h-1.5 bg-white/10 rounded cursor-pointer"
                   />
@@ -694,9 +657,7 @@ export default function BrandKitManager() {
         {activeTab === "typography" && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-white mb-1">
-                {t("brand_kit.fonts")}
-              </h3>
+              <h3 className="text-sm font-bold text-white mb-1">{t("brand_kit.fonts")}</h3>
               <p className="text-xs text-zinc-400">
                 Configure primary and secondary fonts for captions and title cards.
               </p>
@@ -710,9 +671,7 @@ export default function BrandKitManager() {
                 </label>
                 <select
                   value={currentKit.typography.primaryFont}
-                  onChange={(e) =>
-                    handleUpdateNested("typography", "primaryFont", e.target.value)
-                  }
+                  onChange={(e) => handleUpdateNested("typography", "primaryFont", e.target.value)}
                   className="w-full rounded-xl bg-white/5 border border-white/10 px-3 py-2 text-xs text-white focus:outline-none focus:border-brand"
                 >
                   {FONT_PRESETS.map((font) => (
@@ -747,9 +706,7 @@ export default function BrandKitManager() {
             {/* Minimum Font Size Guideline */}
             <div>
               <div className="flex items-center justify-between text-xs mb-1">
-                <span className="text-zinc-300">
-                  {t("brand_kit.min_font_size")}
-                </span>
+                <span className="text-zinc-300">{t("brand_kit.min_font_size")}</span>
                 <span className="font-mono text-white">
                   {currentKit.typography.minFontSizePx}px
                 </span>
@@ -760,11 +717,7 @@ export default function BrandKitManager() {
                 max={32}
                 value={currentKit.typography.minFontSizePx}
                 onChange={(e) =>
-                  handleUpdateNested(
-                    "typography",
-                    "minFontSizePx",
-                    parseInt(e.target.value, 10)
-                  )
+                  handleUpdateNested("typography", "minFontSizePx", parseInt(e.target.value, 10))
                 }
                 className="w-full accent-brand h-1.5 bg-white/10 rounded cursor-pointer"
               />
@@ -776,9 +729,7 @@ export default function BrandKitManager() {
         {activeTab === "guidelines" && (
           <div className="space-y-6">
             <div>
-              <h3 className="text-sm font-bold text-white mb-1">
-                {t("brand_kit.guidelines")}
-              </h3>
+              <h3 className="text-sm font-bold text-white mb-1">{t("brand_kit.guidelines")}</h3>
               <p className="text-xs text-zinc-400">
                 Enforce strict rules so editors cannot create non-compliant video exports.
               </p>
@@ -819,11 +770,7 @@ export default function BrandKitManager() {
                   type="checkbox"
                   checked={currentKit.guidelines.requireWatermark}
                   onChange={(e) =>
-                    handleUpdateNested(
-                      "guidelines",
-                      "requireWatermark",
-                      e.target.checked
-                    )
+                    handleUpdateNested("guidelines", "requireWatermark", e.target.checked)
                   }
                   className="w-4 h-4 accent-brand rounded cursor-pointer"
                 />
@@ -849,10 +796,10 @@ export default function BrandKitManager() {
                   currentKit.watermark.position === "top-left"
                     ? "top-3 left-3"
                     : currentKit.watermark.position === "top-right"
-                    ? "top-3 right-3"
-                    : currentKit.watermark.position === "bottom-left"
-                    ? "bottom-3 left-3"
-                    : "bottom-3 right-3"
+                      ? "top-3 right-3"
+                      : currentKit.watermark.position === "bottom-left"
+                        ? "bottom-3 left-3"
+                        : "bottom-3 right-3"
                 }`}
                 style={{
                   color: currentKit.palette.textColor,
@@ -941,9 +888,7 @@ export default function BrandKitManager() {
           aria-modal="true"
         >
           <div className="bg-[#121316] border border-white/10 rounded-2xl p-6 max-w-sm w-full space-y-4">
-            <h3 className="text-base font-bold text-white">
-              {t("brand_kit.create_kit")}
-            </h3>
+            <h3 className="text-base font-bold text-white">{t("brand_kit.create_kit")}</h3>
             <div>
               <label className="block text-xs font-medium text-zinc-400 mb-1">
                 {t("brand_kit.kit_name")}

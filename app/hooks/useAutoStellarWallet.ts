@@ -1,9 +1,16 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect,useState } from "react";
+
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
+import {
+  getActiveNetworkConfig,
+  getFreighterNetwork,
+  getStellarNetwork,
+} from "@/app/lib/networkConfig";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { getBalance, Balance } from "./useBalance";
-import { getStellarNetwork, getFreighterNetwork, getActiveNetworkConfig } from "@/app/lib/networkConfig";
+
+import { Balance,getBalance } from "./useBalance";
 
 /** Current connection phase indicator for the managed auto-wallet context */
 export type WalletStatus = "idle" | "ready" | "loading" | "error";
@@ -41,8 +48,7 @@ export function useAutoStellarWallet(): AutoStellarWallet {
   const [error, setError] = useState<string | null>(null);
 
   // Derive public key from auth context (stored during signup/onboarding)
-  const publicKey: string | null =
-    (user?.profile?.stellarPublicKey as string) ?? null;
+  const publicKey: string | null = (user?.profile?.stellarPublicKey as string) ?? null;
 
   // Resolve the Horizon-compatible network identifier from the env config
   const horizonNetwork = getFreighterNetwork(getStellarNetwork());
@@ -73,7 +79,7 @@ export function useAutoStellarWallet(): AutoStellarWallet {
           setError(null);
         } else {
           setStatus("error");
-          setError(err?.message ?? "Failed to load wallet");
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.loadWallet, "load wallet"));
         }
       });
 

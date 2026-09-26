@@ -1,5 +1,7 @@
-import { prisma } from "@/app/lib/prisma";
 import crypto from "crypto";
+
+import { logger } from "@/app/lib/logger";
+import { prisma } from "@/app/lib/prisma";
 
 const RETRY_DELAYS = [1000, 5000, 15000, 60000, 300000]; // 1s, 5s, 15s, 1m, 5m
 const MAX_RETRIES = RETRY_DELAYS.length;
@@ -111,7 +113,7 @@ async function attemptDelivery(
       }, nextRetryDelay);
     }
   } catch (error) {
-    console.error("Webhook delivery failed:", error);
+    logger.error("Webhook delivery failed:", error);
 
     await prisma.webhookDelivery.update({
       where: { id: deliveryId },
@@ -165,8 +167,5 @@ function generateSignature(payload: WebhookPayload, secret: string): string {
 
 export function verifySignature(payload: string, signature: string, secret: string): boolean {
   const expectedSignature = generateSignature(JSON.parse(payload), secret);
-  return crypto.timingSafeEqual(
-    Buffer.from(signature),
-    Buffer.from(expectedSignature)
-  );
+  return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expectedSignature));
 }

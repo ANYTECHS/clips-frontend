@@ -1,11 +1,9 @@
 import Redis from "ioredis";
-import type { Job } from "./jobStore";
+
 import { logger } from "@/app/lib/logger";
-import { 
-  getRedisClient, 
-  isRedisAvailable, 
-  checkRedisHealth 
-} from "./redisClient";
+
+import type { Job } from "./jobStore";
+import { getRedisClient, isRedisAvailable } from "./redisClient";
 
 interface StorageAdapter {
   get(key: string): Promise<string | null>;
@@ -16,7 +14,10 @@ interface StorageAdapter {
 }
 
 export class JobRepositoryError extends Error {
-  constructor(message: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly cause?: Error
+  ) {
     super(message);
     this.name = "JobRepositoryError";
   }
@@ -29,7 +30,7 @@ class RedisStorageAdapter implements StorageAdapter {
     try {
       return await this.client.get(key);
     } catch (error) {
-      logger.error('[RedisStorageAdapter] get() failed:', error);
+      logger.error("[RedisStorageAdapter] get() failed:", error);
       throw error;
     }
   }
@@ -38,7 +39,7 @@ class RedisStorageAdapter implements StorageAdapter {
     try {
       return await this.client.set(key, value);
     } catch (error) {
-      logger.error('[RedisStorageAdapter] set() failed:', error);
+      logger.error("[RedisStorageAdapter] set() failed:", error);
       throw error;
     }
   }
@@ -47,7 +48,7 @@ class RedisStorageAdapter implements StorageAdapter {
     try {
       return await this.client.del(key);
     } catch (error) {
-      logger.error('[RedisStorageAdapter] del() failed:', error);
+      logger.error("[RedisStorageAdapter] del() failed:", error);
       throw error;
     }
   }
@@ -59,7 +60,7 @@ class RedisStorageAdapter implements StorageAdapter {
       const values = await this.client.mget(...keys);
       return values.filter((val): val is string => val !== null);
     } catch (error) {
-      logger.error('[RedisStorageAdapter] getAll() failed:', error);
+      logger.error("[RedisStorageAdapter] getAll() failed:", error);
       throw error;
     }
   }
@@ -68,7 +69,7 @@ class RedisStorageAdapter implements StorageAdapter {
     try {
       return await this.client.flushdb();
     } catch (error) {
-      logger.error('[RedisStorageAdapter] flushdb() failed:', error);
+      logger.error("[RedisStorageAdapter] flushdb() failed:", error);
       throw error;
     }
   }
@@ -179,7 +180,7 @@ export class JobRepository {
 export function createJobRepository(): JobRepository {
   // In test mode, always use in-memory storage
   if (process.env.NODE_ENV === "test") {
-    logger.debug('[JobRepository] Using in-memory storage (test mode)');
+    logger.debug("[JobRepository] Using in-memory storage (test mode)");
     return new JobRepository(new InMemoryStorageAdapter());
   }
 
@@ -187,26 +188,28 @@ export function createJobRepository(): JobRepository {
   const redisClient = getRedisClient();
 
   if (!redisClient) {
-    const isProduction = process.env.NODE_ENV === 'production';
-    
+    const isProduction = process.env.NODE_ENV === "production";
+
     if (isProduction) {
       logger.warn(
-        '[JobRepository] Redis not available in production - falling back to in-memory storage. ' +
-        'Job state will NOT persist across serverless instances!'
+        "[JobRepository] Redis not available in production - falling back to in-memory storage. " +
+          "Job state will NOT persist across serverless instances!"
       );
     } else {
-      logger.info('[JobRepository] Using in-memory storage (development mode)');
+      logger.info("[JobRepository] Using in-memory storage (development mode)");
     }
-    
+
     return new JobRepository(new InMemoryStorageAdapter());
   }
 
   // Check if Redis is actually connected before using it
   if (!isRedisAvailable()) {
-    logger.warn('[JobRepository] Redis client exists but not connected - falling back to in-memory storage');
+    logger.warn(
+      "[JobRepository] Redis client exists but not connected - falling back to in-memory storage"
+    );
     return new JobRepository(new InMemoryStorageAdapter());
   }
 
-  logger.info('[JobRepository] Using Redis storage with connection pooling');
+  logger.info("[JobRepository] Using Redis storage with connection pooling");
   return new JobRepository(new RedisStorageAdapter(redisClient));
 }

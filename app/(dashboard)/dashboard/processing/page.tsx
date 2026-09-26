@@ -1,14 +1,23 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  RefreshCw,
+  RotateCcw,
+  Sparkles,
+  X,
+  Zap,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Sparkles, Clock, Zap, RefreshCw, X, CheckCircle, AlertCircle, RotateCcw } from "lucide-react";
-import { useProcessStore, selectProcess, selectHasHydrated } from "@/app/store/processStore";
+import React, { useEffect, useState } from "react";
+
 import { useProcessingStatus } from "@/app/hooks/useProcessingStatus";
-import { ProcessStatus } from "@/app/store/types";
+import { notifyClipsReady,sendNotification } from "@/app/lib/notifications";
+import { selectHasHydrated,selectProcess, useProcessStore } from "@/app/store/processStore";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
-import { sendNotification, notifyClipsReady } from "@/app/lib/notifications";
 
 function formatTimeRemaining(seconds: number | null): string {
   if (seconds === null) return "Calculating…";
@@ -113,15 +122,21 @@ export default function ProcessingPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                 <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2">
-                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Moments Found</span>
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Moments Found
+                  </span>
                   <span className="text-3xl font-extrabold text-white">{momentsFound}</span>
                 </div>
                 <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2">
-                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Progress</span>
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Progress
+                  </span>
                   <span className="text-3xl font-extrabold text-green-500">100%</span>
                 </div>
                 <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2">
-                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Status</span>
+                  <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+                    Status
+                  </span>
                   <span className="text-3xl font-extrabold text-green-500">Done</span>
                 </div>
               </div>
@@ -231,7 +246,9 @@ export default function ProcessingPage() {
                 <div className="w-6 h-6 rounded-full bg-input border border-white/5 flex items-center justify-center">
                   <RefreshCw className="w-3.5 h-3.5 text-brand animate-spin-slow" />
                 </div>
-                <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">Processing Stream</span>
+                <span className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                  Processing Stream
+                </span>
               </div>
               <span className="text-3xl font-black text-brand">{progress}%</span>
             </div>
@@ -258,7 +275,9 @@ export default function ProcessingPage() {
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2.5 text-muted-foreground text-sm font-medium">
                 <Clock className="w-4 h-4" />
-                <span>Estimated time remaining: {formatTimeRemaining(estimatedSecondsRemaining)}</span>
+                <span>
+                  Estimated time remaining: {formatTimeRemaining(estimatedSecondsRemaining)}
+                </span>
               </div>
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <div className="w-2 h-2 rounded-full bg-brand animate-pulse shadow-[0_0_8px_var(--color-brand)]" />
@@ -277,7 +296,9 @@ export default function ProcessingPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 w-full max-w-4xl mt-6">
           {/* Card 1 */}
           <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2 group hover:border-brand/20 transition-all">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Moments Found</span>
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+              Moments Found
+            </span>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-extrabold text-white">{momentsFound}</span>
             </div>
@@ -285,7 +306,9 @@ export default function ProcessingPage() {
 
           {/* Card 2 */}
           <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2 group hover:border-brand/20 transition-all">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">Input Quality</span>
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+              Input Quality
+            </span>
             <div className="flex flex-col">
               <span className="text-3xl font-extrabold text-white">4K</span>
               <span className="text-muted-foreground text-xs font-bold">Ultra HD</span>
@@ -294,7 +317,9 @@ export default function ProcessingPage() {
 
           {/* Card 3 */}
           <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col items-center text-center space-y-2 group hover:border-brand/20 transition-all">
-            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">AI Throughput</span>
+            <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">
+              AI Throughput
+            </span>
             <div className="flex flex-col">
               <span className="text-3xl font-extrabold text-white">2.5x</span>
               <span className="text-brand text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-1">
@@ -314,7 +339,8 @@ export default function ProcessingPage() {
             Cancel Processing
           </button>
           <p className="text-muted-foreground text-xs text-center max-w-sm leading-relaxed">
-            Closing this window won&apos;t stop the processing. We&apos;ll notify you once your clips are ready.
+            Closing this window won&apos;t stop the processing. We&apos;ll notify you once your
+            clips are ready.
           </p>
         </div>
       </main>
@@ -325,9 +351,24 @@ export default function ProcessingPage() {
           © 2024 ClipCash AI. All rights reserved.
         </p>
         <div className="flex items-center gap-8">
-          <Link href="/privacy" className="text-muted-foreground hover:text-gray-300 text-xs font-medium transition-colors">Privacy Policy</Link>
-          <Link href="/terms" className="text-muted-foreground hover:text-gray-300 text-xs font-medium transition-colors">Terms of Service</Link>
-          <Link href="/status" className="text-muted-foreground hover:text-gray-300 text-xs font-medium transition-colors">Status</Link>
+          <Link
+            href="/privacy"
+            className="text-muted-foreground hover:text-gray-300 text-xs font-medium transition-colors"
+          >
+            Privacy Policy
+          </Link>
+          <Link
+            href="/terms"
+            className="text-muted-foreground hover:text-gray-300 text-xs font-medium transition-colors"
+          >
+            Terms of Service
+          </Link>
+          <Link
+            href="/status"
+            className="text-muted-foreground hover:text-gray-300 text-xs font-medium transition-colors"
+          >
+            Status
+          </Link>
         </div>
       </footer>
     </div>

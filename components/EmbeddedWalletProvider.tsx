@@ -1,12 +1,10 @@
 "use client";
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
-import {
-  EmbeddedWallet,
-  createEmbeddedWallet,
-  getEmbeddedWallet,
-} from "@/app/lib/embeddedWallet";
 import { useSession } from "next-auth/react";
+import React, { createContext, useCallback,useContext, useEffect, useState } from "react";
+
+import { createEmbeddedWallet, EmbeddedWallet, getEmbeddedWallet } from "@/app/lib/embeddedWallet";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 
 export interface EmbeddedWalletContextType {
   wallet: EmbeddedWallet | null;
@@ -65,7 +63,7 @@ export function EmbeddedWalletProvider({ children }: { children: React.ReactNode
         setWallet(res.wallet);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load wallet");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.loadWallet, "load wallet"));
     } finally {
       setIsLoading(false);
     }
@@ -80,8 +78,7 @@ export function EmbeddedWalletProvider({ children }: { children: React.ReactNode
       setWallet(res.wallet);
       return res.wallet;
     } catch (err) {
-      const msg = err instanceof Error ? err.message : "Failed to create wallet";
-      setError(msg);
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.createWallet, "create wallet"));
       return null;
     } finally {
       setIsLoading(false);

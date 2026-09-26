@@ -1,8 +1,10 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef,useState } from "react";
+
 import type { SearchResponse } from "@/app/api/search/route";
 import type { ApiResponse } from "@/app/api/types";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 
 const DEBOUNCE_MS = 300;
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
@@ -23,7 +25,7 @@ const searchCache = new Map<string, { data: SearchResponse; timestamp: number }>
  * #798), backing the command palette's search mode. Returns null results
  * (not an empty state) for a blank query so callers can distinguish "no
  * query yet" from "query returned nothing".
- * 
+ *
  * Enhanced with:
  * - Request cancellation for stale searches
  * - Result caching with TTL
@@ -48,7 +50,7 @@ export function useGlobalSearch(query: string): UseGlobalSearchResult {
     const cacheKey = trimmed.toLowerCase();
     const cached = searchCache.get(cacheKey);
     const now = Date.now();
-    if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
+    if (cached && now - cached.timestamp < CACHE_TTL_MS) {
       setResults(cached.data);
       setLoading(false);
       setError(null);
@@ -78,24 +80,24 @@ export function useGlobalSearch(query: string): UseGlobalSearchResult {
         }
         const body = (await res.json()) as ApiResponse<SearchResponse>;
         const data = body.data ?? EMPTY;
-        
+
         // Cache the results
         searchCache.set(cacheKey, { data, timestamp: now });
-        
+
         // Clean up old cache entries
         searchCache.forEach((value, key) => {
           if (now - value.timestamp > CACHE_TTL_MS) {
             searchCache.delete(key);
           }
         });
-        
+
         setResults(data);
       } catch (err) {
         if (signal.aborted) {
           // Request was cancelled, don't show error
           return;
         }
-        setError(err instanceof Error ? err.message : "Search failed");
+        setError(safeErrorMessage(err, FAILURE_MESSAGES.searchFailed, "global search"));
         setResults(EMPTY);
       } finally {
         if (!signal.aborted) {

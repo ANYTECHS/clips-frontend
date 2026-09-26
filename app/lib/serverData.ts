@@ -15,16 +15,10 @@
  * Do NOT import Zustand stores or React hooks from this file.
  */
 
-import { auth } from "@/app/lib/auth";
-import type {
-  DashboardStats,
-  RevenuePoint,
-  Project,
-  UserProfile,
-  EarningsBreakdownItem,
-} from "@/app/store/types";
 import type { BillingPlan } from "@/app/api/billing/plans/route";
-import type { EarningTransaction, EarningsSummary, EarningsTrend } from "@/app/api/earnings/types";
+import type { EarningsSummary, EarningsTrend,EarningTransaction } from "@/app/api/earnings/types";
+import { auth } from "@/app/lib/auth";
+import type { DashboardStats, Project, RevenuePoint, UserProfile } from "@/app/store/types";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,9 +28,7 @@ import type { EarningTransaction, EarningsSummary, EarningsTrend } from "@/app/a
  * back to localhost:3000 for local development without that env var.
  */
 function internalUrl(path: string): string {
-  const base =
-    process.env.NEXTAUTH_URL?.replace(/\/$/, "") ??
-    "http://localhost:3000";
+  const base = process.env.NEXTAUTH_URL?.replace(/\/$/, "") ?? "http://localhost:3000";
   return `${base}${path}`;
 }
 
@@ -45,10 +37,7 @@ function internalUrl(path: string): string {
  * Returns null on auth failure (401/403) so callers can handle redirects
  * cleanly rather than throwing.
  */
-async function serverFetch<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T | null> {
+async function serverFetch<T>(path: string, init?: RequestInit): Promise<T | null> {
   // Forward the session cookie so the API route can verify the session.
   // `auth()` already gives us the session object; we pass the Cookie header
   // extracted from incoming request headers so the route's `auth()` call
@@ -145,7 +134,7 @@ export async function fetchEarningsTransactions(
   page = 1,
   pageSize = 20,
   startDate?: string,
-  endDate?: string,
+  endDate?: string
 ): Promise<EarningsPageData | null> {
   const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (startDate) params.set("startDate", startDate);
@@ -173,7 +162,7 @@ export interface AnalyticsData {
  */
 export async function fetchAnalyticsData(
   startDate?: string,
-  platform?: string,
+  platform?: string
 ): Promise<AnalyticsData | null> {
   const params = new URLSearchParams();
   if (startDate) params.set("startDate", startDate);

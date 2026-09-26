@@ -56,6 +56,13 @@ jobs:
         run: npm run lint:comments
       - name: Complexity check
         run: COMPLEXITY_BASELINE=129 npm run complexity
+      # Ratcheted ESLint gate (#1108). `.eslint-baseline.json` records the
+      # current per-rule counts and this fails only when one of them rises —
+      # the same shape as the complexity check above, for the same reason:
+      # ~4,800 pre-existing findings means `eslint --max-warnings 0` would be
+      # red on every PR regardless of what it touched. See scripts/check-lint.js.
+      - name: Lint baseline check
+        run: npm run lint:check
       - name: Migration check
         run: npm run migrate:test
       - name: Unit tests

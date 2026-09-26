@@ -1,7 +1,9 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { Plus, Trash2, Copy, Check, Key, Eye, EyeOff, BarChart3, Clock } from "lucide-react";
+import { BarChart3, Check, Clock,Copy, Eye, EyeOff, Key, Plus, Trash2 } from "lucide-react";
+import React, { useEffect,useState } from "react";
+
+import { logger } from "@/app/lib/logger";
 import { useToast } from "@/hooks/useToast";
 
 interface ApiKey {
@@ -68,7 +70,7 @@ export default function ApiSettings() {
       const data = await response.json();
       setApiKeys(data.apiKeys || []);
     } catch (error) {
-      console.error("Error fetching API keys:", error);
+      logger.error("Error fetching API keys:", error);
       showToast("Failed to load API keys", "error");
     } finally {
       setLoading(false);
@@ -81,7 +83,7 @@ export default function ApiSettings() {
       const data = await response.json();
       setUsages(data.apiKey?.usages || []);
     } catch (error) {
-      console.error("Error fetching usage:", error);
+      logger.error("Error fetching usage:", error);
     }
   };
 
@@ -101,13 +103,14 @@ export default function ApiSettings() {
       setFormData({ name: "", scopes: [], expiresAt: "" });
       fetchApiKeys();
     } catch (error) {
-      console.error("Error creating API key:", error);
+      logger.error("Error creating API key:", error);
       showToast("Failed to create API key", "error");
     }
   };
 
   const handleDeleteKey = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this API key? This action cannot be undone.")) return;
+    if (!confirm("Are you sure you want to delete this API key? This action cannot be undone."))
+      return;
 
     try {
       await fetch(`/api/keys/${id}`, { method: "DELETE" });
@@ -118,7 +121,7 @@ export default function ApiSettings() {
       }
       fetchApiKeys();
     } catch (error) {
-      console.error("Error deleting API key:", error);
+      logger.error("Error deleting API key:", error);
       showToast("Failed to delete API key", "error");
     }
   };
@@ -132,7 +135,7 @@ export default function ApiSettings() {
       });
       fetchApiKeys();
     } catch (error) {
-      console.error("Error toggling API key:", error);
+      logger.error("Error toggling API key:", error);
       showToast("Failed to update API key", "error");
     }
   };
@@ -300,18 +303,23 @@ export default function ApiSettings() {
           ) : (
             <div className="space-y-2 max-h-96 overflow-y-auto">
               {usages.map((usage) => (
-                <div
-                  key={usage.id}
-                  className="p-3 rounded-lg bg-white/5 border border-white/10"
-                >
+                <div key={usage.id} className="p-3 rounded-lg bg-white/5 border border-white/10">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-white">{usage.method} {usage.endpoint}</span>
+                    <span className="text-xs font-bold text-white">
+                      {usage.method} {usage.endpoint}
+                    </span>
                     <span className="text-[10px] text-muted-foreground">
                       {new Date(usage.createdAt).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex items-center gap-4 text-[10px] text-muted-foreground">
-                    <span className={usage.statusCode >= 200 && usage.statusCode < 300 ? "text-green-400" : "text-red-400"}>
+                    <span
+                      className={
+                        usage.statusCode >= 200 && usage.statusCode < 300
+                          ? "text-green-400"
+                          : "text-red-400"
+                      }
+                    >
                       Status: {usage.statusCode}
                     </span>
                     <span>Response time: {usage.responseTime}ms</span>
@@ -361,7 +369,9 @@ export default function ApiSettings() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-white mb-2">Expiration (optional)</label>
+                <label className="block text-xs font-bold text-white mb-2">
+                  Expiration (optional)
+                </label>
                 <input
                   type="date"
                   value={formData.expiresAt}

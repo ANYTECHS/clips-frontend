@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/app/lib/prisma";
 import { z } from "zod";
+
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { logger } from "@/app/lib/logger";
+import { prisma } from "@/app/lib/prisma";
 
 const updateWebhookSchema = z.object({
   url: z.string().url().optional(),
@@ -12,10 +14,7 @@ const updateWebhookSchema = z.object({
   active: z.boolean().optional(),
 });
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -41,15 +40,12 @@ export async function GET(
 
     return NextResponse.json({ webhook });
   } catch (error) {
-    console.error("Error fetching webhook:", error);
+    logger.error("Error fetching webhook:", error);
     return NextResponse.json({ error: "Failed to fetch webhook" }, { status: 500 });
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -80,15 +76,12 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
     }
-    console.error("Error updating webhook:", error);
+    logger.error("Error updating webhook:", error);
     return NextResponse.json({ error: "Failed to update webhook" }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -108,7 +101,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting webhook:", error);
+    logger.error("Error deleting webhook:", error);
     return NextResponse.json({ error: "Failed to delete webhook" }, { status: 500 });
   }
 }

@@ -13,13 +13,13 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import { applyRateLimit } from "@/app/lib/serverRateLimit";
+
 import { parseJsonRequest } from "@/app/api/jobs/shared/jsonBody";
-import {
-  getRecoveryRepository,
-  type RecoverySession,
-} from "../shared/recoveryStore";
+import { logger } from "@/app/lib/logger";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
+
 import { sendGuardianApprovalEmail } from "../shared/mailer";
+import { getRecoveryRepository, type RecoverySession } from "../shared/recoveryStore";
 
 const BodySchema = z.object({
   email: z.string().email("Invalid email address"),
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       approvalToken: `${sessionId}:${g.email}`,
       expiresAt: new Date(expiresAt).toISOString(),
     }).catch((err) => {
-      console.error(`[recovery/initiate] Failed to email guardian ${g.email}:`, err);
+      logger.error(`[recovery/initiate] Failed to email guardian ${g.email}:`, err);
     })
   );
 

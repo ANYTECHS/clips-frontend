@@ -1,18 +1,18 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useCallback, useRef,useState } from "react";
+
+import { TRANSACTION_TIMEOUT_MS } from "@/app/lib/constants";
+import { captureSorobanNotSupportedWarning } from "@/app/lib/sentry";
+import type { StellarTransactionError } from "@/app/lib/stellar";
+import { submitTransaction } from "@/app/lib/stellar";
 import type { StellarOperation } from "@/app/lib/stellarOperations";
 import {
-  validateOperations,
   BatchValidationError,
   INVOKE_CONTRACT_USER_MESSAGE,
   isInvokeContractBuildError,
+  validateOperations,
 } from "@/app/lib/stellarOperations";
-import { captureSorobanNotSupportedWarning } from "@/app/lib/sentry";
-import { TRANSACTION_TIMEOUT_MS } from "@/app/lib/constants";
-import { logger } from "@/app/lib/logger";
-import { submitTransaction } from "@/app/lib/stellar";
-import type { StellarTransactionError } from "@/app/lib/stellar";
 
 // Re-export so consumers can import the error type from this hook's module
 export type { StellarTransactionError };
@@ -21,12 +21,7 @@ export type { StellarTransactionError };
  * Stellar transaction processing lifecycle state designations.
  */
 export type StellarTransactionStatus =
-  | "idle"
-  | "building"
-  | "signing"
-  | "submitting"
-  | "success"
-  | "error";
+  "idle" | "building" | "signing" | "submitting" | "success" | "error";
 
 /**
  * Supported operational core network types.
@@ -80,9 +75,7 @@ export type TransactionBuilder = () => Promise<string>;
 /**
  * Batch transaction builder processing atomic structural queues.
  */
-export type BatchTransactionBuilder = (
-  operations: StellarOperation[]
-) => Promise<string>;
+export type BatchTransactionBuilder = (operations: StellarOperation[]) => Promise<string>;
 
 /**
  * Queued operation context schema tracking localized indices.
@@ -148,7 +141,8 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
     if (!freighter) {
       const error: StellarTransactionError = {
         code: "FREIGHTER_NOT_INSTALLED",
-        message: "Freighter wallet is not installed. Please install the Freighter browser extension.",
+        message:
+          "Freighter wallet is not installed. Please install the Freighter browser extension.",
       };
       setState((prev) => ({
         ...prev,
@@ -172,7 +166,10 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
   const getPublicKey = useCallback(async (): Promise<string> => {
     const freighter = window.freighter;
     if (!freighter) {
-      throw { code: "FREIGHTER_NOT_INSTALLED", message: "Freighter wallet is not installed." } as StellarTransactionError;
+      throw {
+        code: "FREIGHTER_NOT_INSTALLED",
+        message: "Freighter wallet is not installed.",
+      } as StellarTransactionError;
     }
 
     try {
@@ -202,7 +199,10 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
     async (xdr: string, publicKey: string): Promise<string> => {
       const freighter = window.freighter;
       if (!freighter) {
-        throw { code: "FREIGHTER_NOT_INSTALLED", message: "Freighter wallet is not installed." } as StellarTransactionError;
+        throw {
+          code: "FREIGHTER_NOT_INSTALLED",
+          message: "Freighter wallet is not installed.",
+        } as StellarTransactionError;
       }
       const freighterNetwork = network === "mainnet" ? "PUBLIC" : "TESTNET";
 
@@ -400,23 +400,20 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
    * @param label - Optional user interface description context string.
    * @throws {BatchValidationError} When immediate schema enforcement validation rules are triggered.
    */
-  const addOperation = useCallback(
-    (operation: StellarOperation, label?: string) => {
-      setState((prev) => {
-        const updated = [...prev.queuedOperations, { operation, label }];
-        try {
-          validateOperations(updated.map((q) => q.operation));
-        } catch (err) {
-          if (err instanceof BatchValidationError) {
-            throw err;
-          }
+  const addOperation = useCallback((operation: StellarOperation, label?: string) => {
+    setState((prev) => {
+      const updated = [...prev.queuedOperations, { operation, label }];
+      try {
+        validateOperations(updated.map((q) => q.operation));
+      } catch (err) {
+        if (err instanceof BatchValidationError) {
           throw err;
         }
-        return { ...prev, queuedOperations: updated };
-      });
-    },
-    []
-  );
+        throw err;
+      }
+      return { ...prev, queuedOperations: updated };
+    });
+  }, []);
 
   /**
    * Remove the operation at `index` from the batch queue.
@@ -448,9 +445,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
    * @returns Structural metrics array pointers on successful ledger settlement or null.
    */
   const executeBatchTransaction = useCallback(
-    async (
-      buildBatch: BatchTransactionBuilder
-    ): Promise<StellarTransactionResult | null> => {
+    async (buildBatch: BatchTransactionBuilder): Promise<StellarTransactionResult | null> => {
       const currentOps = state.queuedOperations;
 
       if (currentOps.length === 0) {
@@ -507,9 +502,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
         return null;
       }
 
-      return executeTransaction(() =>
-        buildBatch(currentOps.map((q) => q.operation))
-      );
+      return executeTransaction(() => buildBatch(currentOps.map((q) => q.operation)));
     },
     [state.queuedOperations, executeTransaction, onError]
   );

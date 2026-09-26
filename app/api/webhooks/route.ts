@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { logger } from "@/app/lib/logger";
 
 export async function GET(req: NextRequest) {
   try {
@@ -15,10 +16,9 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ webhooks });
   } catch (error) {
-    console.error("Error fetching webhooks:", error);
+    logger.error("Error fetching webhooks:", error);
     return NextResponse.json({ error: "Failed to fetch webhooks" }, { status: 500 });
   }
-
 }
 
 export async function POST(req: NextRequest) {
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
     }
-    console.error("Error creating webhook:", error);
+    logger.error("Error creating webhook:", error);
     return NextResponse.json({ error: "Failed to create webhook" }, { status: 500 });
   }
 }

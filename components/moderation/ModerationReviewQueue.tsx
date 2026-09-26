@@ -8,15 +8,18 @@
  * oldest item is the creator who has been waiting longest.
  */
 
-import { useCallback, useEffect, useState } from "react";
 import { Check, Loader2, RefreshCw, X } from "lucide-react";
-import ModerationStatusBadge from "./ModerationStatusBadge";
-import { CATEGORY_LABELS } from "@/app/lib/moderation/types";
+import { useCallback, useEffect, useState } from "react";
+
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import type {
   ModerationCategory,
   ModerationDecision,
   ModerationStatus,
 } from "@/app/lib/moderation/types";
+import { CATEGORY_LABELS } from "@/app/lib/moderation/types";
+
+import ModerationStatusBadge from "./ModerationStatusBadge";
 
 interface QueueDecision extends ModerationDecision {
   appeals?: { id: string; status: string; statement: string }[];
@@ -63,12 +66,10 @@ export default function ModerationReviewQueue() {
       const rows: QueueDecision[] = Array.isArray(body.decisions) ? body.decisions : [];
       // Oldest first — see the note at the top of the file.
       setDecisions(
-        [...rows].sort(
-          (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-        ),
+        [...rows].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not load the review queue.");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.loadReviewQueue, "load review queue"));
     } finally {
       setLoading(false);
     }
@@ -102,12 +103,12 @@ export default function ModerationReviewQueue() {
         // should appear immediately, not after a round trip.
         setDecisions((prev) => prev.filter((d) => d.id !== decisionId));
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Could not record the decision.");
+        setError(safeErrorMessage(err, FAILURE_MESSAGES.recordDecision, "record decision"));
       } finally {
         setPendingId(null);
       }
     },
-    [reasons],
+    [reasons]
   );
 
   return (
@@ -115,9 +116,7 @@ export default function ModerationReviewQueue() {
       <div className="flex items-center justify-between gap-4">
         <h2 id="review-queue-heading" className="text-xl font-bold text-white">
           Review queue
-          <span className="ml-2 text-sm font-medium text-white/40">
-            {decisions.length} waiting
-          </span>
+          <span className="ml-2 text-sm font-medium text-white/40">{decisions.length} waiting</span>
         </h2>
         <button
           type="button"
@@ -165,9 +164,7 @@ export default function ModerationReviewQueue() {
               <ModerationStatusBadge status={decision.status} />
             </div>
 
-            {decision.reason && (
-              <p className="text-sm text-white/70">{decision.reason}</p>
-            )}
+            {decision.reason && <p className="text-sm text-white/70">{decision.reason}</p>}
 
             <CategoryScores categories={decision.categories} />
 
@@ -194,9 +191,7 @@ export default function ModerationReviewQueue() {
               <input
                 id={`reason-${decision.id}`}
                 value={reasons[decision.id] ?? ""}
-                onChange={(e) =>
-                  setReasons((prev) => ({ ...prev, [decision.id]: e.target.value }))
-                }
+                onChange={(e) => setReasons((prev) => ({ ...prev, [decision.id]: e.target.value }))}
                 placeholder="Reason — shown to the creator"
                 className="w-full rounded-xl border border-white/10 bg-input px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:border-brand focus:outline-none"
               />

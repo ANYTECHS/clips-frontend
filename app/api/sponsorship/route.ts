@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { getSponsorBalance, hasSufficientSponsorBalance, estimateSponsoredFee } from "@/app/api/lib/feeSponsorship";
+
+import {
+  estimateSponsoredFee,
+  getSponsorBalance,
+  hasSufficientSponsorBalance,
+} from "@/app/api/lib/feeSponsorship";
+import { logger } from "@/app/lib/logger";
 
 export async function GET(request: Request) {
   try {
@@ -8,10 +14,7 @@ export async function GET(request: Request) {
     const operationCount = parseInt(searchParams.get("operationCount") || "1", 10);
 
     if (!publicKey) {
-      return NextResponse.json(
-        { error: "Missing publicKey parameter" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Missing publicKey parameter" }, { status: 400 });
     }
 
     const [balance, sufficient] = await Promise.all([
@@ -27,7 +30,7 @@ export async function GET(request: Request) {
       feeEstimate,
     });
   } catch (error: any) {
-    console.error("Sponsorship check failed:", error);
+    logger.error("Sponsorship check failed:", error);
     return NextResponse.json(
       { error: error.message || "Failed to check sponsorship" },
       { status: 500 }

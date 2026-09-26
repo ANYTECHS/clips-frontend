@@ -1,10 +1,11 @@
 "use client";
 
+import { Check, Copy, DollarSign, Share2,Users } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
-import StatCard from "@/components/dashboard/StatCard";
-import Skeleton from "@/components/ui/Skeleton";
-import { Copy, Check, Users, DollarSign, Share2 } from "lucide-react";
+
 import analytics from "@/app/lib/analytics";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
+import StatCard from "@/components/dashboard/StatCard";
 
 type ReferralStats = {
   code: string;
@@ -29,13 +30,18 @@ export default function ReferralPage() {
         const data = (await res.json()) as ReferralStats;
         if (!cancelled) setStats(data);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load referral stats");
+        if (!cancelled)
+          setError(
+            safeErrorMessage(err, FAILURE_MESSAGES.loadReferralStats, "load referral stats")
+          );
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleCopy = async () => {
@@ -54,7 +60,9 @@ export default function ReferralPage() {
     if (!stats) return;
     analytics.trackEvent("referral_link_shared", { code: stats.code });
     if (navigator.share) {
-      navigator.share({ title: "Join ClipCash", text: "Use my referral link to sign up", url: stats.link }).catch(() => {});
+      navigator
+        .share({ title: "Join ClipCash", text: "Use my referral link to sign up", url: stats.link })
+        .catch(() => {});
     } else {
       handleCopy();
     }
@@ -64,8 +72,12 @@ export default function ReferralPage() {
     <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-10 py-10">
       <div className="space-y-8">
         <div>
-          <h1 className="text-[28px] sm:text-[32px] font-extrabold tracking-tight text-white">Referral Program</h1>
-          <p className="text-muted text-[14px] mt-1">Share your unique link and earn bonuses when friends join.</p>
+          <h1 className="text-[28px] sm:text-[32px] font-extrabold tracking-tight text-white">
+            Referral Program
+          </h1>
+          <p className="text-muted text-[14px] mt-1">
+            Share your unique link and earn bonuses when friends join.
+          </p>
         </div>
 
         {loading ? (

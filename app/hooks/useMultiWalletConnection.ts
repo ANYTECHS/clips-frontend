@@ -17,11 +17,12 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
-import { useWallet } from "@/components/wallet/WalletProvider";
-import { useMultiWallet } from "@/components/wallet/MultiWalletProvider";
+
+import { WalletProviderType } from "@/app/lib/multiWalletStorage";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { MultiWalletRecord, WalletProviderType } from "@/app/lib/multiWalletStorage";
+import { useMultiWallet } from "@/components/wallet/MultiWalletProvider";
 import { migrateToMultiWallet } from "@/components/wallet/MultiWalletProvider";
+import { useWallet } from "@/components/wallet/WalletProvider";
 
 const POLL_INTERVAL_MS = 50;
 const MAX_POLL_ATTEMPTS = 20; // 1 second total
@@ -109,19 +110,19 @@ export function useMultiWalletConnection() {
     const address = await resolveAddress(returned);
 
     if (user?.id && address) {
-        try {
-          await multiWallet.addWallet({
-            publicKey: address,
-            walletType: "metamask",
-            chainId: wallet.chainId ?? undefined,
-            isPrimary: false,
-            isActive: true,
-            label: "MetaMask",
-          });
-        } catch (err) {
-          logger.error("Failed to add MetaMask to multi-wallet list:", err);
-        }
+      try {
+        await multiWallet.addWallet({
+          publicKey: address,
+          walletType: "metamask",
+          chainId: wallet.chainId ?? undefined,
+          isPrimary: false,
+          isActive: true,
+          label: "MetaMask",
+        });
+      } catch (err) {
+        logger.error("Failed to add MetaMask to multi-wallet list:", err);
       }
+    }
   }, [wallet, user?.id, multiWallet, resolveAddress]);
 
   /** Connect to Phantom and add to multi-wallet list */
@@ -130,19 +131,19 @@ export function useMultiWalletConnection() {
     const address = await resolveAddress(returned);
 
     if (user?.id && address) {
-        try {
-          await multiWallet.addWallet({
-            publicKey: address,
-            walletType: "phantom",
-            chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h",
-            isPrimary: false,
-            isActive: true,
-            label: "Phantom",
-          });
-        } catch (err) {
-          logger.error("Failed to add Phantom to multi-wallet list:", err);
-        }
+      try {
+        await multiWallet.addWallet({
+          publicKey: address,
+          walletType: "phantom",
+          chainId: "5EJ9Vc47M3VvM2x6wCk3F2nZ3qG7yB9rD6aX8cE5fG1h",
+          isPrimary: false,
+          isActive: true,
+          label: "Phantom",
+        });
+      } catch (err) {
+        logger.error("Failed to add Phantom to multi-wallet list:", err);
       }
+    }
   }, [wallet, user?.id, multiWallet, resolveAddress]);
 
   /** Connect to Stellar and add to multi-wallet list */
@@ -151,30 +152,31 @@ export function useMultiWalletConnection() {
     const address = await resolveAddress(returned);
 
     if (user?.id && address) {
-        try {
-          await multiWallet.addWallet({
-            publicKey: address,
-            walletType: "stellar",
-            network: "testnet",
-            isPrimary: false,
-            isActive: true,
-            label: "Stellar Wallet",
-            _encodedSecret: wallet.stellarSecret ? btoa(wallet.stellarSecret) : undefined,
-          });
-        } catch (err) {
-          logger.error("Failed to add Stellar to multi-wallet list:", err);
-        }
+      try {
+        await multiWallet.addWallet({
+          publicKey: address,
+          walletType: "stellar",
+          network: "testnet",
+          isPrimary: false,
+          isActive: true,
+          label: "Stellar Wallet",
+          _encodedSecret: wallet.stellarSecret ? btoa(wallet.stellarSecret) : undefined,
+        });
+      } catch (err) {
+        logger.error("Failed to add Stellar to multi-wallet list:", err);
       }
+    }
   }, [wallet, user?.id, multiWallet, resolveAddress]);
 
-  /** * Import existing Stellar key and add to multi-wallet list 
+  /** * Import existing Stellar key and add to multi-wallet list
    * * @param secret - The private plain text seed string target configuration block.
    */
-  const importStellarKey = useCallback(async (secret: string) => {
-    const returned = await wallet.importStellarKey(secret);
-    const address = await resolveAddress(returned);
+  const importStellarKey = useCallback(
+    async (secret: string) => {
+      const returned = await wallet.importStellarKey(secret);
+      const address = await resolveAddress(returned);
 
-    if (user?.id && address) {
+      if (user?.id && address) {
         try {
           await multiWallet.addWallet({
             publicKey: address,
@@ -189,9 +191,11 @@ export function useMultiWalletConnection() {
           logger.error("Failed to add imported wallet to multi-wallet list:", err);
         }
       }
-  }, [wallet, user?.id, multiWallet, resolveAddress]);
+    },
+    [wallet, user?.id, multiWallet, resolveAddress]
+  );
 
-  /** * Switch to a different wallet from the multi-wallet list 
+  /** * Switch to a different wallet from the multi-wallet list
    * * @param walletId - Primary identification string matching the target connection entity.
    * @throws {Error} Throws an issue descriptor context message if matching profile mappings cannot be found.
    */
@@ -230,7 +234,7 @@ export function useMultiWalletConnection() {
     wallet.disconnect();
   }, [wallet]);
 
-  /** * Remove a wallet from the multi-wallet list 
+  /** * Remove a wallet from the multi-wallet list
    * * @param walletId - Tracking ID target string slated for erasure processing.
    */
   const removeWallet = useCallback(

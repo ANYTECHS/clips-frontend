@@ -1,9 +1,11 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/app/lib/prisma";
 import { z } from "zod";
-import crypto from "crypto";
+
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { logger } from "@/app/lib/logger";
+import { prisma } from "@/app/lib/prisma";
 
 const apiKeySchema = z.object({
   name: z.string().min(1).max(100),
@@ -30,7 +32,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ apiKeys });
   } catch (error) {
-    console.error("Error fetching API keys:", error);
+    logger.error("Error fetching API keys:", error);
     return NextResponse.json({ error: "Failed to fetch API keys" }, { status: 500 });
   }
 }
@@ -46,7 +48,7 @@ export async function POST(req: NextRequest) {
     const validatedData = apiKeySchema.parse(body);
 
     // Generate API key
-    const key = `ck_${crypto.randomBytes(32).toString('hex')}`;
+    const key = `ck_${crypto.randomBytes(32).toString("hex")}`;
 
     const apiKey = await prisma.apiKey.create({
       data: {
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest) {
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
     }
-    console.error("Error creating API key:", error);
+    logger.error("Error creating API key:", error);
     return NextResponse.json({ error: "Failed to create API key" }, { status: 500 });
   }
 }

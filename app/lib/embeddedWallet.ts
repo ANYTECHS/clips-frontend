@@ -39,6 +39,9 @@ import { NETWORK_CONFIGS } from "@/app/lib/networkConfig";
 import { withRetry, withFallback } from "./retryUtils";
 import { Keypair } from "@stellar/stellar-sdk";
 
+import { getStellarNetwork, NETWORK_CONFIGS, StellarNetwork } from "./networkConfig";
+import { WalletStorage, WalletStorageError } from "./walletStorage";
+
 export type { StellarNetwork };
 
 /** @deprecated Import from networkConfig.ts instead */
@@ -81,9 +84,9 @@ export interface WalletCreationResult {
 
 /** Unique identification string error categorization codes */
 export type WalletErrorCode =
-  | "KEYPAIR_GENERATION_FAILED"  // Web Crypto API unavailable or failed
-  | "STORAGE_FAILED"              // localStorage unavailable or full
-  | "FUNDING_FAILED"              // Friendbot unreachable (testnet only)
+  | "KEYPAIR_GENERATION_FAILED" // Web Crypto API unavailable or failed
+  | "STORAGE_FAILED" // localStorage unavailable or full
+  | "FUNDING_FAILED" // Friendbot unreachable (testnet only)
   | "UNKNOWN";
 
 /**
@@ -148,8 +151,6 @@ function classifyError(err: unknown): WalletCreationError {
     true
   );
 }
-
-
 
 // ─── Freighter detection ───────────────────────────────────────────────────────
 

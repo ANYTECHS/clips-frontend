@@ -1,7 +1,7 @@
 /**
  * @jest-environment node
  */
-import { scanFile, VirusScanError } from "@/app/lib/virusScan";
+import { scanFile } from "@/app/lib/virusScan";
 
 describe("virusScan - VirusTotal Provider", () => {
   const originalEnv = process.env;

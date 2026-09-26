@@ -1,20 +1,15 @@
-import React, { Suspense } from "react";
-import { getProjectDetail } from "@/app/lib/projectService";
-import ProjectDetailClient from "./ProjectDetailClient";
-import ProjectDetailLoading from "./loading";
-
-import React, { useState, useEffect, useCallback } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { ArrowLeft, Pencil, Play, Sparkles,Trash2 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowLeft, Pencil, Trash2, Play, Sparkles } from "lucide-react";
-import { useToast } from "@/hooks/useToast";
-import type { Clip } from "@/components/projects/ClipGrid";
+import React from "react";
+import React from "react";
+
 import {
   DEFAULT_BLUR_PLACEHOLDER,
-  SIZES_PROJECT_HERO,
   SIZES_CLIP_GRID,
+  SIZES_PROJECT_HERO,
 } from "@/app/lib/imageUtils";
+import { getProjectDetail } from "@/app/lib/projectService";
 
 export default async function ProjectPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -40,10 +35,16 @@ export default async function ProjectPage(props: { params: Promise<{ id: string 
                 className="bg-white/5 border border-white/10 rounded-xl px-3 py-2 text-white text-xl font-bold"
                 autoFocus
               />
-              <button onClick={handleRename} className="px-4 py-2 bg-brand text-black rounded-xl text-sm font-bold">
+              <button
+                onClick={handleRename}
+                className="px-4 py-2 bg-brand text-black rounded-xl text-sm font-bold"
+              >
                 Save
               </button>
-              <button onClick={() => setRenaming(false)} className="px-4 py-2 bg-white/5 text-white rounded-xl text-sm">
+              <button
+                onClick={() => setRenaming(false)}
+                className="px-4 py-2 bg-white/5 text-white rounded-xl text-sm"
+              >
                 Cancel
               </button>
             </div>
@@ -102,7 +103,10 @@ export default async function ProjectPage(props: { params: Promise<{ id: string 
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
             {clips.map((clip) => (
-              <div key={clip.id} className="rounded-2xl overflow-hidden border border-white/10 bg-white/5">
+              <div
+                key={clip.id}
+                className="rounded-2xl overflow-hidden border border-white/10 bg-white/5"
+              >
                 <div className="aspect-[9/16] relative">
                   <Image
                     src={clip.thumbnail}
@@ -119,7 +123,9 @@ export default async function ProjectPage(props: { params: Promise<{ id: string 
                 </div>
                 <div className="p-3">
                   <h4 className="text-white font-bold text-sm truncate">{clip.title}</h4>
-                  <p className="text-xs text-muted-foreground">{clip.duration} · {clip.style}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {clip.duration} · {clip.style}
+                  </p>
                 </div>
               </div>
             ))}

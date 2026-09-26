@@ -1,10 +1,9 @@
 import {
+  applyBrandKitToEdits,
+  type BrandKit,
   getContrastRatio,
   meetsWCAG_AA,
   validateBrandCompliance,
-  applyBrandKitToEdits,
-  INITIAL_BRAND_KITS,
-  type BrandKit,
 } from "@/app/lib/brandKit";
 
 describe("Brand Kit Library", () => {

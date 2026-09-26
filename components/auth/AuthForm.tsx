@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState } from "react";
+import { Loader2 } from "lucide-react";
 import Link from "next/link";
 import { signIn } from "next-auth/react";
-import { Loader2 } from "lucide-react";
+import React, { useState } from "react";
+
+import { FAILURE_MESSAGES, safeErrorMessage, signInFailed } from "@/app/lib/errorMessages";
 
 interface AuthFormProps {
   mode?: "login" | "signup";
@@ -30,10 +32,9 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
     try {
       // For now, this is a placeholder for email/password auth
       // In production, integrate with your backend
-      console.log(`${mode} attempt with:`, { email, password });
       setError("Email/password auth not yet implemented. Use OAuth providers below.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.unexpected, "authenticate"));
     } finally {
       setIsLoading(false);
     }
@@ -45,7 +46,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
     try {
       await signIn(provider, { redirect: false });
     } catch (err) {
-      setError(err instanceof Error ? err.message : `Failed to sign in with ${provider}`);
+      setError(safeErrorMessage(err, signInFailed(provider), "oauth sign-in"));
       setIsLoading(false);
     }
   };
@@ -64,9 +65,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
         {mode === "login" ? "Welcome Back" : "Get Started"}
       </h2>
       <p className="text-muted text-sm mb-8">
-        {mode === "login"
-          ? "Sign in to your ClipCash account"
-          : "Create your ClipCash account"}
+        {mode === "login" ? "Sign in to your ClipCash account" : "Create your ClipCash account"}
       </p>
 
       <form onSubmit={handleSubmit} className="space-y-4 mb-6">

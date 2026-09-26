@@ -2,23 +2,26 @@
 
 /**
  * Hook for data prefetching
- * 
+ *
  * Manages prefetch lifecycle:
  * - Route-based: Prefetch on component mount for navigation routes
  * - Hover-based: Prefetch on mouse over for interactive elements
  * - Idle-time: Prefetch during requestIdleCallback
  * - Cancellation: Abort prefetch on navigation away
- * 
+ *
  * Integration with RequestCache for automatic deduplication
  * and stale-while-revalidate handling.
  */
 
-import { useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
+
 import { RequestCache } from "@/app/lib/cache/RequestCache";
+import { logger } from "@/app/lib/logger";
+
 import {
-  getImmediatePrefetchEndpoints,
   getHoverPrefetchEndpoints,
   getIdlePrefetchEndpoints,
+  getImmediatePrefetchEndpoints,
 } from "./prefetchStrategies";
 
 // Shared prefetch cache instance
@@ -84,10 +87,7 @@ export function usePrefetchRoute(route: string) {
  * Hook for hover-based prefetching
  * Call this on elements that link to other routes
  */
-export function usePrefetchOnHover(
-  selector: string,
-  containerRef: React.RefObject<HTMLElement>
-) {
+export function usePrefetchOnHover(selector: string, containerRef: React.RefObject<HTMLElement>) {
   const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
 
   const handleMouseOver = useCallback(
@@ -135,10 +135,7 @@ export function usePrefetchOnHover(
 /**
  * Internal function to prefetch an endpoint
  */
-async function prefetchEndpoint(
-  endpoint: string,
-  abortSignal: AbortSignal
-): Promise<void> {
+async function prefetchEndpoint(endpoint: string, abortSignal: AbortSignal): Promise<void> {
   try {
     const response = await fetch(endpoint, {
       method: "GET",
@@ -159,7 +156,7 @@ async function prefetchEndpoint(
   } catch (error) {
     // Prefetch errors are non-fatal - silently ignore
     if (error instanceof Error && error.name !== "AbortError") {
-      console.debug(`Prefetch error for ${endpoint}:`, error.message);
+      logger.debug(`Prefetch error for ${endpoint}:`, error.message);
     }
   }
 }

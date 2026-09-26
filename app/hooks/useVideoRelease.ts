@@ -35,7 +35,9 @@
  *     Clearing `src` without it leaves the old resource attached.
  */
 
-import { useEffect, type RefObject } from "react";
+import { type RefObject,useEffect } from "react";
+
+import { logger } from "@/app/lib/logger";
 
 /**
  * Live-element counter, development only (Issue #1066).
@@ -62,11 +64,10 @@ function trackMounted(): void {
   liveVideoElements += 1;
 
   if (liveVideoElements > LIVE_ELEMENT_WARN_THRESHOLD) {
-    // eslint-disable-next-line no-console
-    console.warn(
+    logger.warn(
       `[video] ${liveVideoElements} video elements are mounted without being ` +
         `released. If this number only goes up as you navigate, a player is ` +
-        `missing useVideoRelease — see app/hooks/useVideoRelease.ts.`,
+        `missing useVideoRelease — see app/hooks/useVideoRelease.ts.`
     );
   }
 }
@@ -109,10 +110,7 @@ export function releaseVideoElement(video: HTMLVideoElement | null): void {
  * `src` on a mounted element. The element stays, so no cleanup runs, and the
  * previous resource is orphaned while still attached to the same node.
  */
-export function useVideoRelease(
-  ref: RefObject<HTMLVideoElement | null>,
-  sourceKey?: string,
-): void {
+export function useVideoRelease(ref: RefObject<HTMLVideoElement | null>, sourceKey?: string): void {
   useEffect(() => {
     const video = ref.current;
     trackMounted();
@@ -130,7 +128,7 @@ export function useVideoRelease(
  */
 export function useVideoReleaseAll(
   refs: RefObject<HTMLVideoElement | null>[],
-  sourceKey?: string,
+  sourceKey?: string
 ): void {
   useEffect(() => {
     const videos = refs.map((ref) => ref.current);

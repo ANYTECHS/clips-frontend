@@ -2,6 +2,27 @@
  * Audio mixing, normalization, trimming, and WAV encoding utilities.
  */
 
+import {
+  AUDIO_END_TOLERANCE_S,
+  NORMALIZATION_GAIN_MAX,
+  NORMALIZATION_GAIN_MIN,
+  PCM_BITS_PER_SAMPLE,
+  PCM16_NEGATIVE_SCALE,
+  PCM16_POSITIVE_SCALE,
+  WAV_AUDIO_FORMAT_OFFSET,
+  WAV_BITS_PER_SAMPLE_OFFSET,
+  WAV_BLOCK_ALIGN_OFFSET,
+  WAV_BYTE_RATE_OFFSET,
+  WAV_CHANNEL_COUNT_OFFSET,
+  WAV_DATA_CHUNK_OFFSET,
+  WAV_DATA_CHUNK_SIZE_OFFSET,
+  WAV_FMT_CHUNK_SIZE_BYTES,
+  WAV_FMT_CHUNK_SIZE_OFFSET,
+  WAV_HEADER_SIZE_BYTES,
+  WAV_RIFF_CHUNK_SIZE_BASE_BYTES,
+  WAV_RIFF_CHUNK_SIZE_OFFSET,
+} from "@/app/lib/constants";
+
 export interface VoiceoverTake {
   id: string;
   name: string;
@@ -27,10 +48,7 @@ export interface AudioTimeline {
   frameCount: number;
 }
 
-export function calculateNormalizationGain(
-  channelData: Float32Array,
-  targetPeak = 0.98,
-): number {
+export function calculateNormalizationGain(channelData: Float32Array, targetPeak = 0.98): number {
   let maxPeak = 0;
 
   for (let index = 0; index < channelData.length; index += 1) {
@@ -41,17 +59,16 @@ export function calculateNormalizationGain(
 
   const multiplier = targetPeak / maxPeak;
 
-  return Math.min(Math.max(multiplier, 0.5), 4);
+  return Math.min(Math.max(multiplier, NORMALIZATION_GAIN_MIN), NORMALIZATION_GAIN_MAX);
 }
 
 export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   const numberOfChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
   const bytesPerSample = 2;
-  const dataLength =
-    buffer.length * numberOfChannels * bytesPerSample;
+  const dataLength = buffer.length * numberOfChannels * bytesPerSample;
 
-  const arrayBuffer = new ArrayBuffer(44 + dataLength);
+  const arrayBuffer = new ArrayBuffer(WAV_HEADER_SIZE_BYTES + dataLength);
   const view = new DataView(arrayBuffer);
 
   const writeString = (offset: number, value: string) => {
@@ -61,42 +78,29 @@ export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
   };
 
   writeString(0, "RIFF");
-  view.setUint32(4, 36 + dataLength, true);
+  view.setUint32(WAV_RIFF_CHUNK_SIZE_OFFSET, WAV_RIFF_CHUNK_SIZE_BASE_BYTES + dataLength, true);
   writeString(8, "WAVE");
 
   writeString(12, "fmt ");
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numberOfChannels, true);
+  view.setUint32(WAV_FMT_CHUNK_SIZE_OFFSET, WAV_FMT_CHUNK_SIZE_BYTES, true);
+  view.setUint16(WAV_AUDIO_FORMAT_OFFSET, 1, true);
+  view.setUint16(WAV_CHANNEL_COUNT_OFFSET, numberOfChannels, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(
-    28,
-    sampleRate * numberOfChannels * bytesPerSample,
-    true,
-  );
-  view.setUint16(
-    32,
-    numberOfChannels * bytesPerSample,
-    true,
-  );
-  view.setUint16(34, 16, true);
+  view.setUint32(WAV_BYTE_RATE_OFFSET, sampleRate * numberOfChannels * bytesPerSample, true);
+  view.setUint16(WAV_BLOCK_ALIGN_OFFSET, numberOfChannels * bytesPerSample, true);
+  view.setUint16(WAV_BITS_PER_SAMPLE_OFFSET, PCM_BITS_PER_SAMPLE, true);
 
-  writeString(36, "data");
-  view.setUint32(40, dataLength, true);
+  writeString(WAV_DATA_CHUNK_OFFSET, "data");
+  view.setUint32(WAV_DATA_CHUNK_SIZE_OFFSET, dataLength, true);
 
-  let offset = 44;
+  let offset = WAV_HEADER_SIZE_BYTES;
 
   for (let sampleIndex = 0; sampleIndex < buffer.length; sampleIndex += 1) {
-    for (
-      let channelIndex = 0;
-      channelIndex < numberOfChannels;
-      channelIndex += 1
-    ) {
+    for (let channelIndex = 0; channelIndex < numberOfChannels; channelIndex += 1) {
       const channel = buffer.getChannelData(channelIndex);
       const sample = Math.max(-1, Math.min(1, channel[sampleIndex]));
 
-      const pcmValue =
-        sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+      const pcmValue = sample < 0 ? sample * PCM16_NEGATIVE_SCALE : sample * PCM16_POSITIVE_SCALE;
 
       view.setInt16(offset, pcmValue, true);
       offset += 2;
@@ -119,13 +123,7 @@ export function createAudioTimeline(params: {
   trimStart: number;
   trimEnd: number;
 }): AudioTimeline {
-  const {
-    sampleRate,
-    videoDuration,
-    offsetSeconds,
-    trimStart,
-    trimEnd,
-  } = params;
+  const { sampleRate, videoDuration, offsetSeconds, trimStart, trimEnd } = params;
 
   assertFiniteNumber("sampleRate", sampleRate);
   assertFiniteNumber("videoDuration", videoDuration);
@@ -143,18 +141,12 @@ export function createAudioTimeline(params: {
 
   const safeTrimStart = Math.max(0, trimStart);
   const safeTrimEnd = Math.max(safeTrimStart, trimEnd);
-  const effectiveDuration = Math.max(
-    0,
-    safeTrimEnd - safeTrimStart,
-  );
+  const effectiveDuration = Math.max(0, safeTrimEnd - safeTrimStart);
   const safeOffset = Math.max(0, offsetSeconds);
   const endSeconds = safeOffset + effectiveDuration;
 
   const outputDuration = Math.max(videoDuration, endSeconds);
-  const frameCount = Math.max(
-    1,
-    Math.ceil(outputDuration * sampleRate),
-  );
+  const frameCount = Math.max(1, Math.ceil(outputDuration * sampleRate));
 
   return {
     videoDuration,
@@ -181,10 +173,8 @@ export function validateAudioTimeline(timeline: AudioTimeline): void {
     throw new Error("Audio trim end must be after trim start.");
   }
 
-  if (timeline.endSeconds > timeline.videoDuration + 0.001) {
-    throw new Error(
-      "Audio track extends beyond the requested video duration.",
-    );
+  if (timeline.endSeconds > timeline.videoDuration + AUDIO_END_TOLERANCE_S) {
+    throw new Error("Audio track extends beyond the requested video duration.");
   }
 }
 
@@ -197,14 +187,7 @@ export async function mixAudioTracks(params: {
   gain: number;
   autoDuck?: boolean;
 }): Promise<Blob> {
-  const {
-    voiceoverBuffer,
-    videoDuration,
-    offsetSeconds,
-    trimStart,
-    trimEnd,
-    gain = 1,
-  } = params;
+  const { voiceoverBuffer, videoDuration, offsetSeconds, trimStart, trimEnd, gain = 1 } = params;
 
   if (!voiceoverBuffer) {
     throw new Error("A voiceover audio buffer is required.");
@@ -225,9 +208,7 @@ export async function mixAudioTracks(params: {
   });
 
   if (timeline.trimEnd > voiceoverBuffer.duration) {
-    throw new Error(
-      "Audio trim end cannot be longer than the source audio duration.",
-    );
+    throw new Error("Audio trim end cannot be longer than the source audio duration.");
   }
 
   const offlineContextConstructor =
@@ -246,11 +227,7 @@ export async function mixAudioTracks(params: {
     });
   }
 
-  const offlineContext = new offlineContextConstructor(
-    2,
-    timeline.frameCount,
-    timeline.sampleRate,
-  );
+  const offlineContext = new offlineContextConstructor(2, timeline.frameCount, timeline.sampleRate);
 
   const source = offlineContext.createBufferSource();
   source.buffer = voiceoverBuffer;
@@ -262,11 +239,7 @@ export async function mixAudioTracks(params: {
   gainNode.connect(offlineContext.destination);
 
   if (timeline.effectiveDuration > 0) {
-    source.start(
-      timeline.offsetSeconds,
-      timeline.trimStart,
-      timeline.effectiveDuration,
-    );
+    source.start(timeline.offsetSeconds, timeline.trimStart, timeline.effectiveDuration);
   }
 
   const renderedBuffer = await offlineContext.startRendering();

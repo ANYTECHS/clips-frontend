@@ -1,8 +1,11 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { MockApi } from "../../__mocks__/app/lib/mockApi";
 import { useRouter } from "next/navigation";
+import React, { useEffect,useState } from "react";
+
+import { tooManyAttempts, VALIDATION_MESSAGES } from "@/app/lib/errorMessages";
+
+import { MockApi } from "../../__mocks__/app/lib/mockApi";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
@@ -38,7 +41,7 @@ export default function ForgotPasswordPage() {
     e.preventDefault();
     setError("");
     setMessage("");
-    
+
     if (cooldownUntil && Date.now() < cooldownUntil) {
       setError(`Too many attempts. Please wait ${countdown} before trying again.`);
       return;
@@ -50,8 +53,8 @@ export default function ForgotPasswordPage() {
       await MockApi.requestPasswordReset(email);
       setMessage("If an account with that email exists, you will receive a password reset link.");
     } catch (err) {
-      if (err instanceof Error && err.message === 'RATE_LIMIT_EXCEEDED') {
-        setError(countdown ? `Too many attempts. Please wait ${countdown} before trying again.` : "Too many requests. Please wait a moment and try again.");
+      if (err instanceof Error && err.message === "RATE_LIMIT_EXCEEDED") {
+        setError(countdown ? tooManyAttempts(countdown) : VALIDATION_MESSAGES.tooManyRequests);
       } else {
         setMessage("If an account with that email exists, you will receive a password reset link.");
       }

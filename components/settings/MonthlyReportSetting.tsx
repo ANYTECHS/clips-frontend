@@ -9,8 +9,10 @@
  * page depends on it and a failed toggle should not disturb the rest.
  */
 
-import React, { useCallback, useEffect, useState } from "react";
 import { FileSpreadsheet, Loader2 } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 
 interface ScheduleState {
   enabled: boolean;
@@ -36,7 +38,7 @@ export default function MonthlyReportSetting() {
         if (!cancelled) setState(body.data);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Could not load your preference");
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.loadPreference, "load preference"));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -73,7 +75,7 @@ export default function MonthlyReportSetting() {
       setState((prev) => (prev ? { ...prev, enabled: body.data.enabled } : prev));
     } catch (err) {
       setState((prev) => (prev ? { ...prev, enabled: !next } : prev));
-      setError(err instanceof Error ? err.message : "Could not save your preference");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.savePreference, "save preference"));
     } finally {
       setSaving(false);
     }
@@ -94,7 +96,7 @@ export default function MonthlyReportSetting() {
         <h2 className="text-lg font-extrabold text-white">Earnings Reports</h2>
         <div className="bg-surface border border-white/5 rounded-2xl p-6">
           <p role="alert" className="text-xs text-red-400">
-            {error ?? "Could not load your preference."}
+            {error ?? FAILURE_MESSAGES.loadPreference}
           </p>
         </div>
       </div>
@@ -114,8 +116,8 @@ export default function MonthlyReportSetting() {
             <p className="font-bold text-white">Monthly Report Email</p>
             <p className="text-xs text-muted-foreground mt-0.5">
               On the 1st of each month, we email last month&apos;s earnings summary to{" "}
-              <span className="text-white/80">{state.deliveryEmail}</span> with a CSV
-              export attached for your tax records.
+              <span className="text-white/80">{state.deliveryEmail}</span> with a CSV export
+              attached for your tax records.
             </p>
             {state.lastSentAt && (
               <p className="text-[11px] text-muted-foreground mt-1">

@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useEffect, useMemo } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import React, { useEffect, useMemo } from "react";
+
+import type { EarningsSummary,EarningTransaction } from "@/app/api/earnings/types";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
-import SkeletonTable from "@/components/ui/SkeletonTable";
-import type { EarningTransaction, EarningsSummary } from "@/app/api/earnings/types";
 
 interface EarningsTableProps {
   transactions: EarningTransaction[];
@@ -162,11 +162,16 @@ export default function EarningsTable({
               </tr>
             ) : (
               filtered.map((tx) => (
-                <tr key={tx.id} className="border-b border-white/5 hover:bg-white/[0.02] transition-colors">
+                <tr
+                  key={tx.id}
+                  className="border-b border-white/5 hover:bg-white/[0.02] transition-colors"
+                >
                   <td className="px-5 py-3.5 text-muted-foreground">{tx.date}</td>
                   <td className="px-5 py-3.5 text-white">{tx.description}</td>
                   <td className="px-5 py-3.5 text-muted-foreground">{tx.platform}</td>
-                  <td className="px-5 py-3.5 text-muted-foreground">{TYPE_LABEL[tx.type] ?? tx.type}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground">
+                    {TYPE_LABEL[tx.type] ?? tx.type}
+                  </td>
                   <td className="px-5 py-3.5 text-right font-mono font-bold text-white">
                     ${tx.amount.toFixed(2)}
                     {tx.cryptoAmount && (
@@ -175,10 +180,14 @@ export default function EarningsTable({
                       </span>
                     )}
                   </td>
-                  <td className={`px-5 py-3.5 font-semibold capitalize ${STATUS_STYLES[tx.status] ?? ""}`}>
+                  <td
+                    className={`px-5 py-3.5 font-semibold capitalize ${STATUS_STYLES[tx.status] ?? ""}`}
+                  >
                     {tx.status}
                   </td>
-                  <td className="px-5 py-3.5 text-muted-foreground font-mono text-[12px]">{tx.taxId}</td>
+                  <td className="px-5 py-3.5 text-muted-foreground font-mono text-[12px]">
+                    {tx.taxId}
+                  </td>
                 </tr>
               ))
             )}
@@ -199,9 +208,7 @@ export default function EarningsTable({
           </button>
 
           <span className="text-sm text-muted-foreground">
-            Page{" "}
-            <span className="font-bold text-white">{pagination.page}</span>
-            {" "}of{" "}
+            Page <span className="font-bold text-white">{pagination.page}</span> of{" "}
             <span className="font-bold text-white">{pagination.totalPages}</span>
             <span className="ml-2 text-[12px]">({pagination.total} total)</span>
           </span>
