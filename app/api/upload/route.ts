@@ -52,6 +52,8 @@ import { dispatchJob } from "@/app/lib/aiBackend";
 import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST } from "@/app/lib/constants";
 import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
 import { logger } from "@/app/lib/logger";
+import { templatesStore, type TemplateScope } from "@/app/api/templates/templatesStore";
+import type { TemplateSettings } from "@/app/api/schemas/templates.schema";
 
 export { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST };
 export { ALLOWED_TYPES, ALLOWED_EXTENSIONS, validateMagicBytes };
@@ -76,14 +78,45 @@ export async function POST(request: NextRequest) {
     if (csrfError) return csrfError;
 
     const session = await auth();
-    const userId = (session?.user as { id?: string } | undefined)?.id;
+    const sessionUser = session?.user as { id?: string; teamId?: string } | undefined;
+    const userId = sessionUser?.id;
     if (!userId) {
       const body: ApiResponse<null> = { data: null, error: "Unauthorized" };
       return NextResponse.json(body, { status: 401 });
     }
+    const templateScope: TemplateScope = {
+      userId,
+      teamId:
+        typeof sessionUser?.teamId === "string" && sessionUser.teamId.trim()
+          ? sessionUser.teamId.trim()
+          : null,
+    };
 
     const formData = await request.formData();
     const files = formData.getAll("files") as File[];
+
+    const rawTemplateId = formData.get("templateId");
+    let clipTemplate: {
+      id: string;
+      version: number;
+      settings: TemplateSettings;
+    } | undefined;
+    if (typeof rawTemplateId === "string" && rawTemplateId.trim()) {
+      const resolved = templatesStore.getSettings(rawTemplateId.trim(), templateScope);
+      if (!resolved) {
+        const body: ApiResponse<null> = {
+          data: null,
+          error: "Template not found",
+          code: "NOT_FOUND",
+        };
+        return NextResponse.json(body, { status: 404 });
+      }
+      clipTemplate = {
+        id: rawTemplateId.trim(),
+        version: resolved.version,
+        settings: resolved.settings,
+      };
+    }
 
     if (!files || files.length === 0) {
       const body: ApiResponse<null> = {
@@ -156,6 +189,9 @@ export async function POST(request: NextRequest) {
           ...({ objectKey: result.objectKey } as object),
           ...({ contentType: result.type } as object),
           ...({ filename: result.name } as object),
+          ...(clipTemplate
+            ? ({ templateId: clipTemplate.id, templateVersion: clipTemplate.version } as object)
+            : {}),
         });
 
         await dispatchJob({
@@ -165,6 +201,7 @@ export async function POST(request: NextRequest) {
           contentType: result.type,
           filename: result.name,
           callbackUrl: `${callbackBase}/api/jobs/${result.jobId}/callback`,
+          ...(clipTemplate ? { clipTemplate } : {}),
         });
       })
     );

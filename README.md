@@ -63,6 +63,8 @@ For a deep dive into each system — upload quarantine, AES-GCM wallet encryptio
 
 For the current security posture, threat model, and reporting process, see **[docs/SECURITY.md](docs/SECURITY.md)**.
 
+For the full HTTP API reference — every endpoint, request/response examples, authentication, and error shapes — see **[docs/API.md](docs/API.md)**. A machine-readable OpenAPI 3.1 spec is available at **[docs/openapi.yaml](docs/openapi.yaml)**.
+
 ---
 
 ## Quick Start
@@ -87,9 +89,82 @@ Open [http://localhost:3000](http://localhost:3000). The app runs fully offline 
 
 ---
 
+## API Documentation
+
+The HTTP API is documented in **[docs/API.md](docs/API.md)** and described by an OpenAPI 3.1 spec at **[docs/openapi.yaml](docs/openapi.yaml)**.
+
+### Authentication
+
+Most endpoints require an authenticated session. Callers authenticate in one of two ways:
+
+- **Browser session cookie** — set by NextAuth after an OAuth sign-in (`/api/auth/*`). Sent automatically by the browser.
+- **Bearer token** — send `Authorization: Bearer <token>` for server-to-server calls (e.g. the AI backend calling back into the app).
+
+Endpoints that are called by the AI backend additionally require the shared secret header `x-callback-secret: <AI_BACKEND_CALLBACK_SECRET>`.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/upload` | Session | Upload a source video (multipart). Returns a job id. |
+| `GET` | `/api/jobs` | Session | List the caller's jobs. |
+| `GET` | `/api/jobs/[id]` | Session | Fetch a single job's status and metadata. |
+| `GET` | `/api/jobs/[id]/stream` | Session | SSE stream of job progress (polling fallback available). |
+| `POST` | `/api/jobs/[id]/callback` | Callback secret | AI backend reports job completion/failure. |
+| `GET` | `/api/auth/session` | Public | Current session (NextAuth). |
+| `POST` | `/api/auth/signin` | Public | Begin OAuth sign-in. |
+| `POST` | `/api/auth/signout` | Session | End the current session. |
+
+### Example: upload a video
+
+```bash
+curl -X POST http://localhost:3000/api/upload \
+  -H "Cookie: next-auth.session-token=<token>" \
+  -F "file=@clip.mp4"
+```
+
+```json
+{ "jobId": "job_01H...", "status": "queued" }
+```
+
+### Example: fetch a job
+
+```bash
+curl http://localhost:3000/api/jobs/job_01H... \
+  -H "Cookie: next-auth.session-token=<token>"
+```
+
+```json
+{
+  "id": "job_01H...",
+  "status": "completed",
+  "clips": [{ "id": "clip_1", "url": "https://.../clip_1.mp4" }]
+}
+```
+
+### Error responses
+
+All errors share a consistent JSON shape:
+
+```json
+{ "error": "Unauthorized", "message": "Authentication required" }
+```
+
+| Status | Meaning |
+|---|---|
+| `400` | Malformed request (missing/invalid fields) |
+| `401` | Missing or invalid authentication |
+| `403` | Authenticated but not permitted (e.g. bad callback secret) |
+| `404` | Resource not found |
+| `413` | Upload exceeds the size limit |
+| `429` | Rate limit exceeded |
+| `500` | Unexpected server error |
+
+---
+
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in the values. The table below lists every variable; required ones will cause the server to fail or the feature to be silently broken if omitted.
+Copy `.env.example` to `.env.local` and fill in the values. The most common variables are summarised below. The **complete reference**, with required/optional status, defaults, examples and security notes, is in **[docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)**.
 
 ### Auth
 
@@ -148,10 +223,6 @@ Files require a valid S3-compatible bucket to upload. In development you can lea
 | `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID` | Optional | — | Soroban NFT contract address (testnet). | `C...` |
 | `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID_MAINNET` | Optional | — | Soroban NFT contract address (mainnet). | `C...` |
 
-### Security Notes
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for onboarding, local setup, contribution guidelines, the code review process, good first issues and where to ask questions. Browse the component library with `npm run storybook`; see [STORYBOOK.md](STORYBOOK.md) for how it is deployed.
 
-- **Never commit secrets.** `.env.local` is git-ignored; only `.env.example` (with placeholder values) belongs in the repo.
-- **`NEXT_PUBLIC_*` variables are embedded in the client bundle** and are visible to anyone. Never put secrets in a `NEXT_PUBLIC_` variable.
-- **Rotate `NEXTAUTH_SECRET`** to invalidate all active sessions; rotate `AI_BACKEND_SECRET` and `AI_BACKEND_CALLBACK_SECRET` if they may have leaked.
-- **Scope storage credentials** to the single bucket used by the app and prefer short-lived credentials where your provider supports them.
-- **Use TLS** for `REDIS_URL` (`rediss://`) and any external endpoint in production.
+/* … truncated 5008 chars — edit only what you need near the top … */

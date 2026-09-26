@@ -1,27 +1,20 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
-import { X, Wand2, Loader2, Sparkles } from "lucide-react";
+import React, { useMemo, useState } from "react";
+import { X, Wand2, Loader2, Sparkles, Clock3 } from "lucide-react";
 import { StylePicker } from "@/components/transform/StylePicker";
 import { AnimeTransformControls } from "@/components/transform/AnimeTransformControls";
-import { useAnimePreview } from "@/app/hooks/useAnimePreview";
+import { StylePreviewCard } from "@/components/transform/StylePreviewCard";
 import { DEFAULT_ANIME_OPTIONS, type AnimeTransformOptions } from "@/app/lib/animeTransform";
 import { sanitize } from "@/app/lib/sanitize";
-import { DEFAULT_BLUR_PLACEHOLDER, SIZES_MODAL_PREVIEW } from "@/app/lib/imageUtils";
+import { TRANSFORM_STYLES } from "@/app/lib/transformStyles";
 import type { TransformOptions } from "@/app/api/transform/batch/route";
 import { useWillChange } from "@/app/hooks/useWillChange";
-
-// ─── Props ────────────────────────────────────────────────────────────────────
 
 export interface BatchTransformModalProps {
   /** Number of clips selected. */
   clipCount: number;
-  /**
-   * A representative clip id for live preview. When provided, the anime
-   * controls will fire a low-res preview as the user tunes options.
-   * Pass null when no individual clip can be identified (batch of > 1).
-   */
+  /** Representative owned clip used to generate low-resolution previews. */
   previewClipId?: string | null;
   /** Whether the submission is currently in-flight. */
   isSubmitting: boolean;
@@ -31,60 +24,6 @@ export interface BatchTransformModalProps {
   onConfirm: (style: string, options?: TransformOptions) => void;
   /** Called when the user closes the modal. */
   onClose: () => void;
-}
-
-// ─── Preview thumbnail ────────────────────────────────────────────────────────
-
-interface PreviewThumbnailProps {
-  previewUrl: string | null;
-  isLoading: boolean;
-  error: string | null;
-}
-
-function PreviewThumbnail({ previewUrl, isLoading, error }: PreviewThumbnailProps) {
-  if (!previewUrl && !isLoading && !error) return null;
-
-  return (
-    <div className="mt-4 rounded-xl border border-brand/20 bg-input overflow-hidden">
-      <div className="px-3 py-2 border-b border-white/5 flex items-center gap-2">
-        <Sparkles className="w-3 h-3 text-brand" aria-hidden="true" />
-        <span className="text-[11px] font-bold text-brand uppercase tracking-wider">
-          Live Preview
-        </span>
-        {isLoading && (
-          <span className="text-[10px] text-muted-foreground ml-auto animate-pulse">
-            Generating…
-          </span>
-        )}
-      </div>
-
-      <div className="relative aspect-video bg-black flex items-center justify-center">
-        {previewUrl && (
-          <Image
-            src={previewUrl}
-            alt="Low-res anime style preview"
-            fill
-            sizes={SIZES_MODAL_PREVIEW}
-            placeholder="blur"
-            blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
-            className="object-contain"
-          />
-        )}
-        {isLoading && !previewUrl && (
-          <Loader2 className="w-6 h-6 text-brand animate-spin" aria-label="Generating preview" />
-        )}
-        {/* Overlay spinner on top of existing preview while refreshing */}
-        {isLoading && previewUrl && (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <Loader2 className="w-5 h-5 text-brand animate-spin" aria-label="Updating preview" />
-          </div>
-        )}
-        {error && !previewUrl && (
-          <p className="text-[11px] text-muted-foreground px-4 text-center">{sanitize(error)}</p>
-        )}
-      </div>
-    </div>
-  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -106,26 +45,48 @@ export function BatchTransformModal({
 }: BatchTransformModalProps) {
   const panelRef = useWillChange<HTMLDivElement>("transform, opacity");
   const [selectedStyle, setSelectedStyle] = useState<string | null>(null);
+  const [intensity, setIntensity] = useState(70);
   const [animeOptions, setAnimeOptions] = useState<AnimeTransformOptions>(DEFAULT_ANIME_OPTIONS);
+  const [comparisonStyles, setComparisonStyles] = useState<string[]>([]);
 
   const isAnime = selectedStyle === "anime";
+  const comparisonItems = useMemo(
+    () =>
+      comparisonStyles
+        .map((name) => TRANSFORM_STYLES.find((style) => style.name === name))
+        .filter((style): style is (typeof TRANSFORM_STYLES)[number] => Boolean(style)),
+    [comparisonStyles]
+  );
 
-  // Live preview — only fires when anime is selected and a clip id is available
-  const {
-    previewUrl,
-    isLoading: isPreviewLoading,
-    error: previewError,
-  } = useAnimePreview({
-    clipId: isAnime ? previewClipId : null,
-    options: animeOptions,
-    enabled: isAnime && !!previewClipId,
-  });
+  const handleStyleSelect = (style: string) => {
+    setSelectedStyle(style);
+    setComparisonStyles((current) =>
+      [style, ...current.filter((name) => name !== style)].slice(0, 3)
+    );
+  };
+
+  const toggleComparison = (style: string) => {
+    setComparisonStyles((current) => {
+      if (current.includes(style)) {
+        return current.filter((name) => name !== style);
+      }
+      return [...current, style].slice(-3);
+    });
+  };
+
+  const handleIntensityChange = (value: number) => {
+    setIntensity(value);
+    if (isAnime) {
+      setAnimeOptions((options) => ({ ...options, colorIntensity: value }));
+    }
+  };
 
   const handleConfirm = () => {
     if (!selectedStyle || isSubmitting) return;
-    const options: TransformOptions | undefined = isAnime
-      ? { animeOptions }
-      : undefined;
+    const options: TransformOptions = {
+      intensity,
+      ...(isAnime ? { animeOptions: { ...animeOptions, colorIntensity: intensity } } : {}),
+    };
     onConfirm(selectedStyle, options);
   };
 
@@ -156,15 +117,11 @@ export function BatchTransformModal({
               <Wand2 className="w-4 h-4 text-brand" aria-hidden="true" />
             </div>
             <div>
-              <h2
-                id="batch-transform-modal-title"
-                className="text-base font-extrabold text-white"
-              >
+              <h2 id="batch-transform-modal-title" className="text-base font-extrabold text-white">
                 {safeCount === 1 ? "Transform Clip" : "Batch Transform"}
               </h2>
               <p className="text-xs text-muted-foreground">
-                Applying AI style to{" "}
-                <span className="text-white font-bold">{safeCount}</span> clip
+                Applying AI style to <span className="text-white font-bold">{safeCount}</span> clip
                 {safeCount !== 1 ? "s" : ""}
               </p>
             </div>
@@ -188,27 +145,104 @@ export function BatchTransformModal({
           <StylePicker
             selectedStyle={selectedStyle}
             disabled={isSubmitting}
-            onStyleSelect={setSelectedStyle}
+            onStyleSelect={handleStyleSelect}
           />
 
-          {/* Anime-specific controls — animate in when anime is selected */}
           {isAnime && (
-            <>
-              <AnimeTransformControls
-                value={animeOptions}
-                onChange={setAnimeOptions}
-                disabled={isSubmitting}
-              />
+            <AnimeTransformControls
+              value={animeOptions}
+              onChange={(next) => {
+                setAnimeOptions(next);
+                setIntensity(next.colorIntensity);
+              }}
+              disabled={isSubmitting}
+            />
+          )}
 
-              {/* Live preview thumbnail */}
-              {previewClipId && (
-                <PreviewThumbnail
-                  previewUrl={previewUrl}
-                  isLoading={isPreviewLoading}
-                  error={previewError}
-                />
-              )}
-            </>
+          <section
+            className="mt-4 rounded-2xl border border-white/10 bg-surface p-4"
+            aria-label="Style intensity"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <label
+                htmlFor="style-intensity"
+                className="text-xs font-bold uppercase tracking-wider text-muted-foreground"
+              >
+                Style intensity
+              </label>
+              <span className="text-sm font-bold text-brand">{intensity}%</span>
+            </div>
+            <input
+              id="style-intensity"
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={intensity}
+              disabled={isSubmitting}
+              onChange={(event) => handleIntensityChange(Number(event.target.value))}
+              className="mt-3 w-full accent-brand"
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-valuenow={intensity}
+            />
+            <p className="mt-2 text-xs text-muted-foreground">
+              Lower values stay closer to the source; higher values apply a stronger effect.
+            </p>
+          </section>
+
+          {previewClipId && selectedStyle && (
+            <section className="mt-5 space-y-3" aria-label="Style preview comparison">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-brand" aria-hidden="true" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                  Compare style previews
+                </h3>
+                <span className="ml-auto inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                  low resolution
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Styles to preview">
+                {TRANSFORM_STYLES.map((style) => {
+                  const active = comparisonStyles.includes(style.name);
+                  return (
+                    <button
+                      key={style.name}
+                      type="button"
+                      disabled={isSubmitting || (!active && comparisonStyles.length >= 3)}
+                      onClick={() => toggleComparison(style.name)}
+                      aria-pressed={active}
+                      className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                        active
+                          ? "border-brand/50 bg-brand/10 text-brand"
+                          : "border-white/10 text-white/70 hover:bg-white/5"
+                      }`}
+                    >
+                      {sanitize(style.label)}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="space-y-3">
+                {comparisonItems.map((style) => (
+                  <StylePreviewCard
+                    key={style.name}
+                    styleName={style.name}
+                    styleLabel={style.label}
+                    clipId={previewClipId}
+                    intensity={intensity}
+                    animeOptions={animeOptions}
+                    enabled={!isSubmitting}
+                    onRemove={
+                      comparisonStyles.length > 1 ? () => toggleComparison(style.name) : undefined
+                    }
+                  />
+                ))}
+              </div>
+            </section>
           )}
         </div>
 

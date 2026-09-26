@@ -1,12 +1,24 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
-import { validateRequiredEnv } from "./app/lib/validateEnv";
+import { appConfig } from "./app/lib/config";
+import { validateRequiredEnv } from "./app/lib/validate-env";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
 validateRequiredEnv();
 
 /** CDN origin for static assets. Undefined disables the prefix (dev/test). */
 const CDN_URL = process.env.NEXT_PUBLIC_CDN_URL?.replace(/\/+$/, "") || undefined;
+
+/** Hostname allowed for CDN-hosted images — the configured CDN, else the default one. */
+const CDN_HOSTNAME = CDN_URL ? new URL(CDN_URL).hostname : "cdn.clipcash.dev";
+
+/** Horizon origins the browser talks to, including any configured overrides. */
+const HORIZON_ORIGINS = [
+  ...new Set([
+    new URL(appConfig.stellar.horizonUrl.testnet).origin,
+    new URL(appConfig.stellar.horizonUrl.mainnet).origin,
+  ]),
+];
 
 const withAnalyzer = withBundleAnalyzer({
   enabled: process.env.ANALYZE === "true",
@@ -26,8 +38,7 @@ function buildCsp(): string {
 
   const connectSrc = [
     "'self'",
-    "https://horizon-testnet.stellar.org",
-    "https://horizon.stellar.org",
+    ...HORIZON_ORIGINS,
     "https://api.coingecko.com",
   ];
   if (ANALYTICS_ENABLED) {
@@ -47,7 +58,7 @@ function buildCsp(): string {
       "https://*.cloudfront.net",
       "https://*.amazonaws.com",
       "https://*.cloudflarestorage.com",
-      "https://cdn.clipcash.dev",
+      `https://${CDN_HOSTNAME}`,
       "https://lh3.googleusercontent.com",
       "https://avatars.githubusercontent.com"
     ],
@@ -204,7 +215,7 @@ const nextConfig: NextConfig = {
       // App CDN
       {
         protocol: 'https',
-        hostname: 'cdn.clipcash.dev',
+        hostname: CDN_HOSTNAME,
         port: '',
         pathname: '/**',
       },

@@ -13,8 +13,8 @@ Successfully implemented Redis-based session sharing across serverless instances
 - Logs warnings in production when Redis is not configured
 
 **Files:**
-- `app/api/jobs/shared/redisClient.ts` - Redis client manager
-- `app/api/jobs/shared/jobRepository.ts` - Updated to use Redis manager
+- `app/api/jobs/shared/redis-client.ts` - Redis client manager
+- `app/api/jobs/shared/job-repository.ts` - Updated to use Redis manager
 
 ### ✅ Add health check for Redis connection
 **Implementation:**
@@ -24,7 +24,7 @@ Successfully implemented Redis-based session sharing across serverless instances
 - Periodic health checks every 30 seconds (configurable)
 
 **Files:**
-- `app/api/jobs/shared/redisClient.ts` - Health check functions
+- `app/api/jobs/shared/redis-client.ts` - Health check functions
 - `app/api/health/redis/route.ts` - HTTP health endpoint
 
 ### ✅ Implement fallback to in-memory storage if Redis is unavailable
@@ -35,8 +35,8 @@ Successfully implemented Redis-based session sharing across serverless instances
 - Graceful degradation with logging
 
 **Files:**
-- `app/api/jobs/shared/jobRepository.ts` - Fallback logic
-- `app/api/jobs/shared/redisClient.ts` - Availability checks
+- `app/api/jobs/shared/job-repository.ts` - Fallback logic
+- `app/api/jobs/shared/redis-client.ts` - Availability checks
 
 ### ✅ Add Redis connection pooling for better performance
 **Implementation:**
@@ -46,7 +46,7 @@ Successfully implemented Redis-based session sharing across serverless instances
 - Pool statistics and metrics
 
 **Files:**
-- `app/api/jobs/shared/redisClient.ts` - Connection pool configuration
+- `app/api/jobs/shared/redis-client.ts` - Connection pool configuration
 
 ### ✅ Document Redis configuration requirements
 **Implementation:**
@@ -62,14 +62,14 @@ Successfully implemented Redis-based session sharing across serverless instances
 
 ### Core Components
 
-1. **Redis Client Manager** (`app/api/jobs/shared/redisClient.ts`)
+1. **Redis Client Manager** (`app/api/jobs/shared/redis-client.ts`)
    - Singleton Redis client with connection pooling
    - Automatic reconnection with exponential backoff
    - Health monitoring and metrics
    - Event listeners for connection state
    - Graceful shutdown handlers
 
-2. **Enhanced Job Repository** (`app/api/jobs/shared/jobRepository.ts`)
+2. **Enhanced Job Repository** (`app/api/jobs/shared/job-repository.ts`)
    - Updated to use Redis client manager
    - Automatic fallback to in-memory storage
    - Error handling with proper logging
@@ -189,7 +189,7 @@ curl http://localhost:3000/api/health/redis
 ### Basic Usage (No Code Changes)
 
 ```typescript
-import { jobStore } from '@/app/api/jobs/shared/jobStore';
+import { jobStore } from '@/app/api/jobs/shared/job-store';
 
 // Works with Redis OR in-memory storage automatically
 const job = await jobStore.get('job-123');
@@ -198,7 +198,7 @@ const job = await jobStore.get('job-123');
 ### Health Check
 
 ```typescript
-import { checkRedisHealth } from '@/app/api/jobs/shared/redisClient';
+import { checkRedisHealth } from '@/app/api/jobs/shared/redis-client';
 
 if (await checkRedisHealth()) {
   console.log('Redis is healthy');
@@ -208,7 +208,7 @@ if (await checkRedisHealth()) {
 ### Get Metrics
 
 ```typescript
-import { getRedisHealthMetrics } from '@/app/api/jobs/shared/redisClient';
+import { getRedisHealthMetrics } from '@/app/api/jobs/shared/redis-client';
 
 const metrics = await getRedisHealthMetrics();
 console.log(`Status: ${metrics.status}`);
@@ -219,7 +219,7 @@ console.log(`Healthy: ${metrics.isHealthy}`);
 ### Pool Information
 
 ```typescript
-import { getRedisPoolInfo } from '@/app/api/jobs/shared/redisClient';
+import { getRedisPoolInfo } from '@/app/api/jobs/shared/redis-client';
 
 const poolInfo = await getRedisPoolInfo();
 console.log(`Connected clients: ${poolInfo.connectedClients}`);
@@ -240,11 +240,11 @@ curl https://your-app.vercel.app/api/health/database
 ## Files Created (4 files)
 
 ### Implementation
-1. ✅ `app/api/jobs/shared/redisClient.ts` - Redis client manager with pooling
+1. ✅ `app/api/jobs/shared/redis-client.ts` - Redis client manager with pooling
 2. ✅ `app/api/health/redis/route.ts` - Health check endpoint
 
 ### Testing
-3. ✅ `__tests__/api/jobs/redisClient.test.ts` - Redis client tests
+3. ✅ `__tests__/api/jobs/redis-client.test.ts` - Redis client tests
 4. ✅ `__tests__/api/health-redis.test.ts` - Health endpoint tests
 
 ### Documentation
@@ -256,9 +256,9 @@ curl https://your-app.vercel.app/api/health/database
 
 ## Files Modified (2 files)
 
-1. ✅ `app/api/jobs/shared/jobRepository.ts` - Updated to use Redis manager
+1. ✅ `app/api/jobs/shared/job-repository.ts` - Updated to use Redis manager
 2. ✅ `.env.example` - Added Redis configuration variables
-3. ✅ `app/api/jobs/shared/jobRepository.test.ts` - Enhanced tests
+3. ✅ `app/api/jobs/shared/job-repository.test.ts` - Enhanced tests
 
 ## Deployment Guides
 

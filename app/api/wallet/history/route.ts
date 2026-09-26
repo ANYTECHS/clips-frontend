@@ -55,16 +55,16 @@ export async function GET(request: NextRequest) {
 
     // Build ordered array of days
     const history: number[] = [];
-    let running = 0;
+    let runningTotal = 0;
     const allDays: string[] = [];
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-      allDays.push(d.toISOString().slice(0, 10));
+    for (let dayOffset = days - 1; dayOffset >= 0; dayOffset--) {
+      const currentDate = new Date(Date.now() - dayOffset * 24 * 60 * 60 * 1000);
+      allDays.push(currentDate.toISOString().slice(0, 10));
     }
     // Accumulate from oldest to newest
     for (const day of allDays) {
-      running += dailyDeltas[day] ?? 0;
-      history.push(running);
+      runningTotal += dailyDeltas[day] ?? 0;
+      history.push(runningTotal);
     }
 
     return NextResponse.json({ history });
