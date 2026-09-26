@@ -21,7 +21,7 @@ Balance fetching functionality has been successfully implemented with auto-refre
 ## 📦 Deliverables
 
 ### 1. Balance Hook (`useBalance.ts`)
-**Location:** `app/hooks/useBalance.ts`
+**Location:** `app/hooks/use-balance.ts`
 
 **Features:**
 - ✅ `getBalance()` function using Horizon API
@@ -81,7 +81,7 @@ const {
 ```
 
 ### 3. Updated Wallet Info Card
-**Location:** `components/dashboard/WalletInfoCard.tsx`
+**Location:** `components/dashboard/wallet-info-card.tsx`
 
 **Changes:**
 - ✅ Integrated `BalanceDisplay` component
@@ -90,7 +90,7 @@ const {
 - ✅ Auto-refresh enabled by default
 
 ### 4. Comprehensive Test Suite
-**Location:** `app/hooks/useBalance.test.ts`
+**Location:** `app/hooks/use-balance.test.ts`
 
 **Coverage:**
 - ✅ `getBalance()` function tests
@@ -578,12 +578,12 @@ interface UseBalanceReturn {
 ## 📝 Code Statistics
 
 ### Files Created
-1. `app/hooks/useBalance.ts` (~350 lines)
+1. `app/hooks/use-balance.ts` (~350 lines)
 2. `components/wallet/BalanceDisplay.tsx` (~250 lines)
-3. `app/hooks/useBalance.test.ts` (~400 lines)
+3. `app/hooks/use-balance.test.ts` (~400 lines)
 
 ### Files Modified
-1. `components/dashboard/WalletInfoCard.tsx` (simplified)
+1. `components/dashboard/wallet-info-card.tsx` (simplified)
 
 ### Total Lines
 - **Production Code**: ~600 lines

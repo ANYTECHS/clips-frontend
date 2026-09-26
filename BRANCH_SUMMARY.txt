@@ -88,10 +88,10 @@ Test Infrastructure:
         └── authentication.test.ts - Auth tests (4)
 
 Example Tests:
-  components/Button.test.tsx    - Component tests (7)
+  components/button.test.tsx    - Component tests (7)
   app/lib/sanitize.test.ts      - Sanitization tests (7)
   app/lib/validators.test.ts    - Validation tests (6)
-  app/hooks/useProcessingStatus.test.ts - Hook tests (8)
+  app/hooks/use-processing-status.test.ts - Hook tests (8)
   tests/e2e/visual.spec.ts      - Visual tests (50+)
 
 Documentation:

@@ -33,56 +33,49 @@ The static build will be output to `storybook-static/` directory.
 
 ## 📦 Components Documented
 
-We have created stories for 11+ core components:
+Every visual component has a story, grouped in the sidebar by title prefix. Stories tagged `autodocs` get a generated **Docs** page with a props table, the component's JSDoc description, and usage snippets.
 
-### Dashboard Components
-1. **StatCard** - Display key metrics with trend indicators
-   - Variants: Positive/Negative trends, with/without icons
-   - Props: label, value, trend, isPositive, icon, hideTrendIcon
+| Group | Stories |
+| --- | --- |
+| **UI** | Skeleton, SkeletonCard, SkeletonTable, SkeletonPresets, RouteSkeleton, ProgressBar, ErrorUI |
+| **Feedback** | OfflineBanner |
+| **Common** | VirtualList |
+| **Components** | Navbar, Footer, ErrorBoundary, RateLimitToast, LandingLayout |
+| **Layout** | BackgroundOrbs |
+| **Icons** | PlatformIcons (YouTube, TikTok, Instagram, Twitter, MetaMask, Phantom) |
+| **Auth** | AuthForm |
+| **Charts** | DonutChart, Sparkline, WalletCharts |
+| **Clips** | ClipsNavbar, ClipsStats, CreateClipsForm, Hero |
+| **Dashboard** | StatCard, ProjectCard, AIInsightCard, DashboardHeader, DashboardSidebar, EarningsSummaryCards, EarningsTable, PlanUsage, PlatformDistribution, RevenueChart, WalletInfoCard |
+| **Platforms** | PlatformCard, SectionHeader, HelpBanner, PlatformsFooter |
+| **Projects** | ClipEditorModal, ClipPreviewModal, MintConfigForm, ProjectFilters, ScoreBreakdownTooltip, SelectionFooter, TagsFilter |
+| **Transform** | StyleCard, StylePicker, AnimeTransformControls, BatchTransformModal, BatchTransformQueue, ComparisonPlayer, TransformResult |
+| **Vault** | NFTCard, NFTGrid |
+| **Wallet** | AssetRow, TrustlineManager, WalletConnectButton, WalletHealthCard |
+| **App** | NotFound |
 
-2. **ProjectCard** - Show project status and clip count
-   - Variants: Processing, Completed
-   - Props: title, clipsCount, status, thumbnail
+### What does not get a story
 
-3. **AIInsightCard** - AI-powered insights display
-   - Single variant with coming soon message
+Components that render no UI of their own have no story. They are exercised through the stories that use them or through Jest tests. This covers context providers (`AuthProvider`, `WalletProvider`, `MultiWalletProvider`, `EmbeddedWalletProvider`, `StellarWalletProvider`, `DataSyncProvider`, `AnalyticsProvider`, `theme-provider`) and side-effect-only components (`PerformanceMonitor`, `ResourceHints`, `DnsPrefetchHints`, `CryptoSaltInitializer`, `KeyboardShortcuts`). Files that only re-export another component are skipped too.
 
-### UI Components
-4. **StatusBadge** - Status indicators
-   - Variants: Completed, Pending, Failed (in sm/md sizes)
-   - Props: status, size
+### Variants
 
-5. **ProgressBar** - Visual progress indicators
-   - Variants: Different heights, colors, animated/static
-   - Props: value, color, label, animated, height
+Each story file exports one named story per meaningful state: default, loading, empty, error, disabled, and each value of a `variant`/`size`/`status` prop. For example, `Platforms/PlatformCard` covers NotLinked, Active, Connecting, ComingSoon, HorizontalWallet, HorizontalLinked and Skeletons.
 
-6. **Skeleton** - Loading placeholders
-   - Variants: Circle, Rectangle, Text, Card, List, Table
-   - Props: className
+### Usage examples
 
-7. **Switch** - Toggle switches
-   - Variants: On, Off, Interactive with labels
-   - Props: checked, onChange, ariaLabel
+Put a usage snippet in the JSDoc comment above `meta`. It shows up on the component's Docs page:
 
-### Project Components
-8. **ClipCard** - Individual clip display with actions
-   - Variants: High/Medium/Low score, Selected, Recommended
-   - Props: id, title, thumbnail, score, duration, isSelected, isRecommended, callbacks
-
-### Vault Components
-9. **NFTCard** - NFT status and details
-   - Variants: Ready to Mint, In Queue, Minted (all rarities)
-   - Props: id, title, thumbnail, status, rarity, aiScore, prices
-
-### Platform Components
-10. **PlatformCard** - Social platform connections
-    - Variants: Not Linked, Linked, Active, Loading (vertical/horizontal)
-    - Props: name, description, icon, status, ctaText, username, variant
-
-### Wallet Components
-11. **WalletConnectButton** - Wallet connection UI
-    - Variants: Disconnected, Connected, Loading, Error (compact/full)
-    - Props: compact
+```tsx
+/**
+ * Compositor-friendly progress bar.
+ *
+ * ```tsx
+ * <ProgressBar value={uploadPercent} label="Uploading video.mp4" />
+ * ```
+ */
+const meta: Meta<typeof ProgressBar> = { ... };
+```
 
 ## 🎨 Storybook Features
 
@@ -134,7 +127,7 @@ clips-frontend/
 ### Basic Story Structure
 
 ```typescript
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import MyComponent from './MyComponent';
 
 const meta = {
@@ -180,78 +173,27 @@ Stories are organized into categories:
 
 ## 🚢 Deployment
 
-### Option 1: Chromatic (Recommended)
+Storybook is deployed to **GitHub Pages** by [`.github/workflows/storybook.yml`](.github/workflows/storybook.yml):
 
-Chromatic provides visual testing and hosting for Storybook.
+1. Runs on every push to `main` (and manually via **Actions → Deploy Storybook to GitHub Pages → Run workflow**).
+2. Installs dependencies with `npm ci` on Node 20.
+3. Runs `npm run build-storybook`, which outputs to `storybook-static/`.
+4. Uploads the folder with `actions/upload-pages-artifact` and publishes it with `actions/deploy-pages`.
 
-```bash
-# Install Chromatic
-npm install --save-dev chromatic
+The published URL is shown on the workflow run's `deploy` job and under **Settings → Pages**. It follows the pattern `https://<owner>.github.io/clips-frontend/`.
 
-# Publish to Chromatic
-npx chromatic --project-token=<your-project-token>
-```
+**One-time setup:** in the repository's **Settings → Pages**, set **Source** to **GitHub Actions**.
 
-**Setup Steps:**
-1. Sign up at https://www.chromatic.com/
-2. Create a new project
-3. Get your project token
-4. Add token to GitHub Secrets as `CHROMATIC_PROJECT_TOKEN`
-5. Chromatic will auto-deploy on every push
+**Environment:** `storybook build` loads `next.config.ts`, which runs `validateRequiredEnv()`. The workflow therefore sets non-secret placeholder values for the required variables. To build locally, either have a filled-in `.env.local` or export the same placeholders shown in the workflow.
 
-### Option 2: Vercel
-
-Deploy Storybook as a static site on Vercel.
+**Before merging UI changes**, check that the build succeeds locally:
 
 ```bash
-# Build Storybook
 npm run build-storybook
-
-# Deploy to Vercel
-npx vercel --prod storybook-static
+npx http-server storybook-static   # optional: preview the static build
 ```
 
-**Setup Steps:**
-1. Install Vercel CLI: `npm i -g vercel`
-2. Run `vercel login`
-3. Build Storybook: `npm run build-storybook`
-4. Deploy: `vercel --prod storybook-static`
-
-### Option 3: GitHub Pages
-
-Deploy to GitHub Pages for free hosting.
-
-**Setup Steps:**
-1. Build Storybook: `npm run build-storybook`
-2. Push `storybook-static/` to `gh-pages` branch
-3. Enable GitHub Pages in repository settings
-
-**Automated Deployment:**
-
-Create `.github/workflows/storybook.yml`:
-
-```yaml
-name: Deploy Storybook
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-node@v3
-        with:
-          node-version: '18'
-      - run: npm ci
-      - run: npm run build-storybook
-      - uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./storybook-static
-```
+For visual regression review, the `@chromatic-com/storybook` addon is already installed. Publishing to Chromatic is optional and needs a `CHROMATIC_PROJECT_TOKEN` secret.
 
 ## 🧪 Testing with Storybook
 
@@ -331,19 +273,25 @@ parameters: {
 }
 ```
 
-### Custom Decorators
+### Global Providers and Router Mock
 
-Global decorator wraps all stories with proper styling:
+`.storybook/preview.tsx` wraps every story in the app-wide providers, so components that use these hooks render without extra setup:
 
-```typescript
-decorators: [
-  (Story) => (
-    <div className="min-h-screen bg-background text-white p-8">
-      <Story />
-    </div>
-  ),
-],
+| Provider | Hooks it satisfies | Story value |
+| --- | --- | --- |
+| `SessionProvider` (next-auth) | `useSession()` | A static mock session (`storybook@example.com`). No network fetch. |
+| `AuthProvider` | `useAuth()` | Derived from the mock session |
+| `I18nProvider` | `useI18n()` | English |
+
+`parameters.nextjs.appDirectory: true` mocks the App Router (`useRouter`, `usePathname`, `useSearchParams`). To set the current route for one story:
+
+```tsx
+export const OnEarnings: Story = {
+  parameters: { nextjs: { navigation: { pathname: '/earnings' } } },
+};
 ```
+
+Providers that talk to real services (wallets, the data-sync layer) are **not** global. Mock them with props or a story-level decorator.
 
 ## 📖 Resources
 

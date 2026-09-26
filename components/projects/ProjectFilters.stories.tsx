@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
-import { fn } from '@storybook/test';
+import { fn } from 'storybook/test';
 import ProjectFilters from './ProjectFilters';
 
 const meta: Meta<typeof ProjectFilters> = {
@@ -12,6 +12,11 @@ const meta: Meta<typeof ProjectFilters> = {
     onResetFilters: { action: 'filters_reset' },
     onVaultFilterChange: { action: 'vault_filter_changed' },
     mobile: { control: 'boolean' },
+  },
+  args: {
+    availableTags: ['gaming', 'tutorial', 'funny', 'highlights'],
+    selectedTags: [],
+    onTagsChange: fn(),
   },
 };
 

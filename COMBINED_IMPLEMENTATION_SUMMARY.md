@@ -20,7 +20,7 @@ Two major infrastructure improvements have been implemented to enhance the Clips
 - Comprehensive test coverage
 
 ### Key Files Created
-- `app/lib/prismaMiddleware.ts` - Timeout and monitoring middleware
+- `app/lib/prisma-middleware.ts` - Timeout and monitoring middleware
 - `app/api/health/database/route.ts` - Database health endpoint
 - `docs/DATABASE_CONNECTION_POOLING.md` - Complete documentation
 - 3 test files with 20+ test cases
@@ -46,7 +46,7 @@ DATABASE_SLOW_QUERY_THRESHOLD=1000
 - Pool metrics and connection statistics
 
 ### Key Files Created
-- `app/api/jobs/shared/redisClient.ts` - Redis client manager
+- `app/api/jobs/shared/redis-client.ts` - Redis client manager
 - `app/api/health/redis/route.ts` - Redis health endpoint
 - `docs/REDIS_SESSION_SHARING.md` - Complete documentation
 - `docs/REDIS_QUICK_START.md` - Quick start guide
@@ -237,7 +237,7 @@ curl http://localhost:3000/api/health/redis
 - `.env.example` - Added all configuration variables
 - `prisma/schema.prisma` - Added pooling documentation
 - `app/lib/prisma.ts` - Enhanced with pooling
-- `app/api/jobs/shared/jobRepository.ts` - Redis integration
+- `app/api/jobs/shared/job-repository.ts` - Redis integration
 - `SCALING.md` - Updated with health checks
 
 ## Next Steps

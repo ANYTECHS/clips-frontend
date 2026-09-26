@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { fn } from "@storybook/test";
+import { fn } from "storybook/test";
 import { StylePicker } from "./StylePicker";
 import type { TransformStyle } from "@/app/api/transform/styles/route";
 import type { ApiResponse } from "@/app/api/types";

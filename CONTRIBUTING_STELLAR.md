@@ -1,6 +1,6 @@
 # Contributing to Stellar Wallet Features
 
-This guide covers everything you need to work on wallet-related code in ClipCash AI. Read it before opening a PR that touches anything in `app/hooks/`, `app/lib/stellar*`, `components/wallet/`, or `components/WalletProvider.tsx`.
+This guide covers everything you need to work on wallet-related code in ClipCash AI. Read it before opening a PR that touches anything in `app/hooks/`, `app/lib/stellar*`, `components/wallet/`, or `components/wallet-provider.tsx`.
 
 ---
 
@@ -28,17 +28,17 @@ Environment variable
   NEXT_PUBLIC_STELLAR_NETWORK=testnet|mainnet
           │
           ▼
-  app/lib/networkConfig.ts          ← single source of truth for URLs/passphrases
+  app/lib/network-config.ts          ← single source of truth for URLs/passphrases
           │
           ├── app/lib/stellar.ts    ← Stellar SDK wrappers, buildBatchTransaction
           │         │
-          │         └── app/lib/stellarOperations.ts  ← typed operation descriptors
+          │         └── app/lib/stellar-operations.ts  ← typed operation descriptors
           │
           ├── app/hooks/use*.ts     ← React hooks (no direct SDK calls in components)
           │
           └── components/wallet/   ← UI components (consume hooks only)
                     │
-                    └── components/WalletProvider.tsx  ← session + signing for embedded wallets
+                    └── components/wallet-provider.tsx  ← session + signing for embedded wallets
 ```
 
 **Key rule:** Components never import `@stellar/stellar-sdk` directly. All SDK usage lives in `app/lib/` or hooks.
@@ -49,22 +49,22 @@ Environment variable
 
 | File | Responsibility |
 |------|---------------|
-| `app/lib/networkConfig.ts` | Horizon URLs, passphrases, Friendbot URL, network label |
+| `app/lib/network-config.ts` | Horizon URLs, passphrases, Friendbot URL, network label |
 | `app/lib/stellar.ts` | `buildBatchTransaction`, `buildPaymentTransaction`, `getBalance`, `fundWithFriendbot` |
-| `app/lib/stellarOperations.ts` | Typed operation descriptors + builder helpers + `validateOperations` |
-| `app/lib/stellarTransaction.ts` | Low-level XDR envelope builder used in tests |
-| `app/hooks/useWalletConnection.ts` | Freighter browser extension connect/disconnect |
-| `app/hooks/useAutoStellarWallet.ts` | Loads wallet from auth context, no manual connect needed |
-| `app/hooks/useBalance.ts` | Balance polling with auto-refresh and USD conversion |
-| `app/hooks/useStellarTransaction.ts` | Freighter-based transaction execution + batch queue |
-| `app/hooks/useTrustline.ts` | Add/remove asset trustlines (embedded or Freighter) |
+| `app/lib/stellar-operations.ts` | Typed operation descriptors + builder helpers + `validateOperations` |
+| `app/lib/stellar-transaction.ts` | Low-level XDR envelope builder used in tests |
+| `app/hooks/use-wallet-connection.ts` | Freighter browser extension connect/disconnect |
+| `app/hooks/use-auto-stellar-wallet.ts` | Loads wallet from auth context, no manual connect needed |
+| `app/hooks/use-balance.ts` | Balance polling with auto-refresh and USD conversion |
+| `app/hooks/use-stellar-transaction.ts` | Freighter-based transaction execution + batch queue |
+| `app/hooks/use-trustline.ts` | Add/remove asset trustlines (embedded or Freighter) |
 | `app/hooks/useWalletHealth.ts` | Horizon latency, account status, connection quality |
-| `components/WalletProvider.tsx` | React context: embedded wallet session, `sendXlmPayment`, `refreshBalance` |
-| `components/wallet/TrustlineManager.tsx` | Trustline UI (preset + custom assets) |
-| `components/wallet/WalletHealthCard.tsx` | Health status display |
+| `components/wallet-provider.tsx` | React context: embedded wallet session, `sendXlmPayment`, `refreshBalance` |
+| `components/wallet/trustline-manager.tsx` | Trustline UI (preset + custom assets) |
+| `components/wallet/wallet-health-card.tsx` | Health status display |
 | `components/wallet/BalanceDisplay.tsx` | XLM + USD balance display with auto-refresh |
 | `components/wallet/TransactionHistory.tsx` | Recent transaction list |
-| `app/lib/walletErrorTracking.ts` | Sentry integration + structured error logging |
+| `app/lib/wallet-error-tracking.ts` | Sentry integration + structured error logging |
 | `app/lib/analytics.ts` | Analytics events for all wallet actions |
 
 ---
@@ -90,7 +90,7 @@ type StellarOperation =
 Always use the builder helpers — never construct the raw object manually:
 
 ```ts
-import { createChangeTrustOp, createPaymentOp } from "@/app/lib/stellarOperations";
+import { createChangeTrustOp, createPaymentOp } from "@/app/lib/stellar-operations";
 
 const ops = [
   createChangeTrustOp({ assetCode: "USDC", assetIssuer: "G...", limit: "1000" }),
@@ -131,7 +131,7 @@ The Stellar SDK uses string amounts to avoid floating-point precision loss. Alwa
 
 ## How to add a new Stellar operation
 
-1. **Add the interface** to `app/lib/stellarOperations.ts`:
+1. **Add the interface** to `app/lib/stellar-operations.ts`:
 
 ```ts
 export interface MyNewOperation {
@@ -196,7 +196,7 @@ Follow the pattern established by `useTrustline` and `useWalletHealth`.
 import { useState, useCallback } from "react";
 // Import from lib, never directly from @stellar/stellar-sdk in hooks
 import { buildBatchTransaction, NETWORK_PASSPHRASE, getStellarServer } from "@/app/lib/stellar";
-import { STELLAR_NETWORK } from "@/app/lib/networkConfig";
+import { STELLAR_NETWORK } from "@/app/lib/network-config";
 import analytics from "@/lib/analytics";
 
 export type MyFeatureStatus = "idle" | "loading" | "success" | "error";
@@ -350,7 +350,7 @@ import {
   getNetworkPassphrase,
   getFriendbotUrl,          // throws on mainnet — use this intentionally
   getFreighterNetwork,      // "PUBLIC" | "TESTNET" for Freighter API
-} from "@/app/lib/networkConfig";
+} from "@/app/lib/network-config";
 ```
 
 The active network is set by the `NEXT_PUBLIC_STELLAR_NETWORK` environment variable. Default is `testnet`.
@@ -438,10 +438,10 @@ await fetch(url, { signal: AbortSignal.timeout(5_000) });
 
 **Never call `getFriendbotUrl()` on mainnet.** The function throws intentionally — do not catch and suppress that error.
 
-**Error tracking:** Use `captureWalletError` and `logWalletOperation` from `@/app/lib/walletErrorTracking.ts` for all wallet errors. These sanitize PII before sending to Sentry.
+**Error tracking:** Use `captureWalletError` and `logWalletOperation` from `@/app/lib/wallet-error-tracking.ts` for all wallet errors. These sanitize PII before sending to Sentry.
 
 ```ts
-import { captureWalletError, logWalletOperation } from "@/app/lib/walletErrorTracking";
+import { captureWalletError, logWalletOperation } from "@/app/lib/wallet-error-tracking";
 
 try {
   // ...
@@ -564,6 +564,6 @@ useEffect(() => {
 - [Stellar Developer Docs](https://developers.stellar.org/)
 - [Horizon API Reference](https://developers.stellar.org/api/horizon)
 - [Freighter Wallet Docs](https://docs.freighter.app/)
-- [`useWalletConnection` README](app/hooks/useWalletConnection.README.md)
-- [`useStellarTransaction` README](app/hooks/useStellarTransaction.README.md)
+- [`useWalletConnection` README](app/hooks/use-wallet-connection.README.md)
+- [`useStellarTransaction` README](app/hooks/use-stellar-transaction.README.md)
 - [Analytics guide](ANALYTICS.md)
