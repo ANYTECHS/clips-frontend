@@ -26,6 +26,38 @@ describe('rateLimiter', () => {
     await limited();
     expect(fn).toHaveBeenCalledTimes(2);
   });
+
+  it('resets at the exact window boundary', async () => {
+    const fn = jest.fn().mockResolvedValue('ok');
+    const limited = rateLimiter(fn, 1, 1000);
+    await limited();
+    jest.advanceTimersByTime(1000);
+    await limited();
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it('emits retry status when limit is exceeded', async () => {
+    const fn = jest.fn().mockResolvedValue('ok');
+    const limited = rateLimiter(fn, 1, 1000);
+    const listener = jest.fn();
+    window.addEventListener('rate-limit-exceeded', listener);
+
+    await limited();
+    await expect(limited()).rejects.toThrow('RATE_LIMIT_EXCEEDED');
+
+    expect(listener).toHaveBeenCalledWith(
+      expect.objectContaining({
+        detail: expect.objectContaining({
+          retryAfter: 1,
+          limit: 1,
+          remaining: 0,
+          resetAt: expect.any(Number),
+        }),
+      }),
+    );
+
+    window.removeEventListener('rate-limit-exceeded', listener);
+  });
 });
 
 // Property-based tests for sliding window correctness (#439)

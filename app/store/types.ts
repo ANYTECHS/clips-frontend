@@ -122,6 +122,46 @@ export interface EarningsActions {
   invalidateEarningsCache: () => void;
 }
 
+// ─── Batch Transform ──────────────────────────────────────────────────────────
+
+/**
+ * The status of a single job within a batch transform operation.
+ */
+export type BatchJobStatus = "queued" | "processing" | "complete" | "error" | "cancelled";
+
+/**
+ * A single job entry in a batch transform operation.
+ * Tracks per-clip progress and cancellation state.
+ */
+export interface BatchTransformJob {
+  /** Unique job id assigned by the server. */
+  jobId: string;
+  /** The source clip being transformed. */
+  clipId: string;
+  /** Current lifecycle status. */
+  status: BatchJobStatus;
+  /** Completion percentage 0–100. */
+  progress: number;
+  /** URL of the final transformed video (set on completion). */
+  resultUrl: string | null;
+  /** Human-readable error if status === "error". */
+  errorMessage?: string;
+}
+
+/**
+ * The overall state of an active batch transform operation.
+ */
+export interface BatchTransformState {
+  /** Unique id for this batch operation. */
+  batchId: string;
+  /** The visual style applied to all clips. */
+  style: string;
+  /** All jobs in this batch, keyed by jobId. */
+  jobs: Record<string, BatchTransformJob>;
+  /** ISO timestamp when the batch was created. */
+  createdAt: string;
+}
+
 // ─── User ─────────────────────────────────────────────────────────────────────
 
 export interface UserProfile {
@@ -131,6 +171,7 @@ export interface UserProfile {
   avatarUrl: string | null;
   plan: "free" | "pro" | "enterprise";
   planUsagePercent: number;
+  transformQuotaRemaining?: number;
 }
 
 export interface UserState {

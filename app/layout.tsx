@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import dynamic from "next/dynamic";
 import "./globals.css";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
@@ -8,14 +9,42 @@ import { NetworkProvider } from "@/app/context/NetworkContext";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { I18nProvider } from "@/app/lib/i18n/I18nProvider";
-import CookieConsent from "@/components/CookieConsent";
 import RateLimitToast from "@/components/RateLimitToast";
-import KeyboardShortcuts from "@/components/KeyboardShortcuts";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import AnalyticsProvider from "@/components/AnalyticsProvider";
+import ResourceHints from "@/components/ResourceHints";
 import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
+import PerformanceMonitor from "@/components/PerformanceMonitor";
+import FontPreload from "@/components/FontPreload";
+import DataSyncProvider from "@/components/DataSyncProvider";
 
-const inter = Inter({ subsets: ["latin", "latin-ext"], display: "swap" });
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"), {
+  ssr: false,
+});
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const CookieConsent = dynamic(() => import("@/components/CookieConsent"), {
+  ssr: false,
+});
+
+/**
+ * Inter font configuration with performance optimizations:
+ * - Subsets: latin + latin-ext for European languages
+ * - display: "swap" - Shows fallback immediately, swaps when loaded (FOUT strategy)
+ * - preload: true - Eager load for LCP improvements
+ * - adjustFontFallback: "Arial" - Smooth visual transition on swap
+ * 
+ * Font subsetting reduces file size by ~60% for most use cases.
+ * See: https://web.dev/articles/variable-fonts-optimize-performance
+ */
+const inter = Inter({ 
+  subsets: ["latin", "latin-ext"], 
+  display: "swap",
+  variable: "--font-inter",
+  preload: true,
+  adjustFontFallback: "Arial",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://clipcash.ai"),
@@ -48,13 +77,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+    <html lang="en" suppressHydrationWarning className={inter.variable}>
+      <head>
+        <meta name="theme-color" content="#080C0B" />
+        <FontPreload />
+        <ResourceHints />
+      </head>
+      <body className={`${inter.className} font-sans antialiased`}>
         <div className="radial-bg" />
+        <PerformanceMonitor />
         <CryptoSaltInitializer />
         <ThemeProvider>
           <ErrorBoundary>
             <I18nProvider>
+              <DataSyncProvider>
               <AuthProvider>
                 <ToastProvider>
                   <NetworkProvider>
@@ -69,6 +105,7 @@ export default function RootLayout({
                   </NetworkProvider>
                 </ToastProvider>
               </AuthProvider>
+              </DataSyncProvider>
             </I18nProvider>
           </ErrorBoundary>
         </ThemeProvider>

@@ -3,7 +3,7 @@
  * Covers: first page, last page, empty results, page clamping
  */
 
-import { getEarningsReport } from "@/app/lib/mockApi";
+import { getEarningsReport } from "@/__mocks__/app/lib/mockApi";
 
 // Bypass rate limiter by calling the unwrapped function via the rateLimiter wrapper
 // The mock just calls through synchronously
@@ -20,7 +20,7 @@ beforeAll(async () => {
   jest.mock("@/app/lib/rateLimiter", () => ({
     rateLimiter: (fn: any) => fn,
   }));
-  const mod = await import("@/app/lib/mockApi");
+  const mod = await import("@/__mocks__/app/lib/mockApi");
   getReport = mod.getEarningsReport as any;
 });
 

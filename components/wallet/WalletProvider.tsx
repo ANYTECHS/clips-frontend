@@ -1,14 +1,15 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { secureStorage } from "@/app/lib/secureStorage";
 import { truncateAddress } from "@/app/lib/stringUtils";
+import { createSelectableContext } from "@/app/lib/createSelectableContext";
 
 const STORAGE_KEY = "clipcash_wallet";
 
 export type WalletType = "metamask" | "phantom" | "stellar" | "embedded" | "imported";
 
-interface WalletState {
+export interface WalletState {
   address: string | null;
   chainId: string | null;
   walletType: WalletType | null;
@@ -18,7 +19,7 @@ interface WalletState {
   stellarSecret: string | null;
 }
 
-interface WalletContextValue extends WalletState {
+export interface WalletActions {
   connectMetaMask: () => Promise<string | null>;
   connectPhantom: () => Promise<string | null>;
   connectStellar: () => Promise<string | null>;
@@ -27,7 +28,19 @@ interface WalletContextValue extends WalletState {
   clearError: () => void;
 }
 
-const WalletContext = createContext<WalletContextValue | null>(null);
+interface WalletContextValue extends WalletState, WalletActions {}
+
+// State lives behind a selectable context so a consumer that only needs one
+// field (e.g. `isConnecting`) can subscribe to just that via
+// `useWalletSelector` instead of re-rendering on every wallet state change.
+const walletStateStore = createSelectableContext<WalletState>("Wallet");
+
+// Actions are plain callbacks with no data of their own, so a plain context
+// is enough — as long as the actions object's identity stays stable (see
+// `disconnect` below), consumers that only need actions never re-render
+// when wallet *state* changes.
+const WalletActionsContext = createContext<WalletActions | null>(null);
+WalletActionsContext.displayName = "WalletActionsContext";
 
 const DEFAULT_STATE: WalletState = {
   address: null,
@@ -41,6 +54,11 @@ const DEFAULT_STATE: WalletState = {
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<WalletState>(DEFAULT_STATE);
+
+  // Read inside stable (empty-dep) callbacks that still need the latest
+  // state without taking it as a dependency — see `disconnect` below.
+  const stateRef = useRef(state);
+  stateRef.current = state;
 
   // Restore persisted session on mount
   useEffect(() => {
@@ -63,6 +81,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Register MetaMask event listeners
   useEffect(() => {
+    // MetaMask injects window.ethereum - types not available
     const eth = (window as any).ethereum;
     if (!eth) return;
 
@@ -88,6 +107,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
   // Register Phantom event listeners
   useEffect(() => {
+    // Phantom injects window.solana - types not available
     const sol = (window as any).solana;
     if (!sol) return;
 
@@ -120,6 +140,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   );
 
   const connectMetaMask = useCallback(async (): Promise<string | null> => {
+    // MetaMask injects window.ethereum - types not available
     const eth = (window as any).ethereum;
     if (!eth) {
       setState((prev) => ({ ...prev, error: "MetaMask is not installed" }));
@@ -158,6 +179,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [persist]);
 
   const connectPhantom = useCallback(async (): Promise<string | null> => {
+    // Phantom injects window.solana - types not available
     const sol = (window as any).solana;
     if (!sol?.isPhantom) {
       setState((prev) => ({ ...prev, error: "Phantom wallet not detected" }));
@@ -225,40 +247,68 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [persist]);
 
   const disconnect = useCallback(() => {
+    // Phantom injects window.solana - types not available
     const sol = (window as any).solana;
-    if (sol && state.walletType === "phantom") {
+    if (sol && stateRef.current.walletType === "phantom") {
       try { sol.disconnect(); } catch {}
     }
     setState(DEFAULT_STATE);
     secureStorage.removeItem(STORAGE_KEY);
-  }, [state.walletType]);
+  }, []);
 
   const clearError = useCallback(() => {
     setState((prev) => ({ ...prev, error: null }));
   }, []);
 
+  // Every dependency here is a `useCallback` with an empty/stable dep list,
+  // so this object's identity never changes across re-renders — a consumer
+  // that only reads `useWalletActions()` never re-renders when wallet state
+  // changes (see docs/context-optimization.md).
+  const actions = useMemo<WalletActions>(
+    () => ({ connectMetaMask, connectPhantom, connectStellar, importStellarKey, disconnect, clearError }),
+    [connectMetaMask, connectPhantom, connectStellar, importStellarKey, disconnect, clearError],
+  );
+
   return (
-    <WalletContext.Provider
-      value={{
-        ...state,
-        connectMetaMask,
-        connectPhantom,
-        connectStellar,
-        importStellarKey,
-        disconnect,
-        clearError,
-      }}
-    >
-      {children}
-    </WalletContext.Provider>
+    <walletStateStore.Provider value={state}>
+      <WalletActionsContext.Provider value={actions}>{children}</WalletActionsContext.Provider>
+    </walletStateStore.Provider>
   );
 }
 
-export function useWallet(): WalletContextValue {
-  const ctx = useContext(WalletContext);
+function useWalletActionsContext(): WalletActions {
+  const ctx = useContext(WalletActionsContext);
   if (!ctx) throw new Error("useWallet must be used inside <WalletProvider>");
   return ctx;
 }
 
 // Re-export truncateAddress from stringUtils for backward compatibility
 export { truncateAddress } from "@/app/lib/stringUtils";
+/**
+ * Full wallet state + actions, kept for existing call sites. Re-renders on
+ * every wallet state change, same as before this file was split — prefer
+ * `useWalletSelector` or `useWalletActions` for a narrower subscription.
+ */
+export function useWallet(): WalletContextValue {
+  const state = walletStateStore.useSelector((s) => s);
+  const actions = useWalletActionsContext();
+  return useMemo(() => ({ ...state, ...actions }), [state, actions]);
+}
+
+/** Subscribes to a derived slice of wallet state; re-renders only when it changes. */
+export function useWalletSelector<S>(
+  selector: (state: WalletState) => S,
+  isEqual?: (a: S, b: S) => boolean,
+): S {
+  return walletStateStore.useSelector(selector, isEqual);
+}
+
+/** Stable wallet action callbacks. Never triggers a re-render on wallet state changes. */
+export function useWalletActions(): WalletActions {
+  return useWalletActionsContext();
+}
+
+export function truncateAddress(address: string): string {
+  if (address.length <= 12) return address;
+  return `${address.slice(0, 6)}...${address.slice(-4)}`;
+}

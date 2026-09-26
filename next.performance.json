@@ -1,0 +1,38 @@
+{
+  "bundles": [
+    {
+      "name": "main",
+      "maxSize": "250kb"
+    },
+    {
+      "name": "commons",
+      "maxSize": "150kb"
+    },
+    {
+      "name": "dashboard",
+      "maxSize": "100kb"
+    },
+    {
+      "name": "analytics",
+      "maxSize": "80kb"
+    }
+  ],
+  "metrics": {
+    "LCP": {
+      "threshold": 2500,
+      "unit": "ms"
+    },
+    "FID": {
+      "threshold": 100,
+      "unit": "ms"
+    },
+    "CLS": {
+      "threshold": 0.1,
+      "unit": "unitless"
+    },
+    "TTFB": {
+      "threshold": 600,
+      "unit": "ms"
+    }
+  }
+}

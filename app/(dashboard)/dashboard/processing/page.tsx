@@ -7,6 +7,8 @@ import { Sparkles, Clock, Zap, RefreshCw, X, CheckCircle, AlertCircle, RotateCcw
 import { useProcessStore, selectProcess, selectHasHydrated } from "@/app/store/processStore";
 import { useProcessingStatus } from "@/app/hooks/useProcessingStatus";
 import { ProcessStatus } from "@/app/store/types";
+import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import { sendNotification, notifyClipsReady } from "@/app/lib/notifications";
 
 function formatTimeRemaining(seconds: number | null): string {
   if (seconds === null) return "Calculating…";
@@ -36,21 +38,25 @@ export default function ProcessingPage() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setNotificationSent(true);
 
-      // Send browser notification if permission granted
-      if ("Notification" in window && Notification.permission === "granted") {
-        const notification = new Notification("Your clips are ready!", {
-          body: `Found ${momentsFound} viral moments from your video`,
-          icon: "/avatar.png",
-          tag: "processing-complete",
-        });
+      // Browser push notification
+      sendNotification("Your clips are ready!");
+      notifyClipsReady(momentsFound, "/projects");
 
-        notification.onclick = () => {
-          window.focus();
-          router.push("/projects");
-        };
-      }
+      // In-app server-side notification (shown in the DashboardHeader bell)
+      fetch("/api/notifications", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "job_complete",
+          title: "Your clips are ready!",
+          message: `Found ${momentsFound} viral moment${momentsFound !== 1 ? "s" : ""} from your video`,
+          payload: { jobId: jobId ?? id },
+        }),
+      }).catch(() => {
+        // Non-critical: swallow errors so we don't block the success UI
+      });
     }
-  }, [status, notificationSent, momentsFound, router]);
+  }, [status, notificationSent, momentsFound, router, jobId, id]);
 
   const handleCancel = () => {
     resetProcess();
@@ -77,9 +83,7 @@ export default function ProcessingPage() {
   if (status === "complete") {
     return (
       <div className="min-h-screen bg-background text-white flex flex-col font-sans relative overflow-hidden">
-        <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
-          <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-brand/5 blur-[120px] rounded-full" />
-        </div>
+        <BackgroundOrbs variant="default" />
 
         <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
           <div className="flex flex-col items-center text-center space-y-6 mb-12">
@@ -192,11 +196,7 @@ export default function ProcessingPage() {
   // Processing state (default)
   return (
     <div className="min-h-screen bg-background text-white flex flex-col font-sans relative overflow-hidden">
-      {/* Background Gradients */}
-      <div className="fixed top-0 left-0 w-full h-full pointer-events-none z-0">
-        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 w-[1000px] h-[600px] bg-brand/5 blur-[120px] rounded-full" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[600px] h-[600px] bg-brand/3 blur-[120px] rounded-full" />
-      </div>
+      <BackgroundOrbs variant="default" />
 
       <main className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
         {/* Hero Section */}
@@ -237,7 +237,14 @@ export default function ProcessingPage() {
             </div>
 
             {/* Progress Bar Container */}
-            <div className="relative h-4 w-full bg-input rounded-full overflow-hidden border border-white/5">
+            <div
+              role="progressbar"
+              aria-valuenow={progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label="Processing progress"
+              className="relative h-4 w-full bg-input rounded-full overflow-hidden border border-white/5"
+            >
               <div
                 className="absolute top-0 left-0 h-full bg-brand rounded-full transition-all duration-[2000ms] ease-out shadow-[0_0_20px_rgba(0,255,133,0.4)]"
                 style={{ width: `${progress}%` }}
@@ -259,6 +266,11 @@ export default function ProcessingPage() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Off-screen live region to announce moments found updates to screen readers */}
+        <div className="sr-only" aria-live="polite" aria-atomic="true">
+          {momentsFound} moments found
         </div>
 
         {/* Stats Section */}

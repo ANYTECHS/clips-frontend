@@ -1,9 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/nextjs";
-import InstagramIcon from "@/components/icons/InstagramIcon";
-import TikTokIcon from "@/components/icons/TikTokIcon";
-import YoutubeIcon from "@/components/icons/YoutubeIcon";
-import TwitterIcon from "@/components/icons/TwitterIcon";
 import React from "react";
+import {
+  InstagramIcon,
+  TikTokIcon,
+  YoutubeIcon,
+  TwitterIcon,
+  PhantomIcon,
+  MetaMaskIcon,
+} from "@/components/icons";
 
 const meta: Meta = {
   title: "Icons/PlatformIcons",
@@ -28,24 +32,38 @@ export default meta;
 type Story = StoryObj;
 
 export const AllIcons: Story = {
-  render: () => (
-    <>
-      <div className="flex flex-col items-center gap-2">
-        <InstagramIcon className="text-[#E1306C]" size={32} />
-        <span className="text-sm">Instagram</span>
+  render: () => {
+    const icons = [
+      { label: "Instagram", component: <InstagramIcon className="text-[#E1306C]" /> },
+      { label: "TikTok", component: <TikTokIcon /> },
+      { label: "YouTube", component: <YoutubeIcon className="text-[#FF0000]" /> },
+      { label: "Twitter", component: <TwitterIcon className="text-[#1DA1F2]" /> },
+      { label: "Phantom", component: <PhantomIcon className="text-[#AB9BFF]" /> },
+      { label: "MetaMask", component: <MetaMaskIcon className="text-[#F6851B]" /> },
+    ];
+
+    return (
+      <div className="flex flex-col gap-6 text-white">
+        {icons.map((icon) => (
+          <div key={icon.label} className="flex flex-col gap-3">
+            <div className="text-sm font-semibold">{icon.label}</div>
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col items-center gap-2">
+                {icon.component}
+                <span className="text-xs text-white/70">Default</span>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                {React.cloneElement(icon.component as React.ReactElement, { size: 18 })}
+                <span className="text-xs text-white/70">Small</span>
+              </div>
+              <div className="flex flex-col items-center gap-2">
+                {React.cloneElement(icon.component as React.ReactElement, { size: 32 })}
+                <span className="text-xs text-white/70">Large</span>
+              </div>
+            </div>
+          </div>
+        ))}
       </div>
-      <div className="flex flex-col items-center gap-2">
-        <TikTokIcon size={32} />
-        <span className="text-sm">TikTok</span>
-      </div>
-      <div className="flex flex-col items-center gap-2">
-        <YoutubeIcon className="text-[#FF0000]" size={32} />
-        <span className="text-sm">YouTube</span>
-      </div>
-      <div className="flex flex-col items-center gap-2">
-        <TwitterIcon className="text-[#1DA1F2]" size={32} />
-        <span className="text-sm">Twitter</span>
-      </div>
-    </>
-  ),
+    );
+  },
 };

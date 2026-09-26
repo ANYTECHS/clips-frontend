@@ -1,0 +1,57 @@
+# CronJob — requeue stalled jobs every 5 minutes.
+# Mirrors the Vercel cron at /api/cron/requeue-stalled-jobs.
+# Uses a lightweight curl image so no app container is needed.
+
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: clipcash-requeue-stalled-jobs
+  namespace: clipcash
+  labels:
+    app.kubernetes.io/name: clipcash-frontend
+    app.kubernetes.io/component: cron
+spec:
+  schedule: "*/5 * * * *"
+  # Don't start a new run if the previous one is still running.
+  concurrencyPolicy: Forbid
+  # Keep 3 successful and 1 failed job for debugging.
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  # If a run is missed by more than 60 s, skip it rather than running late.
+  startingDeadlineSeconds: 60
+  jobTemplate:
+    spec:
+      # Retry once on transient failures (network blip, pod startup delay).
+      backoffLimit: 1
+      activeDeadlineSeconds: 120
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/component: cron-requeue
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: requeue
+              image: curlimages/curl:8.7.1
+              command:
+                - sh
+                - -c
+                - |
+                  curl -sf \
+                    -H "Authorization: Bearer ${CRON_SECRET}" \
+                    http://clipcash-frontend.clipcash.svc.cluster.local/api/cron/requeue-stalled-jobs \
+                    && echo "Requeue complete" \
+                    || { echo "Requeue failed"; exit 1; }
+              env:
+                - name: CRON_SECRET
+                  valueFrom:
+                    secretKeyRef:
+                      name: clipcash-frontend-secrets
+                      key: CRON_SECRET
+              resources:
+                requests:
+                  cpu: "10m"
+                  memory: "16Mi"
+                limits:
+                  cpu: "50m"
+                  memory: "32Mi"

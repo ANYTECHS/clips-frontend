@@ -17,9 +17,6 @@ import { create } from "zustand";
 import type {
   DashboardState,
   DashboardActions,
-  DashboardStats,
-  RevenuePoint,
-  Project,
 } from "./types";
 import { useUserStore } from "./userStore";
 
@@ -31,6 +28,8 @@ const CACHE_TTL_MS = DASHBOARD_CACHE_TTL_MS;
 export { DASHBOARD_CACHE_TTL_MS };
 
 import { fetchDashboardFromAPI } from "./api";
+import { startMeasure } from "@/app/lib/performanceMonitoring";
+import { subscribeInvalidation } from "@/app/lib/data-layer";
 
 // ─── Initial state ────────────────────────────────────────────────────────────
 
@@ -66,6 +65,10 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
 
       set({ loading: true, error: null });
 
+      // Timed on both paths so a slow *failing* dashboard is as visible as a
+      // slow successful one.
+      const endMeasure = startMeasure("dashboard.load");
+
       try {
         const data = await fetchDashboardFromAPI();
         set({
@@ -76,6 +79,7 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
           loading: false,
           error: null,
         });
+        endMeasure({ outcome: "success" });
       } catch (err) {
         import("@/app/lib/logger").then(({ logger }) => {
           logger.error("Error fetching dashboard data:", err);
@@ -87,6 +91,7 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
               ? err.message
               : "Failed to fetch dashboard data",
         });
+        endMeasure({ outcome: "error" });
       }
     },
 
@@ -95,6 +100,14 @@ export const useDashboardStore = create<DashboardState & DashboardActions>(
     setRecentProjects: (projects) => set({ recentProjects: projects }),
   })
 );
+
+if (typeof window !== "undefined") {
+  subscribeInvalidation((keys) => {
+    if (keys.some((key) => key === "*" || key === "dashboard" || key.includes("/api/dashboard"))) {
+      useDashboardStore.getState().invalidateCache();
+    }
+  });
+}
 
 // ─── Selectors (memoised slices — prevent unnecessary re-renders) ─────────────
 
@@ -125,10 +138,44 @@ export const selectRecentProjects = (s: DashboardState & DashboardActions) =>
   s.recentProjects;
 
 /**
+ * Selects the in-flight flag for the dashboard fetch.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns True while a dashboard fetch is in flight.
+ */
+export const selectLoading = (s: DashboardState & DashboardActions) => s.loading;
+
+/**
+ * Selects the last dashboard fetch error message.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns The error message, or null when the last fetch succeeded.
+ */
+export const selectError = (s: DashboardState & DashboardActions) => s.error;
+
+/**
+ * Selects the timestamp of the last successful dashboard fetch.
+ *
+ * @param s - Combined global dashboard store data slice object.
+ * @returns Epoch milliseconds of the last fetch, or null if never fetched.
+ */
+export const selectLastFetchedAt = (s: DashboardState & DashboardActions) =>
+  s.lastFetchedAt;
+
+/**
  * Extracts operation lifecycle timestamps and pending validation flags.
  *
  * @param s - Combined global dashboard store data slice object.
  * @returns Consolidated lifecycle tracking states.
+ *
+ * @remarks
+ * This builds a fresh object on every call, so subscribing to it through
+ * `useDashboardStore` re-renders the consumer on *every* store write — the
+ * returned object never compares equal under zustand's default `Object.is`
+ * check, even when loading, error and lastFetchedAt are all unchanged.
+ * Prefer the atomic {@link selectLoading}, {@link selectError} and
+ * {@link selectLastFetchedAt} selectors in components; this composite is kept
+ * for non-reactive reads such as `useDashboardStore.getState()`.
  */
 export const selectDashboardMeta = (s: DashboardState & DashboardActions) => ({
   loading: s.loading,

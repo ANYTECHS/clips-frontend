@@ -1,0 +1,32 @@
+# ServiceMonitor — tells Prometheus Operator to scrape /api/metrics.
+# Requires: prometheus-operator / kube-prometheus-stack installed.
+#
+# If you're using plain Prometheus (no operator), add a scrape config to
+# prometheus.yml instead — see SCALING.md for the snippet.
+
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: clipcash-frontend
+  namespace: clipcash
+  labels:
+    # Must match the Prometheus Operator's serviceMonitorSelector.
+    # Default kube-prometheus-stack label:
+    release: kube-prometheus-stack
+    app.kubernetes.io/name: clipcash-frontend
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: clipcash-frontend
+  endpoints:
+    - port: http
+      path: /api/metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
+      bearerTokenSecret:
+        name: clipcash-metrics-token
+        key: token
+  namespaceSelector:
+    matchNames:
+      - clipcash

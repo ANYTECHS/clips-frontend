@@ -2,10 +2,12 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { useRouter, usePathname } from "next/navigation";
 import { persistClipcashUser, loadClipcashUser, clearClipcashUser } from "@/app/lib/authUser";
 
-const PUBLIC_ROUTES = ["/", "/login", "/privacy", "/terms", "/status", "/cookies"];
+// Route protection is handled server-side by middleware.ts via NextAuth JWT.
+// The AuthProvider no longer performs client-side redirects, which previously
+// caused dashboard content to flash for one frame before the redirect fired.
+// See: middleware.ts
 
 export interface AuthUser {
   id: string;
@@ -23,11 +25,10 @@ interface AuthContextValue {
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+AuthContext.displayName = "AuthContext";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const { data: session, status } = useSession();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { data: session, status, update } = useSession();
 
   const [user, setUserState] = useState<AuthUser | null>(null);
   const [storageLoaded, setStorageLoaded] = useState(false);
@@ -41,6 +42,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const isLoading = status === "loading" || !storageLoaded;
+
+  useEffect(() => {
+    if (status !== "authenticated") return;
+
+    let lastRefresh = 0;
+    const refreshSession = () => {
+      const now = Date.now();
+      if (now - lastRefresh < 10 * 60 * 1000) return;
+      lastRefresh = now;
+      void update();
+    };
+    const warnBeforeExpiry = () => {
+      const expiresAt = session?.expires ? new Date(session.expires).getTime() : 0;
+      if (expiresAt && expiresAt - Date.now() < 5 * 60 * 1000) {
+        window.dispatchEvent(new CustomEvent("clipcash:session-expiring"));
+      }
+    };
+    const onActivity = () => {
+      refreshSession();
+      warnBeforeExpiry();
+    };
+
+    window.addEventListener("click", onActivity);
+    window.addEventListener("keydown", onActivity);
+    window.addEventListener("visibilitychange", onActivity);
+    refreshSession();
+
+    return () => {
+      window.removeEventListener("click", onActivity);
+      window.removeEventListener("keydown", onActivity);
+      window.removeEventListener("visibilitychange", onActivity);
+    };
+  }, [status, session?.expires, update]);
 
   // Sync NextAuth session -> local state
   useEffect(() => {
@@ -61,23 +95,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (stored && !stored.id.startsWith("mock")) {
           clearClipcashUser();
           setUserState(null);
+          sessionStorage.setItem(
+            "clipcash:logout-recovery",
+            JSON.stringify({ path: window.location.pathname + window.location.search, savedAt: Date.now() }),
+          );
           signOut({ redirect: false });
         }
       });
     }
   }, [status, session]);
-
-  // Route guard
-  useEffect(() => {
-    if (isLoading) return;
-    if (status === "authenticated") return;
-    const isPublic = PUBLIC_ROUTES.some(
-      (r) => pathname === r || pathname.startsWith(r + "/")
-    );
-    if (!user && !isPublic) {
-      router.push("/login");
-    }
-  }, [user, isLoading, status, pathname, router]);
 
   const setUser = useCallback((newUser: AuthUser) => {
     setUserState(newUser);
@@ -87,6 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = useCallback(async () => {
     setUserState(null);
     await clearClipcashUser();
+    sessionStorage.setItem(
+      "clipcash:logout-recovery",
+      JSON.stringify({ path: window.location.pathname + window.location.search, savedAt: Date.now() }),
+    );
     await signOut({ redirect: false });
   }, []);
 

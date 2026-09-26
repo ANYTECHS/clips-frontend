@@ -1,4 +1,5 @@
 import { logger } from "@/app/lib/logger";
+import { scheduleWork } from "@/app/lib/mainThreadOptimization";
 
 /**
  * Analytics Tracking Utility
@@ -137,7 +138,7 @@ class Analytics {
    */
   private initializeGA4(): void {
     const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-    
+
     if (!measurementId) {
       logger.warn('GA4 measurement ID not configured');
       return;
@@ -147,6 +148,24 @@ class Analytics {
     const script = document.createElement('script');
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
+    script.crossOrigin = 'anonymous';
+    // Analytics is not needed for the page to be interactive, so it's
+    // deprioritized relative to the app's own scripts (#917).
+    script.setAttribute('fetchpriority', 'low');
+    script.onerror = () => {
+      logger.error('Failed to load GA4 script (network or ad-blocker); analytics disabled for this session.');
+    };
+    // Subresource Integrity (issue #801): gtag.js is served dynamically per
+    // measurement ID and Google explicitly does not support pinning it with
+    // SRI (the file can change without notice, which would break tracking
+    // the moment the hash goes stale). NEXT_PUBLIC_GA4_SCRIPT_SRI_HASH is
+    // opt-in for teams that have accepted that tradeoff and want to pin a
+    // known-good snapshot anyway; the docs/SECURITY.md SRI section explains
+    // the risk. Left unset by default.
+    const ga4Integrity = process.env.NEXT_PUBLIC_GA4_SCRIPT_SRI_HASH;
+    if (ga4Integrity) {
+      script.integrity = ga4Integrity;
+    }
     document.head.appendChild(script);
 
     // Initialize gtag
@@ -168,11 +187,27 @@ class Analytics {
    */
   private initializePlausible(): void {
     const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || window.location.hostname;
-    
+
     const script = document.createElement('script');
     script.defer = true;
+    script.crossOrigin = 'anonymous';
     script.setAttribute('data-domain', domain);
-    script.src = 'https://plausible.io/js/script.js';
+    script.setAttribute('fetchpriority', 'low');
+    script.onerror = () => {
+      logger.error('Failed to load Plausible script (network or ad-blocker); analytics disabled for this session.');
+    };
+    // Subresource Integrity (issue #801): plausible.io/js/script.js is a
+    // rolling "latest" URL with no first-party version-pinned path, so
+    // "pin to a specific version" here means pinning to a known-good SRI
+    // hash of a snapshot rather than a versioned URL — set
+    // NEXT_PUBLIC_PLAUSIBLE_SCRIPT_SRI_HASH once one has been captured (see
+    // docs/SECURITY.md for the exact command). Falls back to the
+    // unpinned script (current behavior) when unset.
+    script.src = process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL || 'https://plausible.io/js/script.js';
+    const plausibleIntegrity = process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_SRI_HASH;
+    if (plausibleIntegrity) {
+      script.integrity = plausibleIntegrity;
+    }
     document.head.appendChild(script);
   }
 
@@ -235,32 +270,37 @@ class Analytics {
       return;
     }
 
-    const sanitizedPath = this.sanitize(path);
-    this.log('Page view:', sanitizedPath);
+    // PII sanitization and provider dispatch aren't needed for this frame to
+    // paint, so they run at idle time instead of on the click/navigation
+    // that triggered them.
+    scheduleWork(() => {
+      const sanitizedPath = this.sanitize(path);
+      this.log('Page view:', sanitizedPath);
 
-    try {
-      switch (this.provider) {
-        case 'ga4':
-          if (window.gtag) {
-            window.gtag('event', 'page_view', {
-              page_path: sanitizedPath,
-            });
-          }
-          break;
+      try {
+        switch (this.provider) {
+          case 'ga4':
+            if (window.gtag) {
+              window.gtag('event', 'page_view', {
+                page_path: sanitizedPath,
+              });
+            }
+            break;
 
-        case 'plausible':
-          if (window.plausible) {
-            window.plausible('pageview', { props: { path: sanitizedPath } });
-          }
-          break;
+          case 'plausible':
+            if (window.plausible) {
+              window.plausible('pageview', { props: { path: sanitizedPath } });
+            }
+            break;
 
-        case 'custom':
-          this.sendCustomEvent('page_view', { path: sanitizedPath });
-          break;
+          case 'custom':
+            this.sendCustomEvent('page_view', { path: sanitizedPath });
+            break;
+        }
+      } catch (error) {
+        logger.error('Failed to track page view:', error);
       }
-    } catch (error) {
-      logger.error('Failed to track page view:', error);
-    }
+    }, 'background');
   }
 
   /**
@@ -274,30 +314,34 @@ class Analytics {
       return;
     }
 
-    const sanitizedProperties = properties ? this.sanitize(properties) : {};
-    this.log('Event:', name, sanitizedProperties);
+    // Same reasoning as trackPageView: sanitization + dispatch is non-critical
+    // and shouldn't run in the same task as the interaction that fired it.
+    scheduleWork(() => {
+      const sanitizedProperties = properties ? this.sanitize(properties) : {};
+      this.log('Event:', name, sanitizedProperties);
 
-    try {
-      switch (this.provider) {
-        case 'ga4':
-          if (window.gtag) {
-            window.gtag('event', name, sanitizedProperties);
-          }
-          break;
+      try {
+        switch (this.provider) {
+          case 'ga4':
+            if (window.gtag) {
+              window.gtag('event', name, sanitizedProperties);
+            }
+            break;
 
-        case 'plausible':
-          if (window.plausible) {
-            window.plausible(name, { props: sanitizedProperties });
-          }
-          break;
+          case 'plausible':
+            if (window.plausible) {
+              window.plausible(name, { props: sanitizedProperties });
+            }
+            break;
 
-        case 'custom':
-          this.sendCustomEvent(name, sanitizedProperties);
-          break;
+          case 'custom':
+            this.sendCustomEvent(name, sanitizedProperties);
+            break;
+        }
+      } catch (error) {
+        logger.error('Failed to track event:', error);
       }
-    } catch (error) {
-      logger.error('Failed to track event:', error);
-    }
+    }, 'background');
   }
 
   /**

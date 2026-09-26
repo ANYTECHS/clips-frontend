@@ -14,7 +14,7 @@ import {
 import { useToast } from "@/hooks/useToast";
 import { encryptWithPassword } from "@/app/lib/cryptoUtils";
 import { splitSecret } from "@/app/lib/shamirRecovery";
-import { MockApi } from "@/app/lib/mockApi";
+import { MockApi } from "@/__mocks__/app/lib/mockApi";
 import { secureStorage } from "@/app/lib/secureStorage";
 
 export { encryptWithPassword, decryptWithPassword } from "@/app/lib/cryptoUtils";

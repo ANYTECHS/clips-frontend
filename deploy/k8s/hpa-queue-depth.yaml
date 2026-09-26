@@ -1,0 +1,106 @@
+# Horizontal Pod Autoscaler — queue-depth trigger (KEDA)
+#
+# KEDA (Kubernetes Event-Driven Autoscaler) polls the /api/metrics endpoint
+# and scales based on the number of queued + active jobs. This is the most
+# direct signal for job-processing throughput — more jobs in the queue means
+# more Next.js instances needed to serve SSE streams, accept callbacks, and
+# handle re-dispatch cron calls.
+#
+# Prerequisites:
+#   helm repo add kedacore https://kedacore.github.io/charts
+#   helm install keda kedacore/keda --namespace keda --create-namespace
+#
+# The MetricsAPIScaler hits GET /api/metrics with the METRICS_TOKEN bearer
+# token and reads the JSON field at the path specified in `valueLocation`.
+#
+# Scaling thresholds:
+#   targetValue: 5  — scale out 1 replica for every 5 queued+active jobs.
+#   Example: 20 queued jobs → HPA wants 20/5 = 4 replicas (subject to min/max).
+#
+# This ScaledObject coexists with hpa-cpu-memory.yaml. KEDA manages its own
+# HPA object (`keda-hpa-clipcash-frontend-queue`); the two HPAs are
+# independent. Kubernetes takes the maximum desired replica count across all
+# active HPAs, so whichever trigger calls for more pods wins.
+
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: clipcash-frontend-queue
+  namespace: clipcash
+  labels:
+    app.kubernetes.io/name: clipcash-frontend
+spec:
+  scaleTargetRef:
+    name: clipcash-frontend
+
+  minReplicaCount: 2
+  maxReplicaCount: 10
+
+  # Poll the metrics endpoint every 30 seconds.
+  pollingInterval: 30
+
+  # Scale back to minReplicas after 5 minutes of no jobs (cooldown).
+  cooldownPeriod: 300
+
+  # Idle: when queued+active jobs = 0 for the full cooldown period, KEDA
+  # can scale the deployment to 0 if desired. Set to true only if you
+  # accept cold-start latency on the first upload after idle.
+  # Disabled by default because cold-start on Vercel/K8s adds ~2-5 s.
+  # idleReplicaCount: 0
+
+  advanced:
+    horizontalPodAutoscalerConfig:
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 30
+          policies:
+            - type: Pods
+              value: 2
+              periodSeconds: 30
+        scaleDown:
+          stabilizationWindowSeconds: 300
+          policies:
+            - type: Pods
+              value: 1
+              periodSeconds: 120
+
+  triggers:
+    - type: metrics-api
+      metadata:
+        # The metrics endpoint on any pod in the service.
+        url: "http://clipcash-frontend.clipcash.svc.cluster.local/api/metrics"
+        method: "GET"
+        # JSON path to the queued job count.
+        valueLocation: "jobs.queued"
+        # Scale out 1 replica per 5 queued jobs.
+        targetValue: "5"
+      authenticationRef:
+        name: clipcash-metrics-auth
+
+    - type: metrics-api
+      metadata:
+        url: "http://clipcash-frontend.clipcash.svc.cluster.local/api/metrics"
+        method: "GET"
+        # Also scale on active jobs to keep up with callback/SSE load.
+        valueLocation: "jobs.active"
+        targetValue: "8"
+      authenticationRef:
+        name: clipcash-metrics-auth
+
+---
+# TriggerAuthentication — injects the METRICS_TOKEN into KEDA's scrape calls.
+# The Secret must exist before applying this manifest.
+# kubectl create secret generic clipcash-metrics-token \
+#   --from-literal=token=<your-METRICS_TOKEN> \
+#   -n clipcash
+
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: clipcash-metrics-auth
+  namespace: clipcash
+spec:
+  secretTargetRef:
+    - parameter: authHeader
+      name: clipcash-metrics-token
+      key: token

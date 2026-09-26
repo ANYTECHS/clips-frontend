@@ -7,3 +7,9 @@ const { TextEncoder, TextDecoder } = require('util')
 Object.defineProperty(globalThis, 'crypto', { value: webcrypto, writable: false })
 Object.defineProperty(globalThis, 'TextEncoder', { value: TextEncoder, writable: false })
 Object.defineProperty(globalThis, 'TextDecoder', { value: TextDecoder, writable: false })
+
+import { resetDataLayerForTests } from '@/app/lib/data-layer'
+
+beforeEach(() => {
+  resetDataLayerForTests()
+})

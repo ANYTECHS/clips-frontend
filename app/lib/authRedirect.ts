@@ -1,6 +1,6 @@
 import type { User } from "./types";
 
-const PROTECTED_ROUTES = [
+export const PROTECTED_ROUTES = [
   "/dashboard",
   "/onboarding",
   "/earnings",
@@ -74,6 +74,39 @@ export function getAuthRedirectTarget({
   }
 
   if (authenticated && pathname === "/onboarding" && user.onboardingStep > 2) {
+    return "/dashboard";
+  }
+
+  return null;
+}
+
+/**
+ * Middleware-side redirect logic that accepts the JWT-derived token presence and
+ * onboarding step directly, without requiring a full User object.
+ *
+ * @param pathname - The request pathname.
+ * @param hasToken - True when a valid NextAuth JWT session exists.
+ * @param onboardingStep - The user's current onboarding step, if available from the JWT.
+ * @returns The redirect target path, or null if no redirect is needed.
+ */
+export function getMiddlewareRedirectTarget(
+  pathname: string,
+  hasToken: boolean,
+  onboardingStep?: number
+): string | null {
+  if (!hasToken && isProtectedRoute(pathname)) {
+    return "/login";
+  }
+
+  if (hasToken && (isAuthRoute(pathname) || pathname === "/")) {
+    const step = onboardingStep ?? 3;
+    if (step === 1 || step === 2) {
+      return "/onboarding";
+    }
+    return "/dashboard";
+  }
+
+  if (hasToken && pathname === "/onboarding" && (onboardingStep ?? 3) > 2) {
     return "/dashboard";
   }
 

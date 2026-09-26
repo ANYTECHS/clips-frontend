@@ -1,5 +1,5 @@
 import { jwtCallback, sessionCallback } from "@/app/lib/authCallbacks";
-import { DEFAULT_ONBOARDING_STEP } from "@/app/lib/mockApi";
+import { DEFAULT_ONBOARDING_STEP } from "@/__mocks__/app/lib/mockApi";
 import * as userApi from "@/app/lib/userApi";
 
 jest.mock("@/app/lib/userApi");

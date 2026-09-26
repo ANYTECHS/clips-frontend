@@ -1,0 +1,87 @@
+# Horizontal Pod Autoscaler — CPU and memory triggers
+#
+# Scaling logic:
+#   Scale OUT when average CPU across all pods exceeds 60% for 30 s
+#       OR average memory exceeds 70% of the 512 Mi request.
+#   Scale IN after 5 minutes of being below both thresholds (cooldown).
+#
+# Cooldown periods are controlled by:
+#   scaleDown.stabilizationWindowSeconds — how long metrics must stay low
+#   scaleDown.policies[].periodSeconds   — max pods removed per window
+#
+# Min replicas: 2 — always keep two pods for zero-downtime rolling updates
+#                   and zone-spread resilience.
+# Max replicas: 10 — upper cap prevents runaway scaling on a traffic spike
+#                    or a bug that causes high CPU (e.g. infinite loop).
+#                    Raise this if load testing shows you need more.
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: clipcash-frontend-cpu-mem
+  namespace: clipcash
+  labels:
+    app.kubernetes.io/name: clipcash-frontend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: clipcash-frontend
+
+  minReplicas: 2
+  maxReplicas: 10
+
+  metrics:
+    # ── CPU ────────────────────────────────────────────────────────────────
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          # Target 60 % of the 250 m request = 150 m per pod.
+          # At 60 % a scale-out is triggered, giving headroom before
+          # Node.js event-loop saturation (~80 %+).
+          averageUtilization: 60
+
+    # ── Memory ─────────────────────────────────────────────────────────────
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          # Target 70 % of the 512 Mi request = ~358 Mi per pod.
+          # Node.js heap + RSS typically sits at 200-300 Mi under normal
+          # load; this gives buffer before OOMKill.
+          averageUtilization: 70
+
+  behavior:
+    scaleUp:
+      # React quickly to traffic spikes — don't wait for the full 3-min
+      # default stabilisation window.
+      stabilizationWindowSeconds: 30
+      policies:
+        # Allow scaling up by 2 pods every 30 seconds during a spike.
+        - type: Pods
+          value: 2
+          periodSeconds: 30
+        # Or double the replica count every 60 s if the spike is severe.
+        - type: Percent
+          value: 100
+          periodSeconds: 60
+      # Take the more aggressive of the two policies.
+      selectPolicy: Max
+
+    scaleDown:
+      # Wait 5 minutes of sustained low utilisation before scaling in.
+      # This prevents the classic "thrash" pattern where a brief lull
+      # triggers a scale-down that is immediately reversed by the next
+      # request burst.
+      stabilizationWindowSeconds: 300
+      policies:
+        # Remove at most 1 pod every 2 minutes during scale-in.
+        # Slow removal keeps the SSE stream connections alive long enough
+        # for clients to reconnect to a surviving pod.
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+      selectPolicy: Min

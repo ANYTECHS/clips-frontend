@@ -21,7 +21,7 @@ export async function jwtCallback({
   user,
 }: {
   token: JWT;
-  account: Account | null;
+  account?: Account | null;
   profile?: Profile;
   user?: User;
 }): Promise<JWT> {
@@ -36,12 +36,17 @@ export async function jwtCallback({
       token.profile = profile;
     }
 
-    const email = user?.email ?? (token.email as string | undefined);
-    if (email) {
-      token.onboardingStep = await fetchOnboardingStep(
-        email,
-        account.access_token
-      );
+    const onboardingStep = user?.onboardingStep;
+    if (typeof onboardingStep === "number") {
+      token.onboardingStep = onboardingStep;
+    } else {
+      const email = user?.email ?? (token.email as string | undefined);
+      if (email) {
+        token.onboardingStep = await fetchOnboardingStep(
+          email,
+          account.access_token
+        );
+      }
     }
   }
 
@@ -66,22 +71,19 @@ export async function sessionCallback({
 }): Promise<Session> {
   if (session.user) {
     if (token.sub) {
-      (session.user as { id?: string }).id = token.sub;
+      session.user.id = token.sub;
     }
 
     // Always read onboardingStep from the JWT — it was populated on sign-in
     // and is the authoritative value for this session.
-    (session.user as { onboardingStep: number }).onboardingStep =
+    session.user.onboardingStep =
       typeof token.onboardingStep === "number"
         ? token.onboardingStep
         : DEFAULT_ONBOARDING_STEP;
 
-    (session.user as { accessToken?: string }).accessToken =
-      token.accessToken as string | undefined;
-    (session.user as { provider?: string }).provider =
-      token.provider as string | undefined;
-    (session.user as { profile?: Profile }).profile =
-      token.profile as Profile | undefined;
+    session.user.accessToken = token.accessToken;
+    session.user.provider = token.provider;
+    session.user.profile = token.profile;
   }
   return session;
 }

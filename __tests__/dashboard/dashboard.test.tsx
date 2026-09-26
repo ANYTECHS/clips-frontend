@@ -71,6 +71,49 @@ describe("DashboardPage", () => {
     jest.clearAllMocks();
   });
 
+  it("renders loading skeletons while dashboard data is loading", () => {
+    useDashboardData.mockReturnValue({
+      data: null,
+      loading: true,
+      error: null,
+      retry: jest.fn(),
+    });
+
+    render(<DashboardPage />);
+
+    expect(screen.getAllByTestId("skeleton").length).toBeGreaterThan(0);
+    expect(screen.queryByTestId("stat-card")).not.toBeInTheDocument();
+  });
+
+  it("renders stat cards and project cards when data is available", () => {
+    useDashboardData.mockReturnValue({
+      data: {
+        stats: {
+          earnings: { total: "$1,200", trend: 5, trendLabel: "+5%" },
+          clips: { total: 12, trend: 2, trendLabel: "+2" },
+          platforms: { total: 3, trend: 0, trendLabel: "0" },
+        },
+        revenueTrend: [],
+        recentProjects: [
+          {
+            id: "p1",
+            title: "Launch Video",
+            clipsGenerated: 4,
+            status: "completed" as const,
+          },
+        ],
+      },
+      loading: false,
+      error: null,
+      retry: jest.fn(),
+    });
+
+    render(<DashboardPage />);
+
+    expect(screen.getAllByTestId("stat-card")).toHaveLength(3);
+    expect(screen.getAllByTestId("project-card")).toHaveLength(1);
+  });
+
   it("renders error card when store is in error state", () => {
     useDashboardData.mockReturnValue({
       data: null,

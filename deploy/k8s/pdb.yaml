@@ -1,0 +1,21 @@
+# PodDisruptionBudget — ensures rolling updates and node drains never
+# take down more than one pod at a time, keeping the service available
+# throughout voluntary disruptions (deploys, node maintenance, cluster
+# upgrades).
+#
+# minAvailable: 1 — always keep at least 1 pod running during disruption.
+# With minReplicas=2 this means at most 1 pod can be evicted at once,
+# matching the maxUnavailable: 0 rolling update policy in deployment.yaml.
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: clipcash-frontend-pdb
+  namespace: clipcash
+  labels:
+    app.kubernetes.io/name: clipcash-frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: clipcash-frontend

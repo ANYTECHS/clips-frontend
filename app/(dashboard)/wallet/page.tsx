@@ -18,8 +18,25 @@ import {
   Loader2,
 } from "lucide-react";
 
-import DonutChart, { DonutSlice } from "@/components/charts/DonutChart";
-import Sparkline from "@/components/charts/Sparkline";
+import dynamic from "next/dynamic";
+import type { DonutSlice } from "@/components/charts/DonutChart";
+
+const DonutChart = dynamic(() => import("@/components/charts/DonutChart"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-[180px] h-[180px] flex items-center justify-center rounded-full border-4 border-white/5 animate-pulse">
+      <span className="text-muted text-[10px]">Loading...</span>
+    </div>
+  ),
+});
+
+const Sparkline = dynamic(() => import("@/components/charts/Sparkline"), {
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[40px] bg-white/5 animate-pulse rounded mt-2"></div>
+  ),
+});
+
 import AssetRow from "@/components/wallet/AssetRow";
 
 const ASSET_COLORS = ["#00FF9D", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#06B6D4"];
@@ -172,7 +189,11 @@ export default function WalletPortfolioPage() {
                   {/* Sparkline — only shown when real history is available */}
                   {history !== null && history.length > 1 && (
                     <div className="mt-2">
-                      <Sparkline values={history} color={isUp ? "var(--color-brand, #00FF9D)" : "#EF4444"} />
+                      <Sparkline 
+                        values={history} 
+                        color={isUp ? "var(--color-brand, #00FF9D)" : "#EF4444"}
+                        aria-label="14-day portfolio value trend"
+                      />
                       <p className="text-muted text-[10px] mt-1">14-day balance history</p>
                     </div>
                   )}
@@ -208,7 +229,10 @@ export default function WalletPortfolioPage() {
                   <span className="text-muted text-[11px] font-semibold uppercase tracking-wider self-start">
                     Asset Allocation
                   </span>
-                  <DonutChart slices={donutSlices} />
+                  <DonutChart 
+                    slices={donutSlices} 
+                    aria-label={`Asset allocation: ${donutSlices.map(s => `${s.label} ${((s.value / totalUsd) * 100).toFixed(1)}%`).join(', ')}`}
+                  />
                   <div className="w-full space-y-2">
                     {donutSlices.map((s) => (
                       <div key={s.label} className="flex items-center justify-between text-[12px]">

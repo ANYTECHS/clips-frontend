@@ -3,8 +3,8 @@ import Skeleton from "@/components/ui/Skeleton";
 
 export default function Loading() {
   return (
-    <div className="flex h-screen bg-background text-white font-sans overflow-hidden">
-      <div className="hidden lg:flex flex-col sticky top-0 h-screen py-10 pl-10 shrink-0 w-[240px]">
+    <div className="flex flex-1 min-h-0">
+      <div className="hidden lg:flex flex-col sticky top-0 self-start py-10 pl-10 shrink-0 w-[240px]">
         <div className="space-y-6">
           <div>
             <Skeleton className="h-4 w-32 mb-4" />
@@ -18,7 +18,7 @@ export default function Loading() {
           </div>
         </div>
       </div>
-      <main className="flex-1 flex flex-col h-screen relative z-10 px-4 sm:px-6 lg:px-10 xl:px-16 overflow-hidden min-w-0 pt-6">
+      <main className="flex-1 flex flex-col min-h-0 px-4 sm:px-6 lg:px-10 xl:px-16 min-w-0 pt-6">
         <div className="flex justify-between items-center mb-8">
           <Skeleton className="h-10 w-64 rounded-xl" />
           <Skeleton className="h-10 w-10 rounded-full" />

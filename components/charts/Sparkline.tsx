@@ -3,9 +3,10 @@ import React from "react";
 export interface SparklineProps {
   values: number[];
   color?: string;
+  ariaLabel?: string;
 }
 
-export function Sparkline({ values, color = "var(--color-brand)" }: SparklineProps) {
+export function Sparkline({ values, color = "var(--color-brand)", ariaLabel }: SparklineProps) {
   if (values.length < 2) return null;
   const min = Math.min(...values);
   const max = Math.max(...values);
@@ -21,7 +22,7 @@ export function Sparkline({ values, color = "var(--color-brand)" }: SparklinePro
     .join(" ");
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-12" aria-hidden="true">
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-12" role="img" aria-label={ariaLabel}>
       <defs>
         <linearGradient id="spark-fill" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.25" />

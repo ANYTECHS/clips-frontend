@@ -1,5 +1,7 @@
 // Upload limits
 export const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024;
+export const MAX_FILES_PER_REQUEST = 10;
+export const UPLOAD_CONCURRENCY = 3;
 
 // Crypto
 export const PBKDF2_ITERATIONS = 100000;
@@ -25,3 +27,9 @@ export const EXCELLENT_LATENCY_THRESHOLD_MS = 300;
 
 // Virus scan
 export const VIRUS_SCAN_DEFAULT_TIMEOUT_MS = 30000;
+
+// CDN
+export const CDN_STATIC_CACHE_MAX_AGE_S = 31_536_000; // 1 year — immutable assets
+export const CDN_PUBLIC_CACHE_MAX_AGE_S = 86_400; // 1 day
+export const CDN_PUBLIC_STALE_WHILE_REVALIDATE_S = 604_800; // 7 days
+export const CDN_AVAILABILITY_CACHE_TTL_MS = 60_000; // 60 s

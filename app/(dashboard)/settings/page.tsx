@@ -2,25 +2,53 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useWallet } from "@/components/WalletProvider";
-import SocialRecoveryConfig from "@/components/SocialRecoveryConfig";
 import WalletConnectButton from "@/components/WalletConnectButton";
-import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun, TimerOff } from "lucide-react";
+import { Bell, BellOff, Check, X, Key, Wallet, Shield, Copy, Eye, EyeOff, Globe, Moon, Sun, TimerOff, Lock, Download, Fingerprint, Monitor } from "lucide-react";
 import Link from "next/link";
 import { useToast } from "@/hooks/useToast";
 import { useAuth } from "@/components/auth/AuthProvider";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
+import PrivacySettings from "@/components/settings/PrivacySettings";
+import MonthlyReportSetting from "@/components/settings/MonthlyReportSetting";
 import {
   getStoredPermission,
+  getNotificationSettingsInstructions,
+  getNotificationSettingsUrl,
   requestNotificationPermission,
+  syncNotificationPermission,
   storePermission,
+  watchNotificationPermission,
 } from "@/app/lib/notifications";
 import Skeleton from "@/components/ui/Skeleton";
 import TrustlineManager from "@/components/wallet/TrustlineManager";
 import { useTheme } from "@/components/theme-provider";
+import { encryptWithPassword } from "@/app/lib/cryptoUtils";
+import { usePasskeyWallet } from "@/app/hooks/usePasskeyWallet";
+import dynamic from "next/dynamic";
+
+/**
+ * Social recovery sits behind the "advanced" disclosure and drags in Shamir
+ * secret sharing (`secrets.js-grempe`) plus the crypto helpers around it. Very
+ * few visits to Settings ever open it, so it is split out of the route bundle
+ * and fetched when it renders.
+ */
+const SocialRecoveryConfig = dynamic(
+  () => import("@/components/SocialRecoveryConfig"),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="bg-surface border border-border rounded-[24px] p-6 space-y-3">
+        <Skeleton className="h-5 w-48" />
+        <Skeleton className="h-4 w-full max-w-md" />
+        <Skeleton className="h-11 w-40 rounded-xl" />
+      </div>
+    ),
+  },
+);
 
 export default function SettingsPage() {
   const { showToast } = useToast();
-  const { theme, toggleTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
   const { user, setUser, isLoading: authLoading } = useAuth();
   const [walletNetwork, setWalletNetwork] = useState<"testnet" | "mainnet">(
     user?.walletNetwork ?? "testnet"
@@ -38,6 +66,34 @@ export default function SettingsPage() {
   const [copiedKey, setCopiedKey] = useState(false);
   const [mnemonicCopied, setMnemonicCopied] = useState(false);
   const [mnemonicClipboardCountdown, setMnemonicClipboardCountdown] = useState(0);
+
+  // ── Encrypted export modal state ──────────────────────────────────────────
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [exportPassword, setExportPassword] = useState("");
+  const [exportPasswordConfirm, setExportPasswordConfirm] = useState("");
+  const [exportError, setExportError] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
+
+  // Auto-clear the key from view 15 seconds after reveal
+  const revealTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const handleRevealKey = () => {
+    setShowPrivateKey(true);
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+    revealTimerRef.current = setTimeout(() => {
+      setShowPrivateKey(false);
+      navigator.clipboard.writeText("").catch(() => {});
+    }, 15_000);
+  };
+  const handleHideKey = () => {
+    setShowPrivateKey(false);
+    if (revealTimerRef.current) {
+      clearTimeout(revealTimerRef.current);
+      revealTimerRef.current = null;
+    }
+  };
+  useEffect(() => () => {
+    if (revealTimerRef.current) clearTimeout(revealTimerRef.current);
+  }, []);
 
   useEffect(() => {
     if (user?.walletNetwork && user.walletNetwork !== walletNetwork) {
@@ -69,18 +125,25 @@ export default function SettingsPage() {
     isRestoringSession,
   } = useWallet();
 
+  const {
+    credentialId: passkeyCredentialId,
+    publicKey: passkeyPublicKey,
+    isSupported: passkeySupported,
+    isRegistering: passkeyRegistering,
+    error: passkeyError,
+    compatibility: passkeyCompatibility,
+    register: registerPasskey,
+    reset: resetPasskey,
+  } = usePasskeyWallet();
+
   const pageLoading = authLoading || isRestoringSession;
 
   const isStellarConnected = isConnected && walletType === "stellar";
 
   useEffect(() => {
-    // Get notification permissions
     const stored = getStoredPermission();
-    if (stored) {
-      setPermission(stored);
-    } else if ("Notification" in window) {
-      setPermission(Notification.permission);
-    }
+    setPermission(stored ?? syncNotificationPermission());
+    return watchNotificationPermission(setPermission);
   }, []);
 
   const handleEnableNotifications = async () => {
@@ -88,6 +151,9 @@ export default function SettingsPage() {
     try {
       const result = await requestNotificationPermission();
       setPermission(result);
+      if (result === "denied") {
+        showToast(getNotificationSettingsInstructions(), "error");
+      }
     } catch (error) {
       console.error("Error requesting notification permission:", error);
     } finally {
@@ -99,6 +165,9 @@ export default function SettingsPage() {
     storePermission("denied");
     setPermission("denied");
   };
+
+  const notificationSettingsUrl = getNotificationSettingsUrl();
+  const notificationSettingsInstructions = getNotificationSettingsInstructions();
 
   const handleImportKeySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -127,6 +196,51 @@ export default function SettingsPage() {
     setCopiedKey(true);
     showToast("Secret key copied to clipboard", "success");
     setTimeout(() => setCopiedKey(false), 2000);
+  };
+
+  const handleEncryptedExport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setExportError("");
+
+    if (exportPassword.length < 8) {
+      setExportError("Password must be at least 8 characters.");
+      return;
+    }
+    if (exportPassword !== exportPasswordConfirm) {
+      setExportError("Passwords do not match.");
+      return;
+    }
+    if (!stellarSecret) return;
+
+    setExportLoading(true);
+    try {
+      const encrypted = await encryptWithPassword(stellarSecret, exportPassword);
+      const backup = {
+        _instructions:
+          "ClipCash encrypted wallet backup. Import via Settings → Advanced Wallet Mode → Import, or Recovery page → Encrypted Backup tab. Requires the password used during export.",
+        version: 1,
+        createdAt: new Date().toISOString(),
+        ciphertext: encrypted,
+      };
+      const blob = new Blob([JSON.stringify(backup, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "clipcash-wallet-backup.enc.json";
+      a.click();
+      URL.revokeObjectURL(url);
+
+      setExportModalOpen(false);
+      setExportPassword("");
+      setExportPasswordConfirm("");
+      showToast("Encrypted backup downloaded successfully.", "success");
+    } catch {
+      setExportError("Encryption failed. Please try again.");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const mnemonicTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -175,6 +289,7 @@ export default function SettingsPage() {
   useEffect(() => () => clearMnemonicTimers(), [clearMnemonicTimers]);
 
   return (
+    <>
     <div className="dashboard-main space-y-8 max-w-[900px] mx-auto w-full p-6 md:p-8">
           <div>
             <h1 className="text-3xl font-extrabold tracking-tight">Wallet Settings</h1>
@@ -325,12 +440,19 @@ export default function SettingsPage() {
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {permission === "granted"
                           ? "You will receive updates when clip rendering is complete"
-                          : "Authorize browser notifications to receive background alerts"}
+                          : permission === "denied"
+                            ? "Enable notifications in your browser settings to receive render alerts"
+                            : "Get alerts when your clip rendering finishes in the background"}
                       </p>
+                      {permission === "denied" && (
+                        <p className="text-[11px] text-yellow-300 mt-2 max-w-md">
+                          {notificationSettingsInstructions}
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div>
+                  <div className="flex flex-wrap gap-2">
                     {permission === "granted" ? (
                       <button
                         onClick={handleDisableNotifications}
@@ -342,16 +464,35 @@ export default function SettingsPage() {
                     ) : (
                       <button
                         onClick={handleEnableNotifications}
-                        disabled={notificationsLoading || permission === "denied"}
+                        disabled={notificationsLoading}
                         className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all disabled:opacity-50 cursor-pointer"
                       >
                         <Check className="w-3.5 h-3.5" />
                         {notificationsLoading ? "Enabling..." : "Enable System Notifications"}
                       </button>
                     )}
+                    {permission === "denied" && notificationSettingsUrl && (
+                      <a
+                        href={notificationSettingsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-yellow-500/20 bg-yellow-500/5 hover:bg-yellow-500/15 text-yellow-300 text-xs font-bold transition-all"
+                      >
+                        Open Browser Settings
+                      </a>
+                    )}
                   </div>
                 </div>
               </div>
+
+              {/* Monthly earnings report email — Issue #820 */}
+              <MonthlyReportSetting />
+
+              <PrivacySettings />
+
+              <WebhookSettings />
+
+              <ApiSettings />
 
               {/* Language / Locale Settings */}
               <div className="space-y-4">
@@ -378,30 +519,141 @@ export default function SettingsPage() {
               <div className="space-y-4">
                 <h2 className="text-lg font-extrabold text-white">Appearance</h2>
 
-                <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-center gap-4">
+                <div className="bg-surface border border-white/5 rounded-2xl p-6">
+                  <div className="flex items-start gap-4 mb-4">
                     <div className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
-                      {theme === 'dark' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
+                      {resolvedTheme === 'dark' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
                     </div>
                     <div>
-                      <p className="font-bold text-white">Dark Mode</p>
+                      <p className="font-bold text-white">Theme</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Switch between light and dark themes
+                        Choose your preferred color scheme
                       </p>
                     </div>
                   </div>
 
-                  <button
-                    onClick={toggleTheme}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${theme === 'dark' ? "bg-brand" : "bg-white/10"
-                      }`}
-                    aria-label="Toggle Dark Mode"
-                  >
-                    <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${theme === 'dark' ? "translate-x-6" : "translate-x-1"
+                  <div className="flex flex-wrap gap-2">
+                    {([
+                      { value: "light" as const, label: "Light", icon: Sun },
+                      { value: "dark" as const, label: "Dark", icon: Moon },
+                      { value: "system" as const, label: "System", icon: Monitor },
+                    ]).map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => setTheme(option.value)}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all border ${
+                          theme === option.value
+                            ? "bg-brand text-black border-brand"
+                            : "bg-white/5 text-white border-white/10 hover:border-white/20"
                         }`}
-                    />
-                  </button>
+                        aria-label={`Set theme to ${option.label}`}
+                      >
+                        <option.icon className="w-4 h-4" />
+                        {option.label}
+                        {option.value === "system" && (
+                          <span className="text-[10px] opacity-70">({resolvedTheme})</span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="h-px bg-white/5 my-4" />
+
+              {/* Security Settings — Passkey Authentication */}
+              <div className="space-y-4">
+                <div>
+                  <h2 className="text-lg font-extrabold text-white">Security</h2>
+                  <p className="text-xs text-muted-foreground leading-relaxed mt-1">
+                    Manage biometric authentication and passkey-based wallet access.
+                  </p>
+                </div>
+
+                <div className="bg-surface border border-white/5 rounded-2xl p-6">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                        <Fingerprint className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="font-bold text-white">Passkey Wallet Authentication</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Use biometrics or hardware security key to authenticate your wallet.
+                        </p>
+                        {passkeyCompatibility?.isSafari && (
+                          <p className="text-[11px] text-yellow-300 mt-2 max-w-md">
+                            Safari works best with HTTPS and iCloud Keychain, Touch ID, Face ID, or a security key enabled.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+
+                    {!passkeySupported && (
+                      <span className="shrink-0 text-[10px] px-2 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 font-semibold">
+                        Not supported
+                      </span>
+                    )}
+                    {passkeySupported && passkeyCredentialId && (
+                      <span className="shrink-0 text-[10px] px-2 py-1 rounded-full bg-brand/10 border border-brand/25 text-brand font-semibold">
+                        Registered
+                      </span>
+                    )}
+                  </div>
+
+                  {!passkeySupported ? (
+                    <div className="mt-4 p-3 bg-yellow-500/5 border border-yellow-500/15 rounded-xl">
+                      <p className="text-xs text-yellow-300 leading-relaxed">
+                        {passkeyCompatibility?.fallbackMessage ??
+                          "Your browser does not support WebAuthn passkeys. Try Chrome, Safari, or Edge on a device with biometric authentication."}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-5 space-y-4">
+                      {passkeyCredentialId ? (
+                        <div className="space-y-3">
+                          <div className="p-3 rounded-xl bg-black/40 border border-white/5">
+                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Credential ID</p>
+                            <p className="text-xs font-mono text-white break-all">{passkeyCredentialId.slice(0, 32)}…</p>
+                            {passkeyPublicKey && (
+                              <>
+                                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 mt-2">Linked Stellar Address</p>
+                                <p className="text-xs font-mono text-brand break-all">{passkeyPublicKey}</p>
+                              </>
+                            )}
+                          </div>
+                          <button
+                            id="passkey-reset-btn"
+                            onClick={resetPasskey}
+                            className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-bold hover:bg-red-500/20 transition-all cursor-pointer"
+                          >
+                            Remove Passkey
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          <p className="text-xs text-muted-foreground leading-relaxed">
+                            Register a passkey to sign in with your fingerprint, face, or security key instead of a password.
+                          </p>
+                          <button
+                            id="passkey-register-btn"
+                            onClick={() => registerPasskey()}
+                            disabled={passkeyRegistering}
+                            className="px-4 py-2.5 rounded-xl bg-brand text-black text-xs font-extrabold hover:bg-brand-hover transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                          >
+                            <Fingerprint className="w-3.5 h-3.5" />
+                            {passkeyRegistering ? "Registering…" : "Register Passkey"}
+                          </button>
+                        </div>
+                      )}
+
+                      {passkeyError && (
+                        <div className="p-3 bg-red-950/40 border border-red-500/20 rounded-xl">
+                          <p className="text-xs text-red-400 font-semibold">{passkeyError}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -469,7 +721,7 @@ export default function SettingsPage() {
                             </div>
                             <div className="flex gap-2 shrink-0 items-end flex-wrap md:flex-nowrap">
                               <button
-                                onClick={() => setShowPrivateKey(!showPrivateKey)}
+                                onClick={() => (showPrivateKey ? handleHideKey() : handleRevealKey())}
                                 className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-xs font-bold hover:text-brand hover:border-brand/30 transition-all flex items-center gap-1 cursor-pointer"
                               >
                                 {showPrivateKey ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
@@ -478,19 +730,15 @@ export default function SettingsPage() {
 
                               <button
                                 onClick={() => {
-                                  // minimal client-side enforcement; full flow implemented in a modal in follow-up PR if needed
-                                  if (!stellarSecret) return;
-                                  const ok1 = window.confirm("Warning: This is your raw Stellar Secret Key. Anyone with it controls your funds. Continue?");
-                                  if (!ok1) return;
-                                  const ok2 = window.confirm("Last chance: Click OK to download an encrypted backup. Your password is required.");
-                                  if (!ok2) return;
-                                  // encrypted download is handled by a future secure modal; for now, we block raw copy via this button
-                                  showToast("Encrypted export will be available in the next step.", "success");
+                                  setExportModalOpen(true);
+                                  setExportError("");
+                                  setExportPassword("");
+                                  setExportPasswordConfirm("");
                                 }}
                                 className="px-3 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-brand-hover transition-all flex items-center gap-1 cursor-pointer"
                                 disabled={!stellarSecret}
                               >
-                                <Key className="w-3.5 h-3.5" aria-hidden="true" />
+                                <Download className="w-3.5 h-3.5" aria-hidden="true" />
                                 Export (Encrypted)
                               </button>
 
@@ -636,5 +884,85 @@ export default function SettingsPage() {
             </>
           )}
         </div>
+
+      {/* ── Encrypted Export Modal ─────────────────────────────────────────── */}
+      {exportModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="export-modal-title"
+        >
+          <div className="w-full max-w-sm bg-[#080B0A] border border-white/10 rounded-2xl p-6 shadow-2xl relative">
+            <button
+              onClick={() => setExportModalOpen(false)}
+              className="absolute top-4 right-4 text-muted-foreground hover:text-white transition-colors cursor-pointer"
+              aria-label="Close export modal"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand shrink-0">
+                <Lock className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 id="export-modal-title" className="font-bold text-white text-sm">Export Encrypted Backup</h2>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Set a strong password to protect your secret key.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleEncryptedExport} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="export-password" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Encryption Password
+                </label>
+                <input
+                  id="export-password"
+                  type="password"
+                  placeholder="Min. 8 characters"
+                  value={exportPassword}
+                  onChange={(e) => setExportPassword(e.target.value)}
+                  className="w-full bg-input border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="export-password-confirm" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                  Confirm Password
+                </label>
+                <input
+                  id="export-password-confirm"
+                  type="password"
+                  placeholder="Re-enter password"
+                  value={exportPasswordConfirm}
+                  onChange={(e) => setExportPasswordConfirm(e.target.value)}
+                  className="w-full bg-input border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
+                  autoComplete="new-password"
+                />
+              </div>
+
+              {exportError && (
+                <p className="text-xs text-red-400 font-semibold">{exportError}</p>
+              )}
+
+              <div className="bg-yellow-500/5 border border-yellow-500/20 rounded-xl p-3 text-[10px] text-yellow-300 leading-relaxed">
+                <strong>Important:</strong> If you lose this password, your backup cannot be decrypted. Store both the file and password safely offline.
+              </div>
+
+              <button
+                type="submit"
+                disabled={exportLoading || !exportPassword || !exportPasswordConfirm}
+                className="w-full py-3.5 rounded-xl bg-brand text-black text-xs font-extrabold hover:bg-brand-hover transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                <Download className="w-3.5 h-3.5" />
+                {exportLoading ? "Encrypting…" : "Download clipcash-wallet-backup.enc.json"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

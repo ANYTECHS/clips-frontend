@@ -1,2 +1,23 @@
-
 npx lint-staged
+
+# Warn (not block) when this branch has no changeset yet relative to its
+# merge-base with main (issue #800). This mirrors the "Check for changeset"
+# step in .github/workflows/ci.yml, which hard-fails at PR time — this hook
+# is just an earlier, non-blocking heads-up so it's not a surprise at PR
+# time. Skipped gracefully if origin/main isn't available locally (e.g. a
+# shallow clone) rather than failing the commit.
+BASE_BRANCH="${CHANGESET_BASE_BRANCH:-main}"
+if git rev-parse --verify "origin/$BASE_BRANCH" >/dev/null 2>&1; then
+  # `grep -c` exits 1 when it counts zero matches, which aborts this hook under
+  # husky's `set -e` — the exact case this reminder exists for. Fall back to 0
+  # so the block stays advisory, as documented above.
+  CHANGESET_COUNT=$(git diff --name-only "origin/$BASE_BRANCH"...HEAD 2>/dev/null | grep -c '^\.changeset/.*\.md$' || true)
+  CHANGESET_COUNT=${CHANGESET_COUNT:-0}
+  if [ "$CHANGESET_COUNT" -eq 0 ]; then
+    echo ""
+    echo "No changeset found for this branch yet."
+    echo "Run 'npm run changeset' to add one (or 'npm run changeset -- --empty' for changes that don't need a release note)."
+    echo "This is just a reminder -- CI will fail at PR time if it's still missing."
+    echo ""
+  fi
+fi

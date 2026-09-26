@@ -386,7 +386,7 @@ export function validateOperations(operations: StellarOperation[]): void {
   }
 
   if (operations.length > 100) {
-    throw new Error
+    throw new Error(
       `Batch contains ${operations.length} operations. Stellar allows a maximum of 100 per transaction.`
     );
   }

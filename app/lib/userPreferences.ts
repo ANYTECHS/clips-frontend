@@ -10,6 +10,13 @@ import type { StellarNetwork } from "./networkConfig";
 
 const NETWORK_OVERRIDE_KEY = "clipcash_network_override";
 
+/**
+ * Typed storage helper for the non-sensitive runtime network preference.
+ *
+ * This key only stores the selected Stellar network (`mainnet` | `testnet`),
+ * which is public configuration and not user-secret material. Encryption via
+ * secure storage is intentionally not required for this value.
+ */
 export const NetworkPreferenceStorage = {
   /**
    * Retrieves the user's preferred network override.

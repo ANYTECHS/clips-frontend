@@ -12,6 +12,7 @@ type NetworkContextValue = {
 };
 
 const NetworkContext = createContext<NetworkContextValue | undefined>(undefined);
+NetworkContext.displayName = "NetworkContext";
 
 export function NetworkProvider({ children }: { children: React.ReactNode }) {
   const [network, setNetworkState] = useState<StellarNetwork>(() => getStellarNetwork());

@@ -3,6 +3,9 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
+import { checkCsrf } from "@/app/lib/csrf";
+import { parseRequestJson } from "@/app/lib/parseRequestJson";
+import { prisma } from "@/app/lib/prisma";
 
 export const UserProfileResponseSchema = z.object({
   id: z.string(),
@@ -11,7 +14,14 @@ export const UserProfileResponseSchema = z.object({
   avatarUrl: z.string().nullable(),
   plan: z.enum(["free", "pro", "enterprise"]),
   planUsagePercent: z.number().min(0).max(100),
+  transformQuotaRemaining: z.number().optional(),
 });
+
+function getQuotaRemaining(plan: string, usagePercent: number): number {
+  const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
+  const limit = limits[plan] ?? 10;
+  return Math.max(0, limit - Math.round((usagePercent / 100) * limit));
+}
 
 export const PatchUserProfileSchema = z.object({
   name: z.string().optional(),
@@ -25,17 +35,26 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // TODO: Replace with actual database call
-    const mockUser = {
-      id: session.user.id || "test-user-id",
-      name: session.user.name || "User",
-      email: session.user.email || "",
-      avatarUrl: session.user.image || "/avatar.png",
-      plan: "pro" as const,
-      planUsagePercent: 80,
-    };
+    const user = await prisma.user.findUnique({
+      where: { email: session.user.email || "" },
+    });
 
-    return NextResponse.json(mockUser);
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const plan = user.plan as "free" | "pro" | "enterprise";
+    const transformQuotaRemaining = getQuotaRemaining(plan, user.planUsagePercent);
+
+    return NextResponse.json({
+      id: user.id,
+      name: user.name || "User",
+      email: user.email,
+      avatarUrl: user.avatarUrl,
+      plan,
+      planUsagePercent: user.planUsagePercent,
+      transformQuotaRemaining,
+    });
   } catch (error) {
     Sentry.captureException(error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
@@ -43,18 +62,18 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
+  const csrfError = checkCsrf(request);
+  if (csrfError) return csrfError;
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
+    const parsedBody = await parseRequestJson(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     const parsed = PatchUserProfileSchema.safeParse(body);
     if (!parsed.success) {
@@ -66,17 +85,26 @@ export async function PATCH(request: NextRequest) {
 
     const data = parsed.data;
 
-    // TODO: Replace with actual database update
-    const updatedUser = {
-      id: session.user.id || "test-user-id",
-      name: data.name || session.user.name || "User",
-      email: session.user.email || "",
-      avatarUrl: data.avatarUrl ?? session.user.image || "/avatar.png",
-      plan: "pro" as const,
-      planUsagePercent: 80,
-    };
+    const updatedUser = await prisma.user.update({
+      where: { email: session.user.email || "" },
+      data: {
+        ...(data.name && { name: data.name }),
+        ...(data.avatarUrl !== undefined && { avatarUrl: data.avatarUrl }),
+      },
+    });
 
-    return NextResponse.json(updatedUser);
+    const plan = updatedUser.plan as "free" | "pro" | "enterprise";
+    const transformQuotaRemaining = getQuotaRemaining(plan, updatedUser.planUsagePercent);
+
+    return NextResponse.json({
+      id: updatedUser.id,
+      name: updatedUser.name || "User",
+      email: updatedUser.email,
+      avatarUrl: updatedUser.avatarUrl,
+      plan,
+      planUsagePercent: updatedUser.planUsagePercent,
+      transformQuotaRemaining,
+    });
   } catch (error) {
     Sentry.captureException(error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

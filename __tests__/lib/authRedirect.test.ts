@@ -1,5 +1,5 @@
 import { getAuthRedirectTarget } from "@/app/lib/authRedirect";
-import type { User } from "@/app/lib/mockApi";
+import type { User } from "@/__mocks__/app/lib/mockApi";
 
 const baseUser: User = {
   id: "1",

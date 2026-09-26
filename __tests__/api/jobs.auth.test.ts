@@ -27,10 +27,10 @@ const ownerJob = {
   createdAt: Date.now(),
 };
 
-beforeEach(() => {
+beforeEach(async () => {
   process.env.NEXTAUTH_URL = APP_ORIGIN;
-  jobStore.clear();
-  jobStore.set("job1", ownerJob);
+  await jobStore.clear();
+  await jobStore.set("job1", ownerJob);
 });
 
 function makeRequest(url = "http://localhost/api/jobs/job1") {
@@ -62,7 +62,7 @@ describe("GET /api/jobs/[id]", () => {
   });
 
   it("includes errorCode and errorMessage when job is in error state", async () => {
-    jobStore.set("job1", {
+    await jobStore.set("job1", {
       ...ownerJob,
       status: "error",
       errorCode: "UNSUPPORTED_CODEC",
@@ -93,14 +93,14 @@ describe("POST /api/jobs/[id]", () => {
     mockGetServerSession.mockResolvedValue({ user: { id: "user-owner" } });
     const res = await jobPOST(makeRequest(), makeContext("job1"));
     expect(res.status).toBe(200);
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.status).toBe("queued");
     expect(job.progress).toBe(0);
     expect(job.momentsFound).toBe(0);
   });
 
   it("clears errorCode and errorMessage on restart", async () => {
-    jobStore.set("job1", {
+    await jobStore.set("job1", {
       ...ownerJob,
       status: "error",
       errorCode: "PROCESSING_TIMEOUT",
@@ -108,7 +108,7 @@ describe("POST /api/jobs/[id]", () => {
     });
     mockGetServerSession.mockResolvedValue({ user: { id: "user-owner" } });
     await jobPOST(makeRequest(), makeContext("job1"));
-    const job = jobStore.get("job1")!;
+    const job = await jobStore.get("job1")!;
     expect(job.errorCode).toBeUndefined();
     expect(job.errorMessage).toBeUndefined();
   });

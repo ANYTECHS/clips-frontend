@@ -93,6 +93,7 @@ When you're ready to release a new version:
 ## Code standards & security
 - Follow the existing code style (TypeScript + Next.js + Tailwind). Run `npm run lint` to catch lint issues.
 - For security & sanitization guidance see [AGENTS.md](clips-frontend/AGENTS.md) — apply the sanitization rules, input validation, and secrets handling described there.
+- Review the threat model and reporting process in [docs/SECURITY.md](docs/SECURITY.md) before shipping security-sensitive changes.
 - Never commit secrets or private keys. `.env.local` is ignored by git.
 - Use native Web Crypto APIs for local encryption when applicable (see project docs).
 

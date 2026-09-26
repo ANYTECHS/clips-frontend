@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: clipcash-frontend-config
+  namespace: clipcash
+  labels:
+    app.kubernetes.io/name: clipcash-frontend
+data:
+  NODE_ENV: "production"
+  PORT: "3000"
+  # Stalled-job requeue threshold: 10 minutes
+  STALLED_JOB_THRESHOLD_MS: "600000"
+  # Cleanup jobs older than 7 days
+  CLEANUP_JOB_AGE_MS: "604800000"
+  # Max jobs requeued per cron run
+  REQUEUE_MAX_JOBS: "20"
+  # Allow uploads to proceed if the virus scanner circuit is open
+  # Set to "true" only if a compensating control exists (e.g. AI backend re-scan)
+  VIRUS_SCAN_ALLOW_ON_FAILURE: "false"

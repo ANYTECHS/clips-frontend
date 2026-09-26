@@ -4,7 +4,8 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Globe, Shield, CheckCircle2, ExternalLink, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { useWallet } from "@/components/wallet/WalletProvider";
+import { useWalletSelector } from "@/components/wallet/WalletProvider";
+import { shallowEqual } from "@/app/lib/createSelectableContext";
 import { useStellarTransaction } from "@/app/hooks/useStellarTransaction";
 import { buildBatchTransaction } from "@/app/lib/stellar";
 import { createAddSignerOp, createMultisigThresholdsOp } from "@/app/lib/stellarOperations";
@@ -14,7 +15,13 @@ import { StrKey } from "@stellar/stellar-sdk";
 
 export default function MultisigPage() {
     const { user } = useAuth();
-    const { address, walletType, isConnected } = useWallet();
+    // Selector + shallow-equal instead of `useWallet()`: this page only
+    // reads these three fields, so it shouldn't re-render on e.g. `error` or
+    // `isConnecting` changes elsewhere in the wallet state.
+    const { address, walletType, isConnected } = useWalletSelector(
+      (s) => ({ address: s.address, walletType: s.walletType, isConnected: s.isConnected }),
+      shallowEqual,
+    );
     const { showToast } = useToast();
     const [sourcePublicKey, setSourcePublicKey] = useState("");
     const [signerPublicKey, setSignerPublicKey] = useState("");

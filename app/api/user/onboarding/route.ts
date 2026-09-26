@@ -4,6 +4,9 @@ import { authOptions } from "@/app/lib/auth";
 import * as Sentry from "@sentry/nextjs";
 import { z } from "zod";
 import { logger } from "@/app/lib/logger";
+import { checkCsrf } from "@/app/lib/csrf";
+import { parseRequestJson } from "@/app/lib/parseRequestJson";
+import { prisma } from "@/app/lib/prisma";
 
 export const PostOnboardingSchema = z.object({
   step: z.number().min(0),
@@ -15,18 +18,18 @@ export const OnboardingResponseSchema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  const csrfError = checkCsrf(request);
+  if (csrfError) return csrfError;
+
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: unknown;
-    try {
-      body = await request.json();
-    } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
-    }
+    const parsedBody = await parseRequestJson(request);
+    if (!parsedBody.ok) return parsedBody.response;
+    const body = parsedBody.body;
 
     const parsed = PostOnboardingSchema.safeParse(body);
     if (!parsed.success) {
@@ -38,7 +41,15 @@ export async function POST(request: NextRequest) {
 
     const { step, data } = parsed.data;
 
-    // TODO: Replace with actual database update to save onboarding data
+    await prisma.user.update({
+      where: { email: session.user.email || "" },
+      data: {
+        onboardingStep: step,
+        // Onboarding data types are dynamic - use as any
+        onboardingData: data as any,
+      },
+    });
+
     logger.info(`[Onboarding] Saved step ${step} for user ${session.user.id}`, data);
 
     return NextResponse.json({ success: true, onboardingStep: step });
