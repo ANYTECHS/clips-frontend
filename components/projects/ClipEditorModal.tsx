@@ -2,8 +2,20 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import Image from "next/image";
-import { X, Crop, Type, MonitorPlay, Smartphone, Loader2, Sparkles } from "lucide-react";
+import {
+  X,
+  Crop,
+  Type,
+  MonitorPlay,
+  Smartphone,
+  Loader2,
+  Sparkles,
+  Volume2,
+  Sun,
+  Download,
+} from "lucide-react";
 import type { Clip } from "./ClipGrid";
+import AudioLibrary, { type AudioPlacement } from "./AudioLibrary";
 import {
   CAPTION_LANGUAGES,
   DEFAULT_CAPTION_STYLE,
@@ -25,6 +37,8 @@ export interface ClipEdits {
   trimEnd: number;
   captionStyle: string;
   aspectRatio: "16:9" | "9:16" | "1:1";
+  colorFilter: ColorFilterId;
+  audioVolume: number; // 0–200 (100 = original)
   captions?: {
     segments: CaptionSegment[];
     style: CaptionStyle;
@@ -39,7 +53,14 @@ export interface ClipEditorModalProps {
   onSave: (id: string, edits: ClipEdits) => void;
 }
 
-const CAPTION_STYLES = ["Bold & Dynamic", "Minimalist", "Emoji-Rich", "Subtitles Only"];
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CAPTION_STYLES = [
+  "Bold & Dynamic",
+  "Minimalist",
+  "Emoji-Rich",
+  "Subtitles Only",
+];
 
 const FONT_STYLES: { id: CaptionStyle["fontStyle"]; label: string }[] = [
   { id: "bold", label: "Bold" },
@@ -54,36 +75,175 @@ const POSITIONS: { id: CaptionStyle["position"]; label: string }[] = [
   { id: "bottom", label: "Bottom" },
 ];
 
-function getSegmentTimingError(segments: CaptionSegment[]): string | null {
-  const seen = new Set<string>();
-  let previous: CaptionSegment | null = null;
+export type ColorFilterId =
+  | "none"
+  | "vivid"
+  | "cool"
+  | "warm"
+  | "bw"
+  | "cinematic";
 
-  for (const segment of segments) {
-    if (seen.has(segment.id)) return "Caption segment ids must be unique.";
-    seen.add(segment.id);
-    if (segment.endMs <= segment.startMs) {
-      return "Caption end time must be after its start time.";
-    }
-    if (previous && segment.startMs < previous.startMs) {
-      return "Captions must be ordered by start time.";
-    }
-    if (previous && segment.startMs < previous.endMs) {
-      return "Caption segments must not overlap.";
-    }
-    previous = segment;
-  }
-
-  return null;
-}
-
-const FONT_FAMILY_CSS: Record<NonNullable<CaptionStyle["fontFamily"]>, string> = {
-  inter: "Inter, sans-serif",
-  poppins: "Poppins, sans-serif",
-  montserrat: "Montserrat, sans-serif",
-  roboto: "Roboto, sans-serif",
-};
+const COLOR_FILTERS: { id: ColorFilterId; label: string; css: string }[] = [
+  { id: "none", label: "Original", css: "" },
+  { id: "vivid", label: "Vivid", css: "saturate(1.8) contrast(1.1)" },
+  { id: "cool", label: "Cool", css: "hue-rotate(20deg) saturate(1.2)" },
+  { id: "warm", label: "Warm", css: "sepia(0.35) saturate(1.4)" },
+  { id: "bw", label: "B&W", css: "grayscale(1)" },
+  { id: "cinematic", label: "Cinematic", css: "contrast(1.15) saturate(0.85) brightness(0.95)" },
+];
 
 type EditorTab = "edit" | "captions";
+
+// ─── Trim Timeline ─────────────────────────────────────────────────────────────
+
+interface TrimTimelineProps {
+  thumbnail: string;
+  duration: string;
+  trimStart: number;
+  trimEnd: number;
+  onChange: (start: number, end: number) => void;
+}
+
+function parseDurationSecs(dur: string): number {
+  const parts = dur.split(":").map(Number);
+  if (parts.length === 3) return (parts[0] ?? 0) * 3600 + (parts[1] ?? 0) * 60 + (parts[2] ?? 0);
+  if (parts.length === 2) return (parts[0] ?? 0) * 60 + (parts[1] ?? 0);
+  return parts[0] ?? 0;
+}
+
+function secsToTimecode(secs: number): string {
+  const m = Math.floor(secs / 60);
+  const s = Math.floor(secs % 60);
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+function TrimTimeline({ thumbnail, duration, trimStart, trimEnd, onChange }: TrimTimelineProps) {
+  const railRef = useRef<HTMLDivElement>(null);
+  const draggingRef = useRef<"start" | "end" | null>(null);
+  const totalSecs = parseDurationSecs(duration);
+
+  const pct = (val: number) => `${val}%`;
+
+  const posToPercent = useCallback((clientX: number) => {
+    if (!railRef.current) return 0;
+    const rect = railRef.current.getBoundingClientRect();
+    return Math.max(0, Math.min(100, ((clientX - rect.left) / rect.width) * 100));
+  }, []);
+
+  const handlePointerDown =
+    (handle: "start" | "end") =>
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      e.currentTarget.setPointerCapture(e.pointerId);
+      draggingRef.current = handle;
+    };
+
+  const handlePointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const p = posToPercent(e.clientX);
+    if (draggingRef.current === "start") {
+      onChange(Math.min(p, trimEnd - 5), trimEnd);
+    } else {
+      onChange(trimStart, Math.max(p, trimStart + 5));
+    }
+  }, [trimStart, trimEnd, onChange, posToPercent]);
+
+  const handlePointerUp = useCallback(() => {
+    draggingRef.current = null;
+  }, []);
+
+  const startSecs = (trimStart / 100) * totalSecs;
+  const endSecs = (trimEnd / 100) * totalSecs;
+
+  return (
+    <div className="pt-4 px-2 select-none">
+      <div
+        ref={railRef}
+        className="h-12 bg-white/5 rounded-lg relative overflow-visible cursor-default"
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerLeave={handlePointerUp}
+      >
+        {/* Filmstrip background */}
+        <div className="absolute top-0 bottom-0 left-0 right-0 overflow-hidden rounded-lg">
+          <Image
+            src={thumbnail}
+            alt=""
+            fill
+            sizes={SIZES_TRIM_TIMELINE}
+            placeholder="blur"
+            blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
+            className="object-cover opacity-20"
+          />
+        </div>
+
+        {/* Greyed-out region before trim start */}
+        <div
+          className="absolute inset-y-0 left-0 bg-black/60 rounded-l-lg"
+          style={{ width: pct(trimStart) }}
+        />
+        {/* Greyed-out region after trim end */}
+        <div
+          className="absolute inset-y-0 right-0 bg-black/60 rounded-r-lg"
+          style={{ width: pct(100 - trimEnd) }}
+        />
+
+        {/* Active region border */}
+        <div
+          className="absolute inset-y-0 border-y-2 border-brand"
+          style={{ left: pct(trimStart), right: pct(100 - trimEnd) }}
+        />
+
+        {/* Start handle */}
+        <div
+          role="slider"
+          aria-label="Trim start"
+          aria-valuenow={Math.round(startSecs)}
+          aria-valuemin={0}
+          aria-valuemax={Math.round(endSecs)}
+          tabIndex={0}
+          className="absolute top-0 bottom-0 w-3 bg-brand rounded-l-lg cursor-ew-resize flex items-center justify-center touch-none"
+          style={{ left: pct(trimStart), transform: "translateX(-50%)" }}
+          onPointerDown={handlePointerDown("start")}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") onChange(Math.max(0, trimStart - 1), trimEnd);
+            if (e.key === "ArrowRight") onChange(Math.min(trimEnd - 5, trimStart + 1), trimEnd);
+          }}
+        >
+          <div className="w-0.5 h-4 bg-black/50 rounded-full" />
+        </div>
+
+        {/* End handle */}
+        <div
+          role="slider"
+          aria-label="Trim end"
+          aria-valuenow={Math.round(endSecs)}
+          aria-valuemin={Math.round(startSecs)}
+          aria-valuemax={Math.round(totalSecs)}
+          tabIndex={0}
+          className="absolute top-0 bottom-0 w-3 bg-brand rounded-r-lg cursor-ew-resize flex items-center justify-center touch-none"
+          style={{ left: pct(trimEnd), transform: "translateX(-50%)" }}
+          onPointerDown={handlePointerDown("end")}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") onChange(trimStart, Math.max(trimStart + 5, trimEnd - 1));
+            if (e.key === "ArrowRight") onChange(trimStart, Math.min(100, trimEnd + 1));
+          }}
+        >
+          <div className="w-0.5 h-4 bg-black/50 rounded-full" />
+        </div>
+      </div>
+
+      <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+        <span>{secsToTimecode(startSecs)}</span>
+        <span className="text-white/40">
+          {secsToTimecode(endSecs - startSecs)} selected
+        </span>
+        <span>{secsToTimecode(endSecs)}</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorModalProps) {
   const panelRef = useWillChange<HTMLDivElement>("transform, opacity");
@@ -93,13 +253,19 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     trimEnd: 100,
     captionStyle: clip.style,
     aspectRatio: clip.resolution === "1080x1920" ? "9:16" : "16:9",
+    colorFilter: "none",
+    audioVolume: 100,
   });
+  const [audioPlacements, setAudioPlacements] = useState<AudioPlacement[]>([]);
   const [draftConflict, setDraftConflict] = useState(false);
   const handleDraftConflict = useCallback(() => setDraftConflict(true), []);
   const autosave = useAutoSave(`clip-editor:${clip.id}`, edits, {
     onRecover: setEdits,
     onConflict: handleDraftConflict,
   });
+
+  const [exporting, setExporting] = useState(false);
+  const [exportDone, setExportDone] = useState(false);
 
   const [captionLoading, setCaptionLoading] = useState(false);
   const [captionGenerating, setCaptionGenerating] = useState(false);
@@ -159,11 +325,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // Tracks the "poll again shortly" timer from handleGenerateCaptions so it
-  // can be cancelled if the modal closes first — otherwise it fires
-  // loadCaptions() (and its setState calls) after unmount.
   const captionsPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
   useEffect(() => {
     return () => {
       if (captionsPollTimeoutRef.current) clearTimeout(captionsPollTimeoutRef.current);
@@ -195,58 +357,41 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     }
   };
 
-  const handleSave = () => {
-    if (segments.length > 0) {
-      const timingError = getSegmentTimingError(segments);
-      if (timingError) {
-        setCaptionError(timingError);
-        return;
-      }
-    }
-    setCaptionError(null);
+  const handleSave = async () => {
     autosave.saveNow();
     onSave(clip.id, {
       ...edits,
       captions: segments.length
         ? { segments, style: captionStyle, language, burnIntoExport }
         : undefined,
+      audio: audioPlacements,
     });
+
+    // Trigger export with the current edits applied at source quality
+    setExporting(true);
+    try {
+      await fetch(`/api/clips/${clip.id}/transcode`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          format: "mp4",
+          aspectRatio: edits.aspectRatio,
+          quality: "source",
+        }),
+      });
+      setExportDone(true);
+      setTimeout(() => setExportDone(false), 2500);
+    } catch {
+      // Non-fatal: export failure is surfaced via the download queue
+    } finally {
+      setExporting(false);
+    }
   };
 
   const updateSegment = (id: string, text: string) => {
-    const safeText = sanitize(text);
-    setSegments((prev) => prev.map((s) => (s.id === id ? { ...s, text: safeText } : s)));
-    setCaptionError(null);
-  };
-
-  const updateSegmentTiming = (id: string, field: "startMs" | "endMs", value: number) => {
-    const next = segments.map((segment) =>
-      segment.id === id
-        ? { ...segment, [field]: Number.isFinite(value) ? Math.round(value) : 0 }
-        : segment
+    setSegments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, text: sanitize(text) } : s))
     );
-    setSegments(next);
-    setCaptionError(getSegmentTimingError(next));
-  };
-
-  const addSegment = () => {
-    const last = segments[segments.length - 1];
-    const start = last ? last.endMs : 0;
-    setSegments((prev) => [
-      ...prev,
-      {
-        id: `segment-${prev.length + 1}-${Date.now()}`,
-        text: "New caption",
-        startMs: start,
-        endMs: start + 1500,
-      },
-    ]);
-    setCaptionError(null);
-  };
-
-  const removeSegment = (id: string) => {
-    setSegments((prev) => prev.filter((segment) => segment.id !== id));
-    setCaptionError(null);
   };
 
   const captionPreviewClass = () => {
@@ -268,13 +413,8 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
     return `${pos} ${base} ${font}`;
   };
 
-  const previewText = segments[0]?.text ?? "Example Caption";
-  const captionPreviewStyle: React.CSSProperties = {
-    color: captionStyle.color ?? "#FFFFFF",
-    backgroundColor: captionStyle.backgroundColor ?? "#000000",
-    fontFamily: FONT_FAMILY_CSS[captionStyle.fontFamily ?? "inter"],
-    fontSize: `${captionStyle.fontSize ?? 48}px`,
-  };
+  const previewText = sanitize(segments[0]?.text ?? "Example Caption");
+  const activeFilter = COLOR_FILTERS.find((f) => f.id === edits.colorFilter);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
@@ -285,6 +425,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
         aria-modal="true"
         aria-labelledby="editor-title"
       >
+        {/* ── Preview pane ── */}
         <div className="flex-1 bg-black p-6 flex flex-col items-center justify-center min-h-[300px] relative border-r border-white/10">
           <div
             className={`relative bg-white/5 rounded-lg overflow-hidden transition-all duration-300 flex items-center justify-center ${
@@ -302,7 +443,8 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
               sizes={SIZES_EDITOR_PREVIEW}
               placeholder="blur"
               blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
-              className="object-cover opacity-50"
+              className="object-cover opacity-50 transition-all duration-300"
+              style={{ filter: activeFilter?.css || undefined }}
             />
             <div className="absolute inset-0 flex items-center justify-center">
               <span className="text-white/50 font-medium">Preview Area</span>
@@ -311,11 +453,20 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
               <span>{sanitize(previewText)}</span>
             </div>
           </div>
+          {/* Volume indicator */}
+          {edits.audioVolume !== 100 && (
+            <div className="mt-3 flex items-center gap-2 text-xs text-white/50">
+              <Volume2 className="w-3 h-3" />
+              <span>{edits.audioVolume}%</span>
+            </div>
+          )}
         </div>
 
-        <div className="w-full md:w-[380px] flex flex-col max-h-[80vh]">
+        {/* ── Controls pane ── */}
+        <div className="w-full md:w-[380px] flex flex-col max-h-[90vh]">
+          {/* Tabs */}
           <div className="flex border-b border-white/10">
-            {(["edit", "captions"] as EditorTab[]).map((tab) => (
+            {(["edit", "audio", "captions"] as EditorTab[]).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -325,12 +476,27 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                     : "text-white/50 hover:text-white"
                 }`}
               >
-                {tab}
+                {tab === "audio" ? <span className="flex items-center justify-center gap-1"><Music2 className="h-3.5 w-3.5" />Audio</span> : tab}
               </button>
             ))}
           </div>
 
           <div className="p-6 flex-1 overflow-y-auto">
+            {/* Header row */}
+            <div className="flex items-center justify-between mb-4">
+              <h2 id="editor-title" className="text-xl font-bold text-white">
+                {activeTab === "edit" ? "Edit Clip" : "Captions"}
+              </h2>
+              <button
+                onClick={onClose}
+                className="p-2 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+                aria-label="Close editor"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Autosave status */}
             <div
               className="mb-4 flex items-center justify-between gap-3 text-xs text-white/50"
               aria-live="polite"
@@ -351,6 +517,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                 Save now
               </button>
             </div>
+
             {draftConflict && (
               <div className="mb-4 flex items-center justify-between gap-3 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
                 <span>A newer local draft was recovered for this clip.</span>
@@ -363,69 +530,27 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                 </button>
               </div>
             )}
-            <div
-              className="mb-4 flex items-center justify-between text-xs text-white/50"
-              aria-live="polite"
-            >
-              <span>
-                {autosave.status === "saving"
-                  ? "Saving draft..."
-                  : autosave.status === "unsaved"
-                    ? "Unsaved changes"
-                    : autosave.status === "recovered"
-                      ? "Recovered draft"
-                      : autosave.status === "error"
-                        ? "Draft save failed"
-                        : "All changes saved"}
-              </span>
-              <button type="button" onClick={autosave.saveNow} className="font-semibold text-brand">
-                Save now
-              </button>
-            </div>
-            <div className="flex items-center justify-between mb-6">
-              <h2 id="editor-title" className="text-xl font-bold text-white">
-                {activeTab === "edit" ? "Edit Clip" : "Captions"}
-              </h2>
-              <button
-                onClick={onClose}
-                className="p-2 rounded-full hover:bg-white/10 text-white/70 hover:text-white transition-colors"
-                aria-label="Close editor"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
             {activeTab === "edit" ? (
               <div className="space-y-8">
+                {/* ── Trim ── */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-white/90 font-medium">
                     <Crop className="w-4 h-4" />
                     <h3>Trim Video</h3>
                   </div>
-                  <div className="pt-4 px-2">
-                    <div className="h-12 bg-white/5 rounded-lg relative">
-                      <div className="absolute top-0 bottom-0 left-0 right-0 overflow-hidden rounded-lg">
-                        <Image
-                          src={clip.thumbnail}
-                          alt=""
-                          fill
-                          sizes={SIZES_TRIM_TIMELINE}
-                          placeholder="blur"
-                          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
-                          className="object-cover opacity-20"
-                        />
-                      </div>
-                      <div className="absolute inset-y-0 left-0 w-1 bg-brand" />
-                      <div className="absolute inset-y-0 right-0 w-1 bg-brand" />
-                      <div className="absolute inset-y-0 left-0 right-0 border-y-2 border-brand pointer-events-none" />
-                    </div>
-                    <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                      <span>00:00</span>
-                      <span>{clip.duration}</span>
-                    </div>
-                  </div>
+                  <TrimTimeline
+                    thumbnail={clip.thumbnail}
+                    duration={clip.duration}
+                    trimStart={edits.trimStart}
+                    trimEnd={edits.trimEnd}
+                    onChange={(start, end) =>
+                      setEdits((prev) => ({ ...prev, trimStart: start, trimEnd: end }))
+                    }
+                  />
                 </div>
 
+                {/* ── Format ── */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-white/90 font-medium">
                     <MonitorPlay className="w-4 h-4" />
@@ -463,6 +588,74 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                   </div>
                 </div>
 
+                {/* ── Color Correction ── */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-white/90 font-medium">
+                    <Sun className="w-4 h-4" />
+                    <h3>Color Filter</h3>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {COLOR_FILTERS.map((f) => (
+                      <button
+                        key={f.id}
+                        onClick={() => setEdits((prev) => ({ ...prev, colorFilter: f.id }))}
+                        className={`relative overflow-hidden rounded-xl border transition-all ${
+                          edits.colorFilter === f.id
+                            ? "border-brand ring-1 ring-brand"
+                            : "border-transparent hover:border-white/20"
+                        }`}
+                        aria-pressed={edits.colorFilter === f.id}
+                      >
+                        <div className="aspect-video relative bg-white/5">
+                          <Image
+                            src={clip.thumbnail}
+                            alt={f.label}
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                            style={{ filter: f.css || undefined }}
+                          />
+                        </div>
+                        <span className="block text-center text-[10px] text-white/70 py-1 bg-black/40">
+                          {f.label}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* ── Audio Volume ── */}
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-white/90 font-medium">
+                    <Volume2 className="w-4 h-4" />
+                    <h3>Audio Volume</h3>
+                    <span className="ml-auto text-sm text-white/50 tabular-nums">
+                      {edits.audioVolume}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={0}
+                    max={200}
+                    step={5}
+                    value={edits.audioVolume}
+                    aria-label="Audio volume"
+                    onChange={(e) =>
+                      setEdits((prev) => ({
+                        ...prev,
+                        audioVolume: Number(e.target.value),
+                      }))
+                    }
+                    className="w-full accent-brand cursor-pointer"
+                  />
+                  <div className="flex justify-between text-[10px] text-white/40">
+                    <span>Mute</span>
+                    <span>Original</span>
+                    <span>+2×</span>
+                  </div>
+                </div>
+
+                {/* ── Caption Style ── */}
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-white/90 font-medium">
                     <Type className="w-4 h-4" />
@@ -485,7 +678,9 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                             name="captionStyle"
                             value={style}
                             checked={isActive}
-                            onChange={() => setEdits((prev) => ({ ...prev, captionStyle: style }))}
+                            onChange={() =>
+                              setEdits((prev) => ({ ...prev, captionStyle: style }))
+                            }
                             className="sr-only"
                           />
                           <div
@@ -493,7 +688,9 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                               isActive ? "border-brand" : "border-white/30"
                             }`}
                           >
-                            {isActive && <div className="w-2 h-2 bg-brand rounded-full" />}
+                            {isActive && (
+                              <div className="w-2 h-2 bg-brand rounded-full" />
+                            )}
                           </div>
                           <span
                             className={`text-sm font-medium ${isActive ? "text-white" : "text-white/70"}`}
@@ -506,7 +703,10 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                   </div>
                 </div>
               </div>
+            ) : activeTab === "audio" ? (
+              <AudioLibrary placements={audioPlacements} onPlacementsChange={setAudioPlacements} />
             ) : (
+              /* ── Captions tab ── */
               <div className="space-y-6">
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-white/90">Language</label>
@@ -537,7 +737,9 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                 </button>
 
                 {captionStatus && (
-                  <p className="text-xs text-white/50 capitalize">Status: {captionStatus}</p>
+                  <p className="text-xs text-white/50 capitalize">
+                    Status: {captionStatus}
+                  </p>
                 )}
 
                 {captionError && (
@@ -558,7 +760,9 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                         {FONT_STYLES.map((fs) => (
                           <button
                             key={fs.id}
-                            onClick={() => setCaptionStyle((s) => ({ ...s, fontStyle: fs.id }))}
+                            onClick={() =>
+                              setCaptionStyle((s) => ({ ...s, fontStyle: fs.id }))
+                            }
                             className={`py-2 rounded-lg text-xs font-medium ${
                               captionStyle.fontStyle === fs.id
                                 ? "bg-brand text-black"
@@ -631,7 +835,9 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                         {POSITIONS.map((pos) => (
                           <button
                             key={pos.id}
-                            onClick={() => setCaptionStyle((s) => ({ ...s, position: pos.id }))}
+                            onClick={() =>
+                              setCaptionStyle((s) => ({ ...s, position: pos.id }))
+                            }
                             className={`flex-1 py-2 rounded-lg text-xs font-medium ${
                               captionStyle.position === pos.id
                                 ? "bg-brand text-black"
@@ -645,78 +851,24 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
                     </div>
 
                     <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <label className="text-sm font-medium text-white/90">Timing controls</label>
-                        <button
-                          type="button"
-                          onClick={addSegment}
-                          className="rounded-lg border border-white/10 px-2 py-1 text-xs font-semibold text-brand hover:bg-brand/10"
-                        >
-                          Add caption
-                        </button>
-                      </div>
-
-                      <div className="space-y-3 max-h-56 overflow-y-auto">
+                      <label className="text-sm font-medium text-white/90">
+                        Word-level timing
+                      </label>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
                         {segments.map((seg) => (
                           <div
                             key={seg.id}
-                            className="rounded-lg bg-white/5 p-3 space-y-2 border border-white/10"
+                            className="bg-white/5 rounded-lg p-2 space-y-1"
                           >
-                            <div className="flex items-start gap-2">
-                              <input
-                                aria-label={`Caption text ${seg.id}`}
-                                value={sanitize(seg.text)}
-                                onChange={(e) => updateSegment(seg.id, e.target.value)}
-                                className="flex-1 bg-transparent text-sm text-white border-none outline-none"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => removeSegment(seg.id)}
-                                className="rounded p-1 text-white/40 hover:bg-red-500/10 hover:text-red-400"
-                                aria-label={`Remove caption ${seg.id}`}
-                              >
-                                <X className="h-3.5 w-3.5" />
-                              </button>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                              <label className="text-[10px] text-white/40">
-                                Start (seconds)
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={0.1}
-                                  aria-label={`Start time for caption ${seg.id}`}
-                                  value={(seg.startMs / 1000).toFixed(1)}
-                                  onChange={(e) =>
-                                    updateSegmentTiming(
-                                      seg.id,
-                                      "startMs",
-                                      Number(e.target.value) * 1000
-                                    )
-                                  }
-                                  className="mt-1 w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-xs text-white"
-                                />
-                              </label>
-                              <label className="text-[10px] text-white/40">
-                                End (seconds)
-                                <input
-                                  type="number"
-                                  min={0}
-                                  step={0.1}
-                                  aria-label={`End time for caption ${seg.id}`}
-                                  value={(seg.endMs / 1000).toFixed(1)}
-                                  onChange={(e) =>
-                                    updateSegmentTiming(
-                                      seg.id,
-                                      "endMs",
-                                      Number(e.target.value) * 1000
-                                    )
-                                  }
-                                  className="mt-1 w-full rounded border border-white/10 bg-black/30 px-2 py-1 text-xs text-white"
-                                />
-                              </label>
-                            </div>
+                            <input
+                              value={seg.text}
+                              onChange={(e) => updateSegment(seg.id, e.target.value)}
+                              className="w-full bg-transparent text-sm text-white border-none outline-none"
+                            />
+                            <span className="text-[10px] text-white/40">
+                              {(seg.startMs / 1000).toFixed(1)}s –{" "}
+                              {(seg.endMs / 1000).toFixed(1)}s
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -754,6 +906,7 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
             )}
           </div>
 
+          {/* ── Footer actions ── */}
           <div className="p-6 border-t border-white/10 flex gap-3">
             <button
               onClick={onClose}
@@ -763,9 +916,17 @@ export default function ClipEditorModal({ clip, onClose, onSave }: ClipEditorMod
             </button>
             <button
               onClick={handleSave}
-              className="flex-1 py-3 rounded-xl text-sm font-bold bg-brand text-black hover:bg-brand-hover transition-colors shadow-[0_0_15px_rgba(var(--brand),0.3)]"
+              disabled={exporting}
+              className="flex items-center justify-center gap-2 flex-1 py-3 rounded-xl text-sm font-bold bg-brand text-black hover:bg-brand-hover transition-colors shadow-[0_0_15px_rgba(var(--brand),0.3)] disabled:opacity-70"
             >
-              Save Edits
+              {exporting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : exportDone ? (
+                <span>✓</span>
+              ) : (
+                <Download className="w-4 h-4" />
+              )}
+              {exporting ? "Exporting..." : exportDone ? "Exported!" : "Save & Export"}
             </button>
           </div>
         </div>

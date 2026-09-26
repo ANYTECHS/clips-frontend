@@ -21,6 +21,7 @@ import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { earningsStore } from "../earningsStore";
 import type { ApiResponse } from "../../types";
 import type { EarningsResponse, EarningTransaction } from "../types";
+import { paginateItems, parsePaginationParams } from "../../pagination";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -62,11 +63,7 @@ export async function GET(request: NextRequest) {
   // 3. Parse & validate query params
   const { searchParams } = request.nextUrl;
 
-  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
-  const pageSize = Math.min(
-    100,
-    Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10) || 20)
-  );
+  const { page, pageSize } = parsePaginationParams(searchParams);
 
   const rawStartDate = searchParams.get("startDate");
   const rawEndDate = searchParams.get("endDate");
@@ -115,12 +112,8 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
 
-  const currentWindowStart = new Date(now.getTime() - thirtyDaysMs)
-    .toISOString()
-    .split("T")[0];
-  const priorWindowStart = new Date(now.getTime() - 2 * thirtyDaysMs)
-    .toISOString()
-    .split("T")[0];
+  const currentWindowStart = new Date(now.getTime() - thirtyDaysMs).toISOString().split("T")[0];
+  const priorWindowStart = new Date(now.getTime() - 2 * thirtyDaysMs).toISOString().split("T")[0];
   const today = now.toISOString().split("T")[0];
 
   const currentPeriod = allTransactions.filter(
@@ -133,12 +126,8 @@ export async function GET(request: NextRequest) {
   const currentTotal = sumAmount(currentPeriod);
   const priorTotal = sumAmount(priorPeriod);
 
-  const currentCompleted = sumAmount(
-    currentPeriod.filter((tx) => tx.status === "completed")
-  );
-  const priorCompleted = sumAmount(
-    priorPeriod.filter((tx) => tx.status === "completed")
-  );
+  const currentCompleted = sumAmount(currentPeriod.filter((tx) => tx.status === "completed"));
+  const priorCompleted = sumAmount(priorPeriod.filter((tx) => tx.status === "completed"));
 
   const trends = {
     totalTrend: calcTrend(currentTotal, priorTotal),
@@ -150,25 +139,16 @@ export async function GET(request: NextRequest) {
   const taxReady = allTransactions.some((tx) => tx.status === "completed");
 
   // 9. Paginate the filtered results
-  const total = filtered.length;
-  const totalPages = Math.ceil(total / pageSize) || 1;
-  const safePage = Math.max(1, Math.min(page, totalPages));
-  const start = (safePage - 1) * pageSize;
-  const transactions = filtered.slice(start, start + pageSize);
+  const { items: transactions, meta } = paginateItems(filtered, { page, pageSize });
 
   const responseData: EarningsResponse = {
     transactions,
     summary,
     trends,
     taxReady,
-    pagination: {
-      page: safePage,
-      pageSize,
-      total,
-      totalPages,
-    },
+    pagination: meta,
   };
 
-  const body: ApiResponse<EarningsResponse> = { data: responseData, error: null };
+  const body: ApiResponse<EarningsResponse> = { data: responseData, error: null, meta };
   return NextResponse.json(body);
 }

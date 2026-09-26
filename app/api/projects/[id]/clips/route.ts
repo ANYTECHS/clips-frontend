@@ -3,14 +3,12 @@ import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { projectsStore } from "@/app/api/projects/projectsStore";
 import { clipsStore } from "@/app/api/clips/clipsStore";
 import type { ApiResponse } from "@/app/api/types";
+import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
 
 /**
  * GET /api/projects/:id/clips — list clips for a specific project.
  */
-export async function GET(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const authResult = await requireAuth();
   if (authResult instanceof NextResponse) return authResult;
   const { userId } = authResult;
@@ -23,13 +21,8 @@ export async function GET(
   }
 
   const { searchParams } = new URL(request.url);
-  const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10));
-  const pageSize = Math.min(50, Math.max(1, parseInt(searchParams.get("pageSize") ?? "20", 10)));
-
   const allClips = clipsStore.getClipsForProject(userId, projectId);
-  const total = allClips.length;
-  const start = (page - 1) * pageSize;
-  const clips = allClips.slice(start, start + pageSize);
+  const { items: clips, meta } = paginateItems(allClips, parsePaginationParams(searchParams, 50));
 
   const body: ApiResponse<{
     project: { id: string; name: string; thumbnailUrl: string };
@@ -45,11 +38,12 @@ export async function GET(
         thumbnailUrl: project.thumbnailUrl,
       },
       clips,
-      total,
-      page,
-      pageSize,
+      total: meta.total,
+      page: meta.page,
+      pageSize: meta.pageSize,
     },
     error: null,
+    meta,
   };
 
   return NextResponse.json(body);

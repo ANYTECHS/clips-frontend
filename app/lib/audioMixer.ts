@@ -1,5 +1,5 @@
 /**
- * Audio mixing, normalization, trimming, and WAV encoding utilities for voiceover recording
+ * Audio mixing, normalization, trimming, and WAV encoding utilities.
  */
 
 export interface VoiceoverTake {
@@ -7,92 +7,187 @@ export interface VoiceoverTake {
   name: string;
   blob?: Blob;
   audioBuffer?: AudioBuffer;
-  duration: number; // in seconds
-  trimStart: number; // in seconds
-  trimEnd: number; // in seconds
+  duration: number;
+  trimStart: number;
+  trimEnd: number;
   isNormalized: boolean;
   gain: number;
-  offsetSeconds: number; // start offset on video timeline
+  offsetSeconds: number;
   recordedAt: string;
 }
 
-/**
- * Normalizes peak amplitude of an AudioBuffer to target level (default -0.1 dB or ~0.98 linear)
- */
-export function calculateNormalizationGain(
-  channelData: Float32Array,
-  targetPeak: number = 0.98
-): number {
-  let maxPeak = 0;
-  for (let i = 0; i < channelData.length; i++) {
-    const abs = Math.abs(channelData[i]);
-    if (abs > maxPeak) {
-      maxPeak = abs;
-    }
-  }
-
-  if (maxPeak === 0) return 1.0;
-  const multiplier = targetPeak / maxPeak;
-  // Clamp multiplier between 0.5x and 4.0x (+12dB) to prevent extreme distortion on silent tracks
-  return Math.min(Math.max(multiplier, 0.5), 4.0);
+export interface AudioTimeline {
+  videoDuration: number;
+  offsetSeconds: number;
+  trimStart: number;
+  trimEnd: number;
+  effectiveDuration: number;
+  endSeconds: number;
+  sampleRate: number;
+  frameCount: number;
 }
 
-/**
- * Encodes an AudioBuffer into a standard 16-bit PCM WAV Blob
- */
-export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
-  const numChannels = buffer.numberOfChannels;
-  const sampleRate = buffer.sampleRate;
-  const length = buffer.length * numChannels * 2; // 16-bit = 2 bytes per sample
-  const bufferArray = new ArrayBuffer(44 + length);
-  const view = new DataView(bufferArray);
+export function calculateNormalizationGain(
+  channelData: Float32Array,
+  targetPeak = 0.98,
+): number {
+  let maxPeak = 0;
 
-  // Helper to write string into DataView
-  function writeString(offset: number, str: string) {
-    for (let i = 0; i < str.length; i++) {
-      view.setUint8(offset + i, str.charCodeAt(i));
-    }
+  for (let index = 0; index < channelData.length; index += 1) {
+    maxPeak = Math.max(maxPeak, Math.abs(channelData[index]));
   }
 
-  // RIFF identifier
+  if (maxPeak === 0) return 1;
+
+  const multiplier = targetPeak / maxPeak;
+
+  return Math.min(Math.max(multiplier, 0.5), 4);
+}
+
+export function audioBufferToWavBlob(buffer: AudioBuffer): Blob {
+  const numberOfChannels = buffer.numberOfChannels;
+  const sampleRate = buffer.sampleRate;
+  const bytesPerSample = 2;
+  const dataLength =
+    buffer.length * numberOfChannels * bytesPerSample;
+
+  const arrayBuffer = new ArrayBuffer(44 + dataLength);
+  const view = new DataView(arrayBuffer);
+
+  const writeString = (offset: number, value: string) => {
+    for (let index = 0; index < value.length; index += 1) {
+      view.setUint8(offset + index, value.charCodeAt(index));
+    }
+  };
+
   writeString(0, "RIFF");
-  view.setUint32(4, 36 + length, true);
+  view.setUint32(4, 36 + dataLength, true);
   writeString(8, "WAVE");
 
-  // "fmt " chunk
   writeString(12, "fmt ");
-  view.setUint32(16, 16, true); // chunk length
-  view.setUint16(20, 1, true); // PCM format
-  view.setUint16(22, numChannels, true);
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numberOfChannels, true);
   view.setUint32(24, sampleRate, true);
-  view.setUint32(28, sampleRate * numChannels * 2, true); // byte rate
-  view.setUint16(32, numChannels * 2, true); // block align
-  view.setUint16(34, 16, true); // bits per sample
+  view.setUint32(
+    28,
+    sampleRate * numberOfChannels * bytesPerSample,
+    true,
+  );
+  view.setUint16(
+    32,
+    numberOfChannels * bytesPerSample,
+    true,
+  );
+  view.setUint16(34, 16, true);
 
-  // "data" chunk
   writeString(36, "data");
-  view.setUint32(40, length, true);
+  view.setUint32(40, dataLength, true);
 
-  // Interleave and write PCM 16-bit samples
   let offset = 44;
-  for (let i = 0; i < buffer.length; i++) {
-    for (let channel = 0; channel < numChannels; channel++) {
-      let sample = buffer.getChannelData(channel)[i];
-      // Clamp between -1.0 and 1.0
-      sample = Math.max(-1, Math.min(1, sample));
-      // Convert to 16-bit integer
-      const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7fff;
-      view.setInt16(offset, intSample, true);
+
+  for (let sampleIndex = 0; sampleIndex < buffer.length; sampleIndex += 1) {
+    for (
+      let channelIndex = 0;
+      channelIndex < numberOfChannels;
+      channelIndex += 1
+    ) {
+      const channel = buffer.getChannelData(channelIndex);
+      const sample = Math.max(-1, Math.min(1, channel[sampleIndex]));
+
+      const pcmValue =
+        sample < 0 ? sample * 0x8000 : sample * 0x7fff;
+
+      view.setInt16(offset, pcmValue, true);
       offset += 2;
     }
   }
 
-  return new Blob([bufferArray], { type: "audio/wav" });
+  return new Blob([arrayBuffer], { type: "audio/wav" });
 }
 
-/**
- * Mixes background audio and voiceover track with timeline offset and optional ducking
- */
+function assertFiniteNumber(name: string, value: number): void {
+  if (!Number.isFinite(value)) {
+    throw new Error(`${name} must be a finite number.`);
+  }
+}
+
+export function createAudioTimeline(params: {
+  sampleRate: number;
+  videoDuration: number;
+  offsetSeconds: number;
+  trimStart: number;
+  trimEnd: number;
+}): AudioTimeline {
+  const {
+    sampleRate,
+    videoDuration,
+    offsetSeconds,
+    trimStart,
+    trimEnd,
+  } = params;
+
+  assertFiniteNumber("sampleRate", sampleRate);
+  assertFiniteNumber("videoDuration", videoDuration);
+  assertFiniteNumber("offsetSeconds", offsetSeconds);
+  assertFiniteNumber("trimStart", trimStart);
+  assertFiniteNumber("trimEnd", trimEnd);
+
+  if (sampleRate <= 0) {
+    throw new Error("sampleRate must be greater than zero.");
+  }
+
+  if (videoDuration < 0) {
+    throw new Error("videoDuration cannot be negative.");
+  }
+
+  const safeTrimStart = Math.max(0, trimStart);
+  const safeTrimEnd = Math.max(safeTrimStart, trimEnd);
+  const effectiveDuration = Math.max(
+    0,
+    safeTrimEnd - safeTrimStart,
+  );
+  const safeOffset = Math.max(0, offsetSeconds);
+  const endSeconds = safeOffset + effectiveDuration;
+
+  const outputDuration = Math.max(videoDuration, endSeconds);
+  const frameCount = Math.max(
+    1,
+    Math.ceil(outputDuration * sampleRate),
+  );
+
+  return {
+    videoDuration,
+    offsetSeconds: safeOffset,
+    trimStart: safeTrimStart,
+    trimEnd: safeTrimEnd,
+    effectiveDuration,
+    endSeconds,
+    sampleRate,
+    frameCount,
+  };
+}
+
+export function validateAudioTimeline(timeline: AudioTimeline): void {
+  if (timeline.offsetSeconds < 0) {
+    throw new Error("Audio offset cannot be negative.");
+  }
+
+  if (timeline.trimStart < 0) {
+    throw new Error("Audio trim start cannot be negative.");
+  }
+
+  if (timeline.trimEnd < timeline.trimStart) {
+    throw new Error("Audio trim end must be after trim start.");
+  }
+
+  if (timeline.endSeconds > timeline.videoDuration + 0.001) {
+    throw new Error(
+      "Audio track extends beyond the requested video duration.",
+    );
+  }
+}
+
 export async function mixAudioTracks(params: {
   voiceoverBuffer: AudioBuffer;
   videoDuration: number;
@@ -108,34 +203,73 @@ export async function mixAudioTracks(params: {
     offsetSeconds,
     trimStart,
     trimEnd,
-    gain = 1.0,
+    gain = 1,
   } = params;
 
-  const sampleRate = voiceoverBuffer.sampleRate;
-  const totalLength = Math.ceil(Math.max(videoDuration, offsetSeconds + (trimEnd - trimStart)) * sampleRate);
-
-  // If in node test environment without OfflineAudioContext, generate a simulated WAV blob
-  if (typeof window === "undefined" || !(window.AudioContext || (window as any).webkitAudioContext)) {
-    return new Blob(["RIFF_MOCK_MIXED_AUDIO"], { type: "audio/wav" });
+  if (!voiceoverBuffer) {
+    throw new Error("A voiceover audio buffer is required.");
   }
 
-  const OfflineCtx = window.OfflineAudioContext || (window as any).webkitOfflineAudioContext;
-  const offlineContext = new OfflineCtx(2, totalLength, sampleRate);
+  assertFiniteNumber("gain", gain);
 
-  // 1. Create source for voiceover track
-  const voSource = offlineContext.createBufferSource();
-  voSource.buffer = voiceoverBuffer;
+  if (gain < 0) {
+    throw new Error("Audio gain cannot be negative.");
+  }
 
-  const voGainNode = offlineContext.createGain();
-  voGainNode.gain.value = gain;
-  voSource.connect(voGainNode);
-  voGainNode.connect(offlineContext.destination);
+  const timeline = createAudioTimeline({
+    sampleRate: voiceoverBuffer.sampleRate,
+    videoDuration,
+    offsetSeconds,
+    trimStart,
+    trimEnd,
+  });
 
-  // Schedule start at offset with trimmed duration
-  const effectiveTrimDuration = Math.max(0.1, trimEnd - trimStart);
-  voSource.start(offsetSeconds, trimStart, effectiveTrimDuration);
+  if (timeline.trimEnd > voiceoverBuffer.duration) {
+    throw new Error(
+      "Audio trim end cannot be longer than the source audio duration.",
+    );
+  }
 
-  // Render audio mix
+  const offlineContextConstructor =
+    typeof window !== "undefined"
+      ? window.OfflineAudioContext ||
+        (
+          window as typeof window & {
+            webkitOfflineAudioContext?: typeof OfflineAudioContext;
+          }
+        ).webkitOfflineAudioContext
+      : undefined;
+
+  if (!offlineContextConstructor) {
+    return new Blob(["RIFF_MOCK_MIXED_AUDIO"], {
+      type: "audio/wav",
+    });
+  }
+
+  const offlineContext = new offlineContextConstructor(
+    2,
+    timeline.frameCount,
+    timeline.sampleRate,
+  );
+
+  const source = offlineContext.createBufferSource();
+  source.buffer = voiceoverBuffer;
+
+  const gainNode = offlineContext.createGain();
+  gainNode.gain.value = gain;
+
+  source.connect(gainNode);
+  gainNode.connect(offlineContext.destination);
+
+  if (timeline.effectiveDuration > 0) {
+    source.start(
+      timeline.offsetSeconds,
+      timeline.trimStart,
+      timeline.effectiveDuration,
+    );
+  }
+
   const renderedBuffer = await offlineContext.startRendering();
+
   return audioBufferToWavBlob(renderedBuffer);
 }

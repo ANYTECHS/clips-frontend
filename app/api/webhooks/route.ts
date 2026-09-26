@@ -1,15 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/app/lib/prisma";
-import { z } from "zod";
 
-const webhookSchema = z.object({
-  url: z.string().url(),
-  events: z.array(z.string()),
-  secret: z.string().min(16),
-  description: z.string().optional(),
-});
 
 export async function GET(req: NextRequest) {
   try {
@@ -28,6 +18,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching webhooks:", error);
     return NextResponse.json({ error: "Failed to fetch webhooks" }, { status: 500 });
   }
+
 }
 
 export async function POST(req: NextRequest) {
