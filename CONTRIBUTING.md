@@ -8,6 +8,7 @@ Thanks for wanting to contribute — we appreciate it! This document explains ho
 - Environment variables
 - Running tests & Storybook
 - Code standards & security
+- Export conventions
 - Pull request guidelines
 - Issue triage
 
@@ -96,6 +97,42 @@ When you're ready to release a new version:
 - Review the threat model and reporting process in [docs/SECURITY.md](docs/SECURITY.md) before shipping security-sensitive changes.
 - Never commit secrets or private keys. `.env.local` is ignored by git.
 - Use native Web Crypto APIs for local encryption when applicable (see project docs).
+
+## Export conventions
+We use **named exports** as the standard export style across the codebase. Named exports keep imports consistent, make refactors safer, and improve discoverability in editors.
+
+- Prefer named exports for components, hooks, utilities, and types:
+
+```ts
+// Preferred
+export function Button() { /* ... */ }
+export const formatAmount = (value: number) => { /* ... */ };
+export type ButtonProps = { /* ... */ };
+```
+
+- Avoid default exports. When you touch a module that still uses a default export, convert it to a named export and update every import site in the same change.
+
+```ts
+// Avoid
+export default function Button() { /* ... */ }
+
+// Instead
+export function Button() { /* ... */ }
+```
+
+- Update imports to match the named export:
+
+```ts
+// Before
+import Button from './Button';
+
+// After
+import { Button } from './Button';
+```
+
+- Framework-required default exports are the only exception. Next.js route files (`page.tsx`, `layout.tsx`, `route.ts`, `error.tsx`, `loading.tsx`, `not-found.tsx`, `template.tsx`, `default.tsx`) and config files (`next.config.js`, `tailwind.config.ts`, etc.) must keep their default exports because the framework relies on them.
+
+- An ESLint rule enforces this convention (`import/no-default-export`). Run `npm run lint` before opening a PR; the rule flags new default exports outside the allowed framework files.
 
 ## Pull request guidelines
 - Branch naming

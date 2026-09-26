@@ -217,6 +217,40 @@ const eslintConfig = defineConfig([
       ],
     },
   },
+  {
+    // ── Export conventions (Issue #1126) ─────────────────────────────────
+    //
+    // Named exports are the standard: they are greppable, rename-safe, and
+    // keep a module's public surface explicit. Default exports hide the
+    // symbol name at the import site and make refactors harder.
+    //
+    // `warn` for the same reason as the import rules above — the codebase
+    // still has default exports to migrate, and erroring would fail every
+    // PR regardless of what it touched. `--fix` cannot rewrite these
+    // automatically, so the backlog clears as files are edited.
+    //
+    // Config files (eslint.config.mjs, next.config.*, etc.) are exempt:
+    // their tooling requires a default export.
+    files: ["**/*.{ts,tsx,js,jsx}"],
+    ignores: [
+      "**/*.config.{ts,tsx,js,jsx,mjs,cjs}",
+      "**/*.stories.{ts,tsx,js,jsx}",
+      "**/*.test.{ts,tsx,js,jsx}",
+      "**/*.spec.{ts,tsx,js,jsx}",
+      "**/__tests__/**",
+      "**/__mocks__/**",
+    ],
+    rules: {
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector: "ExportDefaultDeclaration",
+          message:
+            "Prefer named exports over default exports. See docs/EXPORT_CONVENTIONS.md.",
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;
