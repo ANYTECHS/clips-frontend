@@ -19,6 +19,7 @@ import {
   CreditCard,
   Plug,
   Tags,
+  Sparkles,
 } from "lucide-react";
 import PlanUsage from "@/components/dashboard/PlanUsage";
 import { useRoutePrefetch } from "@/app/hooks/useRoutePrefetch";
@@ -32,6 +33,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Projects", href: "/projects", icon: Video },
+  { label: "Brand Kit", href: "/brand-kit", icon: Sparkles },
   { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Earnings", href: "/earnings", icon: DollarSign },
   { label: "Referral", href: "/referral", icon: Share2 },
@@ -131,6 +133,7 @@ const DashboardSidebar = memo(function DashboardSidebar({ isOpen, onClose }: Das
           isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
         ].join(" ")}
         aria-label="Sidebar navigation"
+        data-tour="sidebar-nav"
       >
         {/* Logo / branding */}
         <div className="flex items-center justify-between px-5 py-5 border-b border-border shrink-0">
@@ -152,7 +155,7 @@ const DashboardSidebar = memo(function DashboardSidebar({ isOpen, onClose }: Das
           <button
             type="button"
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg text-muted hover:text-white hover:bg-surface-hover transition-colors"
+            className="lg:hidden flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:text-white hover:bg-surface-hover transition-colors"
             aria-label="Close sidebar"
           >
             <X className="w-5 h-5" aria-hidden="true" />

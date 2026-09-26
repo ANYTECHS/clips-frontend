@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
 
 export interface BillingPlan {
   id: "free" | "pro" | "enterprise";
@@ -12,7 +13,7 @@ export interface BillingPlan {
   popular?: boolean;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const plans: BillingPlan[] = [
     {
       id: "free",
@@ -66,5 +67,10 @@ export async function GET() {
     },
   ];
 
-  return NextResponse.json({ plans });
+  const { items, meta } = paginateItems(
+    plans,
+    parsePaginationParams(new URL(request.url).searchParams, 100)
+  );
+
+  return NextResponse.json({ data: items, plans: items, error: null, meta });
 }

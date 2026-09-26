@@ -3,21 +3,75 @@ import { auth } from "@/app/lib/auth";
 import { clipsStore } from "./clipsStore";
 import type { ApiResponse } from "../types";
 import { getClipsQuerySchema, bulkClipIdsBodySchema } from "../schemas/index";
+import {
+  applySort,
+  containsAll,
+  matchesQuery,
+  paginate,
+  parseRange,
+  withinDateRange,
+  withinRange,
+  type SortOrder,
+} from "@/app/api/lib/listQuery";
 import { parseFieldSelection, pickFields } from "@/app/lib/fieldSelection";
 import { withApiAnalytics } from "@/app/lib/withApiAnalytics";
 import type { Clip } from "./clipsStore";
+import { paginateItems, parsePaginationParams } from "../pagination";
 
 const CLIP_FIELD_CONFIG = {
   allowedFields: [
-    "id", "userId", "projectId", "title", "thumbnail", "score", "scoreKey",
-    "duration", "style", "status", "resolution", "videoUrl", "createdAt",
-    "scoreBreakdown", "tags", "shareId",
+    "id",
+    "userId",
+    "projectId",
+    "title",
+    "thumbnail",
+    "score",
+    "scoreKey",
+    "duration",
+    "style",
+    "status",
+    "resolution",
+    "videoUrl",
+    "createdAt",
+    "scoreBreakdown",
+    "tags",
+    "shareId",
   ] as (keyof Clip & string)[],
   defaultFields: [
-    "id", "title", "thumbnail", "score", "scoreKey", "duration",
-    "style", "status", "createdAt", "tags",
+    "id",
+    "title",
+    "thumbnail",
+    "score",
+    "scoreKey",
+    "duration",
+    "style",
+    "status",
+    "createdAt",
+    "tags",
   ] as (keyof Clip & string)[],
 };
+
+/** Fields `?q=` searches. */
+const CLIP_SEARCH_FIELDS = ["title", "style", "tags"] as const;
+
+/**
+ * Converts a stored `mm:ss` (or `hh:mm:ss`) duration to seconds.
+ *
+ * `durationMin`/`durationMax` are numeric seconds, but the store keeps
+ * duration as a display string. Returning `null` for anything unparseable
+ * means such a clip simply does not match a duration filter, rather than
+ * being coerced to 0 and matching every `durationMax`.
+ */
+function durationToSeconds(duration: unknown): number | null {
+  if (typeof duration !== "string") return null;
+
+  const parts = duration.split(":").map((p) => Number(p));
+  if (parts.some((p) => !Number.isFinite(p))) return null;
+
+  if (parts.length === 2) return parts[0]! * 60 + parts[1]!;
+  if (parts.length === 3) return parts[0]! * 3600 + parts[1]! * 60 + parts[2]!;
+  return null;
+}
 
 async function handleGet(request: NextRequest) {
   const session = await auth();
@@ -26,14 +80,11 @@ async function handleGet(request: NextRequest) {
   }
 
   const { searchParams } = new URL(request.url);
-  
-  // Validate query parameters with Zod
-  const queryValidation = getClipsQuerySchema.safeParse({
-    page: searchParams.get("page"),
-    pageSize: searchParams.get("pageSize"),
-    status: searchParams.get("status"),
-    style: searchParams.get("style"),
+
+
     virality: searchParams.getAll("virality"),
+    tags: searchParams.get("tags") ?? undefined,
+    platform: searchParams.get("platform") ?? undefined,
   });
 
   if (!queryValidation.success) {
@@ -43,15 +94,11 @@ async function handleGet(request: NextRequest) {
     );
   }
 
-  const { page, pageSize, status, style, virality } = queryValidation.data;
-  const keepDuplicates = searchParams.get("keepDuplicates") === "true";
+
 
   const fieldResult = parseFieldSelection(searchParams.get("fields"), CLIP_FIELD_CONFIG);
   if (!fieldResult.ok) {
-    return NextResponse.json(
-      { error: fieldResult.error },
-      { status: 400 }
-    );
+    return NextResponse.json({ error: fieldResult.error }, { status: 400 });
   }
 
   // 1. Fetch user's clips. "archived" is a lifecycle state, not a clip status,
@@ -63,32 +110,21 @@ async function handleGet(request: NextRequest) {
 
   // 2. Filter
   if (status && status !== "all" && status !== "archived") {
-    userClips = userClips.filter(c => c.status === status);
+    userClips = userClips.filter((c) => c.status === status);
   }
-  
+
   if (style && style !== "All Styles") {
-    userClips = userClips.filter(c => c.style === style);
+    userClips = userClips.filter((c) => c.style === style);
   }
-  
+
   if (virality.length > 0 && virality.length < 3) {
-    userClips = userClips.filter(c => virality.includes(c.scoreKey));
+    userClips = userClips.filter((c) => virality.includes(c.scoreKey));
   }
 
-  const total = userClips.length;
 
-  // 3. Paginate
-  const startIndex = (page - 1) * pageSize;
-  const endIndex = startIndex + pageSize;
-  const paginatedClips = userClips.slice(startIndex, endIndex);
-
-  const selectedClips = paginatedClips.map(clip => pickFields(clip, fieldResult.fields));
-
-  const body: ApiResponse<{ clips: typeof selectedClips, total: number }> = {
-    data: {
-      clips: selectedClips,
-      total
     },
-    error: null
+    error: null,
+    meta,
   };
 
   return NextResponse.json(body);
@@ -124,7 +160,7 @@ export async function DELETE(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: parsed.error.issues },
-      { status: 400 },
+      { status: 400 }
     );
   }
 
@@ -135,10 +171,7 @@ export async function DELETE(request: NextRequest) {
 
   const unowned = clipsStore.findUnownedClipIds(session.user.id, clipIds);
   if (unowned.length > 0) {
-    return NextResponse.json(
-      { error: "One or more clips do not belong to you" },
-      { status: 403 },
-    );
+    return NextResponse.json({ error: "One or more clips do not belong to you" }, { status: 403 });
   }
 
   const deletedCount = clipsStore.softDeleteClips(session.user.id, clipIds);

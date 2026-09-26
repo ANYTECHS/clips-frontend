@@ -38,7 +38,7 @@ export default function ProjectSelector() {
   const activeProject = projects.find((p) => p.id === activeProjectId);
 
   return (
-    <div className="px-3 mb-2">
+    <div className="px-3 mb-2" data-tour="project-selector">
       <button
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white text-sm transition-colors"

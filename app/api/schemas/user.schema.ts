@@ -31,3 +31,15 @@ export const userPasskeyBodySchema = z.object({
 export type UpdateUserProfileBody = z.infer<typeof updateUserProfileBodySchema>;
 export type UserOnboardingBody = z.infer<typeof userOnboardingBodySchema>;
 export type UserPasskeyBody = z.infer<typeof userPasskeyBodySchema>;
+
+/**
+ * Body for POST /api/earnings/schedule-report (Issue #820).
+ *
+ * An explicit boolean rather than a toggle: a retried request must land the
+ * same way twice, which a flip would not.
+ */
+export const scheduleReportBodySchema = z.object({
+  enabled: z.boolean(),
+});
+
+export type ScheduleReportBody = z.infer<typeof scheduleReportBodySchema>;
