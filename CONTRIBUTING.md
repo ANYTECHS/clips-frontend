@@ -9,6 +9,7 @@ Thanks for wanting to contribute — we appreciate it! This document explains ho
 - Running tests & Storybook
 - Code standards & security
 - Export conventions
+- Type structure
 - Pull request guidelines
 - Issue triage
 
@@ -133,6 +134,15 @@ import { Button } from './Button';
 - Framework-required default exports are the only exception. Next.js route files (`page.tsx`, `layout.tsx`, `route.ts`, `error.tsx`, `loading.tsx`, `not-found.tsx`, `template.tsx`, `default.tsx`) and config files (`next.config.js`, `tailwind.config.ts`, etc.) must keep their default exports because the framework relies on them.
 
 - An ESLint rule enforces this convention (`import/no-default-export`). Run `npm run lint` before opening a PR; the rule flags new default exports outside the allowed framework files.
+
+## Type structure
+TypeScript interfaces and types live alongside the code that owns them, and shared types live in dedicated `types.ts` modules. To keep the type surface lean and avoid dead code:
+
+- **Declare types where they are used.** Prefer a local `type`/`interface` in the module that consumes it; only promote a type to a shared `types.ts` when more than one module imports it.
+- **Remove unused interfaces.** An interface that is neither imported nor referenced anywhere is dead code. Delete it and any type imports that become orphaned in the same change.
+- **Update type imports.** When a type moves or is removed, update every import site so no dangling `import type` statements remain.
+- **Verify no type errors.** Run `npm run lint` and `npm run build` (or `npx tsc --noEmit`) after removing types to confirm the change is type-safe.
+- **Linting.** The ESLint configuration flags unused variables and imports (`@typescript-eslint/no-unused-vars`), which surfaces interfaces and type imports that are no longer referenced. Run `npm run lint` before opening a PR.
 
 ## Pull request guidelines
 - Branch naming
