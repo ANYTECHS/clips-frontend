@@ -142,9 +142,9 @@ npm test useWalletConnection.test.ts
 ## 📊 Code Changes
 
 ### Files Created
-1. `app/hooks/useWalletConnection.ts` (250 lines)
-2. `app/hooks/useWalletConnection.test.ts` (300 lines)
-3. `app/hooks/useWalletConnection.README.md` (500 lines)
+1. `app/hooks/use-wallet-connection.ts` (250 lines)
+2. `app/hooks/use-wallet-connection.test.ts` (300 lines)
+3. `app/hooks/use-wallet-connection.README.md` (500 lines)
 4. `WALLET_CONNECTION_IMPLEMENTATION.md` (400 lines)
 5. `WALLET_UI_PREVIEW.md` (300 lines)
 6. `ISSUE_313_SUMMARY.md` (this file)

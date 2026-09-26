@@ -29,7 +29,7 @@ interface MultiWalletRecord {
 
 ### Components
 
-#### 1. MultiWalletStorage (`app/lib/multiWalletStorage.ts`)
+#### 1. MultiWalletStorage (`app/lib/multi-wallet-storage.ts`)
 
 Storage layer for managing multiple wallets per user. Provides methods for:
 - `getAll(userId)` - Get all wallets for a user
@@ -66,7 +66,7 @@ Features:
 - Copy wallet addresses
 - Add new wallets
 
-#### 4. useMultiWalletConnection (`app/hooks/useMultiWalletConnection.ts`)
+#### 4. useMultiWalletConnection (`app/hooks/use-multi-wallet-connection.ts`)
 
 Integration hook that combines the existing WalletProvider with the new MultiWalletProvider. Provides:
 - All existing wallet methods from WalletProvider
@@ -97,7 +97,7 @@ Wrap your app with the MultiWalletProvider (in addition to WalletProvider and Au
 ### Adding a Wallet
 
 ```tsx
-import { useMultiWalletConnection } from "@/app/hooks/useMultiWalletConnection";
+import { useMultiWalletConnection } from "@/app/hooks/use-multi-wallet-connection";
 
 function MyComponent() {
   const { connectMetaMask, connectPhantom, connectStellar } = useMultiWalletConnection();
@@ -200,10 +200,10 @@ To test the multi-wallet functionality:
 
 ## Files Changed
 
-- **New**: `app/lib/multiWalletStorage.ts` - Multi-wallet storage layer
+- **New**: `app/lib/multi-wallet-storage.ts` - Multi-wallet storage layer
 - **New**: `components/MultiWalletProvider.tsx` - Multi-wallet context provider
 - **New**: `components/WalletSelector.tsx` - Wallet selection UI component
-- **New**: `app/hooks/useMultiWalletConnection.ts` - Integration hook
+- **New**: `app/hooks/use-multi-wallet-connection.ts` - Integration hook
 - **Modified**: `components/WalletStatus.tsx` - Added WalletSelector integration
 
 ## Backward Compatibility

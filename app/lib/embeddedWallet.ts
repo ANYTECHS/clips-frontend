@@ -33,6 +33,10 @@
  * The `walletType: "smart_contract"` field is reserved for this upgrade.
  */
 
+import { WalletStorage, WalletStorageError } from "./walletStorage";
+import { logger } from "@/app/lib/logger";
+import { NETWORK_CONFIGS } from "@/app/lib/networkConfig";
+import { withRetry, withFallback } from "./retryUtils";
 import { Keypair } from "@stellar/stellar-sdk";
 
 import { getStellarNetwork, NETWORK_CONFIGS, StellarNetwork } from "./networkConfig";
@@ -282,12 +286,5 @@ export async function getEmbeddedWallet(userId: string): Promise<EmbeddedWallet 
   };
 }
 
-/**
- * Truncate a Stellar public key for display: GABCD...WXYZ
- * @param publicKey - Complete address identifier mapping string.
- * @returns Formatted representation target text.
- */
-export function truncateStellarAddress(publicKey: string): string {
-  if (publicKey.length < 10) return publicKey;
-  return `${publicKey.slice(0, 6)}...${publicKey.slice(-4)}`;
-}
+// Re-export truncateStellarAddress from stringUtils for backward compatibility
+export { truncateStellarAddress } from "./stringUtils";

@@ -22,7 +22,7 @@ Social recovery protects a Stellar wallet backup using:
 
 ## Error monitoring (Sentry)
 
-Wallet and Stellar errors sent to Sentry use `beforeSend` and `beforeBreadcrumb` hooks with shared redaction in `app/lib/sentryRedaction.ts`. Secret keys, mnemonics, and similar fields are never included in events or breadcrumbs.
+Wallet and Stellar errors sent to Sentry use `beforeSend` and `beforeBreadcrumb` hooks with shared redaction in `app/lib/sentry-redaction.ts`. Secret keys, mnemonics, and similar fields are never included in events or breadcrumbs.
 
 ## Soroban smart contracts
 

@@ -226,7 +226,7 @@ Event Recorded
 ### Data Fetching Analytics
 
 The shared `RequestCache` records bounded, process-local fetch telemetry in
-`app/lib/cache/FetchAnalytics.ts`. It tracks total reads, errors, cache hits,
+`app/lib/cache/fetch-analytics.ts`. It tracks total reads, errors, cache hits,
 batch size, average duration, and p95 duration. Keys are retained only as
 internal metric labels; response data, request bodies, and user identifiers are
 never recorded.

@@ -22,9 +22,48 @@ graph LR
     Browser -->|"mint / sign tx"| Stellar
 ```
 
+### System Overview
+
+ClipCash is a single Next.js application that serves both the React UI and the API routes, backed by an external AI video-processing service, S3-compatible object storage, and the Stellar network for on-chain ownership.
+
+| Layer | Responsibility |
+|---|---|
+| **Frontend** | Next.js App Router pages, React 19 components, Zustand stores for client state |
+| **API Routes** | Auth (NextAuth), upload handling, job orchestration, AI callbacks, SSE streaming |
+| **AI Backend** | External service that transcribes, segments, and renders clips |
+| **Storage** | S3-compatible bucket holding source videos and rendered clips |
+| **Job State** | Redis in production; in-memory fallback for local development |
+| **Blockchain** | Soroban smart contracts on Stellar for NFT minting and royalties |
+
+### Data Flow
+
+1. **Upload** — the browser streams the source video to `/api/upload` via XHR. The API writes it to a quarantine prefix, runs the configured virus scan, then moves the object to its final key.
+2. **Dispatch** — the API creates a job record and `POST`s it to the AI backend with a Bearer token.
+3. **Processing** — the AI backend transcribes and segments the video, then calls back to `/api/jobs/[id]/callback` with the generated clips.
+4. **Delivery** — the browser receives progress over an SSE stream, falling back to polling when SSE is unavailable.
+5. **Minting** — when a creator mints a clip, the browser signs a transaction that the Soroban contract records on Stellar.
+
+### Key Design Decisions
+
+- **Single Next.js app for UI + API** — keeps deployment simple and lets API routes share types and utilities with the frontend. Trade-off: heavier serverless functions and no independent scaling of the API tier.
+- **External AI backend** — video processing is CPU/GPU intensive and long-running, so it lives outside the request/response cycle. Trade-off: an extra network hop and a callback contract to maintain.
+- **Quarantine-then-scan uploads** — files are staged and scanned before becoming visible, so untrusted content never reaches the serving path. Trade-off: extra storage writes and latency per upload.
+- **Redis for job state** — job state must be shared across instances in production; an in-memory store keeps local development dependency-free. Trade-off: two code paths to keep in sync.
+- **Stellar/Soroban for ownership** — low fees and fast finality make on-chain minting practical for individual creators. Trade-off: wallet UX and network-specific contract IDs.
+
+### Technology Choices
+
+- **Next.js 16 / React 19** — App Router, server components, and built-in API routes in one framework.
+- **Zustand** — lightweight client state without the boilerplate of a larger store library.
+- **S3-compatible storage** — portable across AWS S3, Cloudflare R2, and GCS via the S3 interop API.
+- **Redis** — simple, fast shared state for job tracking across instances.
+- **Stellar / Soroban** — low-cost smart contracts for NFT ownership and royalties.
+
 For a deep dive into each system — upload quarantine, AES-GCM wallet encryption, JWT session shape, Zustand store layout — see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 For the current security posture, threat model, and reporting process, see **[docs/SECURITY.md](docs/SECURITY.md)**.
+
+For the full HTTP API reference — every endpoint, request/response examples, authentication, and error shapes — see **[docs/API.md](docs/API.md)**. A machine-readable OpenAPI 3.1 spec is available at **[docs/openapi.yaml](docs/openapi.yaml)**.
 
 ---
 
@@ -50,230 +89,140 @@ Open [http://localhost:3000](http://localhost:3000). The app runs fully offline 
 
 ---
 
+## API Documentation
+
+The HTTP API is documented in **[docs/API.md](docs/API.md)** and described by an OpenAPI 3.1 spec at **[docs/openapi.yaml](docs/openapi.yaml)**.
+
+### Authentication
+
+Most endpoints require an authenticated session. Callers authenticate in one of two ways:
+
+- **Browser session cookie** — set by NextAuth after an OAuth sign-in (`/api/auth/*`). Sent automatically by the browser.
+- **Bearer token** — send `Authorization: Bearer <token>` for server-to-server calls (e.g. the AI backend calling back into the app).
+
+Endpoints that are called by the AI backend additionally require the shared secret header `x-callback-secret: <AI_BACKEND_CALLBACK_SECRET>`.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/upload` | Session | Upload a source video (multipart). Returns a job id. |
+| `GET` | `/api/jobs` | Session | List the caller's jobs. |
+| `GET` | `/api/jobs/[id]` | Session | Fetch a single job's status and metadata. |
+| `GET` | `/api/jobs/[id]/stream` | Session | SSE stream of job progress (polling fallback available). |
+| `POST` | `/api/jobs/[id]/callback` | Callback secret | AI backend reports job completion/failure. |
+| `GET` | `/api/auth/session` | Public | Current session (NextAuth). |
+| `POST` | `/api/auth/signin` | Public | Begin OAuth sign-in. |
+| `POST` | `/api/auth/signout` | Session | End the current session. |
+
+### Example: upload a video
+
+```bash
+curl -X POST http://localhost:3000/api/upload \
+  -H "Cookie: next-auth.session-token=<token>" \
+  -F "file=@clip.mp4"
+```
+
+```json
+{ "jobId": "job_01H...", "status": "queued" }
+```
+
+### Example: fetch a job
+
+```bash
+curl http://localhost:3000/api/jobs/job_01H... \
+  -H "Cookie: next-auth.session-token=<token>"
+```
+
+```json
+{
+  "id": "job_01H...",
+  "status": "completed",
+  "clips": [{ "id": "clip_1", "url": "https://.../clip_1.mp4" }]
+}
+```
+
+### Error responses
+
+All errors share a consistent JSON shape:
+
+```json
+{ "error": "Unauthorized", "message": "Authentication required" }
+```
+
+| Status | Meaning |
+|---|---|
+| `400` | Malformed request (missing/invalid fields) |
+| `401` | Missing or invalid authentication |
+| `403` | Authenticated but not permitted (e.g. bad callback secret) |
+| `404` | Resource not found |
+| `413` | Upload exceeds the size limit |
+| `429` | Rate limit exceeded |
+| `500` | Unexpected server error |
+
+---
+
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in the values. The table below lists every variable; required ones will cause the server to fail or the feature to be silently broken if omitted.
+Copy `.env.example` to `.env.local` and fill in the values. The most common variables are summarised below. The **complete reference**, with required/optional status, defaults, examples and security notes, is in **[docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)**.
 
 ### Auth
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXTAUTH_SECRET` | **Yes** | Session signing key. Generate: `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | **Yes** | Canonical app URL, e.g. `http://localhost:3000` |
-| `GOOGLE_CLIENT_ID` | **Yes** | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | **Yes** | Google OAuth client secret |
-| `APPLE_ID` | Optional | Apple Sign-In service ID |
-| `APPLE_TEAM_ID` | Optional | Apple developer team ID |
-| `APPLE_KEY_ID` | Optional | Apple Sign-In key ID |
-| `APPLE_PRIVATE_KEY` | Optional | Apple Sign-In private key (full PEM) |
-| `TWITTER_CLIENT_ID` | Optional | Twitter OAuth 2.0 client ID |
-| `TWITTER_CLIENT_SECRET` | Optional | Twitter OAuth 2.0 client secret |
-| `INSTAGRAM_CLIENT_ID` | Optional | Instagram OAuth client ID |
-| `INSTAGRAM_CLIENT_SECRET` | Optional | Instagram OAuth client secret |
-| `TIKTOK_CLIENT_KEY` | Optional | TikTok OAuth client key |
-| `TIKTOK_CLIENT_SECRET` | Optional | TikTok OAuth client secret |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `NEXTAUTH_SECRET` | **Yes** | — | Session signing key. Never commit this value; rotate it to invalidate all sessions. | `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | **Yes** | — | Canonical app URL used to build OAuth callbacks. Must match the deployed origin. | `http://localhost:3000` |
+| `GOOGLE_CLIENT_ID` | **Yes** | — | Google OAuth client ID. | `1234567890-abc.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | **Yes** | — | Google OAuth client secret. Keep server-side only. | `GOCSPX-xxxxxxxxxxxxxxxx` |
+| `APPLE_ID` | Optional | — | Apple Sign-In service ID. | `com.clipcash.web` |
+| `APPLE_TEAM_ID` | Optional | — | Apple developer team ID. | `ABCDE12345` |
+| `APPLE_KEY_ID` | Optional | — | Apple Sign-In key ID. | `XYZ9876543` |
+| `APPLE_PRIVATE_KEY` | Optional | — | Apple Sign-In private key (full PEM). Store as a secret; never expose to the client. | `-----BEGIN PRIVATE KEY-----\n...` |
+| `TWITTER_CLIENT_ID` | Optional | — | Twitter OAuth 2.0 client ID. | `abc123` |
+| `TWITTER_CLIENT_SECRET` | Optional | — | Twitter OAuth 2.0 client secret. | `def456` |
+| `INSTAGRAM_CLIENT_ID` | Optional | — | Instagram OAuth client ID. | `1234567890` |
+| `INSTAGRAM_CLIENT_SECRET` | Optional | — | Instagram OAuth client secret. | `abcdef123456` |
+| `TIKTOK_CLIENT_KEY` | Optional | — | TikTok OAuth client key. | `aw1234567890` |
+| `TIKTOK_CLIENT_SECRET` | Optional | — | TikTok OAuth client secret. | `abcdef123456` |
 
 ### AI Backend
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_AI_API_URL` | Prod only | Base URL of the AI video processing service. If unset in dev, jobs stay `queued` — no crash. |
-| `AI_BACKEND_SECRET` | Prod only | Bearer token sent on outbound dispatches to the AI service |
-| `AI_BACKEND_CALLBACK_SECRET` | **Yes (prod)** | Secret the AI service must send when calling `/api/jobs/[id]/callback`. Generate: `openssl rand -hex 32` |
-| `NEXT_PUBLIC_API_URL` | Optional | Base URL for the main backend API (user profile, earnings). Defaults to `http://localhost:4000`. |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `NEXT_PUBLIC_AI_API_URL` | Prod only | — | Base URL of the AI video processing service. If unset in dev, jobs stay `queued` — no crash. | `https://ai.example.com` |
+| `AI_BACKEND_SECRET` | Prod only | — | Bearer token sent on outbound dispatches to the AI service. Server-side only. | `openssl rand -hex 32` |
+| `AI_BACKEND_CALLBACK_SECRET` | **Yes (prod)** | — | Secret the AI service must send when calling `/api/jobs/[id]/callback`. Generate: `openssl rand -hex 32`. | `openssl rand -hex 32` |
+| `NEXT_PUBLIC_API_URL` | Optional | `http://localhost:4000` | Base URL for the main backend API (user profile, earnings). | `https://api.example.com` |
 
 ### Cloud Storage
 
 Files require a valid S3-compatible bucket to upload. In development you can leave these blank — uploads will fail but the rest of the app works.
 
-| Variable | Required | Description |
-|---|---|---|
-| `CLOUD_STORAGE_BUCKET` | **Yes (prod)** | Bucket name |
-| `CLOUD_STORAGE_REGION` | **Yes (prod)** | Region, e.g. `us-east-1`. Use `auto` for Cloudflare R2. |
-| `AWS_ACCESS_KEY_ID` | **Yes (prod)** | Access key / account ID |
-| `AWS_SECRET_ACCESS_KEY` | **Yes (prod)** | Secret key / API token |
-| `CLOUD_STORAGE_PROVIDER` | Optional | `s3` (default) \| `r2` \| `gcs` |
-| `CLOUD_STORAGE_ENDPOINT` | Optional | Custom endpoint for R2/GCS S3 interop. Leave blank for AWS S3. |
-| `CLOUD_STORAGE_KEY_PREFIX` | Optional | Object key prefix (default: `uploads/`) |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `CLOUD_STORAGE_BUCKET` | **Yes (prod)** | — | Bucket name. | `clipcash-uploads` |
+| `CLOUD_STORAGE_REGION` | **Yes (prod)** | — | Region, e.g. `us-east-1`. Use `auto` for Cloudflare R2. | `us-east-1` |
+| `AWS_ACCESS_KEY_ID` | **Yes (prod)** | — | Access key / account ID. Grant least-privilege bucket access only. | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_ACCESS_KEY` | **Yes (prod)** | — | Secret key / API token. Never commit or expose to the client. | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `CLOUD_STORAGE_PROVIDER` | Optional | `s3` | Storage backend: `s3` \| `r2` \| `gcs`. | `r2` |
+| `CLOUD_STORAGE_ENDPOINT` | Optional | — | Custom endpoint for R2/GCS S3 interop. Leave blank for AWS S3. | `https://<account>.r2.cloudflarestorage.com` |
+| `CLOUD_STORAGE_KEY_PREFIX` | Optional | `uploads/` | Object key prefix for stored files. | `uploads/` |
 
 ### Redis
 
-| Variable | Required | Description |
-|---|---|---|
-| `REDIS_URL` | **Yes (prod)** | Redis connection string, e.g. `redis://:password@hostname:6379`. Without this, job state lives in-process — fine for dev, broken on multi-instance deployments. |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `REDIS_URL` | **Yes (prod)** | — | Redis connection string. Without this, job state lives in-process — fine for dev, broken on multi-instance deployments. Use TLS (`rediss://`) and a password in production. | `redis://:password@hostname:6379` |
 
 ### Stellar / Blockchain
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_STELLAR_NETWORK` | Optional | `testnet` (default) \| `mainnet` |
-| `NEXT_PUBLIC_STELLAR_RPC` | Optional | Custom Soroban RPC URL override |
-| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID` | Optional | Soroban NFT contract address (testnet) |
-| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID_MAINNET` | Optional | Soroban NFT contract address (mainnet) |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `NEXT_PUBLIC_STELLAR_NETWORK` | Optional | `testnet` | Target network: `testnet` \| `mainnet`. | `testnet` |
+| `NEXT_PUBLIC_STELLAR_RPC` | Optional | — | Custom Soroban RPC URL override. | `https://soroban-testnet.stellar.org` |
+| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID` | Optional | — | Soroban NFT contract address (testnet). | `C...` |
+| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID_MAINNET` | Optional | — | Soroban NFT contract address (mainnet). | `C...` |
 
-### Virus Scanning
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for onboarding, local setup, contribution guidelines, the code review process, good first issues and where to ask questions. Browse the component library with `npm run storybook`; see [STORYBOOK.md](STORYBOOK.md) for how it is deployed.
 
-Scanning is **enabled by default in production** and **disabled in development**. If `VIRUS_SCAN_ENABLED` is not set the default applies.
-
-| Variable | Required | Description |
-|---|---|---|
-| `VIRUS_SCAN_PROVIDER` | Optional | `clamav` (default) \| `virustotal` \| `cloudmersive` \| `disabled` |
-| `VIRUS_SCAN_ENABLED` | Optional | `true` \| `false`. Overrides the production/development default. |
-| `VIRUS_SCAN_TIMEOUT` | Optional | Scan timeout in ms (default: `30000`) |
-| `VIRUS_SCAN_QUARANTINE_PREFIX` | Optional | S3 prefix for pre-scan staging (default: `uploads/quarantine/`) |
-| `CLAMAV_API_URL` | Conditional | Required when `VIRUS_SCAN_PROVIDER=clamav`. HTTP endpoint of the ClamAV sidecar, e.g. `http://localhost:8080`. |
-| `VIRUSTOTAL_API_KEY` | Conditional | Required when `VIRUS_SCAN_PROVIDER=virustotal` |
-| `CLOUDMERSIVE_API_KEY` | Conditional | Required when `VIRUS_SCAN_PROVIDER=cloudmersive` |
-
-### Monitoring & Analytics
-
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_SENTRY_DSN` | Optional | Sentry DSN for error monitoring |
-| `NEXT_PUBLIC_ANALYTICS_PROVIDER` | Optional | `none` (default) \| `ga4` \| `plausible` \| `custom` |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Optional | Google Analytics 4 measurement ID (e.g. `G-XXXXXXXXXX`) |
-| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible analytics domain |
-| `NEXT_PUBLIC_ANALYTICS_ENDPOINT` | Optional | Custom analytics POST endpoint |
-
-### Social Recovery & Email
-
-| Variable | Required | Description |
-|---|---|---|
-| `EMAIL_FROM` | Optional | From address for guardian approval emails (default: `noreply@clipcash.ai`) |
-| `RESEND_API_KEY` | Optional | [Resend](https://resend.com) API key for transactional email |
-
-### AI Transformation
-
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_TRANSFORM_STYLES` | Optional | Comma-separated list of available styles (default: `anime,cinematic,sketch,watercolor`) |
-
----
-
-## Development Scripts
-
-| Script | Command | What it does |
-|---|---|---|
-| Dev server | `npm run dev` | Starts Next.js at [localhost:3000](http://localhost:3000) with hot reload |
-| Production build | `npm run build` | Compiles and optimises for production |
-| Production server | `npm run start` | Serves the production build |
-| Lint | `npm run lint` | Runs ESLint across the codebase |
-| Unit tests | `npm run test` | Runs Jest test suite |
-| E2E tests | `npm run test:e2e` | Runs Playwright tests against a local dev server (auto-started). Sets `E2E_SKIP_MIDDLEWARE=true` so auth is bypassed. |
-| Storybook | `npm run storybook` | Starts Storybook component explorer at [localhost:6006](http://localhost:6006) |
-| Build Storybook | `npm run build-storybook` | Builds a static Storybook site |
-| Bundle analysis | `npm run analyze` | Builds with `@next/bundle-analyzer` — opens bundle report in browser |
-| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
-
-> **Note:** `npm run test:e2e` automatically starts the Next.js dev server before the test run and reuses an existing server if one is already running. You do not need to run `npm run dev` separately.
-
----
-
-## Tech Stack
-
-| Layer | Technology | Notes |
-|---|---|---|
-| Framework | Next.js 16 + React 19 + TypeScript | App Router, Server Components, API Routes |
-| Styling | Tailwind CSS 4 | Utility-first; dark theme via CSS variables |
-| State | Zustand 5 | Stores for dashboard, earnings, process, transform, user |
-| Auth | NextAuth v5 | Google, Apple, Twitter, Instagram, TikTok, WebAuthn passkeys |
-| Blockchain | Stellar / Soroban (`@stellar/stellar-sdk`) | Embedded wallet, Freighter extension, NFT minting |
-| Storage | AWS S3 / Cloudflare R2 / GCS | S3-compatible via `@aws-sdk/client-s3` |
-| Job state | Redis (`ioredis`) / in-process Map | Swappable via `REDIS_URL` |
-| Icons | lucide-react | |
-| Error monitoring | Sentry | `@sentry/nextjs` |
-| Testing | Jest + Playwright | Unit: Jest; E2E: Playwright (Chromium, Firefox, WebKit) |
-| Component demos | Storybook 10 | Canonical demo environment — do not add public demo routes |
-| Crypto | Web Crypto API | AES-GCM wallet encryption, PBKDF2 key derivation |
-| Secret sharing | secrets.js-grempe | Shamir's Secret Sharing for social recovery |
-
----
-
-## Features
-
-- **AI clip generation** — automatically identifies viral moments in uploaded videos
-- **Full preview & selection** — creators see every clip before anything is posted
-- **Multi-platform posting** — TikTok, Instagram Reels, YouTube Shorts, Facebook Reels, Snapchat Spotlight, Pinterest, LinkedIn
-- **NFT Vault** — mint best clips as Soroban NFTs; earn on-chain royalties
-- **Embedded Stellar wallet** — auto-created on signup, encrypted with AES-GCM; no seed phrase required
-- **Multi-wallet support** — connect MetaMask (EVM), Phantom (Solana), Freighter (Stellar), or import a Stellar key
-- **Social recovery** — Shamir's Secret Sharing splits the wallet secret key across guardian accounts
-- **Earnings dashboard** — unified revenue view across platforms with 5-minute cache
-- **Real-time progress** — SSE stream with automatic polling fallback while jobs process
-- **Push notifications** — browser notifications when a job completes
-
----
-
-## API Reference
-
-### `POST /api/upload`
-
-Upload one or more video files for AI processing.
-
-- **Content-Type:** `multipart/form-data`
-- **Field:** `files` — video file(s), max 500 MB each
-- **Formats:** MP4, MOV, AVI, MKV (validated by magic bytes, not just extension)
-
-```json
-// 200 OK
-{
-  "data": {
-    "success": true,
-    "jobId": "job_abc123",
-    "files": [{ "name": "video.mp4", "size": 104857600, "type": "video/mp4", "jobId": "job_abc123", "url": "https://..." }]
-  }
-}
-```
-
-### `GET /api/jobs/:jobId`
-
-Poll for job status (fallback when SSE is unavailable).
-
-```json
-{ "progress": 45, "status": "processing", "momentsFound": 3, "estimatedSecondsRemaining": 120 }
-```
-
-`status` values: `queued` → `processing` → `complete` | `error`
-
-### `GET /api/jobs/:jobId/stream`
-
-Server-Sent Events stream. Pushes the same shape as the poll endpoint every ~1 s until `status` reaches a terminal state. Requires authentication; the session user must own the job.
-
----
-
-## Project Structure
-
-```
-app/
-├── (dashboard)/          # Authenticated dashboard routes (layout.tsx wraps all)
-│   ├── dashboard/        # Overview, stats, recent projects
-│   ├── earnings/         # Earnings breakdown
-│   ├── vault/            # NFT management
-│   ├── transform/[id]/   # AI style-transfer job monitor
-│   └── …
-├── api/                  # API Route handlers
-│   ├── upload/           # File ingestion pipeline
-│   ├── jobs/             # Job CRUD, SSE stream, AI callback
-│   └── auth/             # NextAuth + passkey endpoints
-├── hooks/                # React hooks (useProcessingStatus, useBalance, …)
-├── lib/                  # Pure utilities (auth, secureStorage, aiBackend, …)
-├── store/                # Zustand stores (barrel export at store/index.ts)
-└── onboarding/           # 3-step onboarding flow
-components/               # Shared React components
-docs/
-└── ARCHITECTURE.md       # Deep-dive: pipeline, wallet encryption, auth, state
-hooks/                    # App-level hooks (useFilterQueryState, …)
-tests/e2e/                # Playwright end-to-end tests
-stories/                  # Storybook stories
-```
-
----
-
-## Contributing
-
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, the Changesets versioning workflow, branch naming conventions, PR checklist, and issue triage guidelines.
-
-Key rules from [AGENTS.md](AGENTS.md):
-- All user-controlled strings rendered in the UI must be sanitized with the `sanitize` utility at `app/lib/sanitize.ts`.
-- Never use `dangerouslySetInnerHTML` without explicit DOMPurify sanitization.
-- Component demos belong in **Storybook**, not in public App Router pages.
+/* … truncated 5008 chars — edit only what you need near the top … */

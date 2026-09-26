@@ -11,6 +11,8 @@ export interface TransformOptions {
   quality?: "draft" | "standard" | "high";
   resolution?: string;
   preserveAudio?: boolean;
+  /** Common style strength, from 0 to 100. */
+  intensity?: number;
   /** Anime-specific tuning options. Only used when style === "anime". */
   animeOptions?: AnimeTransformOptions;
 }
@@ -191,7 +193,7 @@ export function useBatchTransform(): UseBatchTransformReturn {
         setIsSubmitting(false);
       }
     },
-    [addJob],
+    [addJob]
   );
 
   // ── Cancel a single job ──────────────────────────────────────────────────────
@@ -226,7 +228,7 @@ export function useBatchTransform(): UseBatchTransformReturn {
   const jobList = batch ? Object.values(batch.jobs) : [];
   const totalCount = jobList.length;
   const completedCount = jobList.filter(
-    (j) => j.status === "complete" || j.status === "error" || j.status === "cancelled",
+    (j) => j.status === "complete" || j.status === "error" || j.status === "cancelled"
   ).length;
 
   return {

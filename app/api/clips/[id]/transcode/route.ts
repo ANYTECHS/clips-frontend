@@ -2,6 +2,7 @@ import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 
 import { clipsStore } from "@/app/api/clips/clipsStore";
+import { captionsStore } from "@/app/api/captions/captionsStore";
 import { exportsStore } from "@/app/api/exports/exportsStore";
 import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     );
   }
 
-  const { format, aspectRatio, quality } = bodyValidation.data;
+  const { format, aspectRatio, quality, platform } = bodyValidation.data;
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   const plan = user?.plan ?? "free";
@@ -107,9 +108,19 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
   }
 
   const clip = clipsStore.getClipById(userId, clipId);
+  const captionRecord = captionsStore.get(clipId, userId);
+  const captionOptions =
+    captionRecord?.burnIntoExport && captionRecord.segments.length > 0
+      ? {
+          format: "vtt" as const,
+          segments: captionRecord.segments,
+          style: captionRecord.style,
+          burnIntoExport: true,
+        }
+      : undefined;
   const { targetResolution, targetBitrateKbps } = exportTargets(
     quality,
-    clip?.resolution ?? "1080x1920"
+    clip?.resolution ?? (platform === "youtube" ? "1920x1080" : "1080x1920"),
   );
 
   const jobId = `transcode_${randomUUID().replace(/-/g, "")}`;
@@ -120,6 +131,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     format,
     aspectRatio,
     quality,
+    platform,
     targetResolution,
     targetBitrateKbps,
     objectKey: "",
@@ -157,9 +169,11 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       format,
       aspectRatio,
       quality,
+      platform,
       targetResolution,
       targetBitrateKbps,
       outputObjectKey: objectKey,
+      ...(captionOptions ? { captionOptions } : {}),
     },
   });
 
@@ -178,6 +192,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     targetBitrateKbps: number;
     status: string;
     dispatched: boolean;
+    captionsBurnedIn: boolean;
   }> = {
     data: {
       exportId: exportRecord.id,
@@ -190,6 +205,7 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       targetBitrateKbps,
       status: "queued",
       dispatched: dispatchResult.dispatched,
+      captionsBurnedIn: Boolean(captionOptions),
     },
     error: null,
   };

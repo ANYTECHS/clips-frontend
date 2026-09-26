@@ -18,6 +18,23 @@ const ClipGrid = dynamic(() => import("@/components/projects/ClipGrid"), {
     </div>
   ),
 });
+import SelectionFooter from "@/components/projects/SelectionFooter";
+const ClipEditorModal = dynamic(() => import("@/components/projects/ClipEditorModal"), {
+  ssr: false,
+});
+const ClipPreviewModal = dynamic(() => import("@/components/projects/ClipPreviewModal"), {
+  ssr: false,
+});
+const BatchTransformModal = dynamic(
+  () => import("@/components/transform/BatchTransformModal").then((mod) => mod.BatchTransformModal),
+  { ssr: false }
+);
+const BatchTransformQueue = dynamic(
+  () => import("@/components/transform/BatchTransformQueue").then((mod) => mod.BatchTransformQueue),
+  { ssr: false }
+);
+
+import type { ClipEdits } from "@/components/projects/ClipEditorModal";
 import { X } from "lucide-react";
 
 import { useBatchTransform } from "@/app/hooks/useBatchTransform";
@@ -141,7 +158,7 @@ export default function ProjectsPage() {
         }
         setTotalClips(data.total);
       } catch (err) {
-        setError(safeErrorMessage(err, FAILURE_MESSAGES.generic, "load clips"));
+        setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
         setLoadingNextPage(false);
@@ -267,7 +284,7 @@ export default function ProjectsPage() {
     async (id: string, edits: ClipEdits) => {
       if (edits.captions) {
         try {
-          await fetch(`/api/clips/${id}/captions`, {
+          const res = await fetch(`/api/clips/${id}/captions`, {
             method: "PATCH",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -277,16 +294,35 @@ export default function ProjectsPage() {
               burnIntoExport: edits.captions.burnIntoExport,
             }),
           });
+          if (!res.ok) {
+            const body = (await res.json().catch(() => ({}))) as { error?: string };
+            throw new Error(body.error || "Failed to save captions");
+          }
         } catch {
           showToast("Failed to save captions", "error");
           return;
         }
       }
-      showToast(`Edits saved for clip ${id}`, "success");
-      setEditingClip(null);
-    },
-    [showToast]
-  );
+    }
+    // Persist trim, color, and volume edits alongside captions
+    try {
+      await fetch(`/api/clips/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trimStart: edits.trimStart,
+          trimEnd: edits.trimEnd,
+          colorFilter: edits.colorFilter,
+          audioVolume: edits.audioVolume,
+          aspectRatio: edits.aspectRatio,
+        }),
+      });
+    } catch {
+      // Non-fatal: editing metadata is best-effort until a real API exists
+    }
+    showToast(`Edits saved for clip ${id}`, "success");
+    setEditingClip(null);
+  }, [showToast]);
 
   const handlePreview = useCallback(
     (id: string) => {
@@ -353,7 +389,7 @@ export default function ProjectsPage() {
         if (!res.ok) throw new Error(data.error || "Posting failed");
         if (Array.isArray(data.failed) && data.failed.length > 0) {
           setPostError(`${data.failed.length} post${data.failed.length > 1 ? "s" : ""} failed`);
-          data.failed.forEach((f: unknown) => logger.warn(f));
+          data.failed.forEach((f: unknown) => console.warn(f));
         }
         if (Array.isArray(data.posted) && data.posted.length > 0) {
           showToast(
@@ -591,6 +627,7 @@ export default function ProjectsPage() {
       {showTransformModal && (
         <BatchTransformModal
           clipCount={selectedIds.length}
+          previewClipId={selectedIds.length === 1 ? selectedIds[0] : null}
           isSubmitting={isTransformSubmitting}
           submitError={transformSubmitError}
           onConfirm={handleTransformConfirm}

@@ -51,6 +51,9 @@ jobs:
         run: npm ci
       - name: Formatting check
         run: npm run format:check
+      # Enforces the comment style guide documented in CONTRIBUTING.md.
+      - name: Comment style check
+        run: npm run lint:comments
       - name: Complexity check
         run: COMPLEXITY_BASELINE=129 npm run complexity
       # Ratcheted ESLint gate (#1108). `.eslint-baseline.json` records the

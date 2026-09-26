@@ -33,6 +33,8 @@ import { consumeNonce } from "../../shared/nonceCache";
 import { z } from "zod";
 import { logger } from "@/app/lib/logger";
 import { triggerWebhookEvent } from "@/app/lib/webhooks/dispatcher";
+import { captionSegmentListSchema } from "@/app/api/schemas/captions.schema";
+import { captionsStore } from "@/app/api/captions/captionsStore";
 
 const TIMESTAMP_TOLERANCE_SECONDS = 60;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -47,29 +49,32 @@ const AI_ERROR_CODES: [AiErrorCode, ...AiErrorCode[]] = [
   "INTERNAL_ERROR",
 ];
 
-const ScoreBreakdownSchema = z.object({
+const scoreBreakdownSchema = z.object({
   hook: z.number().min(0).max(100),
   retention: z.number().min(0).max(100),
   emotional: z.number().min(0).max(100),
   trending: z.number().min(0).max(100),
 });
 
-const CallbackBodySchema = z.object({
+const callbackBodySchema = z.object({
   status: z.enum(["queued", "processing", "complete", "error"]).optional(),
   progress: z.number().min(0).max(100).optional(),
   momentsFound: z.number().min(0).optional(),
   estimatedSecondsRemaining: z.number().min(0).optional(),
-  scoreBreakdown: ScoreBreakdownSchema.optional(),
+  scoreBreakdown: scoreBreakdownSchema.optional(),
   errorCode: z.enum(AI_ERROR_CODES).optional(),
   errorMessage: z.string().max(500).optional(),
+  captions: z
+    .object({
+      segments: captionSegmentListSchema,
+      detectedLanguage: z.string().max(16).optional(),
+    })
+    .optional(),
 });
 
 // ─── Handler ─────────────────────────────────────────────────────────────────
 
-export async function POST(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   // ── Auth ───────────────────────────────────────────────────────────────────
   const authError = validateCallbackSecret(request);
   if (authError) return authError;
@@ -89,7 +94,7 @@ export async function POST(
   const parsedBody = await parseJsonRequest<unknown>(request);
   if (!parsedBody.ok) return parsedBody.response;
 
-  const parsed = CallbackBodySchema.safeParse(parsedBody.body);
+  const parsed = callbackBodySchema.safeParse(parsedBody.body);
   if (!parsed.success) {
     return NextResponse.json(
       { error: "Validation failed", issues: parsed.error.issues },
@@ -121,14 +126,26 @@ export async function POST(
     status: (update.status ?? job.status) as JobStatus,
     progress: update.progress ?? job.progress,
     momentsFound: update.momentsFound ?? job.momentsFound,
-    estimatedSecondsRemaining:
-      update.estimatedSecondsRemaining ?? job.estimatedSecondsRemaining,
+    estimatedSecondsRemaining: update.estimatedSecondsRemaining ?? job.estimatedSecondsRemaining,
     ...(update.scoreBreakdown ? { scoreBreakdown: update.scoreBreakdown } : {}),
     ...(update.errorCode ? { errorCode: update.errorCode } : {}),
     ...(update.errorMessage ? { errorMessage: update.errorMessage } : {}),
   });
 
   if (update.status === "complete") {
+    const captionRecord = captionsStore.getByJobId(jobId);
+    if (captionRecord && update.captions) {
+      captionsStore.upsert({
+        clipId: captionRecord.clipId,
+        userId: job.userId,
+        status: "complete",
+        segments: update.captions.segments,
+        detectedLanguage: update.captions.detectedLanguage,
+        style: captionRecord.style,
+        burnIntoExport: captionRecord.burnIntoExport,
+      });
+    }
+
     void triggerWebhookEvent(job.userId, "job.completed", {
       jobId,
       momentsFound: update.momentsFound ?? job.momentsFound,
@@ -170,25 +187,17 @@ function validateCallbackSecret(request: NextRequest): NextResponse | null {
   return null;
 }
 
-async function validateReplayProtection(
-  request: NextRequest
-): Promise<NextResponse | null> {
+async function validateReplayProtection(request: NextRequest): Promise<NextResponse | null> {
   const timestampHeader = request.headers.get("x-timestamp");
   const nonce = request.headers.get("x-nonce");
 
   if (!timestampHeader || !nonce) {
-    return NextResponse.json(
-      { error: "Missing X-Timestamp or X-Nonce header" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Missing X-Timestamp or X-Nonce header" }, { status: 401 });
   }
 
   const timestamp = Number(timestampHeader);
   if (!Number.isFinite(timestamp)) {
-    return NextResponse.json(
-      { error: "Invalid X-Timestamp header" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Invalid X-Timestamp header" }, { status: 401 });
   }
 
   const nowSeconds = Date.now() / 1000;
