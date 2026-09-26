@@ -169,6 +169,64 @@ Follow the patterns and practices documented in:
 - Add helpful comments
 - Keep it simple
 
+## Component APIs
+
+### Prop Hygiene
+
+Components must only declare props they actually use. Unused props add noise, mislead consumers, and hide dead code paths.
+
+**Rules:**
+- Remove any prop from a component's definition (and its TypeScript interface/type) that is not referenced in the implementation.
+- Update every parent/call site that passed the removed prop so the JSX/TSX stays valid.
+- Confirm no functionality is lost: the removed prop must have had no runtime effect.
+- Keep component APIs documented — list the props a component accepts and what each one does.
+
+**Linting:**
+
+Enforce prop usage automatically so unused props cannot creep back in:
+
+```bash
+# ESLint (react/no-unused-prop-types, react/require-default-props)
+npm run lint
+
+# TypeScript will also flag unused destructured props with noUnusedLocals
+npx tsc --noEmit
+```
+
+Recommended ESLint rules:
+
+```json
+{
+  "rules": {
+    "react/no-unused-prop-types": "error",
+    "react/jsx-no-useless-fragment": "warn"
+  }
+}
+```
+
+### Documenting Component APIs
+
+For each component, document the accepted props in a short table or JSDoc block:
+
+```tsx
+/**
+ * Button
+ *
+ * @param label   - Visible button text.
+ * @param onClick - Click handler.
+ * @param variant - Visual style: "primary" | "secondary".
+ */
+export function Button({ label, onClick, variant = "primary" }: ButtonProps) {
+  return (
+    <button className={variant} onClick={onClick}>
+      {label}
+    </button>
+  );
+}
+```
+
+Keep the documented API in sync with the actual prop signature — remove docs for props that no longer exist.
+
 ## Common Commands
 
 ```bash
