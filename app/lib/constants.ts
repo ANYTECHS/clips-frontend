@@ -6,6 +6,12 @@ export const MAX_UPLOAD_SIZE_BYTES = 500 * 1024 * 1024;
 export const MAX_FILES_PER_REQUEST = 10;
 /** Number of files uploaded in parallel by the upload progress hook. */
 export const UPLOAD_CONCURRENCY = 3;
+/**
+ * Maximum number of files processed concurrently server-side in one request
+ * (quarantine upload + virus scan + storage move). Capped to avoid saturating
+ * the virus-scan circuit breaker and S3 connection pool under burst load.
+ */
+export const UPLOAD_PROCESSING_CONCURRENCY = 3;
 
 // Crypto
 
