@@ -9,7 +9,10 @@ Thanks for wanting to contribute — we appreciate it! This document explains ho
 - Running tests & Storybook
 - Code standards & security
 - Pull request guidelines
+- Code review process
 - Issue triage
+- Good first issues
+- Communication
 
 ## Prerequisites
 - Node.js 18+ (LTS recommended)
@@ -120,12 +123,40 @@ When you're ready to release a new version:
 - Required checks
   - At minimum, ensure lint and unit tests pass locally. The repository uses a Storybook GitHub Actions workflow for Storybook deployment; other CI checks (lint/tests) may be added — ensure your branch satisfies the repository's configured checks before merging.
 
+## Code review process
+All changes land through pull requests and require review before merging.
+
+1. **Open the PR** — fill in the description, link the issue, and request a review from a maintainer (or the `@ANYTECHS` team).
+2. **Automated checks** — CI runs lint, unit tests, and the Storybook build. Fix any failures before requesting human review.
+3. **Reviewer feedback** — a maintainer reviews for correctness, scope, tests, and style. Address comments by pushing new commits to the same branch; avoid force-pushing once review has started so reviewers can see incremental changes.
+4. **Approval & merge** — once at least one maintainer approves and all checks are green, the PR is squash-merged into `main`. The linked issue is closed automatically via `Fixes #<issue>`.
+5. **Stale PRs** — if a PR goes two weeks without activity after review feedback, a maintainer may close it. Reopen or open a fresh PR when you're ready to continue.
+
+If you disagree with feedback, it's fine to explain your reasoning — we aim for respectful, constructive discussion.
+
 ## Issue triage / picking up work
 1. Browse existing issues and look for ones labelled `good first issue` or `help wanted`.
 2. Comment on the issue to say you intend to work on it. Include your GitHub username and a short plan.
 3. If maintainers confirm, create a branch and start working. Link the PR to the issue using `Fixes #<issue>` when appropriate.
 4. If an issue needs clarification, ask questions in the issue; provide screenshots, logs, and steps to reproduce if you need help reproducing a bug.
 5. Tag maintainers or use repository-specific labels if you need an expedited review.
+
+## Good first issues
+New to the project? Start with issues labelled [`good first issue`](https://github.com/ANYTECHS/clips-frontend/labels/good%20first%20issue). These are scoped to be approachable and come with extra context from a maintainer. Typical starter tasks include:
+
+- Documentation fixes and typo corrections
+- Adding or extending unit tests for existing utilities
+- Small UI polish (spacing, copy, accessibility labels)
+- Adding a new locale to the i18n system (see below)
+- Improving Storybook stories for existing components
+
+If you're unsure where to begin, comment on a `good first issue` and a maintainer will help you get oriented.
+
+## Communication
+- **Issues & PRs** — the primary place for project discussion. Ask questions directly on the relevant issue or PR.
+- **GitHub Discussions** — use the repository's Discussions tab for open-ended questions, ideas, and show-and-tell.
+- **Maintainers** — mention `@ANYTECHS` in a comment to reach the maintainers for review or triage help.
+- **Response times** — maintainers are volunteers; expect a reply within a few days. A polite ping after a week is welcome.
 
 ## Questions and support
 If you have questions, make a note in the issue or open a new one titled `help wanted:` followed by a short description. For PR review help, mention `@ANYTECHS` maintainers in a comment.
