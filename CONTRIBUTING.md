@@ -8,6 +8,7 @@ Thanks for wanting to contribute — we appreciate it! This document explains ho
 - Environment variables
 - Running tests & Storybook
 - Code standards & security
+- Comment standards
 - Pull request guidelines
 - Issue triage
 
@@ -97,6 +98,48 @@ When you're ready to release a new version:
 - Never commit secrets or private keys. `.env.local` is ignored by git.
 - Use native Web Crypto APIs for local encryption when applicable (see project docs).
 
+## Comment standards
+Consistent comments keep the codebase readable and reviewable. Follow the guide below for all new and edited code. Comment style is enforced automatically by ESLint (see [Comment lint rule](#comment-lint-rule)).
+
+### When to comment
+- Explain **why**, not **what**. Prefer clear names and small functions over narrating obvious code.
+- Comment non-obvious decisions, trade-offs, edge cases, and workarounds.
+- Do not leave commented-out code. Delete it — git history preserves it.
+- Remove comments that are obsolete, misleading, or restate the code.
+
+### Formatting
+- Use `//` for single-line comments and `/* ... */` for multi-line comments. Do not use `/** ... */` for non-documentation comments.
+- Leave one space after the comment marker: `// like this`, not `//like this`.
+- Keep comments on their own line above the code they describe; avoid trailing comments except for short annotations.
+- Write complete sentences, capitalized, ending with a period.
+- Keep lines within the project's print width (see Prettier config).
+
+### Documentation comments (TSDoc)
+- Use TSDoc (`/** ... */`) for exported functions, classes, types, and public APIs.
+- Start with a one-line summary, then add `@param`, `@returns`, and `@throws` tags where relevant.
+- Document props and public members with a short description.
+
+```ts
+/**
+ * Formats a token amount for display.
+ *
+ * @param amount - Raw amount in the smallest unit.
+ * @param decimals - Number of decimals for the token.
+ * @returns The human-readable amount.
+ */
+export function formatAmount(amount: bigint, decimals: number): string {
+  // ...
+}
+```
+
+### TODO / FIXME conventions
+- Use `TODO:` for planned work and `FIXME:` for known defects.
+- Include context and, when possible, a tracking reference: `// TODO(#123): cache the result to avoid refetching.`
+- Do not merge `TODO`/`FIXME` comments without an owner or issue reference for non-trivial work.
+
+### Comment lint rule
+Comment style is enforced by ESLint via the `eslint-plugin-jsdoc` rules configured in the project's ESLint config. Run `npm run lint` before opening a PR; violations fail CI. The rule set checks TSDoc structure on exported APIs and flags common comment issues (e.g. missing descriptions, malformed tags).
+
 ## Pull request guidelines
 - Branch naming
   - Feature branches: `feature/<short-description>` or `feature/<issue-number>-short-description`
@@ -116,6 +159,7 @@ When you're ready to release a new version:
   - Add tests where applicable
   - Run `npm run test` and `npm run build` locally
   - Confirm Storybook builds if you changed UI components
+  - Review comments for style and accuracy per the [Comment standards](#comment-standards)
 
 - Required checks
   - At minimum, ensure lint and unit tests pass locally. The repository uses a Storybook GitHub Actions workflow for Storybook deployment; other CI checks (lint/tests) may be added — ensure your branch satisfies the repository's configured checks before merging.
