@@ -42,7 +42,10 @@ export type UploadResult = {
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
-export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
+export function useUploadProgress(
+  concurrency = UPLOAD_CONCURRENCY,
+  templateId: string | null = null,
+) {
   const [progresses, setProgresses] = useState<Record<string, FileProgress>>({});
   const [results, setResults] = useState<UploadResult[]>([]);
   const [isUploading, setIsUploading] = useState(false);
@@ -76,6 +79,7 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
 
         const formData = new FormData();
         formData.append("files", file);
+        if (templateId) formData.append("templateId", templateId);
 
         xhr.open("POST", "/api/upload");
         xhr.timeout = UPLOAD_STALL_TIMEOUT_MS;
@@ -142,7 +146,7 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
         xhr.send(formData);
       });
     },
-    [setFileProgress],
+    [setFileProgress, templateId],
   );
 
   // ── Chunked upload for large files ─────────────────────────────────────────
@@ -177,6 +181,7 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
         armStallTimer();
         const result = await uploadFileInChunks(file, {
           signal: controller.signal,
+          ...(templateId ? { templateId } : {}),
           onProgress: (percent) => {
             armStallTimer();
             setFileProgress(file.name, { percent, status: "uploading" });
@@ -207,7 +212,7 @@ export function useUploadProgress(concurrency = UPLOAD_CONCURRENCY) {
         abortMap.current.delete(file.name);
       }
     },
-    [setFileProgress],
+    [setFileProgress, templateId],
   );
 
   // ── Concurrency-limited queue ──────────────────────────────────────────────

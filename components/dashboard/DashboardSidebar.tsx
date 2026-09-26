@@ -19,6 +19,7 @@ import {
   CreditCard,
   Plug,
   Tags,
+  LayoutTemplate,
   Sparkles,
 } from "lucide-react";
 import PlanUsage from "@/components/dashboard/PlanUsage";
@@ -33,6 +34,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { label: "Projects", href: "/projects", icon: Video },
+  { label: "Templates", href: "/templates", icon: LayoutTemplate },
   { label: "Brand Kit", href: "/brand-kit", icon: Sparkles },
   { label: "Billing", href: "/billing", icon: CreditCard },
   { label: "Earnings", href: "/earnings", icon: DollarSign },
