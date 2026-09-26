@@ -2,17 +2,15 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, CheckCircle2, Wallet, Info } from "lucide-react";
+import { Loader2, Link2, User as UserIcon, MonitorPlay, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import Navbar from "@/components/Navbar";
 import { useRouter } from "next/navigation";
-import { useEmbeddedWallet } from "@/components/EmbeddedWalletProvider";
 import { useToast } from "@/hooks/useToast";
-import { fundWithFriendbot } from "@/app/lib/stellar";
-import { IS_TESTNET } from "@/app/lib/networkConfig";
-import { useBalance } from "@/app/hooks/useBalance";
 import Image from "next/image";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import OnboardingProgress, { OnboardingSocialProof } from "@/components/onboarding/OnboardingProgress";
+import WalletAwarenessStep from "@/components/onboarding/WalletAwarenessStep";
 
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import YoutubeIcon from "@/components/icons/YoutubeIcon";
@@ -87,177 +85,6 @@ function FieldError({ message, id }: { message?: string; id?: string }) {
       <AlertCircle className="w-3.5 h-3.5 shrink-0" />
       {message}
     </p>
-  );
-}
-
-function WalletAwarenessStep({ onContinue, loading }: { onContinue: () => void; loading: boolean }) {
-  const [showTooltip, setShowTooltip] = useState(false);
-  const [isFunding, setIsFunding] = useState(false);
-  const [fundingSuccess, setFundingSuccess] = useState(false);
-  const [fundingError, setFundingError] = useState<string | null>(null);
-  const { wallet } = useEmbeddedWallet();
-  const { success, error } = useToast();
-  const isMountedRef = useRef(true);
-  const fundedKeyRef = useRef<string | null>(null);
-
-  const { refresh } = useBalance({
-    publicKey: wallet?.publicKey || null,
-    network: IS_TESTNET ? "TESTNET" : "PUBLIC",
-    autoRefresh: false,
-  });
-
-  useEffect(() => {
-    isMountedRef.current = true;
-
-    // Auto-fund on testnet when wallet is available
-    const fundWallet = async () => {
-      if (!wallet?.publicKey) return;
-
-      // Only fund once per wallet public key
-      if (fundedKeyRef.current === wallet.publicKey) return;
-
-      // Check conditions inside the effect body (not in deps)
-      if (!IS_TESTNET) return;
-
-      fundedKeyRef.current = wallet.publicKey;
-      setIsFunding(true);
-      setFundingError(null);
-      
-      try {
-        await fundWithFriendbot(wallet.publicKey);
-        if (!isMountedRef.current) return;
-        setFundingSuccess(true);
-        success("Wallet funded with 10,000 XLM!");
-        
-        // Refresh balance a few times to ensure it updates
-        for (let i = 0; i < 5; i++) {
-          if (!isMountedRef.current) return;
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          refresh();
-        }
-      } catch (err) {
-        if (!isMountedRef.current) return;
-        console.error("Friendbot funding failed:", err);
-        setFundingError(err instanceof Error ? err.message : "Failed to fund wallet");
-        error("Wallet funding failed. Please try again later.");
-      } finally {
-        if (isMountedRef.current) {
-          setIsFunding(false);
-        }
-      }
-    };
-
-    fundWallet();
-
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [wallet?.publicKey]);
-
-  return (
-    <div className="w-full flex flex-col items-center justify-center animate-in zoom-in-95 fade-in duration-500 mt-12">
-      <div className="w-full max-w-[480px] bg-surface/90 backdrop-blur-md rounded-[24px] p-8 sm:p-10 border border-border shadow-[0_4px_40px_rgba(0,0,0,0.5)] text-center">
-        {/* Icon */}
-        <div className="w-16 h-16 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center mx-auto mb-6">
-          <Wallet className="w-8 h-8 text-brand" />
-        </div>
-
-        <h2 className="text-[32px] font-bold tracking-tight text-white mb-3">
-          Your payment wallet is ready! 🎉
-        </h2>
-        <p className="text-muted text-[16px] leading-relaxed mb-6">
-          We've automatically set up a Stellar wallet for you. You can use it to receive earnings, mint NFTs, and manage your creator payments — no crypto experience needed.
-        </p>
-
-        {/* Testnet Funding Status */}
-        {IS_TESTNET && (
-          <div className="mb-6 p-4 bg-brand/10 border border-brand/20 rounded-xl text-left">
-            {isFunding && (
-              <div className="flex items-center gap-3">
-                <Loader2 className="w-5 h-5 text-brand animate-spin" />
-                <p className="text-[14px] font-bold text-brand">Funding your wallet with 10,000 XLM...</p>
-              </div>
-            )}
-            {fundingSuccess && (
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="w-5 h-5 text-brand" />
-                <p className="text-[14px] font-bold text-brand">Wallet funded with 10,000 XLM! 🎊</p>
-              </div>
-            )}
-            {fundingError && !isFunding && (
-              <div className="flex items-center gap-3">
-                <Info className="w-5 h-5 text-amber-500" />
-                <p className="text-[14px] font-bold text-amber-500">Funding temporarily unavailable. You can still continue.</p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Mainnet CTA */}
-        {!IS_TESTNET && (
-          <div className="mb-6 p-4 bg-white/5 border border-white/10 rounded-xl text-left">
-            <div className="flex items-start gap-3">
-              <Info className="w-5 h-5 text-white shrink-0 mt-0.5" />
-              <div>
-                <p className="text-[14px] font-bold text-white mb-1">Fund your wallet</p>
-                <p className="text-[12px] text-muted leading-relaxed">
-                  On mainnet, you'll need to fund your wallet with XLM to get started. You can do this from your dashboard after onboarding.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        <div className="relative inline-block mb-6">
-          <button
-            onClick={() => setShowTooltip(!showTooltip)}
-            className="flex items-center gap-1.5 text-brand text-[13px] font-medium hover:underline mx-auto"
-          >
-            <Info className="w-4 h-4" />
-            Learn more about your wallet
-          </button>
-
-          {showTooltip && (
-            <div className="absolute left-1/2 -translate-x-1/2 mt-2 w-72 bg-surface border border-border rounded-xl p-4 text-left shadow-xl z-10 animate-in fade-in slide-in-from-top-2 duration-200">
-              <p className="text-[13px] text-white font-bold mb-2">What is a Stellar wallet?</p>
-              <ul className="space-y-1.5 text-[12px] text-muted">
-                <li>• It's like a bank account on the Stellar blockchain — fast and nearly free to use.</li>
-                <li>• Your wallet is secured with AES-GCM encryption and stored only on your device.</li>
-                <li>• You can export your secret key anytime from Settings → Advanced Wallet.</li>
-                <li>• Earnings from your clips can be paid directly to this wallet.</li>
-              </ul>
-              <button
-                onClick={() => setShowTooltip(false)}
-                className="mt-3 text-[11px] text-muted hover:text-white transition-colors"
-              >
-                Got it ✕
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Backup Reminder */}
-        <div className="mb-8 p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-left animate-pulse">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" />
-            <div>
-              <p className="text-[14px] font-bold text-amber-500 mb-1">Important: Backup your wallet!</p>
-              <p className="text-[12px] text-amber-200/80 leading-relaxed">
-                Since we don't store your keys, you must backup your secret key to ensure you never lose access to your funds. You can do this in your Dashboard settings later.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        <button
-          onClick={onContinue}
-          disabled={loading || isFunding}
-          className="w-full bg-brand hover:bg-brand-hover disabled:opacity-60 disabled:cursor-not-allowed text-black py-[15px] rounded-[12px] font-bold text-[15px] flex justify-center items-center gap-2 transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(0,229,143,0.1)]"
-        >
-          {loading || isFunding ? <Loader2 className="animate-spin w-5 h-5" /> : <>Go to Dashboard <CheckCircle2 className="w-[18px] h-[18px]" /></>}
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -424,30 +251,8 @@ export default function OnboardingPage() {
                 Our AI identifies the most viral moments from your videos and formats them for every platform instantly.
               </p>
               
-              {/* Progress Card */}
-              <div className="bg-surface border border-border rounded-[20px] p-[24px] mt-8 w-full shadow-lg">
-                <div className="flex justify-between items-end mb-4">
-                  <div>
-                    <div className="text-muted-foreground text-[10px] font-bold uppercase tracking-[0.1em] mb-1.5">CURRENT PROGRESS</div>
-                    <div className="font-bold text-white text-[15px]">Step 1 of 2: Profile Setup</div>
-                  </div>
-                  <div className="text-[28px] font-extrabold text-brand leading-none">
-                    50%
-                  </div>
-                </div>
-                <div className="w-full h-[10px] bg-input rounded-full overflow-hidden">
-                  <div className="h-full bg-brand rounded-full shadow-[0_0_10px_rgba(0,229,143,0.5)]" style={{ width: "50%" }} />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 text-[13px] text-muted-foreground pt-4">
-                <div className="flex -space-x-2.5">
-                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-800 flex items-center justify-center overflow-hidden"><Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Nico&backgroundColor=c0aede" alt="" width={36} height={36} className="w-full h-full object-cover"/></div>
-                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-700 flex items-center justify-center overflow-hidden"><Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jane&backgroundColor=b6e3f4" alt="" width={36} height={36} className="w-full h-full object-cover"/></div>
-                  <div className="w-9 h-9 rounded-full border-2 border-[#080C0B] bg-zinc-600 flex items-center justify-center overflow-hidden"><Image src="https://api.dicebear.com/7.x/avataaars/svg?seed=Jack&backgroundColor=c0aede" alt="" width={36} height={36} className="w-full h-full object-cover"/></div>
-                </div>
-                <div>Joined by <span className="font-bold text-white">2,500+</span> top creators this month.</div>
-              </div>
+              <OnboardingProgress currentStep={1} totalSteps={2} stepLabel="Step 1 of 2: Profile Setup" />
+              <OnboardingSocialProof />
             </div>
 
             {/* Right side - Forms container Stack */}
