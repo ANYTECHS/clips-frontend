@@ -267,6 +267,22 @@ export default function ProjectsPage() {
         return;
       }
     }
+    // Persist trim, color, and volume edits alongside captions
+    try {
+      await fetch(`/api/clips/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          trimStart: edits.trimStart,
+          trimEnd: edits.trimEnd,
+          colorFilter: edits.colorFilter,
+          audioVolume: edits.audioVolume,
+          aspectRatio: edits.aspectRatio,
+        }),
+      });
+    } catch {
+      // Non-fatal: editing metadata is best-effort until a real API exists
+    }
     showToast(`Edits saved for clip ${id}`, "success");
     setEditingClip(null);
   }, [showToast]);

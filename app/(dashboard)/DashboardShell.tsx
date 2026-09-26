@@ -19,11 +19,13 @@ import React, {
   useContext,
   useEffect,
 } from "react";
+import { usePathname } from "next/navigation";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 import DegradedModeBanner from "@/app/components/DegradedModeBanner";
 import { useServiceHealth } from "@/app/hooks/useServiceHealth";
+import { useScrollRestoration } from "@/app/hooks/useScrollRestoration";
 import { warmCriticalData } from "@/app/lib/cache/warmCriticalData";
 import TutorialProvider from "@/components/tutorial/TutorialProvider";
 
@@ -61,6 +63,9 @@ export default function DashboardShell({
     return () => controller.abort();
   }, []);
 
+  const pathname = usePathname();
+  const mainRef = useScrollRestoration<HTMLElement>(pathname);
+
   const closeSidebar = useCallback(() => setSidebarOpen(false), []);
   const openSidebar  = useCallback(() => setSidebarOpen(true),  []);
 
@@ -88,7 +93,7 @@ export default function DashboardShell({
 
         <DashboardSidebar isOpen={sidebarOpen} onClose={closeSidebar} />
 
-        <main className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
+        <main ref={mainRef} className="flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10">
           <DashboardHeader onMenuClick={openSidebar} />
 
           {degraded && (
