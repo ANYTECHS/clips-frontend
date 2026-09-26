@@ -277,3 +277,8 @@ Key rules from [AGENTS.md](AGENTS.md):
 - All user-controlled strings rendered in the UI must be sanitized with the `sanitize` utility at `app/lib/sanitize.ts`.
 - Never use `dangerouslySetInnerHTML` without explicit DOMPurify sanitization.
 - Component demos belong in **Storybook**, not in public App Router pages.
+
+## Handsoff notes
+
+<!-- handsoff-issue-1128 -->
+- #1128: Consolidate Similar Components
