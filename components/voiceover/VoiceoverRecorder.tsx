@@ -1,29 +1,27 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import {
-  Mic,
-  Square,
-  Play,
-  Pause,
-  RotateCcw,
-  Sparkles,
-  Download,
-  Scissors,
-  Volume2,
-  Trash2,
-  Check,
   AlertCircle,
+  Check,
   Clock,
+  Download,
   Layers,
-  Sliders,
+  Mic,
   Music,
+  Pause,
+  Play,
+  Scissors,
+  Sparkles,
+  Square,
+  Trash2,
 } from "lucide-react";
+import React, { useCallback, useEffect, useMemo,useRef, useState } from "react";
+
 import {
-  type VoiceoverTake,
-  calculateNormalizationGain,
   audioBufferToWavBlob,
+  calculateNormalizationGain,
   mixAudioTracks,
+  type VoiceoverTake,
 } from "@/app/lib/audioMixer";
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { sanitize } from "@/app/lib/sanitize";
@@ -397,12 +395,8 @@ export default function VoiceoverRecorder({
             <Mic className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-white">
-              {t("voiceover.title")}
-            </h2>
-            <p className="text-xs text-zinc-400">
-              {t("voiceover.subtitle")}
-            </p>
+            <h2 className="text-base font-bold text-white">{t("voiceover.title")}</h2>
+            <p className="text-xs text-zinc-400">{t("voiceover.subtitle")}</p>
           </div>
         </div>
 
@@ -456,8 +450,7 @@ export default function VoiceoverRecorder({
             {Math.floor(recordingTime / 60)
               .toString()
               .padStart(2, "0")}
-            :
-            {(recordingTime % 60).toString().padStart(2, "0")}
+            :{(recordingTime % 60).toString().padStart(2, "0")}
           </span>
 
           {!isRecording ? (
@@ -492,9 +485,7 @@ export default function VoiceoverRecorder({
               <Layers className="w-4 h-4 text-brand" />
               {t("voiceover.takes")} ({takes.length})
             </h3>
-            <span className="text-xs text-zinc-400">
-              Select a take to edit and sync with video
-            </span>
+            <span className="text-xs text-zinc-400">Select a take to edit and sync with video</span>
           </div>
 
           {/* Takes list */}
@@ -512,9 +503,7 @@ export default function VoiceoverRecorder({
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-white">
-                      {sanitize(take.name)}
-                    </span>
+                    <span className="text-xs font-bold text-white">{sanitize(take.name)}</span>
                     {isActive && (
                       <span className="rounded bg-brand text-black font-extrabold text-[9px] px-1.5 py-0.5 uppercase">
                         Active
@@ -671,9 +660,7 @@ export default function VoiceoverRecorder({
                 />
 
                 <div className="flex items-center justify-between pt-1">
-                  <span className="text-xs text-zinc-300">
-                    {t("voiceover.auto_ducking")}
-                  </span>
+                  <span className="text-xs text-zinc-300">{t("voiceover.auto_ducking")}</span>
                   <input
                     type="checkbox"
                     checked={autoDucking}
@@ -705,9 +692,7 @@ export default function VoiceoverRecorder({
                   >
                     <Music className="w-4 h-4" />
                     <span>
-                      {isExportingMix
-                        ? t("voiceover.mix_exporting")
-                        : t("voiceover.export_mix")}
+                      {isExportingMix ? t("voiceover.mix_exporting") : t("voiceover.export_mix")}
                     </span>
                   </button>
                 </div>

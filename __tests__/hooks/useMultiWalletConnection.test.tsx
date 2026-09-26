@@ -9,8 +9,8 @@
  *   - The address is captured correctly without requiring a second render cycle.
  */
 
-import React from "react";
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { act, renderHook, waitFor } from "@testing-library/react";
+
 import { useMultiWalletConnection } from "@/app/hooks/useMultiWalletConnection";
 
 // ─── Mock providers ───────────────────────────────────────────────────────────
@@ -185,7 +185,9 @@ describe("connectMetaMask — polling fallback when connect returns null", () =>
     // Start the connect (don't await yet — let the timeout fire while polling)
     let connectDone = false;
     act(() => {
-      result.current.connectMetaMask().then(() => { connectDone = true; });
+      result.current.connectMetaMask().then(() => {
+        connectDone = true;
+      });
     });
 
     // Wait for the timeout to fire and update the address

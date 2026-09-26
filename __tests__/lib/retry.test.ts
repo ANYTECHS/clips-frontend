@@ -4,13 +4,8 @@
  * Test suite for data fetching retry logic (#987).
  */
 
-import {
-  isRetryableError,
-  retryOperation,
-  fetchWithRetry,
-  DEFAULT_RETRY_OPTIONS,
-} from "@/app/lib/retry";
 import { ApiError } from "@/app/lib/apiError";
+import { isRetryableError, retryOperation } from "@/app/lib/retry";
 
 describe("isRetryableError", () => {
   it("classifies network errors (status 0) as retryable", () => {
@@ -133,18 +128,16 @@ describe("retryOperation", () => {
     const unauthErr = new ApiError("Unauthorized", 401);
     const fn = jest.fn().mockRejectedValue(unauthErr);
 
-    await expect(
-      retryOperation(fn, { maxRetries: 3, baseDelayMs: 100 }),
-    ).rejects.toThrow("Unauthorized");
+    await expect(retryOperation(fn, { maxRetries: 3, baseDelayMs: 100 })).rejects.toThrow(
+      "Unauthorized"
+    );
 
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
   it("cancels pending retry backoff when AbortSignal is aborted", async () => {
     const controller = new AbortController();
-    const fn = jest
-      .fn()
-      .mockRejectedValueOnce(new ApiError("Server error", 500));
+    const fn = jest.fn().mockRejectedValueOnce(new ApiError("Server error", 500));
 
     const promise = retryOperation(fn, {
       baseDelayMs: 1000,

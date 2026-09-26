@@ -1,4 +1,5 @@
-import { renderHook, act, waitFor } from "@testing-library/react";
+import { act,renderHook } from "@testing-library/react";
+
 import { useStellarTransaction } from "./useStellarTransaction";
 
 jest.mock("@/app/lib/sentry", () => ({
@@ -116,9 +117,7 @@ describe("useStellarTransaction", () => {
 
     it("should execute transaction successfully", async () => {
       const onSuccess = jest.fn();
-      const { result } = renderHook(() =>
-        useStellarTransaction({ onSuccess })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ onSuccess }));
 
       const buildTransaction = jest.fn().mockResolvedValue("transaction_xdr");
 
@@ -142,10 +141,10 @@ describe("useStellarTransaction", () => {
       // Track status changes
       const promise = act(async () => {
         const executePromise = result.current.executeTransaction(buildTransaction);
-        
+
         // Capture initial status
         statuses.push(result.current.status);
-        
+
         await executePromise;
       });
 
@@ -162,9 +161,7 @@ describe("useStellarTransaction", () => {
       );
 
       const onError = jest.fn();
-      const { result } = renderHook(() =>
-        useStellarTransaction({ onError })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ onError }));
 
       const buildTransaction = jest.fn().mockResolvedValue("transaction_xdr");
 
@@ -186,9 +183,7 @@ describe("useStellarTransaction", () => {
           json: async () => mockTransactionResult,
         });
 
-      const { result } = renderHook(() =>
-        useStellarTransaction({ maxRetries: 3 })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ maxRetries: 3 }));
 
       const buildTransaction = jest.fn().mockResolvedValue("transaction_xdr");
 
@@ -204,9 +199,7 @@ describe("useStellarTransaction", () => {
       (global.fetch as jest.Mock).mockRejectedValue(new Error("Network error"));
 
       const onError = jest.fn();
-      const { result } = renderHook(() =>
-        useStellarTransaction({ maxRetries: 2, onError })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ maxRetries: 2, onError }));
 
       const buildTransaction = jest.fn().mockResolvedValue("transaction_xdr");
 
@@ -247,9 +240,7 @@ describe("useStellarTransaction", () => {
     });
 
     it("should use correct Horizon URL for testnet", async () => {
-      const { result } = renderHook(() =>
-        useStellarTransaction({ network: "testnet" })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ network: "testnet" }));
 
       const buildTransaction = jest.fn().mockResolvedValue("transaction_xdr");
 
@@ -264,9 +255,7 @@ describe("useStellarTransaction", () => {
     });
 
     it("should use correct Horizon URL for mainnet", async () => {
-      const { result } = renderHook(() =>
-        useStellarTransaction({ network: "mainnet" })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ network: "mainnet" }));
 
       const buildTransaction = jest.fn().mockResolvedValue("transaction_xdr");
 
@@ -346,9 +335,7 @@ describe("useStellarTransaction", () => {
 
   describe("Network Configuration", () => {
     it("should pass correct network to Freighter when signing", async () => {
-      const { result } = renderHook(() =>
-        useStellarTransaction({ network: "mainnet" })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ network: "mainnet" }));
 
       const buildTransaction = jest.fn().mockResolvedValue("transaction_xdr");
 
@@ -356,13 +343,10 @@ describe("useStellarTransaction", () => {
         await result.current.executeTransaction(buildTransaction);
       });
 
-      expect(mockFreighter.signTransaction).toHaveBeenCalledWith(
-        "transaction_xdr",
-        {
-          network: "mainnet",
-          accountToSign: "GTEST123456789",
-        }
-      );
+      expect(mockFreighter.signTransaction).toHaveBeenCalledWith("transaction_xdr", {
+        network: "mainnet",
+        accountToSign: "GTEST123456789",
+      });
     });
   });
 });
@@ -370,10 +354,9 @@ describe("useStellarTransaction", () => {
 // ─── Batch transaction tests ──────────────────────────────────────────────────
 
 import {
-  createPaymentOp,
   createChangeTrustOp,
-  createManageSellOfferOp,
   createInvokeContractOp,
+  createPaymentOp,
   INVOKE_CONTRACT_USER_MESSAGE,
 } from "../lib/stellarOperations";
 
@@ -455,9 +438,7 @@ describe("useStellarTransaction — batch operations", () => {
       expect(() => {
         act(() => {
           // Missing assetIssuer — should fail validation
-          result.current.addOperation(
-            createChangeTrustOp({ assetCode: "USDC", assetIssuer: "" })
-          );
+          result.current.addOperation(createChangeTrustOp({ assetCode: "USDC", assetIssuer: "" }));
         });
       }).toThrow();
     });
@@ -492,12 +473,8 @@ describe("useStellarTransaction — batch operations", () => {
       const { result } = renderHook(() => useStellarTransaction());
 
       act(() => {
-        result.current.addOperation(
-          createPaymentOp({ destination: "GDEST1", amount: "5" })
-        );
-        result.current.addOperation(
-          createPaymentOp({ destination: "GDEST2", amount: "10" })
-        );
+        result.current.addOperation(createPaymentOp({ destination: "GDEST1", amount: "5" }));
+        result.current.addOperation(createPaymentOp({ destination: "GDEST2", amount: "10" }));
       });
 
       expect(result.current.queuedOperations).toHaveLength(2);
@@ -513,9 +490,7 @@ describe("useStellarTransaction — batch operations", () => {
       const { result } = renderHook(() => useStellarTransaction());
 
       act(() => {
-        result.current.addOperation(
-          createPaymentOp({ destination: "GDEST1", amount: "5" })
-        );
+        result.current.addOperation(createPaymentOp({ destination: "GDEST1", amount: "5" }));
         result.current.clearOperations();
       });
 
@@ -526,9 +501,7 @@ describe("useStellarTransaction — batch operations", () => {
   describe("executeBatchTransaction", () => {
     it("should execute a batch of operations successfully", async () => {
       const onSuccess = jest.fn();
-      const { result } = renderHook(() =>
-        useStellarTransaction({ onSuccess })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ onSuccess }));
 
       act(() => {
         result.current.addOperation(
@@ -565,9 +538,7 @@ describe("useStellarTransaction — batch operations", () => {
       const { result } = renderHook(() => useStellarTransaction());
 
       act(() => {
-        result.current.addOperation(
-          createPaymentOp({ destination: "GDEST1", amount: "5" })
-        );
+        result.current.addOperation(createPaymentOp({ destination: "GDEST1", amount: "5" }));
       });
 
       const buildBatch = jest.fn().mockResolvedValue("batch_xdr");
@@ -582,9 +553,7 @@ describe("useStellarTransaction — batch operations", () => {
 
     it("should return error when queue is empty", async () => {
       const onError = jest.fn();
-      const { result } = renderHook(() =>
-        useStellarTransaction({ onError })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ onError }));
 
       const buildBatch = jest.fn();
 
@@ -622,19 +591,13 @@ describe("useStellarTransaction — batch operations", () => {
 
     it("should handle batch builder errors gracefully", async () => {
       const onError = jest.fn();
-      const { result } = renderHook(() =>
-        useStellarTransaction({ onError })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ onError }));
 
       act(() => {
-        result.current.addOperation(
-          createPaymentOp({ destination: "GDEST1", amount: "5" })
-        );
+        result.current.addOperation(createPaymentOp({ destination: "GDEST1", amount: "5" }));
       });
 
-      const buildBatch = jest
-        .fn()
-        .mockRejectedValue(new Error("Failed to build batch XDR"));
+      const buildBatch = jest.fn().mockRejectedValue(new Error("Failed to build batch XDR"));
 
       await act(async () => {
         await result.current.executeBatchTransaction(buildBatch);
@@ -709,9 +672,7 @@ describe("useStellarTransaction — batch operations", () => {
       const { result } = renderHook(() => useStellarTransaction());
 
       act(() => {
-        result.current.addOperation(
-          createInvokeContractOp({ contractId: "CABC", method: "mint" })
-        );
+        result.current.addOperation(createInvokeContractOp({ contractId: "CABC", method: "mint" }));
       });
 
       const buildBatch = jest.fn();
@@ -726,14 +687,10 @@ describe("useStellarTransaction — batch operations", () => {
     });
 
     it("should sign the batch XDR with the correct network", async () => {
-      const { result } = renderHook(() =>
-        useStellarTransaction({ network: "mainnet" })
-      );
+      const { result } = renderHook(() => useStellarTransaction({ network: "mainnet" }));
 
       act(() => {
-        result.current.addOperation(
-          createPaymentOp({ destination: "GDEST1", amount: "5" })
-        );
+        result.current.addOperation(createPaymentOp({ destination: "GDEST1", amount: "5" }));
       });
 
       const buildBatch = jest.fn().mockResolvedValue("mainnet_batch_xdr");

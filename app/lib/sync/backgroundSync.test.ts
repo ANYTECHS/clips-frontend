@@ -1,4 +1,4 @@
-import { scheduleBackgroundSync, withSyncErrorHandling, SyncError } from "@/app/lib/sync/backgroundSync";
+import { scheduleBackgroundSync, withSyncErrorHandling } from "@/app/lib/sync/backgroundSync";
 
 describe("background sync", () => {
   it("deduplicates concurrent syncs for the same resource", async () => {
@@ -26,11 +26,7 @@ describe("background sync", () => {
     const sync = jest.fn().mockRejectedValue(new Error("boom"));
 
     await expect(
-      withSyncErrorHandling(
-        "wallet",
-        sync,
-        { fallbackValue: fallback, onError: jest.fn() },
-      ),
+      withSyncErrorHandling("wallet", sync, { fallbackValue: fallback, onError: jest.fn() })
     ).resolves.toEqual(fallback);
   });
 

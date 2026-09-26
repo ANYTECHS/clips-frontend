@@ -1,11 +1,10 @@
 import {
   BIP39_WORDLIST,
+  createRandomWallet,
   deriveSeedFromMnemonic,
   generateMnemonic,
-  createRandomWallet,
   restoreWalletFromMnemonic,
   submitTransaction,
-  getStellarNetwork,
 } from "./stellar";
 
 describe("stellar BIP39 wallet", () => {
@@ -43,9 +42,9 @@ describe("stellar BIP39 wallet", () => {
   });
 
   it("rejects invalid mnemonics", async () => {
-    await expect(
-      deriveSeedFromMnemonic("not a valid mnemonic phrase at all")
-    ).rejects.toThrow("Invalid BIP39 mnemonic phrase");
+    await expect(deriveSeedFromMnemonic("not a valid mnemonic phrase at all")).rejects.toThrow(
+      "Invalid BIP39 mnemonic phrase"
+    );
   });
 });
 
@@ -138,9 +137,7 @@ describe("submitTransaction", () => {
 
     (global.fetch as jest.Mock).mockRejectedValueOnce(customError);
 
-    await expect(submitTransaction({ signedXdr: mockSignedXdr })).rejects.toEqual(
-      customError
-    );
+    await expect(submitTransaction({ signedXdr: mockSignedXdr })).rejects.toEqual(customError);
   });
 
   it("uses correct Horizon URL for mainnet", async () => {

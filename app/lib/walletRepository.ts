@@ -1,4 +1,3 @@
-
 /**
  * walletRepository.ts
  *
@@ -11,8 +10,8 @@
  * - `clipcash_multi_wallets_{userId}` : Multiple wallets including external (multiWalletStorage.ts)
  */
 
-import { WalletStorage, StoredWalletRecord, WalletStorageError } from "./walletStorage";
-import { MultiWalletStorage, MultiWalletRecord, WalletProviderType, MultiWalletStorageError } from "./multiWalletStorage";
+import { MultiWalletStorage, MultiWalletStorageError } from "./multiWalletStorage";
+import { WalletStorage, WalletStorageError } from "./walletStorage";
 
 export const WalletRepository = {
   /**
@@ -22,11 +21,11 @@ export const WalletRepository = {
     const multiWallets = MultiWalletStorage.getAll(userId);
     // Legacy embedded wallet handling
     const embedded = WalletStorage.get(userId);
-    
+
     // In a real app we might merge them, but for this issue we just delegate
     return {
       embedded,
-      multiWallets
+      multiWallets,
     };
   },
 
@@ -42,4 +41,4 @@ export const WalletRepository = {
   // Add more methods as needed by hooks
 };
 
-export { WalletStorageError, MultiWalletStorageError };
+export { MultiWalletStorageError,WalletStorageError };

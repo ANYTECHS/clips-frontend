@@ -8,15 +8,14 @@
  * Unit and integration tests for API Version Negotiation (#984).
  */
 
-import {
-  negotiateVersion,
-  resolveVersion,
-  withVersioning,
-  rejectUnsupportedVersion,
-  SUPPORTED_VERSIONS,
-  DEFAULT_VERSION,
-} from "@/app/api/versioning";
 import { NextRequest, NextResponse } from "next/server";
+
+import {
+  DEFAULT_VERSION,
+  negotiateVersion,
+  SUPPORTED_VERSIONS,
+  withVersioning,
+} from "@/app/api/versioning";
 
 describe("API Version Negotiation (#984)", () => {
   describe("negotiateVersion", () => {
