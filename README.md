@@ -93,113 +93,65 @@ Copy `.env.example` to `.env.local` and fill in the values. The table below list
 
 ### Auth
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXTAUTH_SECRET` | **Yes** | Session signing key. Generate: `openssl rand -base64 32` |
-| `NEXTAUTH_URL` | **Yes** | Canonical app URL, e.g. `http://localhost:3000` |
-| `GOOGLE_CLIENT_ID` | **Yes** | Google OAuth client ID |
-| `GOOGLE_CLIENT_SECRET` | **Yes** | Google OAuth client secret |
-| `APPLE_ID` | Optional | Apple Sign-In service ID |
-| `APPLE_TEAM_ID` | Optional | Apple developer team ID |
-| `APPLE_KEY_ID` | Optional | Apple Sign-In key ID |
-| `APPLE_PRIVATE_KEY` | Optional | Apple Sign-In private key (full PEM) |
-| `TWITTER_CLIENT_ID` | Optional | Twitter OAuth 2.0 client ID |
-| `TWITTER_CLIENT_SECRET` | Optional | Twitter OAuth 2.0 client secret |
-| `INSTAGRAM_CLIENT_ID` | Optional | Instagram OAuth client ID |
-| `INSTAGRAM_CLIENT_SECRET` | Optional | Instagram OAuth client secret |
-| `TIKTOK_CLIENT_KEY` | Optional | TikTok OAuth client key |
-| `TIKTOK_CLIENT_SECRET` | Optional | TikTok OAuth client secret |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `NEXTAUTH_SECRET` | **Yes** | — | Session signing key. Never commit this value; rotate it to invalidate all sessions. | `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | **Yes** | — | Canonical app URL used to build OAuth callbacks. Must match the deployed origin. | `http://localhost:3000` |
+| `GOOGLE_CLIENT_ID` | **Yes** | — | Google OAuth client ID. | `1234567890-abc.apps.googleusercontent.com` |
+| `GOOGLE_CLIENT_SECRET` | **Yes** | — | Google OAuth client secret. Keep server-side only. | `GOCSPX-xxxxxxxxxxxxxxxx` |
+| `APPLE_ID` | Optional | — | Apple Sign-In service ID. | `com.clipcash.web` |
+| `APPLE_TEAM_ID` | Optional | — | Apple developer team ID. | `ABCDE12345` |
+| `APPLE_KEY_ID` | Optional | — | Apple Sign-In key ID. | `XYZ9876543` |
+| `APPLE_PRIVATE_KEY` | Optional | — | Apple Sign-In private key (full PEM). Store as a secret; never expose to the client. | `-----BEGIN PRIVATE KEY-----\n...` |
+| `TWITTER_CLIENT_ID` | Optional | — | Twitter OAuth 2.0 client ID. | `abc123` |
+| `TWITTER_CLIENT_SECRET` | Optional | — | Twitter OAuth 2.0 client secret. | `def456` |
+| `INSTAGRAM_CLIENT_ID` | Optional | — | Instagram OAuth client ID. | `1234567890` |
+| `INSTAGRAM_CLIENT_SECRET` | Optional | — | Instagram OAuth client secret. | `abcdef123456` |
+| `TIKTOK_CLIENT_KEY` | Optional | — | TikTok OAuth client key. | `aw1234567890` |
+| `TIKTOK_CLIENT_SECRET` | Optional | — | TikTok OAuth client secret. | `abcdef123456` |
 
 ### AI Backend
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_AI_API_URL` | Prod only | Base URL of the AI video processing service. If unset in dev, jobs stay `queued` — no crash. |
-| `AI_BACKEND_SECRET` | Prod only | Bearer token sent on outbound dispatches to the AI service |
-| `AI_BACKEND_CALLBACK_SECRET` | **Yes (prod)** | Secret the AI service must send when calling `/api/jobs/[id]/callback`. Generate: `openssl rand -hex 32` |
-| `NEXT_PUBLIC_API_URL` | Optional | Base URL for the main backend API (user profile, earnings). Defaults to `http://localhost:4000`. |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `NEXT_PUBLIC_AI_API_URL` | Prod only | — | Base URL of the AI video processing service. If unset in dev, jobs stay `queued` — no crash. | `https://ai.example.com` |
+| `AI_BACKEND_SECRET` | Prod only | — | Bearer token sent on outbound dispatches to the AI service. Server-side only. | `openssl rand -hex 32` |
+| `AI_BACKEND_CALLBACK_SECRET` | **Yes (prod)** | — | Secret the AI service must send when calling `/api/jobs/[id]/callback`. Generate: `openssl rand -hex 32`. | `openssl rand -hex 32` |
+| `NEXT_PUBLIC_API_URL` | Optional | `http://localhost:4000` | Base URL for the main backend API (user profile, earnings). | `https://api.example.com` |
 
 ### Cloud Storage
 
 Files require a valid S3-compatible bucket to upload. In development you can leave these blank — uploads will fail but the rest of the app works.
 
-| Variable | Required | Description |
-|---|---|---|
-| `CLOUD_STORAGE_BUCKET` | **Yes (prod)** | Bucket name |
-| `CLOUD_STORAGE_REGION` | **Yes (prod)** | Region, e.g. `us-east-1`. Use `auto` for Cloudflare R2. |
-| `AWS_ACCESS_KEY_ID` | **Yes (prod)** | Access key / account ID |
-| `AWS_SECRET_ACCESS_KEY` | **Yes (prod)** | Secret key / API token |
-| `CLOUD_STORAGE_PROVIDER` | Optional | `s3` (default) \| `r2` \| `gcs` |
-| `CLOUD_STORAGE_ENDPOINT` | Optional | Custom endpoint for R2/GCS S3 interop. Leave blank for AWS S3. |
-| `CLOUD_STORAGE_KEY_PREFIX` | Optional | Object key prefix (default: `uploads/`) |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `CLOUD_STORAGE_BUCKET` | **Yes (prod)** | — | Bucket name. | `clipcash-uploads` |
+| `CLOUD_STORAGE_REGION` | **Yes (prod)** | — | Region, e.g. `us-east-1`. Use `auto` for Cloudflare R2. | `us-east-1` |
+| `AWS_ACCESS_KEY_ID` | **Yes (prod)** | — | Access key / account ID. Grant least-privilege bucket access only. | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_SECRET_ACCESS_KEY` | **Yes (prod)** | — | Secret key / API token. Never commit or expose to the client. | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `CLOUD_STORAGE_PROVIDER` | Optional | `s3` | Storage backend: `s3` \| `r2` \| `gcs`. | `r2` |
+| `CLOUD_STORAGE_ENDPOINT` | Optional | — | Custom endpoint for R2/GCS S3 interop. Leave blank for AWS S3. | `https://<account>.r2.cloudflarestorage.com` |
+| `CLOUD_STORAGE_KEY_PREFIX` | Optional | `uploads/` | Object key prefix for stored files. | `uploads/` |
 
 ### Redis
 
-| Variable | Required | Description |
-|---|---|---|
-| `REDIS_URL` | **Yes (prod)** | Redis connection string, e.g. `redis://:password@hostname:6379`. Without this, job state lives in-process — fine for dev, broken on multi-instance deployments. |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `REDIS_URL` | **Yes (prod)** | — | Redis connection string. Without this, job state lives in-process — fine for dev, broken on multi-instance deployments. Use TLS (`rediss://`) and a password in production. | `redis://:password@hostname:6379` |
 
 ### Stellar / Blockchain
 
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_STELLAR_NETWORK` | Optional | `testnet` (default) \| `mainnet` |
-| `NEXT_PUBLIC_STELLAR_RPC` | Optional | Custom Soroban RPC URL override |
-| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID` | Optional | Soroban NFT contract address (testnet) |
-| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID_MAINNET` | Optional | Soroban NFT contract address (mainnet) |
+| Variable | Required | Default | Description | Example |
+|---|---|---|---|---|
+| `NEXT_PUBLIC_STELLAR_NETWORK` | Optional | `testnet` | Target network: `testnet` \| `mainnet`. | `testnet` |
+| `NEXT_PUBLIC_STELLAR_RPC` | Optional | — | Custom Soroban RPC URL override. | `https://soroban-testnet.stellar.org` |
+| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID` | Optional | — | Soroban NFT contract address (testnet). | `C...` |
+| `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID_MAINNET` | Optional | — | Soroban NFT contract address (mainnet). | `C...` |
 
-### Virus Scanning
+### Security Notes
 
-Scanning is **enabled by default in production** and **disabled in development**. If `VIRUS_SCAN_ENABLED` is not set the default applies.
-
-| Variable | Required | Description |
-|---|---|---|
-| `VIRUS_SCAN_PROVIDER` | Optional | `clamav` (default) \| `virustotal` \| `cloudmersive` \| `disabled` |
-| `VIRUS_SCAN_ENABLED` | Optional | `true` \| `false`. Overrides the production/development default. |
-| `VIRUS_SCAN_TIMEOUT` | Optional | Scan timeout in ms (default: `30000`) |
-| `VIRUS_SCAN_QUARANTINE_PREFIX` | Optional | S3 prefix for pre-scan staging (default: `uploads/quarantine/`) |
-| `CLAMAV_API_URL` | Conditional | Required when `VIRUS_SCAN_PROVIDER=clamav`. HTTP endpoint of the ClamAV sidecar, e.g. `http://localhost:8080`. |
-| `VIRUSTOTAL_API_KEY` | Conditional | Required when `VIRUS_SCAN_PROVIDER=virustotal` |
-| `CLOUDMERSIVE_API_KEY` | Conditional | Required when `VIRUS_SCAN_PROVIDER=cloudmersive` |
-
-### Monitoring & Analytics
-
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_SENTRY_DSN` | Optional | Sentry DSN for error monitoring |
-| `NEXT_PUBLIC_ANALYTICS_PROVIDER` | Optional | `none` (default) \| `ga4` \| `plausible` \| `custom` |
-| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | Optional | Google Analytics 4 measurement ID (e.g. `G-XXXXXXXXXX`) |
-| `NEXT_PUBLIC_PLAUSIBLE_DOMAIN` | Optional | Plausible analytics domain |
-| `NEXT_PUBLIC_ANALYTICS_ENDPOINT` | Optional | Custom analytics POST endpoint |
-
-### Social Recovery & Email
-
-| Variable | Required | Description |
-|---|---|---|
-| `EMAIL_FROM` | Optional | From address for guardian approval emails (default: `noreply@clipcash.ai`) |
-| `RESEND_API_KEY` | Optional | [Resend](https://resend.com) API key for transactional email |
-
-### AI Transformation
-
-| Variable | Required | Description |
-|---|---|---|
-| `NEXT_PUBLIC_TRANSFORM_STYLES` | Optional | Comma-separated list of available styles (default: `anime,cinematic,sketch,watercolor`) |
-
----
-
-## Development Scripts
-
-| Script | Command | What it does |
-|---|---|---|
-| Dev server | `npm run dev` | Starts Next.js at [localhost:3000](http://localhost:3000) with hot reload |
-| Production build | `npm run build` | Compiles and optimises for production |
-| Production server | `npm run start` | Serves the production build |
-| Lint | `npm run lint` | Runs ESLint across the codebase |
-| Unit tests | `npm run test` | Runs Jest test suite |
-| E2E tests | `npm run test:e2e` | Runs Playwright tests against a local dev server (auto-started). Sets `E2E_SKIP_MIDDLEWARE=true` so auth is bypassed. |
-| Storybook | `npm run storybook` | Starts Storybook component explorer at [localhost:6006](http://localhost:6006) |
-| Build Storybook | `npm run build-storybook` | Builds a static Storybook site |
-| Bundle analysis | `npm run analyze` | Builds with `@next/bundle-analyzer` — opens bundle report in browser |
-| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTR
-
-/* … truncated 4919 chars — edit only what you need near the top … */
+- **Never commit secrets.** `.env.local` is git-ignored; only `.env.example` (with placeholder values) belongs in the repo.
+- **`NEXT_PUBLIC_*` variables are embedded in the client bundle** and are visible to anyone. Never put secrets in a `NEXT_PUBLIC_` variable.
+- **Rotate `NEXTAUTH_SECRET`** to invalidate all active sessions; rotate `AI_BACKEND_SECRET` and `AI_BACKEND_CALLBACK_SECRET` if they may have leaked.
+- **Scope storage credentials** to the single bucket used by the app and prefer short-lived credentials where your provider supports them.
+- **Use TLS** for `REDIS_URL` (`rediss://`) and any external endpoint in production.
