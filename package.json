@@ -33,7 +33,8 @@
     "bundle:check": "node scripts/check-bundle-size.js",
     "bundle:report": "node scripts/check-bundle-size.js --report",
     "mutation": "stryker run",
-    "perf:test": "lhci autorun --config=./.lighthouserc.json"
+    "perf:test": "lhci autorun --config=./.lighthouserc.json",
+    "validate:translations": "node scripts/validate-translations.js"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.637.0",
