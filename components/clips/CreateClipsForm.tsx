@@ -1,7 +1,9 @@
 "use client";
 
+import { Link, Loader2,Upload } from "lucide-react";
 import React, { useState } from "react";
-import { Upload, Link, Loader2 } from "lucide-react";
+
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 
 /**
  * Form for creating video clips via URL or file upload.
@@ -35,7 +37,7 @@ export default function CreateClipsForm() {
       const data = await response.json();
       setUrl("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.uploadFailed, "upload clips"));
     } finally {
       setLoading(false);
     }
@@ -64,7 +66,7 @@ export default function CreateClipsForm() {
       const data = await response.json();
       setFile(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.uploadFailed, "upload clips"));
     } finally {
       setLoading(false);
     }

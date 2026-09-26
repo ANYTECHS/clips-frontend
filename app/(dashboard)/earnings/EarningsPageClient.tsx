@@ -8,8 +8,9 @@
  * export) are handled entirely client-side after hydration.
  */
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
 import dynamic from "next/dynamic";
+import React, { useCallback,useEffect, useRef, useState } from "react";
+
 import StatCard from "@/components/dashboard/StatCard";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -24,26 +25,25 @@ const EarningsTable = dynamic(() => import("@/components/dashboard/EarningsTable
   ),
 });
 import {
-  Download,
-  DollarSign,
-  TrendingUp,
-  Wallet,
-  FileText,
+  AlertCircle,
   ChevronDown,
+  DollarSign,
+  Download,
   FileJson,
   FileSpreadsheet,
-  AlertCircle,
+  FileText,
+  TrendingUp,
+  Wallet,
 } from "lucide-react";
-import type {
-  EarningTransaction,
-  EarningsSummary,
-  EarningsTrend,
-} from "@/app/api/earnings/types";
-import type { ApiResponse } from "@/app/api/types";
+
+import type { EarningsSummary, EarningsTrend,EarningTransaction } from "@/app/api/earnings/types";
 import type { EarningsResponse } from "@/app/api/earnings/types";
-import { useFilterQueryState } from "@/hooks/useFilterQueryState";
+import type { ApiResponse } from "@/app/api/types";
 import analytics from "@/app/lib/analytics";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
+import { logger } from "@/app/lib/logger";
 import type { EarningsPageData } from "@/app/lib/serverData";
+import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 
 type ExportFormat = "csv" | "json" | "pdf";
 
@@ -80,11 +80,12 @@ function ExportMenu({
     };
   }, []);
 
-  const options: { format: ExportFormat; label: string; desc: string; Icon: React.ElementType }[] = [
-    { format: "csv",  label: "CSV",  desc: "Spreadsheet / Excel",        Icon: FileSpreadsheet },
-    { format: "json", label: "JSON", desc: "Developer / API integration", Icon: FileJson },
-    { format: "pdf",  label: "PDF",  desc: "Tax filing / Accountant",     Icon: FileText },
-  ];
+  const options: { format: ExportFormat; label: string; desc: string; Icon: React.ElementType }[] =
+    [
+      { format: "csv", label: "CSV", desc: "Spreadsheet / Excel", Icon: FileSpreadsheet },
+      { format: "json", label: "JSON", desc: "Developer / API integration", Icon: FileJson },
+      { format: "pdf", label: "PDF", desc: "Tax filing / Accountant", Icon: FileText },
+    ];
 
   return (
     <div ref={ref} className="relative self-start lg:self-auto">
@@ -98,7 +99,14 @@ function ExportMenu({
       >
         {exporting ? (
           <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
           </svg>
         ) : (
@@ -106,7 +114,10 @@ function ExportMenu({
         )}
         {exporting ? "Exporting…" : "Export"}
         {!exporting && (
-          <ChevronDown className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+          <ChevronDown
+            className={`w-4 h-4 transition-transform ${open ? "rotate-180" : ""}`}
+            aria-hidden="true"
+          />
         )}
       </button>
 
@@ -121,11 +132,17 @@ function ExportMenu({
               key={format}
               role="option"
               aria-selected={false}
-              onClick={() => { onExport(format); setOpen(false); }}
+              onClick={() => {
+                onExport(format);
+                setOpen(false);
+              }}
               className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors group"
               aria-label={`Export as ${label}`}
             >
-              <Icon className="w-4 h-4 text-muted-foreground group-hover:text-brand transition-colors shrink-0" aria-hidden="true" />
+              <Icon
+                className="w-4 h-4 text-muted-foreground group-hover:text-brand transition-colors shrink-0"
+                aria-hidden="true"
+              />
               <div>
                 <p className="text-[13px] font-bold text-white">{label}</p>
                 <p className="text-[11px] text-muted-foreground">{desc}</p>
@@ -156,7 +173,10 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
     initialData?.summary ?? { total: "0.00", completed: "0.00", pending: "0.00" }
   );
   const [trends, setTrends] = useState<EarningsTrend>(
-    initialData?.trends ?? { totalTrend: { value: 0, label: "+0.0%" }, completedTrend: { value: 0, label: "+0.0%" } }
+    initialData?.trends ?? {
+      totalTrend: { value: 0, label: "+0.0%" },
+      completedTrend: { value: 0, label: "+0.0%" },
+    }
   );
   const [taxReady, setTaxReady] = useState(initialData?.taxReady ?? false);
   const [transactions, setTransactions] = useState<EarningTransaction[]>(
@@ -207,21 +227,28 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
           setPagination(d.pagination);
         }
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load earnings");
+        if (!cancelled)
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.loadEarnings, "load earnings"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
     loadData();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [page, pageSize]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── PDF helper ───────────────────────────────────────────────────────────────
-  const generatePdfHtml = useCallback((exportData: EarningTransaction[]) => {
-    const rows = exportData
-      .map((tx) => `<tr><td>${tx.date}</td><td>${tx.description}</td><td>$${tx.amount.toFixed(2)}</td><td>${tx.platform}</td><td>${tx.status}</td><td>${tx.taxId}</td></tr>`)
-      .join("");
-    return `<!DOCTYPE html>
+  const generatePdfHtml = useCallback(
+    (exportData: EarningTransaction[]) => {
+      const rows = exportData
+        .map(
+          (tx) =>
+            `<tr><td>${tx.date}</td><td>${tx.description}</td><td>$${tx.amount.toFixed(2)}</td><td>${tx.platform}</td><td>${tx.status}</td><td>${tx.taxId}</td></tr>`
+        )
+        .join("");
+      return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"/><title>ClipCash Earnings Report</title>
 <style>body{font-family:Arial,sans-serif;font-size:12px;color:#111;padding:24px}h1{font-size:20px;margin-bottom:4px}.meta{color:#555;margin-bottom:20px;font-size:11px}.summary{display:flex;gap:32px;margin-bottom:24px}.summary div{background:#f5f5f5;padding:12px 20px;border-radius:8px}.summary strong{display:block;font-size:18px}table{width:100%;border-collapse:collapse}th{background:#111;color:#fff;padding:8px 10px;text-align:left;font-size:11px}td{padding:7px 10px;border-bottom:1px solid #eee}tr:nth-child(even) td{background:#fafafa}@media print{body{padding:0}}</style>
 </head><body>
@@ -230,7 +257,9 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
 <div class="summary"><div><span>Total Earned</span><strong>$${summary.total}</strong></div><div><span>Completed</span><strong>$${summary.completed}</strong></div><div><span>Pending</span><strong>$${summary.pending}</strong></div></div>
 <table><thead><tr><th>Date</th><th>Description</th><th>Amount</th><th>Platform</th><th>Status</th><th>Tax ID</th></tr></thead><tbody>${rows}</tbody></table>
 </body></html>`;
-  }, [summary]);
+    },
+    [summary]
+  );
 
   // ─── Export ───────────────────────────────────────────────────────────────────
   const handleExport = async (format: ExportFormat) => {
@@ -240,7 +269,10 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
     let pdfWindow: Window | null = null;
     if (format === "pdf") {
       pdfWindow = window.open("", "_blank");
-      if (!pdfWindow) { alert("Pop-ups are blocked. Please allow pop-ups to export PDF."); return; }
+      if (!pdfWindow) {
+        alert("Pop-ups are blocked. Please allow pop-ups to export PDF.");
+        return;
+      }
     }
 
     setExporting(true);
@@ -250,11 +282,28 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
       if (format === "csv") {
         const csvContent = [
           ["Date", "Description", "Amount", "Platform", "Status", "Tax ID"],
-          ...exportData.map((tx) => [tx.date, sanitizeCsvCell(tx.description), tx.amount.toFixed(2), sanitizeCsvCell(tx.platform), tx.status, sanitizeCsvCell(tx.taxId)]),
-        ].map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(",")).join("\r\n");
-        triggerDownload(new Blob([csvContent], { type: "text/csv;charset=utf-8;" }), `clipcash-earnings-${monthStamp()}.csv`);
+          ...exportData.map((tx) => [
+            tx.date,
+            sanitizeCsvCell(tx.description),
+            tx.amount.toFixed(2),
+            sanitizeCsvCell(tx.platform),
+            tx.status,
+            sanitizeCsvCell(tx.taxId),
+          ]),
+        ]
+          .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+          .join("\r\n");
+        triggerDownload(
+          new Blob([csvContent], { type: "text/csv;charset=utf-8;" }),
+          `clipcash-earnings-${monthStamp()}.csv`
+        );
       } else if (format === "json") {
-        triggerDownload(new Blob([JSON.stringify({ summary, transactions: exportData }, null, 2)], { type: "application/json;charset=utf-8;" }), `clipcash-earnings-${monthStamp()}.json`);
+        triggerDownload(
+          new Blob([JSON.stringify({ summary, transactions: exportData }, null, 2)], {
+            type: "application/json;charset=utf-8;",
+          }),
+          `clipcash-earnings-${monthStamp()}.json`
+        );
       } else if (format === "pdf" && pdfWindow) {
         pdfWindow.document.write(generatePdfHtml(exportData));
         pdfWindow.document.close();
@@ -262,7 +311,7 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
         pdfWindow.print();
       }
     } catch (err) {
-      console.error("Export failed:", err);
+      logger.error("Export failed:", err);
       alert("Export failed. Please try again.");
     } finally {
       setExporting(false);
@@ -288,9 +337,12 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
     return (
       <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-8 flex flex-col items-center gap-3 text-center">
         <AlertCircle className="w-8 h-8 text-red-400" />
-        <p className="text-red-400 font-medium">Failed to load earnings</p>
+        <p className="text-red-400 font-medium">{FAILURE_MESSAGES.loadEarnings}</p>
         <p className="text-muted text-sm">{error}</p>
-        <button onClick={() => updateFilters({ page: 1 })} className="mt-2 text-sm text-brand hover:underline">
+        <button
+          onClick={() => updateFilters({ page: 1 })}
+          className="mt-2 text-sm text-brand hover:underline"
+        >
           Try again
         </button>
       </div>
@@ -316,10 +368,32 @@ export default function EarningsPageClient({ initialData }: EarningsPageClientPr
 
       {/* Stat cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Total Earned"   value={`$${summary.total}`}     trend={trends.totalTrend}     icon={DollarSign} />
-        <StatCard label="Completed"      value={`$${summary.completed}`} trend={trends.completedTrend} icon={TrendingUp} />
-        <StatCard label="Pending Payout" value={`$${summary.pending}`}   trend="Processing"            icon={Wallet}     hideTrendIcon />
-        <StatCard label="Tax Ready"      value={taxReady ? "✅ Yes" : "⏳ No"} trend={taxReady ? "Exportable" : "No completed transactions"} icon={FileText} hideTrendIcon />
+        <StatCard
+          label="Total Earned"
+          value={`$${summary.total}`}
+          trend={trends.totalTrend}
+          icon={DollarSign}
+        />
+        <StatCard
+          label="Completed"
+          value={`$${summary.completed}`}
+          trend={trends.completedTrend}
+          icon={TrendingUp}
+        />
+        <StatCard
+          label="Pending Payout"
+          value={`$${summary.pending}`}
+          trend="Processing"
+          icon={Wallet}
+          hideTrendIcon
+        />
+        <StatCard
+          label="Tax Ready"
+          value={taxReady ? "✅ Yes" : "⏳ No"}
+          trend={taxReady ? "Exportable" : "No completed transactions"}
+          icon={FileText}
+          hideTrendIcon
+        />
       </div>
 
       {/* Transactions table */}

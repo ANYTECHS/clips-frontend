@@ -1,23 +1,25 @@
 "use client";
 
-import React, { useState } from "react";
 import {
-  Shield,
-  Users,
-  Plus,
-  Trash2,
-  Loader2,
-  CheckCircle2,
   AlertCircle,
+  CheckCircle2,
+  Loader2,
+  Plus,
   Save,
+  Shield,
+  Trash2,
+  Users,
 } from "lucide-react";
-import { useToast } from "@/hooks/useToast";
-import { encryptWithPassword } from "@/app/lib/cryptoUtils";
-import { splitSecret } from "@/app/lib/shamirRecovery";
-import { MockApi } from "@/__mocks__/app/lib/mockApi";
-import { secureStorage } from "@/app/lib/secureStorage";
+import React, { useState } from "react";
 
-export { encryptWithPassword, decryptWithPassword } from "@/app/lib/cryptoUtils";
+import { MockApi } from "@/__mocks__/app/lib/mockApi";
+import { encryptWithPassword } from "@/app/lib/cryptoUtils";
+import { FAILURE_MESSAGES, safeErrorMessage, VALIDATION_MESSAGES } from "@/app/lib/errorMessages";
+import { secureStorage } from "@/app/lib/secureStorage";
+import { splitSecret } from "@/app/lib/shamirRecovery";
+import { useToast } from "@/hooks/useToast";
+
+export { decryptWithPassword,encryptWithPassword } from "@/app/lib/cryptoUtils";
 
 export default function SocialRecoveryConfig() {
   const { showToast } = useToast();
@@ -57,7 +59,7 @@ export default function SocialRecoveryConfig() {
 
     const validGuardians = guardians.filter((g) => g.email.trim());
     if (validGuardians.length < 2) {
-      setError("Add at least two guardians with email addresses.");
+      setError(VALIDATION_MESSAGES.guardiansRequired);
       return;
     }
     if (!recoveryPassword) {
@@ -95,8 +97,7 @@ export default function SocialRecoveryConfig() {
       setSaved(true);
       showToast("Social recovery configuration saved successfully.", "success");
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : "Failed to save social recovery configuration.";
-      setError(message);
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.saveSocialRecovery, "save social recovery"));
     } finally {
       setSaving(false);
     }
@@ -127,7 +128,8 @@ export default function SocialRecoveryConfig() {
         <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/20 flex gap-2 items-start">
           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
           <p className="text-[11px] text-emerald-300 leading-normal">
-            Social recovery configuration saved. Your encrypted backup has been split among your guardians.
+            Social recovery configuration saved. Your encrypted backup has been split among your
+            guardians.
           </p>
         </div>
       )}
@@ -198,7 +200,8 @@ export default function SocialRecoveryConfig() {
               ))}
             </div>
             <p className="text-[9px] text-muted-foreground mt-2">
-              You will need approval from {threshold} out of {guardians.length} guardians to recover your wallet.
+              You will need approval from {threshold} out of {guardians.length} guardians to recover
+              your wallet.
             </p>
           </div>
         )}
@@ -215,7 +218,8 @@ export default function SocialRecoveryConfig() {
             className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
           />
           <p className="text-[9px] text-muted-foreground">
-            This password encrypts your wallet backup. You will need it when recovering through guardians.
+            This password encrypts your wallet backup. You will need it when recovering through
+            guardians.
           </p>
         </div>
 

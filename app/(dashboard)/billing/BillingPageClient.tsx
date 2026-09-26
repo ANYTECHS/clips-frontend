@@ -8,21 +8,23 @@
  * and success-param handling remain fully client-side.
  */
 
-import React, { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import {
-  Check,
-  Zap,
-  Sparkles,
-  Shield,
-  ArrowRight,
-  Loader2,
   AlertCircle,
+  ArrowRight,
+  Check,
   CheckCircle2,
+  Loader2,
+  Shield,
+  Sparkles,
+  Zap,
 } from "lucide-react";
-import { useUserStore } from "@/app/store/userStore";
+import { useSearchParams } from "next/navigation";
+import React, { useEffect, useState } from "react";
+
 import type { BillingPlan } from "@/app/api/billing/plans/route";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import type { UserProfile } from "@/app/store/types";
+import { useUserStore } from "@/app/store/userStore";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -39,19 +41,18 @@ export interface BillingPageClientProps {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function BillingPageClient({
-  plans,
-  initialProfile,
-}: BillingPageClientProps) {
+export default function BillingPageClient({ plans, initialProfile }: BillingPageClientProps) {
   const searchParams = useSearchParams();
 
   // Seed the Zustand user store with server data on first render so the plan
   // badge and quota bar are correct without waiting for a client fetch.
-  const setProfile  = useUserStore((s) => s.setProfile);
-  const fetchUser   = useUserStore((s) => s.fetchUser);
+  const setProfile = useUserStore((s) => s.setProfile);
+  const fetchUser = useUserStore((s) => s.fetchUser);
   const currentPlan = useUserStore((s) => s.profile?.plan ?? initialProfile?.plan ?? "free");
-  const planUsage   = useUserStore((s) => s.profile?.planUsagePercent ?? initialProfile?.planUsagePercent ?? 0);
-  const quota       = useUserStore((s) => {
+  const planUsage = useUserStore(
+    (s) => s.profile?.planUsagePercent ?? initialProfile?.planUsagePercent ?? 0
+  );
+  const quota = useUserStore((s) => {
     const p = s.profile ?? initialProfile;
     if (!p) return 0;
     const limits: Record<string, number> = { free: 10, pro: 100, enterprise: 1000 };
@@ -67,25 +68,25 @@ export default function BillingPageClient({
       // Server fetch failed — fall back to client-side fetch.
       fetchUser();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [upgradingPlanId, setUpgradingPlanId] = useState<string | null>(null);
-  const [error, setError]                     = useState<string | null>(null);
-  const [successMessage, setSuccessMessage]   = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const isSuccess         = searchParams.get("success") === "true";
+  const isSuccess = searchParams.get("success") === "true";
   const upgradedPlanParam = searchParams.get("plan");
 
   // Handle return from Stripe checkout.
   useEffect(() => {
     if (isSuccess && upgradedPlanParam) {
       setSuccessMessage(
-        `Successfully upgraded to ${upgradedPlanParam.toUpperCase()} plan! Your transform quota has been updated.`,
+        `Successfully upgraded to ${upgradedPlanParam.toUpperCase()} plan! Your transform quota has been updated.`
       );
       fetchUser();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSuccess, upgradedPlanParam]);
 
   const handleUpgrade = async (planId: string) => {
@@ -103,7 +104,7 @@ export default function BillingPageClient({
       if (!res.ok || !data.url) throw new Error(data.error || "Failed to initiate checkout");
       window.location.href = data.url;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Checkout error");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.checkoutFailed, "start checkout"));
       setUpgradingPlanId(null);
     }
   };
@@ -120,9 +121,8 @@ export default function BillingPageClient({
           Manage Your Plan &amp; Quotas
         </h1>
         <p className="text-muted text-base max-w-2xl">
-          Scale your viral video clip engine. Upgrade anytime to unlock higher
-          AI transform quotas, 4K/8K export rendering, and priority GPU
-          processing.
+          Scale your viral video clip engine. Upgrade anytime to unlock higher AI transform quotas,
+          4K/8K export rendering, and priority GPU processing.
         </p>
       </div>
 
@@ -148,9 +148,7 @@ export default function BillingPageClient({
               Active Plan
             </span>
             <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-black text-white capitalize">
-                {currentPlan} Plan
-              </h2>
+              <h2 className="text-2xl font-black text-white capitalize">{currentPlan} Plan</h2>
               <span className="px-3 py-0.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-xs font-bold uppercase">
                 Active
               </span>
@@ -159,9 +157,7 @@ export default function BillingPageClient({
           <div className="flex items-center gap-6">
             <div className="text-right">
               <span className="text-xs text-muted block">Remaining Quota</span>
-              <span className="text-xl font-extrabold text-brand">
-                {quota} Transforms
-              </span>
+              <span className="text-xl font-extrabold text-brand">{quota} Transforms</span>
             </div>
           </div>
         </div>
@@ -179,28 +175,26 @@ export default function BillingPageClient({
                 planUsage >= 90
                   ? "bg-red-500 shadow-[0_0_12px_rgba(239,68,68,0.5)]"
                   : planUsage >= 70
-                  ? "bg-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.5)]"
-                  : "bg-brand shadow-[0_0_12px_rgba(0,229,143,0.5)]"
+                    ? "bg-yellow-400 shadow-[0_0_12px_rgba(250,204,21,0.5)]"
+                    : "bg-brand shadow-[0_0_12px_rgba(0,229,143,0.5)]"
               }`}
               style={{ width: `${Math.min(100, Math.max(0, planUsage))}%` }}
             />
           </div>
           <p className="text-xs text-muted">
-            Quotas reset at the beginning of each billing cycle. Upgrading
-            immediately adds new transform capacity.
+            Quotas reset at the beginning of each billing cycle. Upgrading immediately adds new
+            transform capacity.
           </p>
         </div>
       </div>
 
       {/* Plans grid */}
       <div className="space-y-6">
-        <h2 className="text-2xl font-extrabold text-white tracking-tight">
-          Available Plans
-        </h2>
+        <h2 className="text-2xl font-extrabold text-white tracking-tight">Available Plans</h2>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {plans.map((p) => {
-            const isCurrent  = currentPlan === p.id;
+            const isCurrent = currentPlan === p.id;
             const isUpgrading = upgradingPlanId === p.id;
 
             return (
@@ -284,8 +278,7 @@ export default function BillingPageClient({
           <Shield className="w-6 h-6 text-brand shrink-0" />
           <div className="text-xs text-muted">
             <span className="font-bold text-white block">Secure Stripe Checkout</span>
-            Encrypted payment processing. Upgrade or cancel anytime from your
-            billing dashboard.
+            Encrypted payment processing. Upgrade or cancel anytime from your billing dashboard.
           </div>
         </div>
       </div>

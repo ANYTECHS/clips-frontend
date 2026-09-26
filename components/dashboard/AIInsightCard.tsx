@@ -1,7 +1,9 @@
 "use client";
 
+import { AlertCircle,Sparkles } from "lucide-react";
 import React, { useEffect, useState } from "react";
-import { Sparkles, Loader2, AlertCircle } from "lucide-react";
+
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import { sanitize } from "@/app/lib/sanitize";
 
 interface Insight {
@@ -25,7 +27,7 @@ export default function AIInsightCard() {
     async function fetchInsights() {
       try {
         const response = await fetch("/api/insights");
-        
+
         if (response.status === 404) {
           setApiExists(false);
           setLoading(false);
@@ -39,7 +41,7 @@ export default function AIInsightCard() {
         const data = await response.json();
         setInsights(data.insights || []);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
+        setError(safeErrorMessage(err, FAILURE_MESSAGES.unexpected, "load insights"));
       } finally {
         setLoading(false);
       }
@@ -129,10 +131,7 @@ export default function AIInsightCard() {
       </div>
       <div className="space-y-3">
         {insights.map((insight) => (
-          <div
-            key={insight.id}
-            className="p-3 bg-white/5 rounded-lg border border-white/5"
-          >
+          <div key={insight.id} className="p-3 bg-white/5 rounded-lg border border-white/5">
             <p className="text-sm text-white">{sanitize(insight.text)}</p>
           </div>
         ))}

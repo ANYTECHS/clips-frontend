@@ -1,9 +1,17 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { MockApi } from "../../__mocks__/app/lib/mockApi";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
+import React, { useEffect,useState } from "react";
+
+import {
+  FAILURE_MESSAGES,
+  safeErrorMessage,
+  tooManyAttempts,
+  VALIDATION_MESSAGES,
+} from "@/app/lib/errorMessages";
+
+import { MockApi } from "../../__mocks__/app/lib/mockApi";
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -41,7 +49,7 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     if (!token) {
-      setError("Invalid or missing reset token.");
+      setError(VALIDATION_MESSAGES.invalidResetToken);
     }
   }, [token]);
 
@@ -69,7 +77,7 @@ export default function ResetPasswordPage() {
     }
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(VALIDATION_MESSAGES.passwordsMustMatch);
       return;
     }
 
@@ -83,15 +91,15 @@ export default function ResetPasswordPage() {
       }, 2000);
     } catch (err) {
       if (err instanceof Error) {
-        if (err.message === 'RATE_LIMIT_EXCEEDED') {
-          setError(countdown ? `Too many attempts. Please wait ${countdown} before trying again.` : "Too many requests. Please wait a moment and try again.");
-        } else if (err.message === 'Invalid or expired token') {
-          setError("This reset link is invalid or has expired. Please request a new one.");
+        if (err.message === "RATE_LIMIT_EXCEEDED") {
+          setError(countdown ? tooManyAttempts(countdown) : VALIDATION_MESSAGES.tooManyRequests);
+        } else if (err.message === "Invalid or expired token") {
+          setError(VALIDATION_MESSAGES.invalidResetToken);
         } else {
-          setError(err.message);
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.resetPassword, "reset password"));
         }
       } else {
-        setError("An unexpected error occurred");
+        setError(FAILURE_MESSAGES.unexpected);
       }
     } finally {
       setLoading(false);
@@ -102,9 +110,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md bg-surface/80 backdrop-blur-md rounded-[20px] p-8 shadow-lg border border-border">
         <h1 className="text-2xl font-bold text-white mb-2">Reset Password</h1>
-        <p className="text-muted text-sm mb-6">
-          Enter your new password below.
-        </p>
+        <p className="text-muted text-sm mb-6">Enter your new password below.</p>
 
         {message ? (
           <div className="text-center">
@@ -113,7 +119,10 @@ export default function ResetPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label htmlFor="password" className="block text-[13px] font-medium text-[#8e9895] mb-2">
+              <label
+                htmlFor="password"
+                className="block text-[13px] font-medium text-[#8e9895] mb-2"
+              >
                 New Password
               </label>
               <input
@@ -128,7 +137,10 @@ export default function ResetPasswordPage() {
             </div>
 
             <div>
-              <label htmlFor="confirmPassword" className="block text-[13px] font-medium text-[#8e9895] mb-2">
+              <label
+                htmlFor="confirmPassword"
+                className="block text-[13px] font-medium text-[#8e9895] mb-2"
+              >
                 Confirm New Password
               </label>
               <input

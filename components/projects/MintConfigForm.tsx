@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import { calculateStellarMintCost, formatXlm } from "@/app/lib/mintUtils";
 
 interface MintConfigFormProps {
@@ -169,10 +171,11 @@ export default function MintConfigForm({ onSubmit }: MintConfigFormProps) {
         listingPrice: values.listingPrice.trim(),
       });
     } catch (error) {
+      // The caught error goes to the logger with its stack; the user gets the
+      // catalogue string. Interpolating `error.message` here would leak system
+      // vocabulary into the UI and offer no next step.
       setServerError(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong while submitting the form.",
+        safeErrorMessage(error, FAILURE_MESSAGES.unexpected, "mint config"),
       );
     } finally {
       setIsSubmitting(false);

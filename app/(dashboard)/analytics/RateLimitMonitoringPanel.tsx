@@ -10,6 +10,8 @@
 
 import { useEffect, useState } from "react";
 
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
+
 interface RateLimitRouteSummary {
   route: string;
   requestCount: number;
@@ -46,7 +48,13 @@ export default function RateLimitMonitoringPanel() {
         if (!cancelled) setSummary(json);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load rate limit monitoring");
+          setError(
+            safeErrorMessage(
+              err,
+              FAILURE_MESSAGES.loadRateLimitMonitoring,
+              "load rate limit monitoring"
+            )
+          );
         }
       }
     }

@@ -1,6 +1,8 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+
+import { VALIDATION_MESSAGES } from "@/app/lib/errorMessages";
 import {
   MultiWalletRecord,
   MultiWalletStorage,
@@ -9,7 +11,8 @@ import {
 import { useAuth } from "@/components/auth/AuthProvider";
 
 // Analytics is optional — import lazily to avoid breaking tests that don't mock it
-let analytics: { trackEvent: (name: string, props?: Record<string, unknown>) => void } | null = null;
+let analytics: { trackEvent: (name: string, props?: Record<string, unknown>) => void } | null =
+  null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   analytics = require("@/lib/analytics").default;
@@ -83,7 +86,7 @@ export function MultiWalletProvider({ children }: { children: React.ReactNode })
       if (!user?.id) return;
       const target = wallets.find((w) => w.id === walletId);
       if (target?.isPrimary) {
-        setError("Cannot remove primary wallet");
+        setError(VALIDATION_MESSAGES.primaryWalletRequired);
         return;
       }
       MultiWalletStorage.removeWallet(user.id, walletId);

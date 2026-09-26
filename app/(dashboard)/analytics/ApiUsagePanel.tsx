@@ -10,6 +10,8 @@
 
 import { useEffect, useState } from "react";
 
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
+
 interface EndpointAnalytics {
   route: string;
   requestCount: number;
@@ -57,7 +59,7 @@ export default function ApiUsagePanel() {
         if (!cancelled) setSummary(json);
       } catch (err) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Failed to load API usage");
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.loadApiUsage, "load API usage"));
         }
       }
     }
@@ -111,9 +113,7 @@ export default function ApiUsagePanel() {
               <tr key={endpoint.route} className="border-t border-white/5">
                 <td className="py-2 pr-4 text-white font-mono text-xs">{endpoint.route}</td>
                 <td className="py-2 pr-4 text-white">{endpoint.requestCount}</td>
-                <td className="py-2 pr-4 text-white">
-                  {(endpoint.errorRate * 100).toFixed(1)}%
-                </td>
+                <td className="py-2 pr-4 text-white">{(endpoint.errorRate * 100).toFixed(1)}%</td>
                 <td className="py-2 pr-4 text-white">{endpoint.avgDurationMs}</td>
                 <td className="py-2 text-white">{endpoint.p95DurationMs}</td>
               </tr>

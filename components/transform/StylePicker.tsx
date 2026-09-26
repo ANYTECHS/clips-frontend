@@ -1,11 +1,14 @@
 "use client";
 
-import React, { useEffect, useState, useCallback } from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
-import Skeleton from "@/components/ui/Skeleton";
-import { StyleCard } from "./StyleCard";
+import React, { useCallback,useEffect, useState } from "react";
+
 import type { TransformStyle } from "@/app/api/transform/styles/route";
 import type { ApiResponse } from "@/app/api/types";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
+import Skeleton from "@/components/ui/Skeleton";
+
+import { StyleCard } from "./StyleCard";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -72,11 +75,7 @@ function useStyles(): UseStylesResult {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Unable to load transformation styles. Please try again.",
-          );
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.loadStyles, "load styles"));
         }
       } finally {
         if (!cancelled) {
@@ -138,10 +137,7 @@ interface ErrorStateProps {
 
 function StylePickerError({ message, onRetry }: ErrorStateProps) {
   return (
-    <div
-      role="alert"
-      className="flex flex-col items-center justify-center gap-4 py-16 text-center"
-    >
+    <div role="alert" className="flex flex-col items-center justify-center gap-4 py-16 text-center">
       <AlertCircle className="w-10 h-10 text-red-400" aria-hidden="true" />
       <div className="space-y-1">
         <p className="text-white font-bold text-sm">Failed to load styles</p>
@@ -183,7 +179,7 @@ export function StylePicker({
       onStyleSelect?.(name);
       onPreviewRequest?.(name);
     },
-    [disabled, onStyleSelect, onPreviewRequest],
+    [disabled, onStyleSelect, onPreviewRequest]
   );
 
   if (loading) {

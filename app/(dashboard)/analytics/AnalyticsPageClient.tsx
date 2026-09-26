@@ -8,14 +8,17 @@
  * filters. The CSV export uses the currently displayed data.
  */
 
-import React, { useState, useEffect, useRef } from "react";
-import StatCard from "@/components/dashboard/StatCard";
-import { Download, Eye, Clock, BarChart3, AlertCircle } from "lucide-react";
+import { AlertCircle,BarChart3, Clock, Download, Eye } from "lucide-react";
+import React, { useEffect, useRef,useState } from "react";
+
 import analytics from "@/app/lib/analytics";
+import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import type { AnalyticsData } from "@/app/lib/serverData";
+import StatCard from "@/components/dashboard/StatCard";
+
+import AdvancedAnalyticsPanel from "./AdvancedAnalyticsPanel";
 import ApiUsagePanel from "./ApiUsagePanel";
 import RateLimitMonitoringPanel from "./RateLimitMonitoringPanel";
-import AdvancedAnalyticsPanel from "./AdvancedAnalyticsPanel";
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -79,9 +82,7 @@ export default function AnalyticsPageClient({
         const params = new URLSearchParams();
         if (range !== "all") {
           const days = Number(range.replace("d", ""));
-          const startDate = new Date(Date.now() - days * 86_400_000)
-            .toISOString()
-            .split("T")[0];
+          const startDate = new Date(Date.now() - days * 86_400_000).toISOString().split("T")[0];
           params.set("startDate", startDate);
         }
         if (platform !== "all") params.set("platform", platform);
@@ -92,9 +93,7 @@ export default function AnalyticsPageClient({
         if (!cancelled) setData(json);
       } catch (err) {
         if (!cancelled)
-          setError(
-            err instanceof Error ? err.message : "Failed to load analytics",
-          );
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.loadAnalytics, "load analytics"));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -216,15 +215,11 @@ export default function AnalyticsPageClient({
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Engagement by platform */}
               <div className="bg-surface border border-white/5 rounded-2xl p-6">
-                <h3 className="text-white font-bold mb-4">
-                  Engagement by Platform
-                </h3>
+                <h3 className="text-white font-bold mb-4">Engagement by Platform</h3>
                 <div className="space-y-3">
                   {data.byPlatform.map((p) => (
                     <div key={p.platform} className="flex items-center justify-between">
-                      <span className="text-sm text-muted w-20 shrink-0">
-                        {p.platform}
-                      </span>
+                      <span className="text-sm text-muted w-20 shrink-0">{p.platform}</span>
                       <div className="flex-1 mx-4">
                         <div className="h-2 rounded-full bg-white/5 overflow-hidden">
                           <div
@@ -251,21 +246,14 @@ export default function AnalyticsPageClient({
                 <h3 className="text-white font-bold mb-4">Top 5 Clips</h3>
                 <div className="space-y-3">
                   {data.top5.map((clip, idx) => (
-                    <div
-                      key={clip.clipId}
-                      className="flex items-center justify-between"
-                    >
+                    <div key={clip.clipId} className="flex items-center justify-between">
                       <div className="min-w-0">
-                        <p className="text-sm text-white font-semibold truncate">
-                          {clip.title}
-                        </p>
+                        <p className="text-sm text-white font-semibold truncate">{clip.title}</p>
                         <p className="text-xs text-muted">
                           {clip.platform} · {clip.views.toLocaleString()} views
                         </p>
                       </div>
-                      <span className="text-xs text-muted w-6 text-right shrink-0">
-                        #{idx + 1}
-                      </span>
+                      <span className="text-xs text-muted w-6 text-right shrink-0">#{idx + 1}</span>
                     </div>
                   ))}
                   {data.top5.length === 0 && (

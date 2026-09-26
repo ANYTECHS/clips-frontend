@@ -1,28 +1,30 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import {
+  AlertCircle,
+  ArrowLeft,
+  CheckCircle2,
+  ChevronRight,
+  Key,
+  Loader2,
+  Lock,
+  Mail,
+  RefreshCw,
+  Shield,
+  Upload,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { useWalletActions } from "@/components/wallet/WalletProvider";
-import { restoreWalletFromMnemonic } from "@/app/lib/stellar";
+import React, { useRef,useState } from "react";
+
 import { decryptWithPassword } from "@/app/lib/cryptoUtils";
+import { FAILURE_MESSAGES, safeErrorMessage, VALIDATION_MESSAGES } from "@/app/lib/errorMessages";
 import { secureStorage } from "@/app/lib/secureStorage";
-import {
-  Shield,
-  Key,
-  Mail,
-  Lock,
-  ArrowLeft,
-  Loader2,
-  CheckCircle2,
-  AlertCircle,
-  Users,
-  ChevronRight,
-  RefreshCw,
-  Upload,
-} from "lucide-react";
+import { restoreWalletFromMnemonic } from "@/app/lib/stellar";
+import { useAuth } from "@/components/auth/AuthProvider";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import { useWalletActions } from "@/components/wallet/WalletProvider";
 
 export default function RecoveryPage() {
   const router = useRouter();
@@ -74,10 +76,10 @@ export default function RecoveryPage() {
     try {
       // 1. Reconstruct Stellar wallet
       const wallet = await restoreWalletFromMnemonic(phrase);
-      
+
       // 2. Load Stellar keys into secureStorage & wallet state
       await importStellarKey(wallet.secretKey);
-      
+
       // Sync the mnemonic phrase into storage if generated
       const stored = await secureStorage.getItem("clipcash_wallet");
       if (stored) {
@@ -101,7 +103,9 @@ export default function RecoveryPage() {
         router.push("/dashboard");
       }, 2000);
     } catch (err: any) {
-      setError(err.message || "Failed to recover wallet from mnemonic phrase.");
+      setError(
+        safeErrorMessage(err, FAILURE_MESSAGES.recoverFromMnemonic, "recover from mnemonic")
+      );
     } finally {
       setLoading(false);
     }
@@ -113,7 +117,7 @@ export default function RecoveryPage() {
     setSuccess("");
 
     if (!socialEmail) {
-      setError("Please enter your account email address.");
+      setError(VALIDATION_MESSAGES.emailRequired);
       return;
     }
 
@@ -132,7 +136,7 @@ export default function RecoveryPage() {
       setRecoveryGuardianCount(res.guardianCount);
       setIsRecoverable(false);
     } catch (err: any) {
-      setError(err.message || "Failed to find social recovery setup for this email.");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.findSocialRecovery, "find social recovery"));
     } finally {
       setLoading(false);
     }
@@ -179,7 +183,7 @@ export default function RecoveryPage() {
       setIsRecoverable(status.isRecoverable);
       setSuccess("Threshold reached! Guardians have approved your request.");
     } catch (err: any) {
-      setError(err.message || "Simulation failed.");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.simulationFailed, "simulate recovery"));
     } finally {
       setSimulating(false);
     }
@@ -191,7 +195,7 @@ export default function RecoveryPage() {
     setSuccess("");
 
     if (!recoveryPassword) {
-      setError("Please enter your recovery password.");
+      setError(VALIDATION_MESSAGES.recoveryPasswordRequired);
       return;
     }
 
@@ -207,7 +211,7 @@ export default function RecoveryPage() {
 
       // 2. Decrypt the key using user's password
       const decryptedBackup = await decryptWithPassword(status.encryptedBackup, recoveryPassword);
-      
+
       // 3. Restore and set session
       let wallet;
       if (decryptedBackup.startsWith("S") && decryptedBackup.length === 56) {
@@ -217,7 +221,7 @@ export default function RecoveryPage() {
         // Is mnemonic phrase
         wallet = await restoreWalletFromMnemonic(decryptedBackup);
         await importStellarKey(wallet.secretKey);
-        
+
         // Sync mnemonic
         const stored = await secureStorage.getItem("clipcash_wallet");
         if (stored) {
@@ -242,7 +246,7 @@ export default function RecoveryPage() {
         router.push("/dashboard");
       }, 2000);
     } catch (err: any) {
-      setError(err.message || "Decryption failed. Please check your recovery password.");
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.decryptBackup, "decrypt recovery password"));
     } finally {
       setLoading(false);
     }
@@ -254,11 +258,11 @@ export default function RecoveryPage() {
     setSuccess("");
 
     if (!encryptedFile) {
-      setError("Please select a backup file.");
+      setError(VALIDATION_MESSAGES.backupFileRequired);
       return;
     }
     if (!encryptedPassword) {
-      setError("Please enter your backup password.");
+      setError(VALIDATION_MESSAGES.backupPasswordRequired);
       return;
     }
 
@@ -267,7 +271,9 @@ export default function RecoveryPage() {
       const text = await encryptedFile.text();
       const backup = JSON.parse(text) as { ciphertext?: string; version?: number };
       if (!backup.ciphertext) {
-        throw new Error("Invalid backup file format. Expected a clipcash-wallet-backup.enc.json file.");
+        throw new Error(
+          "Invalid backup file format. Expected a clipcash-wallet-backup.enc.json file."
+        );
       }
 
       const decrypted = await decryptWithPassword(backup.ciphertext, encryptedPassword);
@@ -297,10 +303,14 @@ export default function RecoveryPage() {
       setTimeout(() => router.push("/dashboard"), 2000);
     } catch (err: any) {
       const msg = err?.message ?? "";
-      if (msg.includes("decrypt") || msg.includes("key") || msg.toLowerCase().includes("operation")) {
-        setError("Decryption failed. Check your password and try again.");
+      if (
+        msg.includes("decrypt") ||
+        msg.includes("key") ||
+        msg.toLowerCase().includes("operation")
+      ) {
+        setError(FAILURE_MESSAGES.decryptBackup);
       } else {
-        setError(msg || "Failed to restore from backup.");
+        setError(safeErrorMessage(err, FAILURE_MESSAGES.restoreFromBackup, "restore from backup"));
       }
     } finally {
       setLoading(false);
@@ -313,23 +323,30 @@ export default function RecoveryPage() {
 
       {/* Navigation Header */}
       <header className="p-6 border-b border-white/5 bg-[#050807]/30 backdrop-blur-md flex items-center justify-between relative z-10">
-        <Link href="/login" className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-white transition-colors">
+        <Link
+          href="/login"
+          className="flex items-center gap-2 text-xs font-bold text-muted-foreground hover:text-white transition-colors"
+        >
           <ArrowLeft className="w-4 h-4" />
           Back to Login
         </Link>
-        <span className="text-xs font-black tracking-widest text-brand uppercase">CLIPCASH WALLET</span>
+        <span className="text-xs font-black tracking-widest text-brand uppercase">
+          CLIPCASH WALLET
+        </span>
       </header>
 
       {/* Main Container */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative z-10">
         <div className="w-full max-w-md bg-[#080B0A] border border-white/5 rounded-[28px] p-6 md:p-8 shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-brand/20 via-brand to-brand/20" />
-          
+
           <div className="text-center mb-8">
             <div className="w-12 h-12 rounded-2xl bg-brand/10 border border-brand/20 flex items-center justify-center text-brand mx-auto mb-4">
               <Shield className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-white">Secure Wallet Recovery</h1>
+            <h1 className="text-2xl font-black tracking-tight text-white">
+              Secure Wallet Recovery
+            </h1>
             <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
               Restore your Stellar keys and account access using your backup configurations.
             </p>
@@ -399,7 +416,10 @@ export default function RecoveryPage() {
           {activeTab === "mnemonic" && (
             <form onSubmit={handleMnemonicRecovery} className="space-y-5">
               <div className="space-y-2">
-                <label htmlFor="mnemonic" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                <label
+                  htmlFor="mnemonic"
+                  className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider"
+                >
                   Enter 12-Word Phrase
                 </label>
                 <textarea
@@ -415,7 +435,8 @@ export default function RecoveryPage() {
               <div className="bg-white/[0.01] border border-white/5 rounded-xl p-3.5 flex gap-2.5">
                 <Key className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                 <p className="text-[10px] text-muted-foreground leading-normal">
-                  Your seed phrase derived key pair remains strictly client-side. The recovery process decrypts and registers keys in secure local memory.
+                  Your seed phrase derived key pair remains strictly client-side. The recovery
+                  process decrypts and registers keys in secure local memory.
                 </p>
               </div>
 
@@ -425,7 +446,9 @@ export default function RecoveryPage() {
                 className="w-full py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-40"
               >
                 {loading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Restoring Wallet...</>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Restoring Wallet...
+                  </>
                 ) : (
                   <>
                     <span>Recover Wallet</span>
@@ -451,7 +474,10 @@ export default function RecoveryPage() {
                   {encryptedFile ? (
                     <span className="text-white font-medium">{encryptedFile.name}</span>
                   ) : (
-                    <span>Click to select <strong className="text-white">clipcash-wallet-backup.enc.json</strong></span>
+                    <span>
+                      Click to select{" "}
+                      <strong className="text-white">clipcash-wallet-backup.enc.json</strong>
+                    </span>
                   )}
                 </div>
                 <input
@@ -464,7 +490,10 @@ export default function RecoveryPage() {
               </div>
 
               <div className="space-y-2">
-                <label htmlFor="encrypted-password" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                <label
+                  htmlFor="encrypted-password"
+                  className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider"
+                >
                   Backup Password
                 </label>
                 <div className="relative">
@@ -484,7 +513,8 @@ export default function RecoveryPage() {
               <div className="bg-white/[0.01] border border-white/5 rounded-xl p-3.5 flex gap-2.5">
                 <Key className="w-4 h-4 text-brand shrink-0 mt-0.5" />
                 <p className="text-[10px] text-muted-foreground leading-normal">
-                  Decryption is performed entirely client-side using AES-GCM. Your password never leaves your device.
+                  Decryption is performed entirely client-side using AES-GCM. Your password never
+                  leaves your device.
                 </p>
               </div>
 
@@ -494,7 +524,9 @@ export default function RecoveryPage() {
                 className="w-full py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-40"
               >
                 {loading ? (
-                  <><Loader2 className="w-4 h-4 animate-spin" /> Decrypting Backup…</>
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" /> Decrypting Backup…
+                  </>
                 ) : (
                   <>
                     <span>Restore from Backup</span>
@@ -511,7 +543,10 @@ export default function RecoveryPage() {
               {!sessionId ? (
                 <form onSubmit={handleInitiateSocialRecovery} className="space-y-5">
                   <div className="space-y-2">
-                    <label htmlFor="email" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider">
+                    <label
+                      htmlFor="email"
+                      className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider"
+                    >
                       Account Email Address
                     </label>
                     <div className="relative">
@@ -533,7 +568,9 @@ export default function RecoveryPage() {
                     className="w-full py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-40"
                   >
                     {loading ? (
-                      <><Loader2 className="w-4 h-4 animate-spin" /> Verifying Configuration...</>
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" /> Verifying Configuration...
+                      </>
                     ) : (
                       <>
                         <span>Find Social Backup</span>
@@ -551,15 +588,20 @@ export default function RecoveryPage() {
                         <Users className="w-3.5 h-3.5 text-brand" /> Guardian Approvals
                       </span>
                       <span className="text-[10px] font-mono text-brand font-bold bg-brand/10 border border-brand/20 px-2.5 py-0.5 rounded-full">
-                        {guardians.filter((g) => g.approved).length} / {recoveryThreshold} required (
-                        {recoveryThreshold}-of-{recoveryGuardianCount})
+                        {guardians.filter((g) => g.approved).length} / {recoveryThreshold} required
+                        ({recoveryThreshold}-of-{recoveryGuardianCount})
                       </span>
                     </div>
 
                     <div className="bg-[#111613] border border-white/5 rounded-xl divide-y divide-white/5 overflow-hidden">
                       {guardians.map((guardian, i) => (
-                        <div key={i} className="px-4 py-3 flex items-center justify-between text-xs">
-                          <span className="text-white font-medium truncate max-w-[200px]">{guardian.email}</span>
+                        <div
+                          key={i}
+                          className="px-4 py-3 flex items-center justify-between text-xs"
+                        >
+                          <span className="text-white font-medium truncate max-w-[200px]">
+                            {guardian.email}
+                          </span>
                           <span
                             className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase ${
                               guardian.approved
@@ -582,7 +624,10 @@ export default function RecoveryPage() {
                       className="w-full py-3.5 rounded-xl bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
                     >
                       {simulating ? (
-                        <><RefreshCw className="w-3.5 h-3.5 animate-spin" /> Gathering Guardian Signatures...</>
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Gathering Guardian
+                          Signatures...
+                        </>
                       ) : (
                         "Simulate Guardian Approvals"
                       )}
@@ -590,9 +635,15 @@ export default function RecoveryPage() {
                   )}
 
                   {isRecoverable && (
-                    <form onSubmit={handleCompleteSocialRecovery} className="space-y-4 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <form
+                      onSubmit={handleCompleteSocialRecovery}
+                      className="space-y-4 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300"
+                    >
                       <div className="space-y-2">
-                        <label htmlFor="recovery-password" className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                        <label
+                          htmlFor="recovery-password"
+                          className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"
+                        >
                           <Lock className="w-3.5 h-3.5 text-brand" /> Decrypt Recovery Secret
                         </label>
                         <input
@@ -611,7 +662,9 @@ export default function RecoveryPage() {
                         className="w-full py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
                       >
                         {loading ? (
-                          <><Loader2 className="w-4 h-4 animate-spin" /> Decrypting Keypair...</>
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" /> Decrypting Keypair...
+                          </>
                         ) : (
                           "Decrypt & Restore Wallet"
                         )}
