@@ -98,6 +98,26 @@ When you're ready to release a new version:
 - Never commit secrets or private keys. `.env.local` is ignored by git.
 - Use native Web Crypto APIs for local encryption when applicable (see project docs).
 
+### Avoiding nested ternaries
+Nested ternary operators (`a ? b : c ? d : e`) are hard to read and easy to get wrong. Prefer explicit `if`/`else` statements (or early returns) over chained ternaries.
+
+```ts
+// Bad: nested ternary
+const label = isLoading ? 'Loading…' : hasError ? 'Error' : 'Ready';
+
+// Good: if/else
+let label: string;
+if (isLoading) {
+  label = 'Loading…';
+} else if (hasError) {
+  label = 'Error';
+} else {
+  label = 'Ready';
+}
+```
+
+A single, non-nested ternary used for a simple value selection is fine. When a ternary would need to be nested, refactor it into `if`/`else` statements or a small helper function. The ESLint config enforces this with the `no-nested-ternary` rule; run `npm run lint` before opening a PR and fix any violations rather than disabling the rule inline.
+
 ## CSS naming conventions (BEM)
 We use **BEM** (Block, Element, Modifier) for all CSS class names to keep styles predictable and collision-free. This applies to custom CSS, CSS Modules, and any non-utility class names (Tailwind utility classes are exempt).
 
