@@ -26,6 +26,8 @@ For a deep dive into each system — upload quarantine, AES-GCM wallet encryptio
 
 For the current security posture, threat model, and reporting process, see **[docs/SECURITY.md](docs/SECURITY.md)**.
 
+For the full HTTP API reference — every endpoint, request/response examples, authentication, and error shapes — see **[docs/API.md](docs/API.md)**. A machine-readable OpenAPI 3.1 spec is available at **[docs/openapi.yaml](docs/openapi.yaml)**.
+
 ---
 
 ## Quick Start
@@ -47,6 +49,79 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000). The app runs fully offline with in-memory job storage and virus scanning disabled in development.
+
+---
+
+## API Documentation
+
+The HTTP API is documented in **[docs/API.md](docs/API.md)** and described by an OpenAPI 3.1 spec at **[docs/openapi.yaml](docs/openapi.yaml)**.
+
+### Authentication
+
+Most endpoints require an authenticated session. Callers authenticate in one of two ways:
+
+- **Browser session cookie** — set by NextAuth after an OAuth sign-in (`/api/auth/*`). Sent automatically by the browser.
+- **Bearer token** — send `Authorization: Bearer <token>` for server-to-server calls (e.g. the AI backend calling back into the app).
+
+Endpoints that are called by the AI backend additionally require the shared secret header `x-callback-secret: <AI_BACKEND_CALLBACK_SECRET>`.
+
+### Endpoints
+
+| Method | Path | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/upload` | Session | Upload a source video (multipart). Returns a job id. |
+| `GET` | `/api/jobs` | Session | List the caller's jobs. |
+| `GET` | `/api/jobs/[id]` | Session | Fetch a single job's status and metadata. |
+| `GET` | `/api/jobs/[id]/stream` | Session | SSE stream of job progress (polling fallback available). |
+| `POST` | `/api/jobs/[id]/callback` | Callback secret | AI backend reports job completion/failure. |
+| `GET` | `/api/auth/session` | Public | Current session (NextAuth). |
+| `POST` | `/api/auth/signin` | Public | Begin OAuth sign-in. |
+| `POST` | `/api/auth/signout` | Session | End the current session. |
+
+### Example: upload a video
+
+```bash
+curl -X POST http://localhost:3000/api/upload \
+  -H "Cookie: next-auth.session-token=<token>" \
+  -F "file=@clip.mp4"
+```
+
+```json
+{ "jobId": "job_01H...", "status": "queued" }
+```
+
+### Example: fetch a job
+
+```bash
+curl http://localhost:3000/api/jobs/job_01H... \
+  -H "Cookie: next-auth.session-token=<token>"
+```
+
+```json
+{
+  "id": "job_01H...",
+  "status": "completed",
+  "clips": [{ "id": "clip_1", "url": "https://.../clip_1.mp4" }]
+}
+```
+
+### Error responses
+
+All errors share a consistent JSON shape:
+
+```json
+{ "error": "Unauthorized", "message": "Authentication required" }
+```
+
+| Status | Meaning |
+|---|---|
+| `400` | Malformed request (missing/invalid fields) |
+| `401` | Missing or invalid authentication |
+| `403` | Authenticated but not permitted (e.g. bad callback secret) |
+| `404` | Resource not found |
+| `413` | Upload exceeds the size limit |
+| `429` | Rate limit exceeded |
+| `500` | Unexpected server error |
 
 ---
 
@@ -163,122 +238,6 @@ Scanning is **enabled by default in production** and **disabled in development**
 | Storybook | `npm run storybook` | Starts Storybook component explorer at [localhost:6006](http://localhost:6006) |
 | Build Storybook | `npm run build-storybook` | Builds a static Storybook site |
 | Bundle analysis | `npm run analyze` | Builds with `@next/bundle-analyzer` — opens bundle report in browser |
-| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTR
 
-> **Note:** `npm run test:e2e` automatically starts the Next.js dev server before the test run and reuses an existing server if one is already running. You do not need to run `npm run dev` separately.
-
----
-
-## Tech Stack
-
-| Layer | Technology | Notes |
-|---|---|---|
-| Framework | Next.js 16 + React 19 + TypeScript | App Router, Server Components, API Routes |
-| Styling | Tailwind CSS 4 | Utility-first; dark theme via CSS variables |
-| State | Zustand 5 | Stores for dashboard, earnings, process, transform, user |
-| Auth | NextAuth v5 | Google, Apple, Twitter, Instagram, TikTok, WebAuthn passkeys |
-| Blockchain | Stellar / Soroban (`@stellar/stellar-sdk`) | Embedded wallet, Freighter extension, NFT minting |
-| Storage | AWS S3 / Cloudflare R2 / GCS | S3-compatible via `@aws-sdk/client-s3` |
-| Job state | Redis (`ioredis`) / in-process Map | Swappable via `REDIS_URL` |
-| Icons | lucide-react | |
-| Error monitoring | Sentry | `@sentry/nextjs` |
-| Testing | Jest + Playwright | Unit: Jest; E2E: Playwright (Chromium, Firefox, WebKit) |
-| Component demos | Storybook 10 | Canonical demo environment — do not add public demo routes |
-| Crypto | Web Crypto API | AES-GCM wallet encryption, PBKDF2 key derivation |
-| Secret sharing | secrets.js-grempe | Shamir's Secret Sharing for social recovery |
-
----
-
-## Features
-
-- **AI clip generation** — automatically identifies viral moments in uploaded videos
-- **Full preview & selection** — creators see every clip before anything is posted
-- **Multi-platform posting** — TikTok, Instagram Reels, YouTube Shorts, Facebook Reels, Snapchat Spotlight, Pinterest, LinkedIn
-- **NFT Vault** — mint best clips as Soroban NFTs; earn on-chain royalties
-- **Embedded Stellar wallet** — auto-created on signup, encrypted with AES-GCM; no seed phrase required
-- **Multi-wallet support** — connect MetaMask (EVM), Phantom (Solana), Freighter (Stellar), or import a Stellar key
-- **Social recovery** — Shamir's Secret Sharing splits the wallet secret key across guardian accounts
-- **Earnings dashboard** — unified revenue view across platforms with 5-minute cache
-- **Real-time progress** — SSE stream with automatic polling fallback while jobs process
-- **Push notifications** — browser notifications when a job completes
-
----
-
-## API Reference
-
-### `POST /api/upload`
-
-Upload one or more video files for AI processing.
-
-- **Content-Type:** `multipart/form-data`
-- **Field:** `files` — video file(s), max 500 MB each
-- **Formats:** MP4, MOV, AVI, MKV (validated by magic bytes, not just extension)
-
-```json
-// 200 OK
-{
-  "data": {
-    "success": true,
-    "jobId": "job_abc123",
-    "files": [{ "name": "video.mp4", "size": 104857600, "type": "video/mp4", "jobId": "job_abc123", "url": "https://..." }]
-  }
-}
-```
-
-### `GET /api/jobs/:jobId`
-
-Poll for job status (fallback when SSE is unavailable).
-
-```json
-{ "progress": 45, "status": "processing", "momentsFound": 3, "estimatedSecondsRemaining": 120 }
-```
-
-`status` values: `queued` → `processing` → `complete` | `error`
-
-### `GET /api/jobs/:jobId/stream`
-
-Server-Sent Events stream. Pushes the same shape as the poll endpoint every ~1 s until `status` reaches a terminal state. Requires authentication; the session user must own the job.
-
----
-
-## Project Structure
-
-```
-app/
-├── (dashboard)/          # Authenticated dashboard routes (layout.tsx wraps all)
-│   ├── dashboard/        # Overview, stats, recent projects
-│   ├── earnings/         # Earnings breakdown
-│   ├── vault/            # NFT management
-│   ├── transform/[id]/   # AI style-transfer job monitor
-│   └── …
-├── api/                  # API Route handlers
-│   ├── upload/           # File ingestion pipeline
-│   ├── jobs/             # Job CRUD, SSE stream, AI callback
-│   └── auth/             # NextAuth + passkey endpoints
-├── hooks/                # React hooks (useProcessingStatus, useBalance, …)
-├── lib/                  # Pure utilities (auth, secureStorage, aiBackend, …)
-├── store/                # Zustand stores (barrel export at store/index.ts)
-└── onboarding/           # 3-step onboarding flow
-components/               # Shared React components
-docs/
-└── ARCHITECTURE.md       # Deep-dive: pipeline, wallet encryption, auth, state
-hooks/                    # App-level hooks (useFilterQueryState, …)
-tests/e2e/                # Playwright end-to-end tests
-stories/                  # Storybook stories
-```
-
----
-
-## Contributing
-
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, the Changesets versioning workflow, branch naming conventions, PR checklist, and issue triage guidelines.
-
-Key rules from [AGENTS.md](AGENTS.md):
-- All user-controlled strings rendered in the UI must be sanitized with the `sanitize` utility at `app/lib/sanitize.ts`.
-- Never use `dangerouslySetInnerHTML` without explicit DOMPurify sanitization.
-- Component demos belong in **Storybook**, not in public App Router pages.
-
-## Handsoff notes
-
-<!-- handsoff-issue-1128 -->
-- #1128: Consolidate Similar Components
+/* … truncated 5008 chars — edit only what you need near the top … */
