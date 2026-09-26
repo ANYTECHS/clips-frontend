@@ -166,6 +166,8 @@ All errors share a consistent JSON shape:
 
 Copy `.env.example` to `.env.local` and fill in the values. The most common variables are summarised below. The **complete reference**, with required/optional status, defaults, examples and security notes, is in **[docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)**.
 
+For the production release procedure, environment setup, deployment checklists, monitoring, and rollback steps, see the **[Deployment Runbook](docs/DEPLOYMENT_RUNBOOK.md)**.
+
 ### Auth
 
 | Variable | Required | Default | Description | Example |
