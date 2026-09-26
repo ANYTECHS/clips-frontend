@@ -51,3 +51,8 @@ storybook-static
 # mimocode
 .mimocode/
 .mimo/
+
+# Agent tooling scratch. Holds a full git worktree, so leaving it unignored
+# means a duplicate of every file in the repo — enough to make `git status`
+# unreadable and to trip jest's haste-map collision check on each run.
+.kilo/

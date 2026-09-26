@@ -1,0 +1,33 @@
+{
+  "$comment": "ESLint counts per severity:rule. CI fails when any count rises. Regenerate with `npm run lint:baseline` — only after a change that earns it.",
+  "counts": {
+    "warning:simple-import-sort/imports": 547,
+    "error:@typescript-eslint/naming-convention": 458,
+    "warning:no-magic-numbers": 279,
+    "error:@typescript-eslint/no-explicit-any": 229,
+    "warning:max-lines-per-function": 164,
+    "warning:complexity": 128,
+    "warning:@typescript-eslint/no-unused-vars": 89,
+    "warning:unused-imports/no-unused-vars": 81,
+    "warning:no-console": 75,
+    "error:storybook/no-renderer-packages": 51,
+    "warning:no-restricted-imports": 29,
+    "warning:simple-import-sort/exports": 29,
+    "error:react-hooks/refs": 28,
+    "error:@typescript-eslint/no-require-imports": 14,
+    "error:react-hooks/set-state-in-effect": 12,
+    "error:parse-error": 11,
+    "warning:react-hooks/exhaustive-deps": 10,
+    "error:react-hooks/rules-of-hooks": 8,
+    "error:react/no-unescaped-entities": 3,
+    "warning:parse-error": 3,
+    "error:react-hooks/purity": 2,
+    "error:react/jsx-no-undef": 2,
+    "warning:storybook/no-redundant-story-name": 2,
+    "error:prefer-const": 1,
+    "warning:@next/next/google-font-preconnect": 1,
+    "warning:@next/next/no-img-element": 1,
+    "warning:@typescript-eslint/no-unused-expressions": 1,
+    "warning:max-depth": 1
+  }
+}
