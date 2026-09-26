@@ -115,6 +115,7 @@ export const Filters: StoryObj = {
     const [captionsStyle, setCaptionsStyle] = useState("All Styles");
     const [viralityLevels, setViralityLevels] = useState(["high", "medium", "low"]);
     const [vaultFilter, setVaultFilter] = useState("pending");
+    const [selectedTags, setSelectedTags] = useState<string[]>([]);
 
     return (
       <div className="w-64 bg-background p-6">
@@ -122,6 +123,9 @@ export const Filters: StoryObj = {
           captionsStyle={captionsStyle}
           onCaptionsStyleChange={setCaptionsStyle}
           viralityLevels={viralityLevels}
+          selectedTags={selectedTags}
+          onTagsChange={setSelectedTags}
+          availableTags={["gaming", "tutorial", "funny", "highlights"]}
           onViralityLevelToggle={(level) => setViralityLevels(prev => prev.includes(level) ? prev.filter(l => l !== level) : [...prev, level])}
           activeFilterCount={3}
           onResetFilters={() => {

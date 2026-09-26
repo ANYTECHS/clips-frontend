@@ -13,6 +13,7 @@
 
 import React, { useRef, useState, useEffect } from "react";
 import { Copy, Fullscreen, Share2, Sparkles, Maximize2, X } from "lucide-react";
+import { useVideoReleaseAll } from "@/app/hooks/useVideoRelease";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -111,6 +112,10 @@ function SyncedVideos({
 }: SyncedVideosProps) {
   const origRef = useRef<HTMLVideoElement>(null);
   const transRef = useRef<HTMLVideoElement>(null);
+
+  // Both sources change on every new transform while the component stays
+  // mounted, orphaning the previous buffers in place (#1066).
+  useVideoReleaseAll([origRef, transRef], `${originalUrl}|${transformedUrl}`);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);

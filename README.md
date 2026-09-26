@@ -52,7 +52,7 @@ Open [http://localhost:3000](http://localhost:3000). The app runs fully offline 
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in the values. The table below lists every variable; required ones will cause the server to fail or the feature to be silently broken if omitted.
+Copy `.env.example` to `.env.local` and fill in the values. The most common variables are summarised below. The **complete reference**, with required/optional status, defaults, examples and security notes, is in **[docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)**.
 
 ### Auth
 
@@ -271,7 +271,7 @@ stories/                  # Storybook stories
 
 ## Contributing
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, the Changesets versioning workflow, branch naming conventions, PR checklist, and issue triage guidelines.
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for onboarding, local setup, contribution guidelines, the code review process, good first issues and where to ask questions. Browse the component library with `npm run storybook`; see [STORYBOOK.md](STORYBOOK.md) for how it is deployed.
 
 Key rules from [AGENTS.md](AGENTS.md):
 - All user-controlled strings rendered in the UI must be sanitized with the `sanitize` utility at `app/lib/sanitize.ts`.

@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from "react";
 import { Pause, Play } from "lucide-react";
+import { useVideoReleaseAll } from "@/app/hooks/useVideoRelease";
 
 interface ComparisonPlayerProps {
   originalSrc: string;
@@ -12,6 +13,11 @@ export default function ComparisonPlayer({ originalSrc, transformedSrc }: Compar
   const origRef = useRef<HTMLVideoElement>(null);
   const transRef = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+
+  // Two videos, and both sources change every time a new transform finishes —
+  // the case a plain unmount cleanup misses, because the elements stay mounted
+  // and the previous resources are orphaned in place (#1066).
+  useVideoReleaseAll([origRef, transRef], `${originalSrc}|${transformedSrc}`);
 
   const toggle = () => {
     const orig = origRef.current;
@@ -38,6 +44,7 @@ export default function ComparisonPlayer({ originalSrc, transformedSrc }: Compar
             className="w-full rounded-2xl border border-white/10 bg-black aspect-video object-contain"
             playsInline
             loop
+            preload="metadata"
           />
         </div>
         <div className="space-y-2">
@@ -48,6 +55,7 @@ export default function ComparisonPlayer({ originalSrc, transformedSrc }: Compar
             className="w-full rounded-2xl border border-brand/20 bg-black aspect-video object-contain"
             playsInline
             loop
+            preload="metadata"
           />
         </div>
       </div>

@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { X, Play, Pause, Volume2, VolumeX, Share2, TrendingUp } from "lucide-react";
 import type { Clip } from "./ClipGrid";
 import { useWillChange } from "@/app/hooks/useWillChange";
+import { useVideoRelease } from "@/app/hooks/useVideoRelease";
 
 export interface ClipPreviewModalProps {
   clip: Clip;
@@ -15,6 +16,10 @@ export default function ClipPreviewModal({ clip, onClose }: ClipPreviewModalProp
   const [isMuted, setIsMuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const panelRef = useWillChange<HTMLDivElement>("transform, opacity");
+
+  // The modal is opened and closed repeatedly against different clips, so an
+  // unreleased buffer per preview is exactly how this accumulates (#1066).
+  useVideoRelease(videoRef, clip.videoUrl);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -68,6 +73,7 @@ export default function ClipPreviewModal({ clip, onClose }: ClipPreviewModalProp
             className="w-full h-full object-contain"
             loop
             playsInline
+            preload="metadata"
             onClick={togglePlay}
             onPlay={() => setIsPlaying(true)}
             onPause={() => setIsPlaying(false)}

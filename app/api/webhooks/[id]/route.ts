@@ -1,87 +1,114 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/app/lib/auth";
-import { checkCsrf } from "@/app/lib/csrf";
-import { parseRequestJson } from "@/app/lib/parseRequestJson";
-import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
-import { updateWebhookBodySchema } from "@/app/api/schemas/index";
-import { webhookStore } from "@/app/lib/webhooks/webhookStore";
-import type { WebhookEndpoint } from "@/app/lib/webhooks/types";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { prisma } from "@/app/lib/prisma";
+import { z } from "zod";
 
-const WEBHOOK_ID_RE = /^wh_[a-zA-Z0-9-]{1,64}$/;
+const updateWebhookSchema = z.object({
+  url: z.string().url().optional(),
+  events: z.array(z.string()).optional(),
+  secret: z.string().min(16).optional(),
+  description: z.string().optional(),
+  active: z.boolean().optional(),
+});
 
-function validateWebhookId(id: string): NextResponse | null {
-  if (!WEBHOOK_ID_RE.test(id)) {
-    return NextResponse.json({ error: "Invalid webhook id format" }, { status: 400 });
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const webhook = await prisma.webhook.findFirst({
+      where: {
+        id: params.id,
+        userId: session.user.id,
+      },
+      include: {
+        deliveries: {
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        },
+      },
+    });
+
+    if (!webhook) {
+      return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ webhook });
+  } catch (error) {
+    console.error("Error fetching webhook:", error);
+    return NextResponse.json({ error: "Failed to fetch webhook" }, { status: 500 });
   }
-  return null;
-}
-
-function toPublicEndpoint(endpoint: WebhookEndpoint) {
-  const { secret: _secret, ...publicEndpoint } = endpoint;
-  return publicEndpoint;
 }
 
 export async function PATCH(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  const rateLimited = await applyCustomRateLimit(request, "/api/webhooks/[id]");
-  if (rateLimited) return rateLimited;
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const csrfError = checkCsrf(request);
-  if (csrfError) return csrfError;
+    const body = await req.json();
+    const validatedData = updateWebhookSchema.parse(body);
 
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const webhook = await prisma.webhook.updateMany({
+      where: {
+        id: params.id,
+        userId: session.user.id,
+      },
+      data: validatedData,
+    });
+
+    if (webhook.count === 0) {
+      return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+    }
+
+    const updatedWebhook = await prisma.webhook.findUnique({
+      where: { id: params.id },
+    });
+
+    return NextResponse.json({ webhook: updatedWebhook });
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
+    }
+    console.error("Error updating webhook:", error);
+    return NextResponse.json({ error: "Failed to update webhook" }, { status: 500 });
   }
-
-  const { id } = await context.params;
-  const idError = validateWebhookId(id);
-  if (idError) return idError;
-
-  const parsed = await parseRequestJson(request);
-  if (!parsed.ok) return parsed.response;
-
-  const validation = updateWebhookBodySchema.safeParse(parsed.body);
-  if (!validation.success) {
-    return NextResponse.json(
-      { error: "Validation failed", issues: validation.error.issues },
-      { status: 400 }
-    );
-  }
-
-  const updated = webhookStore.update(id, session.user.id, validation.data);
-  if (!updated) {
-    return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ data: toPublicEndpoint(updated), error: null });
 }
 
 export async function DELETE(
-  request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  req: NextRequest,
+  { params }: { params: { id: string } }
 ) {
-  const rateLimited = await applyCustomRateLimit(request, "/api/webhooks/[id]");
-  if (rateLimited) return rateLimited;
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-  const csrfError = checkCsrf(request);
-  if (csrfError) return csrfError;
+    const webhook = await prisma.webhook.deleteMany({
+      where: {
+        id: params.id,
+        userId: session.user.id,
+      },
+    });
 
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (webhook.count === 0) {
+      return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting webhook:", error);
+    return NextResponse.json({ error: "Failed to delete webhook" }, { status: 500 });
   }
-
-  const { id } = await context.params;
-  const idError = validateWebhookId(id);
-  if (idError) return idError;
-
-  const removed = webhookStore.remove(id, session.user.id);
-  if (!removed) {
-    return NextResponse.json({ error: "Webhook not found" }, { status: 404 });
-  }
-
-  return NextResponse.json({ data: { id }, error: null });
 }
