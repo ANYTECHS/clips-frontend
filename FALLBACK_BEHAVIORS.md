@@ -9,7 +9,7 @@ environment variables control the behavior.
 ## Circuit Breaker Overview
 
 All external service calls are protected by a **circuit breaker** implemented
-in `app/lib/circuitBreaker.ts`. The breaker transitions through three states:
+in `app/lib/circuit-breaker.ts`. The breaker transitions through three states:
 
 | State | Meaning | Behavior |
 |-------|---------|----------|
@@ -32,7 +32,7 @@ The current state of all breakers is exposed at
 
 ---
 
-## 1. AI Backend (`app/lib/aiBackend.ts`)
+## 1. AI Backend (`app/lib/ai-backend.ts`)
 
 ### What it does
 Dispatches video processing jobs to the remote AI service via
@@ -60,7 +60,7 @@ Dispatches video processing jobs to the remote AI service via
 
 ---
 
-## 2. Virus Scanning (`app/lib/virusScan.ts`)
+## 2. Virus Scanning (`app/lib/virus-scan.ts`)
 
 ### What it does
 Scans every uploaded file buffer before it leaves the quarantine prefix.
@@ -102,7 +102,7 @@ When `VIRUS_SCAN_ALLOW_ON_FAILURE=true`:
 
 ---
 
-## 3. Cloud Storage — S3/R2/GCS (`app/lib/cloudStorage.ts`)
+## 3. Cloud Storage — S3/R2/GCS (`app/lib/cloud-storage.ts`)
 
 ### What it does
 All file operations (upload, quarantine, move, delete) go through the AWS S3
@@ -131,7 +131,7 @@ the retry loop and go straight to circuit-breaker failure recording.
 
 ---
 
-## 4. Redis / Job Store (`app/api/jobs/shared/jobStore.ts`)
+## 4. Redis / Job Store (`app/api/jobs/shared/job-store.ts`)
 
 ### What it does
 Stores job state (progress, status, error). Redis when `REDIS_URL` is set,
