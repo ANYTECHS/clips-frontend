@@ -9,9 +9,12 @@
  */
 
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
-import type { ProcessState, ProcessActions, ProcessStatus } from "./types";
+import { createJSONStorage,persist } from "zustand/middleware";
+
+import { logger } from "@/app/lib/logger";
 import { secureStorage } from "@/app/lib/secureStorage";
+
+import type { ProcessActions, ProcessState, ProcessStatus } from "./types";
 
 // ─── Default state ────────────────────────────────────────────────────────────
 
@@ -43,7 +46,7 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
       startProcess: (id: string, label: string): string => {
         if (!id) {
           if (process.env.NODE_ENV === "development") {
-            console.warn("useProcessStore.startProcess: no id provided, auto-generating one.");
+            logger.warn("useProcessStore.startProcess: no id provided, auto-generating one.");
           }
           id = crypto.randomUUID();
         }
@@ -60,14 +63,9 @@ export const useProcessStore = create<ProcessState & ProcessActions>()(
         return id;
       },
 
-      update: (
-        patch:
-          | Partial<ProcessState>
-          | ((prev: ProcessState) => Partial<ProcessState>)
-      ) => {
+      update: (patch: Partial<ProcessState> | ((prev: ProcessState) => Partial<ProcessState>)) => {
         set((prev) => {
-          const resolved =
-            typeof patch === "function" ? patch(prev) : patch;
+          const resolved = typeof patch === "function" ? patch(prev) : patch;
           return { ...prev, ...resolved };
         });
       },
@@ -111,9 +109,7 @@ if (typeof window !== "undefined") {
  * @param s - Combined global process store data slice object.
  * @returns Consolidated status structure parameters tracking in-flight pipelines.
  */
-export const selectProcess = (
-  s: ProcessState & ProcessActions
-): ProcessState => ({
+export const selectProcess = (s: ProcessState & ProcessActions): ProcessState => ({
   id: s.id,
   label: s.label,
   progress: s.progress,
@@ -131,8 +127,7 @@ export const selectProcess = (
  * @param s - Combined global process store data slice object.
  * @returns Current state phase token ("idle" | "processing" | "success" | "error").
  */
-export const selectProcessStatus = (s: ProcessState & ProcessActions) =>
-  s.status;
+export const selectProcessStatus = (s: ProcessState & ProcessActions) => s.status;
 
 /**
  * Track current numerical completion progress indices inside processing pipelines.
@@ -140,8 +135,7 @@ export const selectProcessStatus = (s: ProcessState & ProcessActions) =>
  * @param s - Combined global process store data slice object.
  * @returns Quantified progress magnitude ratio ranging from 0 up to 100.
  */
-export const selectProcessProgress = (s: ProcessState & ProcessActions) =>
-  s.progress;
+export const selectProcessProgress = (s: ProcessState & ProcessActions) => s.progress;
 
 /**
  * Evaluates whether state restoration routines from async storage nodes completed.
@@ -149,5 +143,4 @@ export const selectProcessProgress = (s: ProcessState & ProcessActions) =>
  * @param s - Combined global process store data slice object.
  * @returns True if underlying storage engine has resolved historical cached records.
  */
-export const selectHasHydrated = (s: ProcessState & ProcessActions) =>
-  s.hasHydrated;
+export const selectHasHydrated = (s: ProcessState & ProcessActions) => s.hasHydrated;

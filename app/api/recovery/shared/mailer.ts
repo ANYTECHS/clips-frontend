@@ -2,7 +2,8 @@
  * Guardian email helper for social recovery.
  *
  * In production this should be wired to a real transactional email provider.
- * Set RESEND_API_KEY (or SMTP_* vars) and uncomment the Resend block below.
+ * Set RESEND_API_KEY (or SMTP_* vars) and replace the stub below with a call
+ * to that provider.
  *
  * For now the implementation logs to stdout so the rest of the recovery flow
  * can be exercised without an email dependency installed.
@@ -16,6 +17,8 @@
  *   SMTP_USER=...
  *   SMTP_PASS=...
  */
+
+import { logger } from "@/app/lib/logger";
 
 export interface GuardianEmailPayload {
   /** Guardian's email address. */
@@ -33,41 +36,22 @@ export interface GuardianEmailPayload {
  *
  * Returns `true` on success, `false` if email delivery fails non-fatally
  * (so the route can decide whether to surface the error or continue).
+ *
+ * To wire this to Resend: install the `resend` package, construct a client
+ * with `process.env.RESEND_API_KEY`, and send a message to `to` with subject
+ * `ClipCash: <ownerEmail> is requesting wallet recovery`. Build the body from
+ * `approvalUrl` and `expiresAt`, then return `false` if the send reports an
+ * error. A prior HTML template for that body is recoverable from git history
+ * (it was deleted as unreachable code while this function is still a stub).
  */
-export async function sendGuardianApprovalEmail(
-  payload: GuardianEmailPayload
-): Promise<boolean> {
+export async function sendGuardianApprovalEmail(payload: GuardianEmailPayload): Promise<boolean> {
   const { to, ownerEmail, approvalToken, expiresAt } = payload;
   const appUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
   const approvalUrl = `${appUrl}/api/recovery/approve?token=${encodeURIComponent(approvalToken)}`;
 
-  // ── Resend integration (uncomment + install `resend` package) ──────────────
-  // import { Resend } from "resend";
-  // const resend = new Resend(process.env.RESEND_API_KEY!);
-  // const { error } = await resend.emails.send({
-  //   from: process.env.EMAIL_FROM ?? "noreply@clipcash.ai",
-  //   to,
-  //   subject: `ClipCash: ${ownerEmail} is requesting wallet recovery`,
-  //   html: buildEmailHtml(ownerEmail, approvalUrl, expiresAt),
-  // });
-  // if (error) { console.error("[mailer] Resend error:", error); return false; }
-  // return true;
-
-  // ── Stub (logs to stdout; safe to run without any email setup) ────────────
-  console.info(
+  // Stub: logs instead of sending, so this is safe to run with no email setup.
+  logger.info(
     `[recovery-mailer] Guardian email to=${to} | owner=${ownerEmail} | url=${approvalUrl} | expires=${expiresAt}`
   );
   return true;
-}
-
-/** Minimal HTML body for the guardian approval email. */
-function buildEmailHtml(ownerEmail: string, approvalUrl: string, expiresAt: string): string {
-  return `
-    <p>Hello,</p>
-    <p><strong>${ownerEmail}</strong> has requested to recover their ClipCash wallet and listed you as a trusted guardian.</p>
-    <p>Click the button below to approve the request. This link expires on <strong>${expiresAt}</strong>.</p>
-    <p><a href="${approvalUrl}" style="background:#22c55e;color:#000;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Approve Recovery</a></p>
-    <p>If you did not expect this request, you can safely ignore this email.</p>
-    <p>— The ClipCash Team</p>
-  `;
 }

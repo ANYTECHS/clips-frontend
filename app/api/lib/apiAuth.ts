@@ -1,4 +1,6 @@
 import { NextRequest } from "next/server";
+
+import { logger } from "@/app/lib/logger";
 import { prisma } from "@/app/lib/prisma";
 
 export interface ApiAuthResult {
@@ -9,13 +11,13 @@ export interface ApiAuthResult {
 
 export async function authenticateApiKey(req: NextRequest): Promise<ApiAuthResult> {
   const authHeader = req.headers.get("authorization");
-  
+
   if (!authHeader) {
     return { success: false, error: "Missing authorization header" };
   }
 
   const [type, token] = authHeader.split(" ");
-  
+
   if (type !== "Bearer" || !token) {
     return { success: false, error: "Invalid authorization format" };
   }
@@ -50,7 +52,7 @@ export async function authenticateApiKey(req: NextRequest): Promise<ApiAuthResul
 
     return { success: true, apiKey };
   } catch (error) {
-    console.error("Error authenticating API key:", error);
+    logger.error("Error authenticating API key:", error);
     return { success: false, error: "Authentication failed" };
   }
 }
@@ -77,6 +79,6 @@ export async function logApiUsage(
       },
     });
   } catch (error) {
-    console.error("Error logging API usage:", error);
+    logger.error("Error logging API usage:", error);
   }
 }

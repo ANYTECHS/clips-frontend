@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { prisma } from "@/app/lib/prisma";
 import { z } from "zod";
+
+import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { logger } from "@/app/lib/logger";
+import { prisma } from "@/app/lib/prisma";
 
 const updateApiKeySchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -10,10 +12,7 @@ const updateApiKeySchema = z.object({
   active: z.boolean().optional(),
 });
 
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -39,15 +38,12 @@ export async function GET(
 
     return NextResponse.json({ apiKey });
   } catch (error) {
-    console.error("Error fetching API key:", error);
+    logger.error("Error fetching API key:", error);
     return NextResponse.json({ error: "Failed to fetch API key" }, { status: 500 });
   }
 }
 
-export async function PATCH(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -78,15 +74,12 @@ export async function PATCH(
     if (error instanceof z.ZodError) {
       return NextResponse.json({ error: "Invalid input", details: error.errors }, { status: 400 });
     }
-    console.error("Error updating API key:", error);
+    logger.error("Error updating API key:", error);
     return NextResponse.json({ error: "Failed to update API key" }, { status: 500 });
   }
 }
 
-export async function DELETE(
-  req: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const session = await getServerSession(authOptions);
     if (!session?.user?.id) {
@@ -106,7 +99,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Error deleting API key:", error);
+    logger.error("Error deleting API key:", error);
     return NextResponse.json({ error: "Failed to delete API key" }, { status: 500 });
   }
 }

@@ -14,7 +14,7 @@ interface LogEntry {
 }
 
 let drainUrl: string | undefined;
-let batch: LogEntry[] = [];
+const batch: LogEntry[] = [];
 let batchTimer: ReturnType<typeof setTimeout> | null = null;
 const MAX_BATCH_SIZE = 50;
 const MAX_BATCH_DELAY_MS = 100;
@@ -22,18 +22,13 @@ const MAX_BATCH_DELAY_MS = 100;
 function getTraceId(): string | undefined {
   if (typeof window === "undefined") return undefined;
   // Next.js may attach custom request headers to __NEXT_DATA__ at runtime
-  const nextData = (window as any).__NEXT_DATA__ as { headers?: Record<string, string> } | undefined;
-  return (
-    nextData?.headers?.["x-vercel-id"] ||
-    nextData?.headers?.["x-request-id"] ||
-    undefined
-  );
+  const nextData = (window as any).__NEXT_DATA__ as
+    { headers?: Record<string, string> } | undefined;
+  return nextData?.headers?.["x-vercel-id"] || nextData?.headers?.["x-request-id"] || undefined;
 }
 
 function serializeArgs(args: any[]): string {
-  return args
-    .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
-    .join(" ");
+  return args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" ");
 }
 
 function createLogEntry(level: LogLevel, args: any[]): LogEntry {
@@ -102,10 +97,13 @@ function drain(entry: LogEntry) {
 
 function consoleFallback(level: LogLevel, args: any[]) {
   const method =
-    level === "debug" ? console.debug :
-    level === "warn" ? console.warn :
-    level === "error" ? console.error :
-    console.info;
+    level === "debug"
+      ? console.debug
+      : level === "warn"
+        ? console.warn
+        : level === "error"
+          ? console.error
+          : console.info;
   method(...args);
 }
 
@@ -113,9 +111,12 @@ function sendToSentry(level: LogLevel, args: any[]) {
   const message = serializeArgs(args);
   if (level === "error") {
     const error = args.find((arg) => arg instanceof Error);
-    if (error) {
-      Sentry.captureException(error);
-    } else {
+    // An `Error` argument was already forwarded by `logger.error` before this
+    // is reached, so capturing it here too filed every error twice — two
+    // Sentry events, and two entries counted against the project's quota, for
+    // one fault. Non-Error error logs still need capturing, and everything
+    // still gets a breadcrumb for the trail leading up to a later crash.
+    if (!error) {
       Sentry.captureMessage(message, { level: "error" });
     }
     Sentry.addBreadcrumb({ message, level: "error" });

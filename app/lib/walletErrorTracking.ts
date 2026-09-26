@@ -1,11 +1,12 @@
+import { logger } from "@/app/lib/logger";
 import { sanitizeBreadcrumbPayload } from "@/app/lib/sentryRedaction";
 
 /**
  * Wallet Error Tracking Utility
- * 
+ *
  * Provides error tracking and logging for wallet operations.
  * Integrates with Sentry when available, falls back to console logging.
- * 
+ *
  * This utility is designed to be easily integrated into existing wallet providers
  * without requiring extensive code changes.
  */
@@ -113,8 +114,9 @@ export function captureWalletError(
 
   const sanitizedContext = sanitizeContext(fullContext);
 
-  // Log to console
-  console.error(`[Wallet Error] ${operation}`, error, sanitizedContext);
+  // Durable record for this error. Every logger level above debug reaches
+  // Sentry in production, so this is the error's real destination.
+  logger.error(`[Wallet Error] ${operation}`, error, sanitizedContext);
 
   // Send to Sentry if available
   if (isSentryAvailable()) {
@@ -130,7 +132,9 @@ export function captureWalletError(
         level: "error",
       });
     } catch (sentryError) {
-      console.error("Failed to send error to Sentry:", sentryError);
+      // A failure to report is not itself reportable — routing it back into
+      // the reporting pipeline risks a loop, so this stays a local trace.
+      logger.debug("Failed to send error to Sentry:", sentryError);
     }
   }
 }
@@ -138,14 +142,12 @@ export function captureWalletError(
 /**
  * Capture wallet operation success for monitoring
  */
-export function captureWalletEvent(
-  event: string,
-  context?: Partial<WalletErrorContext>
-): void {
+export function captureWalletEvent(event: string, context?: Partial<WalletErrorContext>): void {
   const sanitizedContext = sanitizeContext(context || {});
 
-  // Log to console
-  console.log(`[Wallet Event] ${event}`, sanitizedContext);
+  // Local trace. The structured event below goes to Sentry, so this is a
+  // debug aid rather than the record — dev-only, not shipped noise.
+  logger.debug(`[Wallet Event] ${event}`, sanitizedContext);
 
   // Send to Sentry if available
   if (isSentryAvailable()) {
@@ -161,7 +163,7 @@ export function captureWalletEvent(
         extra: sanitizedContext,
       });
     } catch (sentryError) {
-      console.error("Failed to send event to Sentry:", sentryError);
+      logger.debug("Failed to send event to Sentry:", sentryError);
     }
   }
 }
@@ -176,7 +178,7 @@ export function addWalletBreadcrumb(
 ): void {
   const breadcrumbData = sanitizeBreadcrumbPayload(data);
 
-  console.log(`[Wallet Breadcrumb] ${category}: ${message}`, breadcrumbData);
+  logger.debug(`[Wallet Breadcrumb] ${category}: ${message}`, breadcrumbData);
 
   // Add to Sentry if available
   if (isSentryAvailable()) {
@@ -189,7 +191,7 @@ export function addWalletBreadcrumb(
         data: breadcrumbData,
       });
     } catch (sentryError) {
-      console.error("Failed to add breadcrumb to Sentry:", sentryError);
+      logger.debug("Failed to add breadcrumb to Sentry:", sentryError);
     }
   }
 }
@@ -204,8 +206,8 @@ export function logWalletOperation(
 ): void {
   const sanitizedData = sanitizeContext(data || {});
 
-  // Log to console
-  console.log(`[Wallet ${status.toUpperCase()}] ${operation}`, sanitizedData);
+  // Local trace; the breadcrumb below is the durable record.
+  logger.debug(`[Wallet ${status.toUpperCase()}] ${operation}`, sanitizedData);
 
   // Add as breadcrumb for Sentry
   addWalletBreadcrumb(`${operation} - ${status}`, "wallet", sanitizedData);
@@ -227,7 +229,9 @@ export function withWalletErrorTracking<T extends (...args: any[]) => Promise<an
     try {
       addWalletBreadcrumb(`Starting ${operation}`, "wallet");
       const result = await fn(...args);
-      logWalletOperation(operation, "success", { result: typeof result === "object" ? "success" : result });
+      logWalletOperation(operation, "success", {
+        result: typeof result === "object" ? "success" : result,
+      });
       return result;
     } catch (error) {
       logWalletOperation(operation, "error", { error });
@@ -246,7 +250,7 @@ export function setWalletUserContext(user: { id: string; email?: string } | null
         const Sentry = (window as any).Sentry;
         Sentry.setUser(null);
       } catch (error) {
-        console.error("Failed to clear user context:", error);
+        logger.debug("Failed to clear user context:", error);
       }
     }
     return;
@@ -257,14 +261,14 @@ export function setWalletUserContext(user: { id: string; email?: string } | null
     email: user.email ? redactEmail(user.email) : undefined,
   };
 
-  console.log("[Wallet User Context]", sanitizedUser);
+  logger.debug("[Wallet User Context]", sanitizedUser);
 
   if (isSentryAvailable()) {
     try {
       const Sentry = (window as any).Sentry;
       Sentry.setUser(sanitizedUser);
     } catch (error) {
-      console.error("Failed to set user context:", error);
+      logger.debug("Failed to set user context:", error);
     }
   }
 }

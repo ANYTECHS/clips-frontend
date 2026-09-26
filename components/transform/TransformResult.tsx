@@ -11,9 +11,11 @@
  * - Share comparison link generation
  */
 
-import React, { useRef, useState, useEffect } from "react";
-import { Copy, Fullscreen, Share2, Sparkles, Maximize2, X } from "lucide-react";
+import { Copy, Fullscreen, Share2, Sparkles, X } from "lucide-react";
+import React, { useEffect,useRef, useState } from "react";
+
 import { useVideoReleaseAll } from "@/app/hooks/useVideoRelease";
+import { logger } from "@/app/lib/logger";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -428,7 +430,7 @@ export function TransformResult({
         setIsFullscreen(true);
       }
     } catch (err) {
-      console.error("Fullscreen error:", err);
+      logger.error("Fullscreen error:", err);
     }
   };
 

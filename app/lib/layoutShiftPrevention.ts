@@ -10,6 +10,8 @@
  * Target: CLS < 0.1 (Good rating per Web Vitals)
  */
 
+import { CLS_LOG_PRECISION, LAYOUT_SHIFT_DEBUG_HIGHLIGHT_MS } from "@/app/lib/constants";
+
 import { logger } from "./logger";
 
 // ─── Aspect Ratio Utilities ──────────────────────────────────────────────────
@@ -37,10 +39,10 @@ export type AspectRatioKey = keyof typeof ASPECT_RATIOS;
 
 /**
  * Generate CSS padding-bottom percentage for aspect ratio boxes.
- * 
+ *
  * This creates the classic "padding-bottom hack" to reserve space before
  * content loads, preventing layout shift.
- * 
+ *
  * @example
  * ```tsx
  * <div style={{ paddingBottom: aspectRatioPadding(ASPECT_RATIOS.VIDEO) }}>
@@ -55,7 +57,7 @@ export function aspectRatioPadding(ratio: number): string {
 /**
  * Get Tailwind-compatible aspect-ratio class for common ratios.
  * Falls back to inline style for custom ratios.
- * 
+ *
  * @example
  * ```tsx
  * <div className={aspectRatioClass(ASPECT_RATIOS.VIDEO)}>
@@ -68,7 +70,7 @@ export function aspectRatioClass(ratio: number): string {
   if (ratio === ASPECT_RATIOS.VIDEO) return "aspect-video";
   if (ratio === ASPECT_RATIOS.SQUARE) return "aspect-square";
   if (ratio === ASPECT_RATIOS.PORTRAIT) return "aspect-[9/16]";
-  
+
   // For custom ratios, return a data attribute that can be styled
   return `aspect-[${Math.round(ratio * 100)}/100]`;
 }
@@ -150,7 +152,7 @@ export function reserveGridSpace(
   // Approximate height: (container width / columns) / aspectRatio * rows + gaps
   // This is a best-effort estimate; actual height will be close enough to prevent major shift
   const estimatedHeight = `calc((100vw / ${columns}) / ${aspectRatio} * ${rows} + ${gap * (rows - 1)}px)`;
-  
+
   return {
     minHeight: estimatedHeight,
   };
@@ -176,7 +178,7 @@ export interface LayoutShiftEntry {
 /**
  * Track layout shifts and identify the worst offenders.
  * Useful for debugging CLS issues in development.
- * 
+ *
  * @example
  * ```tsx
  * useEffect(() => {
@@ -187,9 +189,7 @@ export interface LayoutShiftEntry {
  * }, []);
  * ```
  */
-export function trackLayoutShifts(
-  onShift: (entries: LayoutShiftEntry[]) => void
-): () => void {
+export function trackLayoutShifts(onShift: (entries: LayoutShiftEntry[]) => void): () => void {
   if (typeof window === "undefined" || !("PerformanceObserver" in window)) {
     return () => {};
   }
@@ -240,7 +240,7 @@ export function debugLayoutShifts(): () => void {
         return;
       }
 
-      logger.warn(`[CLS] Layout shift detected: ${entry.value.toFixed(4)}`, {
+      logger.warn(`[CLS] Layout shift detected: ${entry.value.toFixed(CLS_LOG_PRECISION)}`, {
         startTime: entry.startTime,
         sources: entry.sources?.map((s) => ({
           node: s.node.nodeName,
@@ -256,7 +256,7 @@ export function debugLayoutShifts(): () => void {
             source.node.classList.add("debug-layout-shift");
             setTimeout(() => {
               source.node.classList?.remove("debug-layout-shift");
-            }, 2000);
+            }, LAYOUT_SHIFT_DEBUG_HIGHLIGHT_MS);
           }
         });
       }
@@ -268,7 +268,7 @@ export function debugLayoutShifts(): () => void {
  * Calculate CLS score from layout shift entries.
  * Groups shifts into sessions (max 5s gap, max 1s session duration).
  * Returns the session with the highest score.
- * 
+ *
  * Implements the windowed CLS algorithm from Web Vitals.
  */
 export function calculateCLS(entries: LayoutShiftEntry[]): number {
@@ -288,10 +288,7 @@ export function calculateCLS(entries: LayoutShiftEntry[]): number {
     const sessionDuration = entry.startTime - sessionStartTime;
 
     // Start new session if gap is too large or session too long
-    if (
-      timeSinceLastShift > MAX_SESSION_GAP_MS ||
-      sessionDuration > MAX_SESSION_DURATION_MS
-    ) {
+    if (timeSinceLastShift > MAX_SESSION_GAP_MS || sessionDuration > MAX_SESSION_DURATION_MS) {
       maxSessionValue = Math.max(maxSessionValue, sessionValue);
       sessionValue = 0;
       sessionStartTime = entry.startTime;
@@ -309,7 +306,7 @@ export function calculateCLS(entries: LayoutShiftEntry[]): number {
 /**
  * Preload critical images to prevent shift during initial render.
  * Use for above-the-fold images that should load before First Contentful Paint.
- * 
+ *
  * @example
  * ```tsx
  * useEffect(() => {
@@ -341,9 +338,7 @@ export async function preloadImages(srcs: string[]): Promise<void> {
  * Get image dimensions without loading the full image.
  * Useful for setting explicit width/height to prevent shift.
  */
-export function getImageDimensions(
-  src: string
-): Promise<{ width: number; height: number }> {
+export function getImageDimensions(src: string): Promise<{ width: number; height: number }> {
   if (typeof window === "undefined") {
     return Promise.reject(new Error("getImageDimensions requires window"));
   }
