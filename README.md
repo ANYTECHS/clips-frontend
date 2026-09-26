@@ -22,6 +22,43 @@ graph LR
     Browser -->|"mint / sign tx"| Stellar
 ```
 
+### System Overview
+
+ClipCash is a single Next.js application that serves both the React UI and the API routes, backed by an external AI video-processing service, S3-compatible object storage, and the Stellar network for on-chain ownership.
+
+| Layer | Responsibility |
+|---|---|
+| **Frontend** | Next.js App Router pages, React 19 components, Zustand stores for client state |
+| **API Routes** | Auth (NextAuth), upload handling, job orchestration, AI callbacks, SSE streaming |
+| **AI Backend** | External service that transcribes, segments, and renders clips |
+| **Storage** | S3-compatible bucket holding source videos and rendered clips |
+| **Job State** | Redis in production; in-memory fallback for local development |
+| **Blockchain** | Soroban smart contracts on Stellar for NFT minting and royalties |
+
+### Data Flow
+
+1. **Upload** — the browser streams the source video to `/api/upload` via XHR. The API writes it to a quarantine prefix, runs the configured virus scan, then moves the object to its final key.
+2. **Dispatch** — the API creates a job record and `POST`s it to the AI backend with a Bearer token.
+3. **Processing** — the AI backend transcribes and segments the video, then calls back to `/api/jobs/[id]/callback` with the generated clips.
+4. **Delivery** — the browser receives progress over an SSE stream, falling back to polling when SSE is unavailable.
+5. **Minting** — when a creator mints a clip, the browser signs a transaction that the Soroban contract records on Stellar.
+
+### Key Design Decisions
+
+- **Single Next.js app for UI + API** — keeps deployment simple and lets API routes share types and utilities with the frontend. Trade-off: heavier serverless functions and no independent scaling of the API tier.
+- **External AI backend** — video processing is CPU/GPU intensive and long-running, so it lives outside the request/response cycle. Trade-off: an extra network hop and a callback contract to maintain.
+- **Quarantine-then-scan uploads** — files are staged and scanned before becoming visible, so untrusted content never reaches the serving path. Trade-off: extra storage writes and latency per upload.
+- **Redis for job state** — job state must be shared across instances in production; an in-memory store keeps local development dependency-free. Trade-off: two code paths to keep in sync.
+- **Stellar/Soroban for ownership** — low fees and fast finality make on-chain minting practical for individual creators. Trade-off: wallet UX and network-specific contract IDs.
+
+### Technology Choices
+
+- **Next.js 16 / React 19** — App Router, server components, and built-in API routes in one framework.
+- **Zustand** — lightweight client state without the boilerplate of a larger store library.
+- **S3-compatible storage** — portable across AWS S3, Cloudflare R2, and GCS via the S3 interop API.
+- **Redis** — simple, fast shared state for job tracking across instances.
+- **Stellar / Soroban** — low-cost smart contracts for NFT ownership and royalties.
+
 For a deep dive into each system — upload quarantine, AES-GCM wallet encryption, JWT session shape, Zustand store layout — see **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**.
 
 For the current security posture, threat model, and reporting process, see **[docs/SECURITY.md](docs/SECURITY.md)**.
@@ -163,117 +200,6 @@ Scanning is **enabled by default in production** and **disabled in development**
 | Storybook | `npm run storybook` | Starts Storybook component explorer at [localhost:6006](http://localhost:6006) |
 | Build Storybook | `npm run build-storybook` | Builds a static Storybook site |
 | Bundle analysis | `npm run analyze` | Builds with `@next/bundle-analyzer` — opens bundle report in browser |
-| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTR
 
-> **Note:** `npm run test:e2e` automatically starts the Next.js dev server before the test run and reuses an existing server if one is already running. You do not need to run `npm run dev` separately.
-
----
-
-## Tech Stack
-
-| Layer | Technology | Notes |
-|---|---|---|
-| Framework | Next.js 16 + React 19 + TypeScript | App Router, Server Components, API Routes |
-| Styling | Tailwind CSS 4 | Utility-first; dark theme via CSS variables |
-| State | Zustand 5 | Stores for dashboard, earnings, process, transform, user |
-| Auth | NextAuth v5 | Google, Apple, Twitter, Instagram, TikTok, WebAuthn passkeys |
-| Blockchain | Stellar / Soroban (`@stellar/stellar-sdk`) | Embedded wallet, Freighter extension, NFT minting |
-| Storage | AWS S3 / Cloudflare R2 / GCS | S3-compatible via `@aws-sdk/client-s3` |
-| Job state | Redis (`ioredis`) / in-process Map | Swappable via `REDIS_URL` |
-| Icons | lucide-react | |
-| Error monitoring | Sentry | `@sentry/nextjs` |
-| Testing | Jest + Playwright | Unit: Jest; E2E: Playwright (Chromium, Firefox, WebKit) |
-| Component demos | Storybook 10 | Canonical demo environment — do not add public demo routes |
-| Crypto | Web Crypto API | AES-GCM wallet encryption, PBKDF2 key derivation |
-| Secret sharing | secrets.js-grempe | Shamir's Secret Sharing for social recovery |
-
----
-
-## Features
-
-- **AI clip generation** — automatically identifies viral moments in uploaded videos
-- **Full preview & selection** — creators see every clip before anything is posted
-- **Multi-platform posting** — TikTok, Instagram Reels, YouTube Shorts, Facebook Reels, Snapchat Spotlight, Pinterest, LinkedIn
-- **NFT Vault** — mint best clips as Soroban NFTs; earn on-chain royalties
-- **Embedded Stellar wallet** — auto-created on signup, encrypted with AES-GCM; no seed phrase required
-- **Multi-wallet support** — connect MetaMask (EVM), Phantom (Solana), Freighter (Stellar), or import a Stellar key
-- **Social recovery** — Shamir's Secret Sharing splits the wallet secret key across guardian accounts
-- **Earnings dashboard** — unified revenue view across platforms with 5-minute cache
-- **Real-time progress** — SSE stream with automatic polling fallback while jobs process
-- **Push notifications** — browser notifications when a job completes
-
----
-
-## API Reference
-
-### `POST /api/upload`
-
-Upload one or more video files for AI processing.
-
-- **Content-Type:** `multipart/form-data`
-- **Field:** `files` — video file(s), max 500 MB each
-- **Formats:** MP4, MOV, AVI, MKV (validated by magic bytes, not just extension)
-
-```json
-// 200 OK
-{
-  "data": {
-    "success": true,
-    "jobId": "job_abc123",
-    "files": [{ "name": "video.mp4", "size": 104857600, "type": "video/mp4", "jobId": "job_abc123", "url": "https://..." }]
-  }
-}
-```
-
-### `GET /api/jobs/:jobId`
-
-Poll for job status (fallback when SSE is unavailable).
-
-```json
-{ "progress": 45, "status": "processing", "momentsFound": 3, "estimatedSecondsRemaining": 120 }
-```
-
-`status` values: `queued` → `processing` → `complete` | `error`
-
-### `GET /api/jobs/:jobId/stream`
-
-Server-Sent Events stream. Pushes the same shape as the poll endpoint every ~1 s until `status` reaches a terminal state. Requires authentication; the session user must own the job.
-
----
-
-## Project Structure
-
-```
-app/
-├── (dashboard)/          # Authenticated dashboard routes (layout.tsx wraps all)
-│   ├── dashboard/        # Overview, stats, recent projects
-│   ├── earnings/         # Earnings breakdown
-│   ├── vault/            # NFT management
-│   ├── transform/[id]/   # AI style-transfer job monitor
-│   └── …
-├── api/                  # API Route handlers
-│   ├── upload/           # File ingestion pipeline
-│   ├── jobs/             # Job CRUD, SSE stream, AI callback
-│   └── auth/             # NextAuth + passkey endpoints
-├── hooks/                # React hooks (useProcessingStatus, useBalance, …)
-├── lib/                  # Pure utilities (auth, secureStorage, aiBackend, …)
-├── store/                # Zustand stores (barrel export at store/index.ts)
-└── onboarding/           # 3-step onboarding flow
-components/               # Shared React components
-docs/
-└── ARCHITECTURE.md       # Deep-dive: pipeline, wallet encryption, auth, state
-hooks/                    # App-level hooks (useFilterQueryState, …)
-tests/e2e/                # Playwright end-to-end tests
-stories/                  # Storybook stories
-```
-
----
-
-## Contributing
-
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for local setup, the Changesets versioning workflow, branch naming conventions, PR checklist, and issue triage guidelines.
-
-Key rules from [AGENTS.md](AGENTS.md):
-- All user-controlled strings rendered in the UI must be sanitized with the `sanitize` utility at `app/lib/sanitize.ts`.
-- Never use `dangerouslySetInnerHTML` without explicit DOMPurify sanitization.
-- Component demos belong in **Storybook**, not in public App Router pages.
+/* … truncated 4919 chars — edit only what you need near the top … */
