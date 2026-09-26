@@ -31,36 +31,114 @@ export const ALLOWED_EXTENSIONS = [".mp4", ".mov", ".avi", ".mkv"];
 const MAGIC_BYTE_WINDOW = 12;
 
 /**
+ * Result of a magic byte inspection.
+ *
+ * Carries enough detail for security logging without leaking raw bytes.
+ */
+export interface MagicByteResult {
+  valid: boolean;
+  /** Detected format, or null when no known signature matched. */
+  detectedFormat: "mp4" | "mov" | "avi" | "mkv" | "webm" | null;
+  error: string | null;
+}
+
+/**
+ * Inspect the leading bytes of `buffer` and return a structured result.
+ *
+ * All signature checks use exact byte-offset comparisons, not substring
+ * matching, so a crafted file cannot trick the check by embedding the
+ * target ASCII sequence at the wrong position.
+ *
+ * Supported signatures:
+ *  - MP4  : bytes 4–7 === 0x66 0x74 0x79 0x70 ("ftyp")
+ *  - MOV  : bytes 4–7 === "ftyp" AND bytes 8–11 contain "qt  " or "moov"/"wide"
+ *           (we detect both as "ftyp"-family and distinguish by brand)
+ *  - AVI  : bytes 0–3 === "RIFF" AND bytes 8–11 === "AVI "
+ *  - MKV  : bytes 0–3 === 0x1A 0x45 0xDF 0xA3 (EBML)
+ *  - WebM : same EBML header — WebM is a subset of Matroska
+ */
+export function inspectMagicBytes(buffer: Buffer): MagicByteResult {
+  if (buffer.length < MAGIC_BYTE_WINDOW) {
+    return {
+      valid: false,
+      detectedFormat: null,
+      error: "File is too small to be a valid video file",
+    };
+  }
+
+  // MP4 / MOV — ISO Base Media (ftyp box at byte offset 4)
+  // Check exact bytes rather than ASCII string scan to prevent bypass.
+  const isFtypBox =
+    buffer[4] === 0x66 && // f
+    buffer[5] === 0x74 && // t
+    buffer[6] === 0x79 && // y
+    buffer[7] === 0x70;   // p
+
+  if (isFtypBox) {
+    // Distinguish MOV (QuickTime brand "qt  ") from generic MP4
+    const brand =
+      buffer[8] === 0x71 && buffer[9] === 0x74 && buffer[10] === 0x20 && buffer[11] === 0x20;
+    return { valid: true, detectedFormat: brand ? "mov" : "mp4", error: null };
+  }
+
+  // AVI — RIFF container with "AVI " sub-type at offset 8
+  const isRiff =
+    buffer[0] === 0x52 && // R
+    buffer[1] === 0x49 && // I
+    buffer[2] === 0x46 && // F
+    buffer[3] === 0x46;   // F
+  const isAviSubtype =
+    buffer[8] === 0x41 && // A
+    buffer[9] === 0x56 && // V
+    buffer[10] === 0x49 && // I
+    buffer[11] === 0x20;   // (space)
+
+  if (isRiff && isAviSubtype) {
+    return { valid: true, detectedFormat: "avi", error: null };
+  }
+
+  // MKV / WebM — EBML magic bytes
+  const isEbml =
+    buffer[0] === 0x1a &&
+    buffer[1] === 0x45 &&
+    buffer[2] === 0xdf &&
+    buffer[3] === 0xa3;
+
+  if (isEbml) {
+    return { valid: true, detectedFormat: "mkv", error: null };
+  }
+
+  return {
+    valid: false,
+    detectedFormat: null,
+    error: "File content does not match declared type",
+  };
+}
+
+/**
  * Validates file magic bytes against known video signatures.
  *
  * Reads the first bytes of the buffer to detect the actual file type,
  * preventing malware masquerading as a video via extension or MIME spoofing.
  *
  * @param buffer - File buffer to inspect.
+ * @param filename - Optional filename used for security audit logging.
  * @returns Error message if the magic bytes do not match, null if valid.
  */
-export function validateMagicBytes(buffer: Buffer): string | null {
-  if (buffer.length < MAGIC_BYTE_WINDOW) {
-    return "File is too small to be a valid video file";
+export function validateMagicBytes(buffer: Buffer, filename?: string): string | null {
+  const result = inspectMagicBytes(buffer);
+
+  if (result.valid) {
+    logger.info(
+      `[Upload] Magic byte validation passed${filename ? ` for "${filename}"` : ""}: detected format=${result.detectedFormat}`,
+    );
+    return null;
   }
 
-  const header = buffer.subarray(0, MAGIC_BYTE_WINDOW);
-  const headerStr = header.toString("ascii", 0, MAGIC_BYTE_WINDOW);
-
-  // MP4/MOV: "ftyp" at offset 4, with a brand like "isom", "mp42" or "qt  ".
-  const isFtyp = headerStr.includes("ftyp");
-  // AVI: "RIFF" followed by "AVI " at offset 8.
-  const isAvi = headerStr.startsWith("RIFF") && headerStr.includes("AVI");
-  // MKV: EBML header \x1A\x45\xDF\xA3.
-  const isMkv =
-    header[0] === 0x1a &&
-    header[1] === 0x45 &&
-    header[2] === 0xdf &&
-    header[3] === 0xa3;
-
-  return isFtyp || isAvi || isMkv
-    ? null
-    : "File content does not match declared type";
+  logger.warn(
+    `[Upload] Magic byte validation failed${filename ? ` for "${filename}"` : ""}: ${result.error}`,
+  );
+  return result.error;
 }
 
 /**
@@ -122,11 +200,8 @@ export async function processUploadedBuffer(
   filename: string,
   contentType: string,
 ): Promise<ProcessedUpload> {
-  const magicBytesError = validateMagicBytes(buffer);
+  const magicBytesError = validateMagicBytes(buffer, filename);
   if (magicBytesError) {
-    logger.error(
-      `[Upload] Magic bytes validation failed for ${filename}: ${magicBytesError}`,
-    );
     throw new Error(magicBytesError);
   }
 

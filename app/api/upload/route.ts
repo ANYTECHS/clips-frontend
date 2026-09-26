@@ -49,7 +49,8 @@ import {
 import { checkCsrf } from "@/app/lib/csrf";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
-import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST } from "@/app/lib/constants";
+import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST, UPLOAD_PROCESSING_CONCURRENCY } from "@/app/lib/constants";
+import { parallelLimit } from "@/app/lib/parallelLimit";
 import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
 import { logger } from "@/app/lib/logger";
 import { templatesStore, type TemplateScope } from "@/app/api/templates/templatesStore";
@@ -153,16 +154,18 @@ export async function POST(request: NextRequest) {
     const scanConfig = getScanConfig();
     logger.info(`[Upload] Scanning enabled: ${scanConfig.enabled}, Provider: ${scanConfig.provider}`);
 
-    // Upload all files to quarantine and scan them
-    const results = await Promise.all(
-      files.map(async (file) => {
+    // Process files with a concurrency cap — uncapped Promise.all can saturate
+    // the virus-scan circuit breaker and S3 connection pool under burst load.
+    const results = await parallelLimit(
+      files.map((file) => async () => {
         const buffer = Buffer.from(await file.arrayBuffer());
         return processUploadedBuffer(
           buffer,
           file.name,
           file.type || "application/octet-stream",
         );
-      })
+      }),
+      UPLOAD_PROCESSING_CONCURRENCY,
     );
 
     // Return the first jobId as the primary reference (for single-file flows)
@@ -175,9 +178,10 @@ export async function POST(request: NextRequest) {
 
     await Promise.all(
       results.map(async (result) => {
-        // Register the job in "queued" state. The AI backend transitions it to
-        // "processing" then "complete"/"error" via the callback route.
-        jobStore.set(result.jobId, {
+        // Persist the job BEFORE dispatching to the AI backend.
+        // If the AI backend calls back before jobStore.set resolves the
+        // callback route would find no job — causing a lost status update.
+        await jobStore.set(result.jobId, {
           id: result.jobId,
           userId,
           status: "queued",

@@ -122,7 +122,9 @@ export async function POST(request: NextRequest) {
       process.env.NEXTAUTH_URL?.replace(/\/$/, "") ??
       `${request.nextUrl.protocol}//${request.nextUrl.host}`;
 
-    jobStore.set(result.jobId, {
+    // Persist the job BEFORE dispatching — same ordering guarantee as the
+    // whole-file route: the callback must not arrive before the store write.
+    await jobStore.set(result.jobId, {
       id: result.jobId,
       userId,
       status: "queued",
