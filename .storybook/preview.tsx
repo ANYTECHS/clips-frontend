@@ -27,7 +27,16 @@ const preview: Preview = {
       // 'error' - fail CI on a11y violations
       // 'off' - skip a11y checks entirely
       test: 'todo'
-    }
+    },
+    docs: {
+      // Generate documentation (autodocs) for every component story.
+      autodocs: 'tag',
+    },
+    options: {
+      storySort: {
+        order: ['Introduction', 'Components', ['*']],
+      },
+    },
   },
   decorators: [
     (Story) => (
