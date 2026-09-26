@@ -127,7 +127,7 @@ All errors share a consistent JSON shape:
 
 ## Environment Variables
 
-Copy `.env.example` to `.env.local` and fill in the values. The table below lists every variable; required ones will cause the server to fail or the feature to be silently broken if omitted.
+Copy `.env.example` to `.env.local` and fill in the values. The most common variables are summarised below. The **complete reference**, with required/optional status, defaults, examples and security notes, is in **[docs/ENVIRONMENT_VARIABLES.md](docs/ENVIRONMENT_VARIABLES.md)**.
 
 ### Auth
 
@@ -238,6 +238,114 @@ Scanning is **enabled by default in production** and **disabled in development**
 | Storybook | `npm run storybook` | Starts Storybook component explorer at [localhost:6006](http://localhost:6006) |
 | Build Storybook | `npm run build-storybook` | Builds a static Storybook site |
 | Bundle analysis | `npm run analyze` | Builds with `@next/bundle-analyzer` — opens bundle report in browser |
-| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTR
+| Changeset | `npm run changeset` | Creates a versioning entry for your PR (see [CONTRIBUTING.md](CONTRIBUTING.md)) |
+
+> **Note:** `npm run test:e2e` automatically starts the Next.js dev server before the test run and reuses an existing server if one is already running. You do not need to run `npm run dev` separately.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Notes |
+|---|---|---|
+| Framework | Next.js 16 + React 19 + TypeScript | App Router, Server Components, API Routes |
+| Styling | Tailwind CSS 4 | Utility-first; dark theme via CSS variables |
+| State | Zustand 5 | Stores for dashboard, earnings, process, transform, user |
+| Auth | NextAuth v5 | Google, Apple, Twitter, Instagram, TikTok, WebAuthn passkeys |
+| Blockchain | Stellar / Soroban (`@stellar/stellar-sdk`) | Embedded wallet, Freighter extension, NFT minting |
+| Storage | AWS S3 / Cloudflare R2 / GCS | S3-compatible via `@aws-sdk/client-s3` |
+| Job state | Redis (`ioredis`) / in-process Map | Swappable via `REDIS_URL` |
+| Icons | lucide-react | |
+| Error monitoring | Sentry | `@sentry/nextjs` |
+| Testing | Jest + Playwright | Unit: Jest; E2E: Playwright (Chromium, Firefox, WebKit) |
+| Component demos | Storybook 10 | Canonical demo environment — do not add public demo routes |
+| Crypto | Web Crypto API | AES-GCM wallet encryption, PBKDF2 key derivation |
+| Secret sharing | secrets.js-grempe | Shamir's Secret Sharing for social recovery |
+
+---
+
+## Features
+
+- **AI clip generation** — automatically identifies viral moments in uploaded videos
+- **Full preview & selection** — creators see every clip before anything is posted
+- **Multi-platform posting** — TikTok, Instagram Reels, YouTube Shorts, Facebook Reels, Snapchat Spotlight, Pinterest, LinkedIn
+- **NFT Vault** — mint best clips as Soroban NFTs; earn on-chain royalties
+- **Embedded Stellar wallet** — auto-created on signup, encrypted with AES-GCM; no seed phrase required
+- **Multi-wallet support** — connect MetaMask (EVM), Phantom (Solana), Freighter (Stellar), or import a Stellar key
+- **Social recovery** — Shamir's Secret Sharing splits the wallet secret key across guardian accounts
+- **Earnings dashboard** — unified revenue view across platforms with 5-minute cache
+- **Real-time progress** — SSE stream with automatic polling fallback while jobs process
+- **Push notifications** — browser notifications when a job completes
+
+---
+
+## API Reference
+
+### `POST /api/upload`
+
+Upload one or more video files for AI processing.
+
+- **Content-Type:** `multipart/form-data`
+- **Field:** `files` — video file(s), max 500 MB each
+- **Formats:** MP4, MOV, AVI, MKV (validated by magic bytes, not just extension)
+
+```json
+// 200 OK
+{
+  "data": {
+    "success": true,
+    "jobId": "job_abc123",
+    "files": [{ "name": "video.mp4", "size": 104857600, "type": "video/mp4", "jobId": "job_abc123", "url": "https://..." }]
+  }
+}
+```
+
+### `GET /api/jobs/:jobId`
+
+Poll for job status (fallback when SSE is unavailable).
+
+```json
+{ "progress": 45, "status": "processing", "momentsFound": 3, "estimatedSecondsRemaining": 120 }
+```
+
+`status` values: `queued` → `processing` → `complete` | `error`
+
+### `GET /api/jobs/:jobId/stream`
+
+Server-Sent Events stream. Pushes the same shape as the poll endpoint every ~1 s until `status` reaches a terminal state. Requires authentication; the session user must own the job.
+
+---
+
+## Project Structure
+
+```
+app/
+├── (dashboard)/          # Authenticated dashboard routes (layout.tsx wraps all)
+│   ├── dashboard/        # Overview, stats, recent projects
+│   ├── earnings/         # Earnings breakdown
+│   ├── vault/            # NFT management
+│   ├── transform/[id]/   # AI style-transfer job monitor
+│   └── …
+├── api/                  # API Route handlers
+│   ├── upload/           # File ingestion pipeline
+│   ├── jobs/             # Job CRUD, SSE stream, AI callback
+│   └── auth/             # NextAuth + passkey endpoints
+├── hooks/                # React hooks (useProcessingStatus, useBalance, …)
+├── lib/                  # Pure utilities (auth, secureStorage, aiBackend, …)
+├── store/                # Zustand stores (barrel export at store/index.ts)
+└── onboarding/           # 3-step onboarding flow
+components/               # Shared React components
+docs/
+└── ARCHITECTURE.md       # Deep-dive: pipeline, wallet encryption, auth, state
+hooks/                    # App-level hooks (useFilterQueryState, …)
+tests/e2e/                # Playwright end-to-end tests
+stories/                  # Storybook stories
+```
+
+---
+
+## Contributing
+
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for onboarding, local setup, contribution guidelines, the code review process, good first issues and where to ask questions. Browse the component library with `npm run storybook`; see [STORYBOOK.md](STORYBOOK.md) for how it is deployed.
 
 /* … truncated 5008 chars — edit only what you need near the top … */

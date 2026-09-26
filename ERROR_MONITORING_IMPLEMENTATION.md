@@ -26,7 +26,7 @@ Helper functions for Sentry integration:
 - `setSentryUser()` - Set user context for error reports
 - `redactAddress()` - Redact wallet addresses for logging
 
-#### 3. Wallet Error Tracking Utility (`app/lib/walletErrorTracking.ts`)
+#### 3. Wallet Error Tracking Utility (`app/lib/wallet-error-tracking.ts`)
 
 Lightweight error tracking utility that works with or without Sentry:
 - Falls back to console logging if Sentry is not available
@@ -94,7 +94,7 @@ The Sentry configuration is automatically loaded by Next.js when you create the 
 ### Basic Error Tracking
 
 ```tsx
-import { captureWalletError, logWalletOperation } from "@/app/lib/walletErrorTracking";
+import { captureWalletError, logWalletOperation } from "@/app/lib/wallet-error-tracking";
 
 try {
   await someWalletOperation();
@@ -111,7 +111,7 @@ try {
 ### Using the React Hook
 
 ```tsx
-import { useWalletErrorTracking } from "@/app/lib/walletErrorTracking";
+import { useWalletErrorTracking } from "@/app/lib/wallet-error-tracking";
 
 function MyComponent() {
   const { captureError, logOperation, addBreadcrumb } = useWalletErrorTracking();
@@ -133,7 +133,7 @@ function MyComponent() {
 ### Wrapping Functions with Error Tracking
 
 ```tsx
-import { withWalletErrorTracking } from "@/app/lib/walletErrorTracking";
+import { withWalletErrorTracking } from "@/app/lib/wallet-error-tracking";
 
 const connectWallet = withWalletErrorTracking(
   "connect_wallet",
@@ -148,7 +148,7 @@ const connectWallet = withWalletErrorTracking(
 User context is automatically set in `MultiWalletProvider` when a user authenticates. For manual context setting:
 
 ```tsx
-import { setWalletUserContext } from "@/app/lib/walletErrorTracking";
+import { setWalletUserContext } from "@/app/lib/wallet-error-tracking";
 
 // Set user context
 setWalletUserContext({ id: "user-123", email: "user@example.com" });
@@ -250,7 +250,7 @@ Error tracking works alongside the existing analytics system:
 
 ```tsx
 import analytics from "@/lib/analytics";
-import { captureWalletError } from "@/app/lib/walletErrorTracking";
+import { captureWalletError } from "@/app/lib/wallet-error-tracking";
 
 try {
   await connectWallet();
@@ -343,8 +343,8 @@ Configure data retention in Sentry:
 
 - **New**: `sentry.client.config.ts` - Sentry client configuration
 - **New**: `app/lib/sentry.ts` - Sentry helper utilities
-- **New**: `app/lib/walletErrorTracking.ts` - Wallet error tracking utility
-- **Modified**: `components/WalletProvider.tsx` - Added error tracking to wallet operations
+- **New**: `app/lib/wallet-error-tracking.ts` - Wallet error tracking utility
+- **Modified**: `components/wallet-provider.tsx` - Added error tracking to wallet operations
 - **Modified**: `components/MultiWalletProvider.tsx` - Added error tracking to multi-wallet operations
 
 ## Next Steps

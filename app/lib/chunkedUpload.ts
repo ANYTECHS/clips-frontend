@@ -69,6 +69,8 @@ export interface ChunkedUploadOptions {
   onProgress?: (percent: number) => void;
   /** Aborts the upload. Chunks already stored stay stored, so it can resume. */
   signal?: AbortSignal;
+  /** Optional saved template applied to the assembled upload. */
+  templateId?: string;
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;
   /** Injectable for tests. */
@@ -221,7 +223,7 @@ export async function uploadFileInChunks(
   // ── Send the chunks the server does not already have ──────────────────────
 
   const alreadyStored = new Set<number>(receivedChunks);
-  const pending = Array.from({ length: totalChunks }, (_, i) => i).filter(
+  const pending = Array.from(Array(totalChunks).keys()).filter(
     (index) => !alreadyStored.has(index),
   );
 
@@ -283,6 +285,7 @@ export async function uploadFileInChunks(
           size: file.size,
           type: file.type || "application/octet-stream",
           totalChunks,
+          ...(options.templateId ? { templateId: options.templateId } : {}),
         }),
       }),
     {

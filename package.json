@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "complexity": "node scripts/check-complexity.js",
+    "env:check": "node scripts/validate-env-example.js",
+    "test:validate": "node scripts/validate-test-files.js",
     "migrate:deploy": "prisma migrate deploy",
     "migrate:backup": "node scripts/migrate-backup.js",
     "migrate:rollback": "node scripts/migrate-rollback.js",

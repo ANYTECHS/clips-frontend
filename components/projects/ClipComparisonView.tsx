@@ -29,6 +29,7 @@ import {
 } from "@/app/lib/comparisonReport";
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { sanitize } from "@/app/lib/sanitize";
+import { DEFAULT_BLUR_PLACEHOLDER, SIZES_CLIP_GRID } from "@/app/lib/imageUtils";
 
 export interface ClipComparisonViewProps {
   clips: Clip[];
@@ -602,8 +603,11 @@ export default function ClipComparisonView({
                     ) : (
                       <Image
                         src={clip.thumbnail || "/placeholder.png"}
-                        alt={clip.title}
+                        alt={sanitize(clip.title)}
                         fill
+                        sizes={SIZES_CLIP_GRID}
+                        placeholder="blur"
+                        blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
                         className="object-cover"
                       />
                     )}

@@ -35,6 +35,8 @@ export interface TransformOptions {
   resolution?: string;
   /** Whether to preserve the original audio track */
   preserveAudio?: boolean;
+  /** Common style strength, from 0 to 100. */
+  intensity?: number;
   /**
    * Anime-specific tuning options. Only used when style === "anime".
    * Falls back to DEFAULT_ANIME_OPTIONS when omitted.
@@ -49,7 +51,7 @@ interface BatchTransformRequestBody {
 }
 
 function validateBody(
-  body: unknown,
+  body: unknown
 ): { valid: true; data: BatchTransformRequestBody } | { valid: false; error: string } {
   if (!body || typeof body !== "object") {
     return { valid: false, error: "Request body must be a JSON object." };
@@ -74,10 +76,7 @@ function validateBody(
   }
 
   // Validate style
-  if (
-    typeof b.style !== "string" ||
-    !ALLOWED_STYLES.includes(b.style.toLowerCase())
-  ) {
+  if (typeof b.style !== "string" || !ALLOWED_STYLES.includes(b.style.toLowerCase())) {
     return {
       valid: false,
       error: `style must be one of: ${ALLOWED_STYLES.join(", ")}.`,
@@ -91,19 +90,25 @@ function validateBody(
       return { valid: false, error: "options must be an object." };
     }
     const o = b.options as Record<string, unknown>;
-    if (
-      o.quality !== undefined &&
-      !["draft", "standard", "high"].includes(o.quality as string)
-    ) {
+    if (o.quality !== undefined && !["draft", "standard", "high"].includes(o.quality as string)) {
       return {
         valid: false,
         error: 'options.quality must be "draft", "standard", or "high".',
       };
     }
+    if (
+      o.intensity !== undefined &&
+      (!Number.isFinite(Number(o.intensity)) ||
+        Number(o.intensity) < 0 ||
+        Number(o.intensity) > 100)
+    ) {
+      return { valid: false, error: "options.intensity must be a number between 0 and 100." };
+    }
     options = {
       ...(o.quality !== undefined ? { quality: o.quality as TransformOptions["quality"] } : {}),
       ...(typeof o.resolution === "string" ? { resolution: o.resolution } : {}),
       ...(typeof o.preserveAudio === "boolean" ? { preserveAudio: o.preserveAudio } : {}),
+      ...(o.intensity !== undefined ? { intensity: Math.round(Number(o.intensity)) } : {}),
     };
 
     // Validate anime-specific options when style is "anime"
@@ -192,13 +197,22 @@ export async function POST(request: NextRequest) {
       transformStyle: style,
       sourceClipKey,
       // Pass through any extra options the AI backend may understand
-      ...(options ? { transformOptions: options.animeOptions ?? options } : {}),
+      ...(options
+        ? {
+            transformOptions: options.animeOptions
+              ? {
+                  ...options.animeOptions,
+                  ...(options.intensity !== undefined ? { intensity: options.intensity } : {}),
+                }
+              : options,
+          }
+        : {}),
     });
 
     if (!dispatchResult.dispatched) {
       logger.warn(
         `[transform/batch] Dispatch failed for clip ${clipId} job ${jobId}: ${dispatchResult.reason}. ` +
-          "Job will remain in queued status.",
+          "Job will remain in queued status."
       );
     }
 
@@ -213,7 +227,7 @@ export async function POST(request: NextRequest) {
   const jobs = await Promise.all(jobPromises);
 
   logger.info(
-    `[transform/batch] Created ${jobs.length} transform jobs for user ${userId}, style: ${style}`,
+    `[transform/batch] Created ${jobs.length} transform jobs for user ${userId}, style: ${style}`
   );
 
   return NextResponse.json({ jobs }, { status: 201 });

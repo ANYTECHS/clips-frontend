@@ -28,7 +28,7 @@ Implemented comprehensive database connection pooling to prevent connection exha
 - `checkDatabaseHealth()` - Health check for database connectivity
 - `disconnectPrisma()` - Graceful shutdown handler
 
-#### `app/lib/prismaMiddleware.ts`
+#### `app/lib/prisma-middleware.ts`
 - Created middleware for timeout handling and monitoring
 - Implemented query timeout protection
 - Added slow query detection and logging
@@ -94,7 +94,7 @@ Implemented comprehensive database connection pooling to prevent connection exha
 - Health checks
 - Graceful disconnection
 
-#### `__tests__/lib/prismaMiddleware.test.ts`
+#### `__tests__/lib/prisma-middleware.test.ts`
 - Middleware functionality tests
 - Timeout handling tests
 - Slow query detection tests
@@ -251,7 +251,7 @@ console.log(`Utilization: ${metrics.utilizationPercent}%`);
 
 ### Monitor Pool Exhaustion
 ```typescript
-import { detectPoolExhaustion } from '@/app/lib/prismaMiddleware';
+import { detectPoolExhaustion } from '@/app/lib/prisma-middleware';
 
 const isExhausted = await detectPoolExhaustion(prisma, 0.9);
 if (isExhausted) {
@@ -278,10 +278,10 @@ if (isExhausted) {
 ## Files Created/Modified
 
 ### Created (13 files)
-1. `app/lib/prismaMiddleware.ts`
+1. `app/lib/prisma-middleware.ts`
 2. `app/api/health/database/route.ts`
 3. `__tests__/lib/prisma.test.ts`
-4. `__tests__/lib/prismaMiddleware.test.ts`
+4. `__tests__/lib/prisma-middleware.test.ts`
 5. `__tests__/api/health-database.test.ts`
 6. `scripts/test-connection-pool.ts`
 7. `scripts/README.md`

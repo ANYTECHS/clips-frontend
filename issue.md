@@ -1,7 +1,7 @@
 #741 [CLEAN] Consolidate Duplicate Auth Redirect Logic
 
 Description:*
-Auth redirect logic exists in three places: app/lib/authRedirect.ts, components/auth/AuthProvider.tsx (useEffect), and the future middleware.ts. Once middleware is implemented (Issue #22), the client-side duplicates must be removed.
+Auth redirect logic exists in three places: app/lib/auth-redirect.ts, components/auth/auth-provider.tsx (useEffect), and the future middleware.ts. Once middleware is implemented (Issue #22), the client-side duplicates must be removed.
 
 Acceptance Criteria:
 
