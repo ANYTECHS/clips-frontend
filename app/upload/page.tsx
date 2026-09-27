@@ -11,12 +11,14 @@
  */
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   useUploadProgress,
   type FileProgress,
 } from "@/app/hooks/useUploadProgress";
+import { useVideoThumbnails, type FileThumbnailState } from "@/app/hooks/useVideoThumbnails";
 import {
   CloudUpload,
   X,
@@ -134,6 +136,64 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1_024 * 1_024)).toFixed(1)} MB`;
 }
 
+// ─── ThumbnailStrip ───────────────────────────────────────────────────────────
+
+const THUMB_LABELS = ["Start", "Middle", "End"];
+
+function ThumbnailStrip({
+  thumbState,
+  fileName,
+}: {
+  thumbState: FileThumbnailState | undefined;
+  fileName: string;
+}) {
+  if (!thumbState || thumbState.status === "idle") return null;
+
+  if (thumbState.status === "loading") {
+    return (
+      <div
+        className="flex gap-2 pt-1"
+        aria-label={`Generating thumbnails for ${sanitize(fileName)}`}
+        aria-live="polite"
+        aria-busy="true"
+      >
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-14 flex-1 rounded-lg bg-white/[0.06] animate-pulse"
+            aria-hidden
+          />
+        ))}
+      </div>
+    );
+  }
+
+  if (thumbState.status === "error") {
+    // Silently omit the strip — the upload itself is unaffected
+    return null;
+  }
+
+  return (
+    <div
+      className="flex gap-2 pt-1"
+      aria-label={`Video previews for ${sanitize(fileName)}`}
+    >
+      {thumbState.thumbnails.map((src, i) => (
+        <div key={i} className="relative flex-1 aspect-video rounded-lg overflow-hidden bg-white/[0.06]">
+          <Image
+            src={src}
+            alt={`${sanitize(fileName)} — ${THUMB_LABELS[i] ?? `frame ${i + 1}`}`}
+            fill
+            sizes="(max-width: 640px) 30vw, 200px"
+            className="object-cover"
+            unoptimized
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function UploadPage() {
@@ -144,6 +204,7 @@ export default function UploadPage() {
     useUploadProgress(undefined, templateId);
 
   const [files, setFiles] = useState<File[]>([]);
+  const thumbnailMap = useVideoThumbnails(files);
   const [dragOver, setDragOver] = useState(false);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -520,6 +581,8 @@ export default function UploadPage() {
                       </button>
                     )}
                   </div>
+
+                  <ThumbnailStrip thumbState={thumbnailMap[file.name]} fileName={file.name} />
 
                   <ProgressBar value={prog.percent} status={prog.status} />
 
