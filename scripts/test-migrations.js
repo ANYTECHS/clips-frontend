@@ -22,7 +22,8 @@ if (invalid.length > 0) {
   process.exit(1);
 }
 
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const isWin = process.platform === "win32";
+const npx = isWin ? "npx.cmd" : "npx";
 execFileSync(npx, ["prisma", "validate", "--schema", "prisma/schema.prisma"], {
   env: {
     ...process.env,
@@ -31,6 +32,7 @@ execFileSync(npx, ["prisma", "validate", "--schema", "prisma/schema.prisma"], {
       "postgresql://migration-test:password@localhost:5432/migration_test",
   },
   stdio: "inherit",
+  ...(isWin ? { shell: true } : {}),
 });
 
 console.log(`Validated ${migrations.length} migration(s).`);

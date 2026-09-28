@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
 import { z } from "zod";
-
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { auth } from "@/app/lib/auth";
 import { logger } from "@/app/lib/logger";
 import { prisma } from "@/app/lib/prisma";
+import { createAuditEvent } from "@/app/lib/auditLog";
 
 const updateApiKeySchema = z.object({
   name: z.string().min(1).max(100).optional(),
@@ -12,19 +11,30 @@ const updateApiKeySchema = z.object({
   active: z.boolean().optional(),
 });
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
+
     const apiKey = await prisma.apiKey.findFirst({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
-      include: {
+      select: {
+        id: true,
+        name: true,
+        keyPrefix: true,
+        scopes: true,
+        lastUsedAt: true,
+        expiresAt: true,
+        revokedAt: true,
+        active: true,
+        createdAt: true,
         usages: {
           orderBy: { createdAt: "desc" },
           take: 50,
@@ -43,22 +53,28 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
     const body = await req.json();
     const validatedData = updateApiKeySchema.parse(body);
 
+    const updateData: any = { ...validatedData };
+    if (validatedData.active === false) {
+      updateData.revokedAt = new Date();
+    }
+
     const apiKey = await prisma.apiKey.updateMany({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
-      data: validatedData,
+      data: updateData,
     });
 
     if (apiKey.count === 0) {
@@ -66,7 +82,28 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
 
     const updatedApiKey = await prisma.apiKey.findUnique({
-      where: { id: params.id },
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        keyPrefix: true,
+        scopes: true,
+        lastUsedAt: true,
+        expiresAt: true,
+        revokedAt: true,
+        active: true,
+        createdAt: true,
+      },
+    });
+
+    // Create audit event
+    await createAuditEvent({
+      actorId: session.user.id,
+      action: validatedData.active === false ? "api_key.revoke" : "api_key.update",
+      resource: "api_key",
+      resourceId: id,
+      status: "success",
+      metadata: validatedData,
     });
 
     return NextResponse.json({ apiKey: updatedApiKey });
@@ -79,16 +116,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await auth();
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { id } = await params;
+
     const apiKey = await prisma.apiKey.deleteMany({
       where: {
-        id: params.id,
+        id,
         userId: session.user.id,
       },
     });
@@ -96,6 +135,15 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     if (apiKey.count === 0) {
       return NextResponse.json({ error: "API key not found" }, { status: 404 });
     }
+
+    // Create audit event
+    await createAuditEvent({
+      actorId: session.user.id,
+      action: "api_key.delete",
+      resource: "api_key",
+      resourceId: id,
+      status: "success",
+    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

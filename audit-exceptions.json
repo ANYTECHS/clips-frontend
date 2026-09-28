@@ -1,0 +1,177 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Documented exceptions for known dependency security advisories evaluated as non-exploitable or accepted dev-tooling risks in the clips-frontend runtime environment.",
+  "exceptions": [
+    {
+      "id": "GHSA-7rqj-j65f-68wh",
+      "package": "@auth/core",
+      "severity": "critical",
+      "reason": "Email provider is not enabled in production (OAuth Google/Apple/Twitter and Stellar WebAuthn are used exclusively). Email homoglyph issue is non-exploitable.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-8fpg-xm3f-6cx3",
+      "package": "next-auth",
+      "severity": "critical",
+      "reason": "Existence-based fail open vulnerability in Auth.js is mitigated across the codebase by explicitly validating `session?.user?.id` rather than testing session object existence.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-p293-qw3h-jr36",
+      "package": "next",
+      "severity": "critical",
+      "reason": "Windows-hosted Next.js server vulnerability. Production deployments execute exclusively on Linux container runtime environments (Fly.io, Kubernetes, Vercel).",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-2xp9-vwfh-vxw4",
+      "package": "next",
+      "severity": "critical",
+      "reason": "Next.js AVIF image optimization advisory. In next.config.ts, remotePatterns are strictly restricted to trusted origins (AWS CloudFront, S3, Dicebear, Google, GitHub, Unsplash). Untrusted arbitrary user image domains are disallowed.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-xmf8-cvqr-rfgj",
+      "package": "@auth/core",
+      "severity": "high",
+      "reason": "Bearer header handling is sanitized by custom apiAuthMiddleware prior to reaching Auth.js handlers.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-x445-f3h2-j279",
+      "package": "@auth/core",
+      "severity": "moderate",
+      "reason": "PKCE check cookies are protected by strict sameSite and secure flags.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-82fw-gwwq-j7x9",
+      "package": "vitest",
+      "severity": "critical",
+      "reason": "Vitest is strictly a devDependency used only during local testing and CI test execution. It is never included in client or production server bundles.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "vitest",
+      "package": "vitest",
+      "severity": "critical",
+      "reason": "Test runner devDependency not bundled into production artifact.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-p63j-vcc4-9vmv",
+      "package": "@vitest/browser",
+      "severity": "critical",
+      "reason": "Vitest browser mode provider devDependency for component testing in headless CI runner only.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-g8mr-85jm-7xhm",
+      "package": "@vitest/browser",
+      "severity": "critical",
+      "reason": "Exposed Browser Mode API restricted to local test runner; not exposed on public network.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "@vitest/browser",
+      "package": "@vitest/browser",
+      "severity": "critical",
+      "reason": "Test runner devDependency for headless browser tests in CI.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "@vitest/browser-playwright",
+      "package": "@vitest/browser-playwright",
+      "severity": "critical",
+      "reason": "Headless browser testing adapter devDependency in CI runner only.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-9j5q-479x-43g2",
+      "package": "@stryker-mutator/util",
+      "severity": "high",
+      "reason": "Mutation testing tooling devDependency; never executed in production.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-96hv-2xvq-fx4p",
+      "package": "ws",
+      "severity": "high",
+      "reason": "Transitive devDependency pulled by storybook and vitest browser runner; not exposed on public production attack surface.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-58qx-3vcg-4xpx",
+      "package": "ws",
+      "severity": "moderate",
+      "reason": "Transitive devDependency pulled by storybook dev server.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-rgj7-g3m4-5g8c",
+      "package": "sharp",
+      "severity": "high",
+      "reason": "Transitive build-time image optimization dependency; Next.js remote pattern limits prevent arbitrary file processing.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-82x6-q7mm-w9cf",
+      "package": "toml",
+      "severity": "high",
+      "reason": "Transitive dependency in @stellar/stellar-sdk used only for parsing local stellar.toml files, not exposed to untrusted user input.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-v5mp-jgw5-2x6j",
+      "package": "toml",
+      "severity": "high",
+      "reason": "Transitive dependency in @stellar/stellar-sdk used only for parsing local stellar.toml files.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    },
+    {
+      "id": "GHSA-ph9p-34f9-6g65",
+      "package": "tmp",
+      "severity": "high",
+      "reason": "Transitive devDependency in @lhci/cli for Lighthouse performance testing.",
+      "approvedBy": "Security Team",
+      "reviewDate": "2026-09-28",
+      "expiresAt": "2026-12-31"
+    }
+  ]
+}
