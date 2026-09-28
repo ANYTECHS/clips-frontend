@@ -5,6 +5,7 @@ import Twitter from "next-auth/providers/twitter";
 import Instagram from "next-auth/providers/instagram";
 import Credentials from "next-auth/providers/credentials";
 import { jwtCallback, sessionCallback } from "./authCallbacks";
+import { getSecureCookieConfig, getSessionSecurityConfig } from "./sessionSecurity";
 // eslint-disable-next-line no-restricted-imports -- TODO: replace MockApi with real recovery API (tracked separately)
 import { MockApi } from "@/__mocks__/app/lib/mockApi";
 
@@ -168,9 +169,11 @@ export const authOptions: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60,
+    maxAge: getSessionSecurityConfig().sessionMaxAgeSeconds,
     updateAge: 10 * 60,
   },
+  useSecureCookies: process.env.NODE_ENV === "production",
+  cookies: getSecureCookieConfig(process.env.NODE_ENV === "production"),
   /** Custom route mappings overriding core fallback display interface links. */
   pages: {
     signIn: "/login",

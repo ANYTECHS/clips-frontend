@@ -25,6 +25,8 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   notifications Notification[]
+  apiKeys       ApiKey[]
+  sessions      UserSession[]
 
   /**
    * Opt-in to the monthly earnings report email (Issue #820).
@@ -136,3 +138,90 @@ model EarningsReportDelivery {
   @@unique([userId, period])
   @@index([period])
 }
+
+/// Secure API Key for authenticated API access (Issue #1164).
+/// Raw key secrets are never stored in the database — only the SHA-256 hash
+/// and an identification prefix are persisted.
+model ApiKey {
+  id          String     @id @default(cuid())
+  userId      String
+  name        String
+  keyPrefix   String     // First 8 characters for identification (e.g. ck_live_a1b2)
+  keyHash     String     @unique // SHA-256 hash of the complete key
+  scopes      String[]   @default(["read", "write"])
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  revokedAt   DateTime?
+  active      Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  usages      ApiUsage[]
+
+  @@index([userId])
+  @@index([keyPrefix])
+  @@index([keyHash])
+}
+
+/// Request metrics logged for API key usage (Issue #1164).
+model ApiUsage {
+  id           String   @id @default(cuid())
+  apiKeyId     String
+  endpoint     String
+  method       String
+  statusCode   Int
+  responseTime Int
+  createdAt    DateTime @default(now())
+
+  apiKey       ApiKey   @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+
+  @@index([apiKeyId])
+  @@index([createdAt])
+}
+
+/// Server-side tracked session supporting rotation, timeouts, and concurrent session limits (Issue #1163).
+model UserSession {
+  id             String    @id @default(cuid())
+  userId         String
+  sessionToken   String    @unique
+  ipAddress      String?
+  userAgent      String?
+  lastActivityAt DateTime  @default(now())
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expiresAt])
+  @@index([sessionToken])
+}
+
+/// Tamper-evident security audit trail with cryptographic hash chaining (Issue #1162).
+/// Rows are append-only. Each record incorporates the previous record's hash to ensure
+/// chronological integrity and detect any unauthorized modifications.
+model AuditLog {
+  id            String    @id @default(cuid())
+  timestamp     DateTime  @default(now())
+  actorId       String
+  actorType     String    @default("user") // user | api_key | system | admin
+  action        String    // e.g. auth.login, api_key.create, session.rotate
+  resource      String    // e.g. api_key, session, user
+  resourceId    String?
+  requestId     String?
+  ipAddress     String?
+  userAgent     String?
+  status        String    @default("success") // success | failure
+  metadata      Json?
+  schemaVersion Int       @default(1)
+  previousHash  String?
+  eventHash     String
+
+  @@index([actorId, timestamp])
+  @@index([action, timestamp])
+  @@index([resource, resourceId])
+  @@index([timestamp])
+}
+

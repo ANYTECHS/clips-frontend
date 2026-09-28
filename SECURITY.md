@@ -75,3 +75,36 @@ export async function POST(request: NextRequest) {
 ```
 
 Integration tests should cover both the same-origin (pass) and cross-origin (403) cases. See `__tests__/api/jobs.csrf.test.ts` and `__tests__/api/upload.csrf.test.ts` for examples.
+
+## API Authentication (#1164)
+
+API routes support authentication via API keys (`ck_live_...` / `ck_test_...`) and cryptographically signed JWT tokens (HMAC-SHA256).
+- Raw API keys are never stored in plaintext; only the SHA-256 hash (`keyHash`) and an identification prefix (`keyPrefix`) are persisted in the database.
+- Routes can enforce required permissions via `withApiAuth(handler, { requiredScope: "read" })` or `authenticateApiRequest()`.
+- Failed authentication attempts are logged for security anomaly detection.
+- Detailed architecture and usage: see [docs/SECURITY_API_AUTHENTICATION.md](docs/SECURITY_API_AUTHENTICATION.md).
+
+## Audit Logging (#1162)
+
+All sensitive administrative and authentication operations are logged to a tamper-evident audit trail with cryptographic SHA-256 hash chaining.
+- Each log entry incorporates the hash of the preceding record (`previousHash`), preventing retroactive manipulation or deletion.
+- Log entries are verified via `verifyAuditLogIntegrity()` and visible to authorized users at `/audit`.
+- Older records are managed under a retention policy via `scripts/prune-audit-logs.js` (`npm run audit:prune`).
+- Detailed architecture and usage: see [docs/AUDIT_LOGGING.md](docs/AUDIT_LOGGING.md).
+
+## Session Security (#1163)
+
+Browser sessions are hardened with comprehensive lifecycle controls:
+- Cookies are configured with `HttpOnly`, `SameSite=lax`, and `Secure` attributes (in production, prefixed with `__Secure-`).
+- Configurable absolute session lifetime (`SESSION_MAX_AGE`) and inactivity timeout (`SESSION_INACTIVITY_TIMEOUT`).
+- Session rotation via `rotateSession()` to mitigate fixation attacks.
+- Concurrent session limit enforcement (`MAX_CONCURRENT_SESSIONS`), evicting the oldest session when exceeded.
+- User session inspection and revocation endpoints under `/api/auth/sessions`.
+- Detailed architecture and usage: see [docs/SESSION_SECURITY.md](docs/SESSION_SECURITY.md).
+
+## Dependency Vulnerability Scanning (#1161)
+
+Automated software supply-chain scanning runs in CI via `npm run security:scan` (`scripts/dependency-scan.js`).
+- Flags vulnerabilities at or above the configured severity threshold (`critical`).
+- Approved and reviewed exceptions with non-exploitable rationales are maintained in `audit-exceptions.json`.
+- Detailed architecture, remediation runbook, and exception guidelines: see [docs/DEPENDENCY_SCANNING.md](docs/DEPENDENCY_SCANNING.md).

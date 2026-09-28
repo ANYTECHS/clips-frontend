@@ -28,7 +28,9 @@ function createPrismaClient() {
   });
 
   // Register middleware for timeout handling and monitoring
-  client.$use(createPrismaMiddleware());
+  if (typeof (client as any).$use === 'function') {
+    (client as any).$use(createPrismaMiddleware());
+  }
 
   // Log warnings
   client.$on('warn' as never, (e: any) => {

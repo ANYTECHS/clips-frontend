@@ -1,7 +1,6 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
-import { appConfig } from "./app/lib/config";
-import { validateRequiredEnv } from "./app/lib/validate-env";
+import { validateRequiredEnv } from "./app/lib/validateEnv";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
 validateRequiredEnv();
@@ -14,10 +13,8 @@ const CDN_HOSTNAME = CDN_URL ? new URL(CDN_URL).hostname : "cdn.clipcash.dev";
 
 /** Horizon origins the browser talks to, including any configured overrides. */
 const HORIZON_ORIGINS = [
-  ...new Set([
-    new URL(appConfig.stellar.horizonUrl.testnet).origin,
-    new URL(appConfig.stellar.horizonUrl.mainnet).origin,
-  ]),
+  "https://horizon-testnet.stellar.org",
+  "https://horizon.stellar.org",
 ];
 
 const withAnalyzer = withBundleAnalyzer({
