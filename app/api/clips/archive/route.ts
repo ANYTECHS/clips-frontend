@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { clipsStore } from "../clipsStore";
 import type { ApiResponse } from "../../types";
 import { bulkClipIdsBodySchema } from "../../schemas/index";
@@ -66,6 +67,8 @@ async function resolveRequest(request: NextRequest): Promise<
  * Archived tab. Non-destructive — DELETE /api/clips is the delete path.
  */
 export async function PATCH(request: NextRequest) {
+  const limited = await applyRateLimit(request, { limit: 30, windowMs: 60_000 });
+  if (limited) return limited;
   const resolved = await resolveRequest(request);
   if (!resolved.ok) return resolved.response;
 
