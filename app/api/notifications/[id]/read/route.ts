@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkCsrf } from "@/app/lib/csrf";
 import { notificationStore } from "../../notificationStore";
 
 export async function PATCH(
@@ -6,6 +7,9 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
+    const csrfError = checkCsrf(request);
+    if (csrfError) return csrfError;
+
     const { id } = await context.params;
 
     if (!id) {
