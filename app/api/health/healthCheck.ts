@@ -29,6 +29,7 @@ export interface HealthCheckResult {
   timestamp: string;
   uptime: number;
   dependencies?: Record<string, DependencyResult>;
+  jobStoreMode?: "redis" | "memory";
 }
 
 const APP_VERSION = process.env.npm_package_version ?? "0.1.0";
@@ -192,11 +193,21 @@ export async function readinessCheck(): Promise<HealthCheckResult> {
 
   const status = aggregate(dependencies);
 
+  // Get job store mode
+  let jobStoreMode: "redis" | "memory" = "memory";
+  try {
+    const { jobStore } = await import("@/app/api/jobs/shared/jobStore");
+    jobStoreMode = jobStore.getMode();
+  } catch (error) {
+    // If jobStore fails to load, default to memory
+  }
+
   return {
     status,
     version: APP_VERSION,
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
     dependencies,
+    jobStoreMode,
   };
 }

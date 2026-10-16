@@ -51,6 +51,7 @@ export interface JobStore {
   clear(): Promise<void>;
   getAll(): Promise<Job[]>;
   getUserJobs(userId: string): Promise<Job[]>;
+  getMode(): "redis" | "memory";
 }
 
 import { JobRepository, createJobRepository } from "./jobRepository";
@@ -94,6 +95,10 @@ class JobRepositoryAdapter implements JobStore {
 
   async getUserJobs(userId: string): Promise<Job[]> {
     return this.repo.getUserJobs(userId);
+  }
+
+  getMode(): "redis" | "memory" {
+    return this.repo.getMode();
   }
 }
 

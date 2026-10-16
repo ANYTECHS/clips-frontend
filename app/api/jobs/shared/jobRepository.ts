@@ -1,9 +1,10 @@
 import Redis from "ioredis";
+import * as Sentry from "@sentry/nextjs";
 
 import { logger } from "@/app/lib/logger";
 
 import type { Job } from "./jobStore";
-import { getRedisClient, isRedisAvailable } from "./redisClient";
+import { getRedisClient, isRedisAvailable, checkRedisHealth } from "./redisClient";
 
 interface StorageAdapter {
   get(key: string): Promise<string | null>;
@@ -75,7 +76,9 @@ class RedisStorageAdapter implements StorageAdapter {
   }
 }
 
-class InMemoryStorageAdapter implements StorageAdapter {
+export type StorageMode = "redis" | "memory";
+
+export class InMemoryStorageAdapter implements StorageAdapter {
   private readonly map = new Map<string, string>();
 
   async get(key: string): Promise<string | null> {
@@ -102,10 +105,15 @@ class InMemoryStorageAdapter implements StorageAdapter {
 }
 
 export class JobRepository {
-  private readonly adapter: StorageAdapter;
+  private adapter: StorageAdapter;
+  private mode: StorageMode = "memory";
+  private inMemoryCache = new Map<string, Job>();
+  private lastHealthCheck = 0;
+  private readonly HEALTH_CHECK_INTERVAL = 30_000; // 30 seconds
 
   constructor(adapter: StorageAdapter) {
     this.adapter = adapter;
+    this.mode = adapter instanceof RedisStorageAdapter ? "redis" : "memory";
   }
 
   private key(jobId: string): string {
@@ -113,6 +121,7 @@ export class JobRepository {
   }
 
   async get(jobId: string): Promise<Job | null> {
+    await this.checkHealthAndSwitch();
     try {
       const raw = await this.adapter.get(this.key(jobId));
       if (!raw) return null;
@@ -125,8 +134,13 @@ export class JobRepository {
   }
 
   async set(jobId: string, jobData: Job): Promise<void> {
+    await this.checkHealthAndSwitch();
     try {
       await this.adapter.set(this.key(jobId), JSON.stringify(jobData));
+      // Also update in-memory cache if in memory mode
+      if (this.mode === "memory") {
+        this.inMemoryCache.set(jobId, jobData);
+      }
     } catch (error) {
       const cause = error instanceof Error ? error : new Error(String(error));
       logger.error(`[JobRepository] failed to write job ${jobId}:`, cause);
@@ -135,8 +149,11 @@ export class JobRepository {
   }
 
   async delete(jobId: string): Promise<boolean> {
+    await this.checkHealthAndSwitch();
     try {
       const result = await this.adapter.del(this.key(jobId));
+      // Also remove from in-memory cache
+      this.inMemoryCache.delete(jobId);
       return result > 0;
     } catch (error) {
       const cause = error instanceof Error ? error : new Error(String(error));
@@ -174,6 +191,109 @@ export class JobRepository {
     }
 
     await this.adapter.flushdb();
+  }
+
+  /**
+   * Get the current storage mode
+   */
+  getMode(): StorageMode {
+    return this.mode;
+  }
+
+  /**
+   * Perform health check and switch modes if needed
+   */
+  private async checkHealthAndSwitch(): Promise<void> {
+    const now = Date.now();
+    if (now - this.lastHealthCheck < this.HEALTH_CHECK_INTERVAL) {
+      return;
+    }
+    this.lastHealthCheck = now;
+
+    const isRedisHealthy = await checkRedisHealth();
+
+    if (this.mode === "redis" && !isRedisHealthy) {
+      // Redis failed - switch to in-memory
+      logger.critical(
+        "[JobRepository] Redis health check failed - switching to in-memory storage"
+      );
+      Sentry.captureMessage("Redis failover to in-memory storage", {
+        level: "error",
+        tags: {
+          component: "jobRepository",
+          operation: "failover",
+          from: "redis",
+          to: "memory",
+        },
+      });
+
+      // Cache all existing jobs before switching
+      await this.cacheAllJobs();
+
+      this.adapter = new InMemoryStorageAdapter();
+      this.mode = "memory";
+    } else if (this.mode === "memory" && isRedisHealthy) {
+      // Redis recovered - sync back and switch
+      logger.info("[JobRepository] Redis recovered - syncing in-memory jobs back to Redis");
+
+      try {
+        await this.syncToRedis();
+        const redisClient = getRedisClient();
+        if (redisClient) {
+          this.adapter = new RedisStorageAdapter(redisClient);
+          this.mode = "redis";
+          this.inMemoryCache.clear();
+          logger.info("[JobRepository] Successfully switched back to Redis storage");
+        }
+      } catch (error) {
+        logger.error("[JobRepository] Failed to sync to Redis, staying in memory mode:", error);
+        Sentry.captureException(error, {
+          tags: {
+            component: "jobRepository",
+            operation: "redis_recovery",
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Cache all jobs from current adapter to in-memory map
+   */
+  private async cacheAllJobs(): Promise<void> {
+    try {
+      const jobs = await this.getAll();
+      for (const job of jobs) {
+        this.inMemoryCache.set(job.id, job);
+      }
+      logger.info(`[JobRepository] Cached ${jobs.length} jobs to in-memory storage`);
+    } catch (error) {
+      logger.error("[JobRepository] Failed to cache jobs:", error);
+    }
+  }
+
+  /**
+   * Sync in-memory jobs back to Redis
+   */
+  private async syncToRedis(): Promise<void> {
+    const redisClient = getRedisClient();
+    if (!redisClient) {
+      throw new Error("Redis client not available for sync");
+    }
+
+    const redisAdapter = new RedisStorageAdapter(redisClient);
+    let synced = 0;
+
+    for (const [jobId, job] of this.inMemoryCache) {
+      try {
+        await redisAdapter.set(this.key(jobId), JSON.stringify(job));
+        synced++;
+      } catch (error) {
+        logger.error(`[JobRepository] Failed to sync job ${jobId}:`, error);
+      }
+    }
+
+    logger.info(`[JobRepository] Synced ${synced}/${this.inMemoryCache.size} jobs to Redis`);
   }
 }
 
