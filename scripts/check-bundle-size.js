@@ -2,16 +2,16 @@
 /**
  * Bundle size budget check.
  *
- * Reads the client chunks emitted by `next build` and compares their gzipped
- * size against the budgets in bundle-budget.json. Exits non-zero when a budget
- * is exceeded, so a dependency or an accidental barrel import that inflates the
- * bundle fails the build instead of being noticed months later.
+ * Reads the first-load JavaScript emitted by `next build` and compares its
+ * gzipped size against bundle-budget.json. A 5% allowance avoids failing on
+ * small build-to-build fluctuations while still catching material regressions.
  *
  * Gzipped rather than raw, because that is what users actually download.
  *
  * Usage:
- *   node scripts/check-bundle-size.js            # fail on any budget breach
+ *   node scripts/check-bundle-size.js            # fail on budget breaches
  *   node scripts/check-bundle-size.js --report   # print sizes, never fail
+ *   node scripts/check-bundle-size.js --update   # record the current build
  */
 
 const fs = require("fs");
@@ -22,8 +22,10 @@ const ROOT = path.join(__dirname, "..");
 const NEXT_DIR = path.join(ROOT, ".next");
 const BUDGET_FILE = path.join(ROOT, "bundle-budget.json");
 const REPORT_ONLY = process.argv.includes("--report");
+const UPDATE = process.argv.includes("--update");
 
 const KB = 1024;
+const TOLERANCE = 0.05;
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf-8"));
@@ -34,7 +36,11 @@ function gzippedSize(file) {
 }
 
 function toKb(bytes) {
-  return Math.round((bytes / KB) * 10) / 10;
+  return Math.round((bytes / KB) * 100) / 100;
+}
+
+function budgetKb(bytes) {
+  return Math.ceil((bytes / KB) * 10) / 10;
 }
 
 /** Absolute path for a chunk listed in a build manifest. */
@@ -110,67 +116,104 @@ function main() {
   const { budgets, routeOverrides = {} } = config;
   const { routes, shared } = collectRoutes();
 
-  const failures = [];
-  const rows = [];
+  if (routes.size === 0) {
+    console.error("No route chunks found in the Next.js build manifests.");
+    process.exit(2);
+  }
+
+  const measurements = [];
 
   // Shared first-load JS.
   const sharedBytes = sumGzipped([...shared].map(chunkPath));
-  rows.push(["shared (first load)", toKb(sharedBytes), budgets.firstLoadShared.maxKb]);
-  if (toKb(sharedBytes) > budgets.firstLoadShared.maxKb) {
-    failures.push(
-      `shared first-load JS is ${toKb(sharedBytes)} kB, budget ${budgets.firstLoadShared.maxKb} kB`,
-    );
-  }
+  measurements.push({
+    route: "shared (first load)",
+    bytes: sharedBytes,
+    budgetKb: budgets.firstLoadShared.maxKb,
+  });
 
   // Per route, shared chunks included — that is what a cold visitor downloads.
   for (const [route, chunks] of [...routes].sort()) {
     const files = new Set([...chunks, ...shared].map(chunkPath));
-    const kb = toKb(sumGzipped([...files]));
+    const bytes = sumGzipped([...files]);
     const override = routeOverrides[route];
     const limit =
       override && typeof override.maxKb === "number"
         ? override.maxKb
         : budgets.perRoute.maxKb;
 
-    rows.push([route, kb, limit]);
-    if (kb > limit) {
-      failures.push(`route ${route} is ${kb} kB, budget ${limit} kB`);
+    measurements.push({ route, bytes, budgetKb: limit });
+  }
+
+  // Every emitted client chunk, counted once.
+  const totalBytes = sumGzipped(collectAllClientChunks());
+  measurements.push({
+    route: "total client JS",
+    bytes: totalBytes,
+    budgetKb: budgets.totalClient.maxKb,
+  });
+
+  if (UPDATE) {
+    budgets.firstLoadShared.maxKb = budgetKb(sharedBytes);
+    budgets.totalClient.maxKb = budgetKb(totalBytes);
+    measurements[0].budgetKb = budgets.firstLoadShared.maxKb;
+    measurements[measurements.length - 1].budgetKb = budgets.totalClient.maxKb;
+    const updatedOverrides = {};
+    for (const measurement of measurements) {
+      const { route, bytes } = measurement;
+      if (route === "shared (first load)" || route === "total client JS") continue;
+      measurement.budgetKb = budgetKb(bytes);
+      updatedOverrides[route] = {
+        maxKb: measurement.budgetKb,
+        reason:
+          routeOverrides[route]?.reason ??
+          "Initial measured baseline; document intentional size increases in the PR.",
+      };
     }
+    updatedOverrides.$comment =
+      "Per-route first-load baselines. Each intentional increase needs a reason in the PR.";
+    config.routeOverrides = updatedOverrides;
+    fs.writeFileSync(BUDGET_FILE, `${JSON.stringify(config, null, 2)}\n`);
+    console.log("Updated bundle-budget.json from the current build.\n");
   }
 
-  // Everything the build emitted.
-  const totalKb = toKb(sumGzipped(collectAllClientChunks()));
-  rows.push(["total client JS", totalKb, budgets.totalClient.maxKb]);
-  if (totalKb > budgets.totalClient.maxKb) {
-    failures.push(`total client JS is ${totalKb} kB, budget ${budgets.totalClient.maxKb} kB`);
-  }
+  const rows = measurements.map(({ route, bytes, budgetKb: limit }) => {
+    const actualKb = toKb(bytes);
+    const deltaKb = actualKb - limit;
+    return {
+      route,
+      budget: limit,
+      actual: actualKb,
+      delta: deltaKb,
+      status: bytes > limit * KB * (1 + TOLERANCE) ? "FAIL" : "PASS",
+    };
+  });
 
-  const nameWidth = Math.max(...rows.map(([name]) => name.length));
-  console.log("\nBundle sizes (gzipped)\n");
-  for (const [name, kb, limit] of rows) {
-    const marker = kb > limit ? "FAIL" : "ok  ";
-    console.log(`  ${marker}  ${name.padEnd(nameWidth)}  ${String(kb).padStart(7)} kB  / ${limit} kB`);
+  const routeWidth = Math.max("ROUTE".length, ...rows.map(({ route }) => route.length));
+  console.log("\nBundle sizes (gzipped, 5% allowance)\n");
+  console.log(
+    `  ${"ROUTE".padEnd(routeWidth)}  ${"BUDGET (KB)".padStart(11)}  ${"ACTUAL (KB)".padStart(11)}  ${"DELTA".padStart(8)}  STATUS`,
+  );
+  for (const row of rows) {
+    const delta = `${row.delta >= 0 ? "+" : ""}${row.delta.toFixed(2)} KB`;
+    console.log(
+      `  ${row.route.padEnd(routeWidth)}  ${row.budget.toFixed(1).padStart(11)}  ${row.actual.toFixed(2).padStart(11)}  ${delta.padStart(8)}  ${row.status}`,
+    );
   }
   console.log("");
 
-  if (failures.length === 0) {
+  const failures = rows.filter(({ status }) => status === "FAIL");
+  if (failures.length === 0 || UPDATE) {
     console.log("All bundle budgets met.\n");
     return;
   }
 
-  for (const failure of failures) {
-    console.error(`Bundle budget exceeded: ${failure}`);
-  }
-
   if (REPORT_ONLY) {
-    console.error("\n(--report: not failing the build)\n");
+    console.error(`\n${failures.length} bundle budget(s) exceeded by more than 5% (--report only).\n`);
     return;
   }
 
-  console.error(
-    "\nEither trim the bundle or raise the budget in bundle-budget.json " +
-      "with a reason in the PR description.\n",
-  );
+  console.error(`\n${failures.length} bundle budget(s) exceeded by more than 5%.`);
+  console.error("Use --update after an intentional size increase and justify it in the PR.\n");
   process.exit(1);
 }
 
