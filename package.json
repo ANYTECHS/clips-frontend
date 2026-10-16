@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.637.0",
+    "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@prisma/client": "^6.1.0",
     "@sentry/nextjs": "^10.55.0",
     "@sentry/types": "^10.55.0",
@@ -60,6 +61,7 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "secrets.js-grempe": "^2.0.0",
+    "web-push": "^3.6.7",
     "zod": "^3.23.8",
     "zustand": "^5.0.12"
   },

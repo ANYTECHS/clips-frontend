@@ -25,6 +25,7 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   notifications Notification[]
+  pushSubscriptions PushSubscription[]
   apiKeys       ApiKey[]
   sessions      UserSession[]
 
@@ -36,6 +37,7 @@ model User {
    * records to be posted to their inbox every month.
    */
   monthlyEarningsReport   Boolean   @default(false)
+  notificationPreferences Json?
   /** Last successful send, used to skip a month the cron re-runs. */
   earningsReportSentAt    DateTime?
 }
@@ -112,6 +114,20 @@ model Notification {
 
   @@index([userId, readAt, createdAt])
   @@index([userId, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /**
