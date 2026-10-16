@@ -90,3 +90,134 @@ export function hasMonotonicGrowth(snapshots: MemorySnapshot[], minGrowingFracti
 
   return growingSteps / (snapshots.length - 1) >= minGrowingFraction;
 }
+
+// ─── Leak Detection ─────────────────────────────────────────────────────────────
+
+export interface LeakSource {
+  type: "eventListener" | "setInterval" | "setTimeout" | "WebSocket" | "Worker" | "closure";
+  description: string;
+  element?: Element;
+  count?: number;
+}
+
+/**
+ * Detect common memory leak sources in the current page context.
+ * This is a heuristic check - not definitive, but useful for development debugging.
+ */
+export function detectLeakSources(): LeakSource[] {
+  const leaks: LeakSource[] = [];
+
+  if (typeof window === "undefined") return leaks;
+
+  // Check for excessive event listeners
+  const allElements = document.querySelectorAll("*");
+  let totalListeners = 0;
+  let elementsWithManyListeners = 0;
+
+  allElements.forEach((el) => {
+    const listeners = (el as any).eventListenerCount || 0;
+    totalListeners += listeners;
+    if (listeners > 10) {
+      elementsWithManyListeners++;
+    }
+  });
+
+  if (elementsWithManyListeners > 5) {
+    leaks.push({
+      type: "eventListener",
+      description: `${elementsWithManyListeners} elements with >10 event listeners`,
+      count: totalListeners,
+    });
+  }
+
+  // Check for orphaned workers (if we can track them)
+  const workerCount = (window as any).__trackedWorkers?.length || 0;
+  if (workerCount > 5) {
+    leaks.push({
+      type: "Worker",
+      description: `${workerCount} active workers (potential orphaned references)`,
+      count: workerCount,
+    });
+  }
+
+  return leaks;
+}
+
+/**
+ * Track active workers for leak detection.
+ * Call this when creating a worker in development.
+ */
+export function trackWorker(worker: Worker): void {
+  if (process.env.NODE_ENV !== "development") return;
+
+  (window as any).__trackedWorkers = (window as any).__trackedWorkers || [];
+  (window as any).__trackedWorkers.push(worker);
+
+  worker.addEventListener("terminate", () => {
+    const tracked = (window as any).__trackedWorkers || [];
+    const index = tracked.indexOf(worker);
+    if (index > -1) {
+      tracked.splice(index, 1);
+    }
+  });
+}
+
+/**
+ * Measure memory using the performance.measureUserAgentSpecificMemory API
+ * if available (Chrome 89+). Returns detailed breakdown of memory usage.
+ */
+export async function measureUserAgentSpecificMemory(): Promise<any | null> {
+  if (typeof performance === "undefined") return null;
+
+  const perf = performance as Performance & {
+    measureUserAgentSpecificMemory?: () => Promise<any>;
+  };
+
+  if (!perf.measureUserAgentSpecificMemory) return null;
+
+  try {
+    return await perf.measureUserAgentSpecificMemory();
+  } catch (error) {
+    // API may be blocked by security features
+    return null;
+  }
+}
+
+export interface MemoryStats {
+  heapUsedMB: number;
+  heapTotalMB: number;
+  heapLimitMB: number;
+  heapUsedRatio: number;
+  domNodes: number;
+  eventListeners: number;
+  workers: number;
+}
+
+/**
+ * Get comprehensive memory statistics for the DEV_ONLY memory panel.
+ */
+export function getMemoryStats(): MemoryStats | null {
+  const snapshot = takeMemorySnapshot();
+  if (!snapshot) return null;
+
+  const domNodes = typeof document !== "undefined" ? document.querySelectorAll("*").length : 0;
+  const workers = (window as any).__trackedWorkers?.length || 0;
+
+  // Estimate event listeners (heuristic)
+  let eventListeners = 0;
+  if (typeof document !== "undefined") {
+    document.querySelectorAll("*").forEach((el) => {
+      eventListeners += (el as any).eventListenerCount || 0;
+    });
+  }
+
+  return {
+    heapUsedMB: Math.round(snapshot.usedJSHeapSize / (1024 * 1024)),
+    heapTotalMB: Math.round(snapshot.totalJSHeapSize / (1024 * 1024)),
+    heapLimitMB: Math.round(snapshot.jsHeapSizeLimit / (1024 * 1024)),
+    heapUsedRatio: snapshot.jsHeapSizeLimit > 0 ? snapshot.usedJSHeapSize / snapshot.jsHeapSizeLimit : 0,
+    domNodes,
+    eventListeners,
+    workers,
+  };
+}
