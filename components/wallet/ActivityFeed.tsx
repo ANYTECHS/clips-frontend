@@ -6,11 +6,12 @@ import { sanitize } from "@/app/lib/sanitize";
 import { formatAmount } from "@/app/lib/formatAmount";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 import VirtualList from "@/components/common/VirtualList";
+import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
 const DEFAULT_PAGE_SIZE = 20;
 const MAX_HORIZON_PAGE_SIZE = 200;
 /** Row height (px) reserved per transaction, incl. padding. Keep in sync with the row's own padding/line-heights below. */
-const ACTIVITY_ROW_HEIGHT = 84;
+const ACTIVITY_ROW_HEIGHT = VIRTUALIZATION_CONFIG.rowHeight.activity;
 const ACTIVITY_ROW_GAP = 8;
 
 type HorizonNetwork = "PUBLIC" | "TESTNET";
@@ -165,7 +166,7 @@ export default function ActivityFeed({
 
       return {
         records,
-        nextCursor: records.length > 0 ? records[records.length - 1].paging_token : null,
+        nextCursor: records.at(-1)?.paging_token ?? null,
       };
     },
     [effectivePageSize, horizonBaseUrl, publicKey]
@@ -317,12 +318,7 @@ export default function ActivityFeed({
           renderItem={(transaction) => (
             <div
               role="listitem"
-              className="flex h-full items-start justify-between gap-3 rounded-xl border border-border bg-surface-hover/40 px-4 py-3"
-        <ul className="space-y-2">
-          {filteredTransactions.map((transaction) => (
-            <li
-              key={transaction.id}
-              className="flex items-start justify-between gap-3 rounded-xl border border-border bg-surface-hover/40 px-4 py-3 contain-layout-style"
+              className="flex h-full items-start justify-between gap-3 overflow-hidden rounded-xl border border-border bg-surface-hover/40 px-4 py-3 contain-layout-style"
             >
               <div className="min-w-0 space-y-1">
                 <p className="truncate text-sm font-semibold text-white">

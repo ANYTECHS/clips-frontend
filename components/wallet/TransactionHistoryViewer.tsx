@@ -44,6 +44,7 @@ import { formatTxTimestamp, type Transaction, type TxFilter, type TxStatus, type
 import { sanitize } from "@/app/lib/sanitize";
 import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
 import { useRenderTiming } from "@/app/hooks/useRenderTiming";
+import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -288,8 +289,8 @@ function VirtualTransactionList({ transactions, isLoading }: { transactions: Tra
   const rowVirtualizer = useSimpleVirtualizer({
     count: transactions.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: 72,
-    overscan: 5,
+    estimateSize: VIRTUALIZATION_CONFIG.rowHeight.transactions,
+    overscan: VIRTUALIZATION_CONFIG.overscanItems,
   });
 
   return (

@@ -17,6 +17,7 @@
  */
 
 import { logger } from "@/app/lib/logger";
+import { immutableCache, shortCache } from "@/app/lib/cacheHeaders";
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -103,7 +104,7 @@ export function cdnStaticUrl(buildPath: string): string {
  * marked `immutable` so browsers skip revalidation entirely.
  */
 export const STATIC_ASSET_CACHE_CONTROL =
-  "public, max-age=31536000, immutable";
+  immutableCache();
 
 /**
  * Cache-Control for public media assets (thumbnails, OG images, avatars) that
@@ -113,7 +114,23 @@ export const STATIC_ASSET_CACHE_CONTROL =
  * the CDN fetches a fresh copy in the background.
  */
 export const PUBLIC_ASSET_CACHE_CONTROL =
-  "public, max-age=86400, stale-while-revalidate=604800";
+  shortCache(86400, 604800);
+
+/** Headers for cacheable public API responses at the browser and CDN edge. */
+export function publicCdnCacheHeaders(
+  contentType: string,
+  maxAgeSeconds = 60,
+  staleWhileRevalidateSeconds = 300,
+): Record<string, string> {
+  const maxAge = Math.max(0, Math.floor(maxAgeSeconds));
+  const stale = Math.max(0, Math.floor(staleWhileRevalidateSeconds));
+  const safeKey = contentType.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-|-$/g, "");
+  return {
+    "Cache-Control": `public, max-age=0, s-maxage=${maxAge}, stale-while-revalidate=${stale}`,
+    "CDN-Cache-Control": `public, max-age=${maxAge}, stale-while-revalidate=${stale}`,
+    "Surrogate-Key": safeKey,
+  };
+}
 
 /**
  * Cache-Control for ISR pages: served fresh for `revalidate` seconds, then

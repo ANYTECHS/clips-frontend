@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { notificationStore } from "./notificationStore";
 import type { NotificationType } from "./notificationStore";
 import { paginateItems, parsePaginationParams } from "../pagination";
+import { noCache } from "@/app/lib/cacheHeaders";
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
       data: notifications,
       unreadCount: unread.length,
       meta,
-    });
+    }, { headers: { "Cache-Control": noCache() } });
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to fetch notifications" },

@@ -1,11 +1,11 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 import { Clock, CheckCircle2 } from "lucide-react";
 import { sanitize } from "@/app/lib/sanitize";
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
-import { DEFAULT_BLUR_PLACEHOLDER, SIZES_STYLE_GRID } from "@/app/lib/imageUtils";
+import { SIZES_STYLE_GRID } from "@/app/lib/imageUtils";
+import LazyImage from "@/components/common/LazyImage";
 import type { TransformStyle } from "@/app/api/transform/styles/route";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -86,13 +86,11 @@ export function StyleCard({
     >
       {/* ── Thumbnail ── */}
       <div className="relative w-full aspect-video overflow-hidden bg-background">
-        <Image
+        <LazyImage
           src={style.thumbnail}
           alt={`${sanitize(label)} style preview`}
           fill
           sizes={SIZES_STYLE_GRID}
-          placeholder="blur"
-          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
           className={[
             "object-cover transition-transform duration-300",
             !isDisabled && !isSelected ? "group-hover:scale-105 group-hover:will-change-transform" : "",

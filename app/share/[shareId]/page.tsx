@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import LazyImage from "@/components/common/LazyImage";
 import { exploreStore } from "@/app/api/explore/exploreStore";
 
 /**
@@ -127,6 +128,15 @@ export default async function SharePage({
           {/* Video Player Section */}
           <div className="bg-surface border border-border rounded-2xl p-6 mb-8">
             <div className="aspect-video bg-black rounded-xl flex items-center justify-center mb-4 relative overflow-hidden">
+              {clip?.thumbnail && (
+                <LazyImage
+                  src={clip.thumbnail}
+                  alt={clip.title}
+                  fill
+                  sizes="(max-width: 768px) 100vw, 896px"
+                  className="object-cover opacity-50"
+                />
+              )}
               {/* Replace with actual video player in production */}
               <div className="text-center">
                 <div className="w-20 h-20 rounded-full bg-brand/20 flex items-center justify-center mx-auto mb-4">

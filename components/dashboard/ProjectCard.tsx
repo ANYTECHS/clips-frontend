@@ -1,8 +1,8 @@
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { sanitize } from "@/app/lib/sanitize";
-import { DEFAULT_BLUR_PLACEHOLDER, SIZES_PROJECT_CARD_THUMB } from "@/app/lib/imageUtils";
+import { SIZES_PROJECT_CARD_THUMB } from "@/app/lib/imageUtils";
+import LazyImage from "@/components/common/LazyImage";
 
 export interface ProjectCardProps {
   id?: string;
@@ -22,13 +22,11 @@ function ProjectCard({
   const content = (
     <div className="bg-surface border border-white/10 rounded-[24px] p-5 flex items-center gap-5 hover:border-brand/50 transition-colors">
       <div className="relative w-24 h-24 rounded-[18px] overflow-hidden shrink-0 bg-input">
-        <Image
+        <LazyImage
           src={thumbnail}
           alt={sanitize(title)}
           fill
           sizes={SIZES_PROJECT_CARD_THUMB}
-          placeholder="blur"
-          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
           className="object-cover"
         />
       </div>

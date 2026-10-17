@@ -13,6 +13,7 @@ export interface BlurPlaceholderRequest {
   requestId: number;
   width: number;
   height: number;
+  source?: ImageBitmap;
 }
 
 export interface BlurPlaceholderResponse {
@@ -30,17 +31,24 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 self.onmessage = async (event: MessageEvent<BlurPlaceholderRequest>) => {
-  const { requestId, width, height } = event.data;
+  const { requestId, width, height, source } = event.data;
 
   const canvas = new OffscreenCanvas(width, height);
   const ctx = canvas.getContext("2d");
 
   if (ctx) {
-    const gradient = ctx.createLinearGradient(0, 0, width, height);
-    gradient.addColorStop(0, "#1a1a1a");
-    gradient.addColorStop(1, "#2a2a2a");
-    ctx.fillStyle = gradient;
-    ctx.fillRect(0, 0, width, height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    if (source) {
+      ctx.drawImage(source, 0, 0, width, height);
+      source.close();
+    } else {
+      const gradient = ctx.createLinearGradient(0, 0, width, height);
+      gradient.addColorStop(0, "#1a1a1a");
+      gradient.addColorStop(1, "#2a2a2a");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, width, height);
+    }
   }
 
   const blob = await canvas.convertToBlob({ type: "image/jpeg", quality: 0.1 });

@@ -1,12 +1,13 @@
 "use client";
 
 import { BarChart3,Check, Edit2, Play, Sparkles } from "lucide-react";
-import Image from "next/image";
 import React, { memo,useEffect, useRef, useState } from "react";
 
 import { useRenderTiming } from "@/app/hooks/useRenderTiming";
 import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
-import { DEFAULT_BLUR_PLACEHOLDER, type ImageLoadingState } from "@/app/lib/imageUtils";
+import { type ImageLoadingState } from "@/app/lib/imageUtils";
+import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
+import LazyImage from "@/components/common/LazyImage";
 
 import ExportDropdown from "./ExportDropdown";
 import ScoreBreakdownTooltip, { ScoreBreakdown } from "./ScoreBreakdownTooltip";
@@ -116,8 +117,8 @@ function ClipGrid({
 
   const virtualizer = useSimpleVirtualizer({
     count: chunks.length,
-    estimateSize: 400,
-    overscan: 2,
+    estimateSize: VIRTUALIZATION_CONFIG.rowHeight.clips,
+    overscan: VIRTUALIZATION_CONFIG.overscanItems,
     containerRef: gridRef,
   });
 
@@ -243,7 +244,7 @@ function ClipGrid({
                           tabIndex={0}
                           onKeyDown={(e) => handleKeyDown(e, clip.id)}
                         >
-                          <Image
+                          <LazyImage
                             src={clip.thumbnail}
                             alt={clip.title}
                             fill
@@ -252,10 +253,8 @@ function ClipGrid({
                                 ? "opacity-100 group-hover:opacity-100"
                                 : "opacity-80 blur-sm group-hover:opacity-90"
                             }`}
-                            placeholder="blur"
-                            blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
-                            onLoad={() => handleImageLoad(clip.id)}
-                            onError={() => handleImageError(clip.id)}
+                            onLoadingComplete={() => handleImageLoad(clip.id)}
+                            onLoadError={() => handleImageError(clip.id)}
                             sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw"
                             priority={false}
                           />
