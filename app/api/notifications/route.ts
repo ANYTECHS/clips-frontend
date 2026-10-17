@@ -3,6 +3,13 @@ import { notificationStore } from "./notificationStore";
 import type { NotificationType } from "./notificationStore";
 import { paginateItems, parsePaginationParams } from "../pagination";
 
+const NOTIFICATION_TYPES: NotificationType[] = [
+  "job_complete",
+  "transform_complete",
+  "mint_success",
+  "earnings_received",
+];
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
@@ -31,6 +38,13 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    if (typeof body !== "object" || body === null || Array.isArray(body)) {
+      return NextResponse.json(
+        { success: false, error: "A JSON object is required" },
+        { status: 400 },
+      );
+    }
+
     const {
       userId = "default_user",
       type,
@@ -45,9 +59,15 @@ export async function POST(request: NextRequest) {
       payload?: Record<string, unknown>;
     };
 
-    if (!type || !title || !message) {
+    if (
+      (typeof userId !== "string" || !userId.trim()) ||
+      !NOTIFICATION_TYPES.includes(type) ||
+      typeof title !== "string" || !title.trim() ||
+      typeof message !== "string" || !message.trim() ||
+      (payload !== undefined && (typeof payload !== "object" || payload === null || Array.isArray(payload)))
+    ) {
       return NextResponse.json(
-        { success: false, error: "type, title, and message are required" },
+        { success: false, error: "Invalid notification fields" },
         { status: 400 }
       );
     }
