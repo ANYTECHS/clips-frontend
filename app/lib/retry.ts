@@ -1,11 +1,4 @@
-/**
- * app/lib/retry.ts
- *
- * Centralised data-fetching retry mechanism with exponential backoff,
- * transient error detection, and AbortSignal cancellation support.
- *
- * Issue #987 – Add data fetching retry logic.
- */
+
 
 import { ApiError, apiFetch } from "@/app/lib/apiError";
 
