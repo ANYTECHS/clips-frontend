@@ -1,11 +1,12 @@
 /**
  * Sentry Error Monitoring Configuration
- * 
+ *
  * Integrates Sentry for production error tracking and monitoring.
  * Captures wallet operation errors, user context, and performance metrics.
  */
 
 import * as Sentry from "@sentry/nextjs";
+import { logger } from "@/app/lib/logger";
 import { useAuth } from "@/components/auth/AuthProvider";
 import {
   redactAddress,

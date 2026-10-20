@@ -29,6 +29,7 @@
  */
 
 import { logger } from "@/app/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,7 +105,28 @@ export class CircuitBreaker {
     this.failureThreshold = options.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD;
     this.successThreshold = options.successThreshold ?? DEFAULT_SUCCESS_THRESHOLD;
     this.resetTimeoutMs = options.resetTimeoutMs ?? DEFAULT_RESET_TIMEOUT_MS;
-    this.onStateChange = options.onStateChange;
+    this.onStateChange = options.onStateChange ?? this.defaultStateChangeHandler;
+  }
+
+  private defaultStateChangeHandler(
+    name: string,
+    from: CircuitState,
+    to: CircuitState
+  ): void {
+    // Send alert to Sentry on state transitions
+    Sentry.captureMessage(`Circuit breaker state change: ${name}`, {
+      level: to === "OPEN" ? "error" : "info",
+      tags: {
+        circuit_breaker: name,
+        from_state: from,
+        to_state: to,
+      },
+      extra: {
+        consecutiveFailures: this.consecutiveFailures,
+        consecutiveSuccesses: this.consecutiveSuccesses,
+        openedAt: this.openedAt,
+      },
+    });
   }
 
   // ── State transition helpers ──────────────────────────────────────────────
@@ -315,7 +337,7 @@ export const CIRCUIT_BREAKER_CONFIGS: Record<
   Required<Omit<CircuitBreakerOptions, "onStateChange">>
 > = {
   aiBackend: {
-    failureThreshold: 5,
+    failureThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || "5", 10),
     successThreshold: 2,
     resetTimeoutMs: 60_000,
   },
