@@ -182,3 +182,121 @@ export async function processInChunks<T>(
     }
   }
 }
+
+// ─── Web Worker Utilities ─────────────────────────────────────────────────────
+
+export interface WorkerRequest<T = unknown> {
+  requestId: number;
+  data: T;
+}
+
+export interface WorkerResponse<R = unknown> {
+  requestId: number;
+  result?: R;
+  error?: string;
+}
+
+/**
+ * Run a computation in a web worker with automatic cleanup.
+ * Provides a fallback to main-thread execution if workers are unavailable.
+ *
+ * @param workerFactory - Function that creates and returns a Worker instance
+ * @param data - Data to send to the worker
+ * @param fallback - Fallback function to run on main thread if worker fails
+ * @returns Promise with the worker's result
+ *
+ * @example
+ * ```tsx
+ * const result = await runInWorker(
+ *   () => new Worker(new URL('./myWorker.ts', import.meta.url)),
+ *   { input: 'data' },
+ *   (data) => mainThreadFallback(data)
+ * );
+ * ```
+ */
+export async function runInWorker<T, R>(
+  workerFactory: () => Worker,
+  data: T,
+  fallback?: (data: T) => R | Promise<R>,
+): Promise<R> {
+  // Check if workers are available
+  if (typeof Worker === "undefined") {
+    if (fallback) {
+      return fallback(data);
+    }
+    throw new Error("Web Workers are not available in this environment");
+  }
+
+  let worker: Worker | null = null;
+  let requestId = 0;
+
+  try {
+    worker = workerFactory();
+    requestId = Math.random();
+
+    return new Promise<R>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        worker?.terminate();
+        reject(new Error("Worker operation timed out"));
+      }, 30000); // 30 second timeout
+
+      worker.onmessage = (event: MessageEvent<WorkerResponse<R>>) => {
+        if (event.data.requestId === requestId) {
+          clearTimeout(timeout);
+          worker.terminate();
+
+          if (event.data.error) {
+            reject(new Error(event.data.error));
+          } else {
+            resolve(event.data.result as R);
+          }
+        }
+      };
+
+      worker.onerror = (error) => {
+        clearTimeout(timeout);
+        worker.terminate();
+        reject(error);
+      };
+
+      worker.postMessage({ requestId, data } as WorkerRequest<T>);
+    });
+  } catch (error) {
+    worker?.terminate();
+
+    if (fallback) {
+      return fallback(data);
+    }
+    throw error;
+  }
+}
+
+/**
+ * Create a worker with automatic cleanup on component unmount.
+ * Returns the worker instance and a cleanup function.
+ *
+ * @example
+ * ```tsx
+ * useEffect(() => {
+ *   const { worker, cleanup } = createWorkerWithCleanup(
+ *     () => new Worker(new URL('./myWorker.ts', import.meta.url))
+ *   );
+ *
+ *   worker.postMessage({ data: 'test' });
+ *
+ *   return cleanup;
+ * }, []);
+ * ```
+ */
+export function createWorkerWithCleanup(workerFactory: () => Worker): {
+  worker: Worker;
+  cleanup: () => void;
+} {
+  const worker = workerFactory();
+
+  const cleanup = () => {
+    worker.terminate();
+  };
+
+  return { worker, cleanup };
+}

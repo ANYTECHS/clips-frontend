@@ -6,6 +6,7 @@
  * - Work scheduling at different priorities
  * - Main thread budget tracking
  * - Helpers for debouncing and throttling
+ * - Web worker integration for heavy computation
  */
 
 import { useEffect, useCallback, useRef } from "react";
@@ -16,6 +17,8 @@ import {
   debounce as debounceFn,
   throttle as throttleFn,
   processInChunks,
+  runInWorker,
+  createWorkerWithCleanup,
   type TaskPriority,
 } from "@/app/lib/mainThreadOptimization";
 import { logger } from "@/app/lib/logger";
@@ -32,14 +35,14 @@ export interface UseMainThreadOptimizationOptions {
 /**
  * Hook for main thread optimization utilities.
  * Provides scheduling, monitoring, and utility functions.
- * 
+ *
  * @example
  * ```tsx
  * function HeavyComponent() {
  *   const { scheduleTask, processArray, debounce, throttle } = useMainThreadOptimization({
  *     monitorLongTasks: true,
  *   });
- * 
+ *
  *   const heavyComputation = useCallback(() => {
  *     scheduleTask(
  *       () => {
@@ -48,11 +51,11 @@ export interface UseMainThreadOptimizationOptions {
  *       'background' // Low priority, won't block UI
  *     );
  *   }, [scheduleTask]);
- * 
+ *
  *   const handleScroll = debounce(() => {
  *     // Handle scroll with debouncing
  *   }, 100);
- * 
+ *
  *   return <div onScroll={handleScroll}>...</div>;
  * }
  * ```
@@ -129,6 +132,21 @@ export function useMainThreadOptimization(
   );
 
   /**
+   * Run computation in a web worker with automatic cleanup.
+   * Provides fallback to main-thread execution if workers are unavailable.
+   */
+  const runComputationInWorker = useCallback(
+    async <T, R>(
+      workerFactory: () => Worker,
+      data: T,
+      fallback?: (data: T) => R | Promise<R>
+    ): Promise<R> => {
+      return runInWorker(workerFactory, data, fallback);
+    },
+    []
+  );
+
+  /**
    * Create a debounced version of a function.
    * Note: This returns a new function on each call, so it should be used
    * with useCallback for stable references.
@@ -157,6 +175,8 @@ export function useMainThreadOptimization(
     scheduleTask,
     /** Process arrays in chunks without blocking */
     processArray,
+    /** Run computation in a web worker */
+    runComputationInWorker,
     /** Create a debounced function */
     debounce,
     /** Create a throttled function */
@@ -170,7 +190,7 @@ export function useMainThreadOptimization(
 
 /**
  * Convenience hook for creating a stable debounced callback.
- * 
+ *
  * @example
  * ```tsx
  * const debouncedSearch = useDebounce((query: string) => {
@@ -194,7 +214,7 @@ export function useDebounce<T extends (...args: any[]) => any>(
 
 /**
  * Convenience hook for creating a stable throttled callback.
- * 
+ *
  * @example
  * ```tsx
  * const throttledScroll = useThrottle((e: ScrollEvent) => {
