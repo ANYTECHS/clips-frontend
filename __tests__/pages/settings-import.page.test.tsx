@@ -24,6 +24,19 @@ jest.mock("@/components/WalletProvider", () => ({
   }),
 }));
 
+jest.mock("@/app/hooks/usePasskeyWallet", () => ({
+  usePasskeyWallet: () => ({
+    credentialId: null,
+    publicKey: null,
+    isSupported: false,
+    isRegistering: false,
+    error: null,
+    compatibility: null,
+    register: jest.fn(),
+    reset: jest.fn(),
+  }),
+}));
+
 jest.mock("@/hooks/useToast", () => ({
   useToast: () => ({ showToast: jest.fn() }),
 }));
@@ -40,11 +53,20 @@ jest.mock("@/app/lib/notifications", () => ({
 }));
 
 describe("SettingsPage import key form", () => {
+  beforeEach(() => {
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({}),
+      } as Response)
+    );
+  });
+
   it("imports a stellar secret key from the advanced wallet form", async () => {
-    render(<SettingsPage />);
+    render(<SettingsPage initialTab="wallet" />);
 
     fireEvent.click(
-      screen.getByRole("button", { name: "Toggle Advanced Wallet Mode" })
+      await screen.findByRole("button", { name: "Toggle Advanced Wallet Mode" })
     );
 
     fireEvent.change(

@@ -146,7 +146,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
       });
     }
 
-    void triggerWebhookEvent(job.userId, "job.completed", {
+    const isTransform = jobId.startsWith("transform_");
+    const eventType = isTransform ? "transform_complete" : "job_complete";
+    void triggerWebhookEvent(job.userId, eventType, {
       jobId,
       momentsFound: update.momentsFound ?? job.momentsFound,
     });

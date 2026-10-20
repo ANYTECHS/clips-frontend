@@ -80,6 +80,20 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning className={inter.variable}>
       <head>
         <meta name="theme-color" content="#080C0B" />
+        <script id="theme-initializer">
+          {`try {
+            var stored = localStorage.getItem('clipcash-theme');
+            var theme = stored === 'light' || stored === 'dark' ? stored : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            document.documentElement.setAttribute('data-theme', theme);
+            if (theme === 'dark') {
+              document.documentElement.classList.add('dark');
+              document.documentElement.classList.remove('light');
+            } else {
+              document.documentElement.classList.add('light');
+              document.documentElement.classList.remove('dark');
+            }
+          } catch (e) {}`}
+        </script>
         <FontPreload />
         <ResourceHints />
       </head>

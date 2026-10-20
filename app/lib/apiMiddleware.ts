@@ -31,6 +31,7 @@ import { auth } from "@/app/lib/auth";
 import { logger } from "@/app/lib/logger";
 import { errorCodeForStatus, normalizeErrorCode } from "@/app/api/errorCodes";
 import type { ErrorCode } from "@/app/api/types";
+import { compressResponse } from "@/app/lib/apiCompression";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +67,8 @@ export interface MiddlewareOptions {
   requiredRoles?: string[];
   /** Maximum time for authentication and route execution; false disables it. */
   timeoutMs?: number | false;
+  /** Whether to apply response compression (Brotli/Gzip) to eligible responses. Defaults to true. */
+  compress?: boolean;
 }
 
 export const DEFAULT_API_TIMEOUT_MS = 10_000;
@@ -188,6 +191,7 @@ async function resolveAuthContext(): Promise<AuthContext | null> {
  *  2. Role-based access control + 403 guard (configurable)
  *  3. Centralised error catching, classification, and response formatting
  *  4. Error logging via the shared logger
+ *  5. API response compression (Brotli / Gzip)
  *
  * @param handler The actual route logic.
  * @param options Middleware configuration.
@@ -200,6 +204,7 @@ export function withApiMiddleware<TParams = unknown>(
     requireAuth: shouldRequireAuth = true,
     requiredRoles = [],
     timeoutMs: configuredTimeoutMs,
+    compress = true,
   } = options;
   const timeoutMs = getTimeoutMs(configuredTimeoutMs);
 
@@ -245,29 +250,39 @@ export function withApiMiddleware<TParams = unknown>(
       return await handler(request, ctx, params as TParams | undefined);
     };
 
+    let response: NextResponse;
+
     try {
-      if (timeoutMs === false) return await execute();
+      if (timeoutMs === false) {
+        response = await execute();
+      } else {
+        let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+          timeoutHandle = setTimeout(() => {
+            reject(new ApiError("Request timed out", 504, "TIMEOUT"));
+          }, timeoutMs);
+        });
 
-      let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
-      const timeout = new Promise<never>((_, reject) => {
-        timeoutHandle = setTimeout(() => {
-          reject(new ApiError("Request timed out", 504, "TIMEOUT"));
-        }, timeoutMs);
-      });
-
-      try {
-        return await Promise.race([execute(), timeout]);
-      } finally {
-        if (timeoutHandle) clearTimeout(timeoutHandle);
+        try {
+          response = await Promise.race([execute(), timeout]);
+        } finally {
+          if (timeoutHandle) clearTimeout(timeoutHandle);
+        }
       }
     } catch (err) {
       // ── 4. Centralised error handling ─────────────────────────────────────
       const { status, body } = classifyError(err);
-      return NextResponse.json(body, {
+      response = NextResponse.json(body, {
         status,
         headers: body.code === "TIMEOUT" ? { "Retry-After": "1" } : undefined,
       });
     }
+
+    // ── 5. Response compression ───────────────────────────────────────────
+    if (compress) {
+      return await compressResponse(request, response);
+    }
+    return response;
   };
 }
 

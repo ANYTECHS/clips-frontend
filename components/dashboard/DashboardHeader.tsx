@@ -1,12 +1,13 @@
 "use client";
 
-import { Bell, Check, CloudUpload, Menu } from "lucide-react";
+import { Bell, Check, CloudUpload, Menu, Moon, Sun } from "lucide-react";
 import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { sanitize } from "@/app/lib/sanitize";
 import { selectUserName, useUserStore } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
+import { useTheme } from "@/components/theme-provider";
 
 interface NotificationItem {
   id: string;
@@ -29,6 +30,7 @@ const DashboardHeader = memo(function DashboardHeader({
 }) {
   const userName = useUserStore(selectUserName);
   const { t } = useI18n();
+  const { theme, resolvedTheme, toggleTheme } = useTheme();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -131,6 +133,21 @@ const DashboardHeader = memo(function DashboardHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        {/* Theme Toggle */}
+        <button
+          type="button"
+          onClick={toggleTheme}
+          aria-label={`Current theme is ${theme}. Click to switch theme.`}
+          title={`Theme: ${theme} (resolved: ${resolvedTheme})`}
+          className="p-2.5 rounded-xl border border-white/10 bg-surface hover:bg-input text-gray-300 hover:text-white transition-colors"
+        >
+          {resolvedTheme === "dark" ? (
+            <Sun className="w-5 h-5 text-amber-400" aria-hidden="true" />
+          ) : (
+            <Moon className="w-5 h-5 text-blue-400" aria-hidden="true" />
+          )}
+        </button>
+
         {/* Notification Bell */}
         <div className="relative" ref={popoverRef} data-tour="notifications">
           <button
@@ -217,4 +234,5 @@ const DashboardHeader = memo(function DashboardHeader({
   );
 });
 
+export { DashboardHeader };
 export default DashboardHeader;

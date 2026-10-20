@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
+import { triggerWebhookEvent } from "@/app/lib/webhooks/delivery";
 import { clipsStore } from "../clipsStore";
 import type { ApiResponse } from "../../types";
 
@@ -25,6 +26,12 @@ export async function POST(request: NextRequest) {
 
     // Simulate batch minting by updating status to 'listed'
     const updatedCount = clipsStore.updateClipStatus(session.user.id, clipIds, "listed");
+
+    void triggerWebhookEvent(session.user.id, "mint_success", {
+      clipIds,
+      updatedCount,
+      timestamp: new Date().toISOString(),
+    });
 
     return NextResponse.json({
       data: { success: true, updatedCount },
