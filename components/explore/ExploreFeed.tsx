@@ -21,6 +21,8 @@ interface TrendingClip {
   duration: string;
   creatorUsername: string;
   shareId: string;
+  platform?: string;
+  views?: number;
 }
 
 interface TrendingPage {
@@ -38,6 +40,9 @@ const CLIP_ROW_HEIGHT = 320;
 const CLIP_MIN_WIDTH = 220;
 
 function ClipCard({ clip, onClick }: { clip: TrendingClip; onClick: () => void }) {
+  const platform = clip.platform ?? "TikTok";
+  const views = clip.views ?? Math.floor(clip.score * 120);
+
   return (
     <Link
       href={`/share/${clip.shareId}`}
@@ -55,13 +60,21 @@ function ClipCard({ clip, onClick }: { clip: TrendingClip; onClick: () => void }
           className="object-cover group-hover:scale-105 transition-transform duration-300"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/30" />
-        <div className="absolute top-3 left-3 flex items-center gap-1 bg-brand text-black px-2 py-1 rounded-lg text-xs font-bold">
-          <TrendingUp className="w-3 h-3" />
-          {clip.score}
+        <div className="absolute top-3 left-3 flex items-center gap-1.5">
+          <div className="flex items-center gap-1 bg-brand text-black px-2 py-1 rounded-lg text-xs font-bold">
+            <TrendingUp className="w-3 h-3" />
+            {clip.score}
+          </div>
+          <span className="bg-black/60 backdrop-blur-sm text-white/80 px-2 py-0.5 rounded text-[10px] font-medium border border-white/10">
+            {platform}
+          </span>
         </div>
         <div className="absolute bottom-3 left-3 right-3">
           <h3 className="text-white font-bold text-sm line-clamp-2 mb-1">{clip.title}</h3>
-          <p className="text-white/60 text-xs">@{clip.creatorUsername}</p>
+          <div className="flex items-center justify-between text-xs text-white/60">
+            <span>@{clip.creatorUsername}</span>
+            <span className="text-[11px] text-brand/90 font-medium">{views.toLocaleString()} views</span>
+          </div>
           <p className="text-white/40 text-[10px] mt-1">
             {clip.style} · {clip.duration}
           </p>
@@ -126,10 +139,58 @@ export default function ExploreFeed() {
     analytics.trackEvent("explore_conversion_intent", { source: "clip_card" });
   };
 
+  const [selectedPlatform, setSelectedPlatform] = useState<string>("All");
+  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>("This Week");
+
+  const displayedClips = clips.filter((c) => {
+    if (selectedPlatform !== "All" && (c.platform ?? "TikTok") !== selectedPlatform) return false;
+    if (selectedCategory !== "All" && c.style !== selectedCategory) return false;
+    return true;
+  });
+
   return (
     <AsyncBoundary loading={loading} error={error} onRetry={refresh}>
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white/50 uppercase font-semibold tracking-wider mr-1">Platform:</span>
+          {["All", "TikTok", "YouTube", "Instagram", "Twitter"].map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => setSelectedPlatform(p)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                selectedPlatform === p
+                  ? "bg-brand text-black shadow-[0_0_12px_rgba(0,229,143,0.3)]"
+                  : "bg-white/5 text-white/70 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-white/50 uppercase font-semibold tracking-wider mr-1">Period:</span>
+          {["Today", "This Week", "This Month", "All Time"].map((period) => (
+            <button
+              key={period}
+              type="button"
+              onClick={() => setSelectedPeriod(period)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                selectedPeriod === period
+                  ? "bg-white/20 text-white"
+                  : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+              }`}
+            >
+              {period}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <VirtualGrid
-        items={clips}
+        items={displayedClips}
         itemKey={(clip) => clip.id}
         rowHeight={CLIP_ROW_HEIGHT}
         minItemWidth={CLIP_MIN_WIDTH}
