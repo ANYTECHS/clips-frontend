@@ -15,8 +15,17 @@ import {
   AbortMultipartUploadCommand,
   CopyObjectCommand,
   DeleteObjectCommand,
+  GetObjectCommand,
 } from "@aws-sdk/client-s3";
+import { getSignedUrl as presignS3Request } from "@aws-sdk/s3-request-presigner";
+import { Readable } from "node:stream";
 import {
+  createStorageProvider,
+  buildObjectUrl,
+  delete as deleteStorageObject,
+  download,
+  getSignedUrl,
+  upload,
   uploadFile,
   uploadToQuarantine,
   moveFromQuarantine,
@@ -24,6 +33,9 @@ import {
 } from "./cloudStorage";
 
 jest.mock("@aws-sdk/client-s3");
+jest.mock("@aws-sdk/s3-request-presigner", () => ({
+  getSignedUrl: jest.fn(),
+}));
 
 describe("cloudStorage", () => {
   const mockS3Client = {
@@ -37,6 +49,9 @@ describe("cloudStorage", () => {
     process.env.AWS_ACCESS_KEY_ID = "test-key";
     process.env.AWS_SECRET_ACCESS_KEY = "test-secret";
     process.env.CLOUD_STORAGE_REGION = "us-east-1";
+    process.env.CLOUD_STORAGE_PROVIDER = "s3";
+    delete process.env.CLOUD_STORAGE_ENDPOINT;
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
   });
 
   afterEach(() => {
@@ -44,6 +59,89 @@ describe("cloudStorage", () => {
     delete process.env.AWS_ACCESS_KEY_ID;
     delete process.env.AWS_SECRET_ACCESS_KEY;
     delete process.env.CLOUD_STORAGE_REGION;
+    delete process.env.CLOUD_STORAGE_PROVIDER;
+    delete process.env.CLOUD_STORAGE_ENDPOINT;
+    delete process.env.CLOUDFLARE_ACCOUNT_ID;
+  });
+
+  describe("provider configuration", () => {
+    it("configures R2 with the auto region and its custom endpoint", () => {
+      process.env.CLOUD_STORAGE_ENDPOINT = "https://account.r2.cloudflarestorage.com";
+      createStorageProvider("r2");
+      expect((S3Client as jest.Mock).mock.calls.at(-1)?.[0]).toMatchObject({
+        region: "auto",
+        endpoint: process.env.CLOUD_STORAGE_ENDPOINT,
+        forcePathStyle: true,
+      });
+    });
+
+    it("configures GCS through the XML interoperability endpoint without ACL settings", () => {
+      createStorageProvider("gcs");
+      const configuration = (S3Client as jest.Mock).mock.calls.at(-1)?.[0];
+      expect(configuration).toMatchObject({
+        region: "auto",
+        endpoint: "https://storage.googleapis.com",
+        forcePathStyle: true,
+      });
+      expect(configuration).not.toHaveProperty("acl");
+    });
+
+    it("derives the R2 endpoint from the Cloudflare account id", () => {
+      process.env.CLOUDFLARE_ACCOUNT_ID = "account-id";
+      createStorageProvider("r2");
+      expect((S3Client as jest.Mock).mock.calls.at(-1)?.[0].endpoint).toBe(
+        "https://account-id.r2.cloudflarestorage.com",
+      );
+    });
+
+    it.each([
+      ["s3", undefined, "https://test-bucket.s3.us-east-1.amazonaws.com/key.mp4"],
+      ["r2", "https://account.r2.cloudflarestorage.com", "https://account.r2.cloudflarestorage.com/test-bucket/key.mp4"],
+      ["gcs", undefined, "https://storage.googleapis.com/test-bucket/key.mp4"],
+    ])("builds object URLs for %s", (provider, endpoint, expectedUrl) => {
+      process.env.CLOUD_STORAGE_PROVIDER = provider as "s3" | "r2" | "gcs";
+      if (endpoint) process.env.CLOUD_STORAGE_ENDPOINT = endpoint;
+      expect(buildObjectUrl("key.mp4")).toBe(expectedUrl);
+    });
+  });
+
+  describe("provider-neutral operations", () => {
+    it.each(["s3", "r2", "gcs"] as const)("supports upload/download/delete/sign on %s", async (provider) => {
+      process.env.CLOUD_STORAGE_PROVIDER = provider;
+      process.env.CLOUD_STORAGE_ENDPOINT =
+        provider === "s3" ? "https://s3.test" : "https://storage.test";
+      const body = Buffer.from("object bytes");
+      const stream = Readable.from(["object bytes"]);
+      mockS3Client.send
+        .mockResolvedValueOnce({})
+        .mockResolvedValueOnce({ Body: stream })
+        .mockResolvedValueOnce({});
+      (presignS3Request as jest.Mock).mockResolvedValue("https://signed.test/object");
+
+      await upload("uploads/object.txt", body, "text/plain");
+      await expect(download("uploads/object.txt")).resolves.toBe(stream);
+      await deleteStorageObject("uploads/object.txt");
+      await expect(getSignedUrl("uploads/object.txt", 300)).resolves.toBe(
+        "https://signed.test/object",
+      );
+
+      expect(mockS3Client.send.mock.calls[0][0]).toBeInstanceOf(PutObjectCommand);
+      expect(mockS3Client.send.mock.calls[0][0].input).toMatchObject({
+        Bucket: "test-bucket",
+        Key: "uploads/object.txt",
+        Body: body,
+        ContentType: "text/plain",
+      });
+      expect(mockS3Client.send.mock.calls[1][0]).toBeInstanceOf(GetObjectCommand);
+      expect(mockS3Client.send.mock.calls[2][0]).toBeInstanceOf(DeleteObjectCommand);
+      expect(presignS3Request).toHaveBeenCalledWith(
+        expect.any(S3Client),
+        expect.any(GetObjectCommand),
+        { expiresIn: 300 },
+      );
+      jest.clearAllMocks();
+      (S3Client as jest.Mock).mockReturnValue(mockS3Client);
+    });
   });
 
   describe("uploadFile", () => {

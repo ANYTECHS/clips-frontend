@@ -1,6 +1,10 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "description": "Documented exceptions for known dependency security advisories evaluated as non-exploitable or accepted dev-tooling risks in the clips-frontend runtime environment.",
+  "accessibilityBaseline": {
+    "generatedAt": "2026-10-16",
+    "violations": []
+  },
   "exceptions": [
     {
       "id": "GHSA-7rqj-j65f-68wh",

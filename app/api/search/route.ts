@@ -7,6 +7,7 @@ import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { earningsStore } from "@/app/api/earnings/earningsStore";
 import { paginateItems, parsePaginationParams } from "@/app/api/pagination";
 import { paginationMeta } from "@/app/api/types";
+import { prisma } from "@/app/lib/prisma";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,8 @@ export interface SearchResult {
   subtitle?: string;
   relevance: number;
   matchType: "exact" | "prefix" | "substring" | "fuzzy";
+  /** Highlighted snippet showing where the match occurred */
+  snippet?: string;
   /** Client-side route to navigate to when this result is selected. */
   href: string;
 }
@@ -41,6 +44,164 @@ interface MatchScore {
   matched: boolean;
   relevance: number;
   matchType: SearchResult["matchType"];
+}
+
+/**
+ * Perform PostgreSQL full-text search on clips
+ */
+async function searchClipsFullText(
+  userId: string,
+  query: string,
+  limit: number
+): Promise<SearchResult[]> {
+  try {
+    // Convert query to tsquery format (simple word search)
+    const tsQuery = query
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" & ");
+
+    if (!tsQuery) return [];
+
+    const results = await prisma.$queryRaw<Array<{
+      clipId: string;
+      title: string;
+      style: string | null;
+      tags: string | null;
+      rank: number;
+    }>>`
+      SELECT
+        "clipId",
+        title,
+        style,
+        tags,
+        ts_rank("searchVector", to_tsquery('english', ${tsQuery})) as rank
+      FROM "ClipSearchIndex"
+      WHERE "searchVector" @@ to_tsquery('english', ${tsQuery})
+      ORDER BY rank DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => ({
+      type: "clip" as const,
+      id: r.clipId,
+      title: r.title,
+      subtitle: r.style ?? undefined,
+      relevance: r.rank * 100,
+      matchType: "fuzzy" as const,
+      href: "/projects",
+    }));
+  } catch (error) {
+    // If full-text search fails (indexes not created yet), fall back to in-memory search
+    return [];
+  }
+}
+
+/**
+ * Perform PostgreSQL full-text search on projects
+ */
+async function searchProjectsFullText(
+  userId: string,
+  query: string,
+  limit: number
+): Promise<SearchResult[]> {
+  try {
+    const tsQuery = query
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" & ");
+
+    if (!tsQuery) return [];
+
+    const results = await prisma.$queryRaw<Array<{
+      jobId: string;
+      filename: string | null;
+      status: string;
+      rank: number;
+    }>>`
+      SELECT
+        "jobId",
+        filename,
+        status,
+        ts_rank("searchVector", to_tsquery('english', ${tsQuery})) as rank
+      FROM "ProjectSearchIndex"
+      WHERE "searchVector" @@ to_tsquery('english', ${tsQuery})
+      ORDER BY rank DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => ({
+      type: "project" as const,
+      id: r.jobId,
+      title: r.filename ? r.filename.replace(/\.[^/.]+$/, "") : `Project ${r.jobId.slice(0, 6)}`,
+      subtitle: r.status,
+      relevance: r.rank * 100,
+      matchType: "fuzzy" as const,
+      href: `/dashboard/transform/${r.jobId}`,
+    }));
+  } catch (error) {
+    return [];
+  }
+}
+
+/**
+ * Perform PostgreSQL full-text search on earnings
+ */
+async function searchEarningsFullText(
+  userId: string,
+  query: string,
+  limit: number
+): Promise<SearchResult[]> {
+  try {
+    const tsQuery = query
+      .toLowerCase()
+      .replace(/[^\w\s]/g, " ")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean)
+      .join(" & ");
+
+    if (!tsQuery) return [];
+
+    const results = await prisma.$queryRaw<Array<{
+      transactionId: string;
+      description: string;
+      platform: string | null;
+      status: string;
+      amount: number;
+      rank: number;
+    }>>`
+      SELECT
+        "transactionId",
+        description,
+        platform,
+        status,
+        amount,
+        ts_rank("searchVector", to_tsquery('english', ${tsQuery})) as rank
+      FROM "EarningSearchIndex"
+      WHERE "searchVector" @@ to_tsquery('english', ${tsQuery})
+      ORDER BY rank DESC
+      LIMIT ${limit}
+    `;
+
+    return results.map((r) => ({
+      type: "earning" as const,
+      id: r.transactionId,
+      title: r.description,
+      subtitle: `$${r.amount.toFixed(2)} · ${r.status}`,
+      relevance: r.rank * 100,
+      matchType: "fuzzy" as const,
+      href: "/earnings",
+    }));
+  } catch (error) {
+    return [];
+  }
 }
 
 function normalize(value: string): string {
@@ -161,58 +322,80 @@ async function handleGet(request: NextRequest) {
     });
   }
 
-  const [clips, jobs, transactions] = await Promise.all([
-    requestedTypes.has("clips")
-      ? Promise.resolve(clipsStore.getClipsForUser(userId))
-      : Promise.resolve([]),
-    requestedTypes.has("projects") ? jobStore.getUserJobs(userId) : Promise.resolve([]),
-    requestedTypes.has("earnings")
-      ? Promise.resolve(earningsStore.getTransactions(userId))
-      : Promise.resolve([]),
-  ]);
+  // Try full-text search first, fall back to in-memory search if it fails
+  let clipResults: SearchResult[] = [];
+  let projectResults: SearchResult[] = [];
+  let earningResults: SearchResult[] = [];
 
-  const clipResults: SearchResult[] = clips
-    .map((clip) => ({ clip, match: bestMatch(q, clip.title, clip.style, ...(clip.tags ?? [])) }))
-    .filter(({ match }) => match.matched)
-    .sort((a, b) => b.match.relevance - a.match.relevance)
-    .map(({ clip, match }) => ({
-      type: "clip" as const,
-      id: clip.id,
-      title: clip.title,
-      subtitle: clip.style,
-      relevance: match.relevance,
-      matchType: match.matchType,
-      href: "/projects",
-    }));
+  if (requestedTypes.has("clips")) {
+    const ftResults = await searchClipsFullText(userId, q, paginationParams.pageSize);
+    if (ftResults.length > 0) {
+      clipResults = ftResults;
+    } else {
+      // Fall back to in-memory search
+      const clips = await clipsStore.getClipsForUser(userId);
+      clipResults = clips
+        .map((clip) => ({ clip, match: bestMatch(q, clip.title, clip.style, ...(clip.tags ?? [])) }))
+        .filter(({ match }) => match.matched)
+        .sort((a, b) => b.match.relevance - a.match.relevance)
+        .map(({ clip, match }) => ({
+          type: "clip" as const,
+          id: clip.id,
+          title: clip.title,
+          subtitle: clip.style,
+          relevance: match.relevance,
+          matchType: match.matchType,
+          href: "/projects",
+        }));
+    }
+  }
 
-  const projectResults: SearchResult[] = jobs
-    .map((job) => ({ job, title: deriveProjectTitle(job) }))
-    .map(({ job, title }) => ({ job, title, match: bestMatch(q, title, job.status) }))
-    .filter(({ match }) => match.matched)
-    .sort((a, b) => b.match.relevance - a.match.relevance)
-    .map(({ job, title, match }) => ({
-      type: "project" as const,
-      id: job.id,
-      title,
-      subtitle: job.status,
-      relevance: match.relevance,
-      matchType: match.matchType,
-      href: `/dashboard/transform/${job.id}`,
-    }));
+  if (requestedTypes.has("projects")) {
+    const ftResults = await searchProjectsFullText(userId, q, paginationParams.pageSize);
+    if (ftResults.length > 0) {
+      projectResults = ftResults;
+    } else {
+      // Fall back to in-memory search
+      const jobs = await jobStore.getUserJobs(userId);
+      projectResults = jobs
+        .map((job) => ({ job, title: deriveProjectTitle(job) }))
+        .map(({ job, title }) => ({ job, title, match: bestMatch(q, title, job.status) }))
+        .filter(({ match }) => match.matched)
+        .sort((a, b) => b.match.relevance - a.match.relevance)
+        .map(({ job, title, match }) => ({
+          type: "project" as const,
+          id: job.id,
+          title,
+          subtitle: job.status,
+          relevance: match.relevance,
+          matchType: match.matchType,
+          href: `/dashboard/transform/${job.id}`,
+        }));
+    }
+  }
 
-  const earningResults: SearchResult[] = transactions
-    .map((tx) => ({ tx, match: bestMatch(q, tx.description, tx.platform, tx.status) }))
-    .filter(({ match }) => match.matched)
-    .sort((a, b) => b.match.relevance - a.match.relevance)
-    .map(({ tx, match }) => ({
-      type: "earning" as const,
-      id: tx.id,
-      title: tx.description,
-      subtitle: `$${tx.amount.toFixed(2)} · ${tx.status}`,
-      relevance: match.relevance,
-      matchType: match.matchType,
-      href: "/earnings",
-    }));
+  if (requestedTypes.has("earnings")) {
+    const ftResults = await searchEarningsFullText(userId, q, paginationParams.pageSize);
+    if (ftResults.length > 0) {
+      earningResults = ftResults;
+    } else {
+      // Fall back to in-memory search
+      const transactions = await earningsStore.getTransactions(userId);
+      earningResults = transactions
+        .map((tx) => ({ tx, match: bestMatch(q, tx.description, tx.platform, tx.status) }))
+        .filter(({ match }) => match.matched)
+        .sort((a, b) => b.match.relevance - a.match.relevance)
+        .map(({ tx, match }) => ({
+          type: "earning" as const,
+          id: tx.id,
+          title: tx.description,
+          subtitle: `$${tx.amount.toFixed(2)} · ${tx.status}`,
+          relevance: match.relevance,
+          matchType: match.matchType,
+          href: "/earnings",
+        }));
+    }
+  }
 
   const suggestions = [
     ...clips.map((clip) => clip.title),

@@ -37,7 +37,9 @@ const Sparkline = dynamic(() => import("@/components/charts/Sparkline"), {
   ),
 });
 
-import AssetRow from "@/components/wallet/AssetRow";
+const AssetRow = dynamic(() => import("@/components/wallet/AssetRow"), {
+  loading: () => <div className="h-14 border-b border-border animate-pulse" />,
+});
 
 const ASSET_COLORS = ["#00FF9D", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#06B6D4"];
 
@@ -89,15 +91,15 @@ export default function WalletPortfolioPage() {
   // Build donut slices: XLM + other assets by USD value
   const donutSlices: DonutSlice[] = useMemo(() => {
     const slices: DonutSlice[] = [
-      { label: "XLM", value: xlmUsd, color: ASSET_COLORS[0] },
+      { label: "XLM", value: xlmUsd, color: ASSET_COLORS[0]! },
       ...otherAssets
         .map((a, i) => {
           const usd = getAssetUsd(a.code, a.balance);
-          return usd !== null ? { label: a.code, value: usd, color: ASSET_COLORS[(i + 1) % ASSET_COLORS.length] } : null;
+          return usd !== null ? { label: a.code, value: usd, color: ASSET_COLORS[(i + 1) % ASSET_COLORS.length]! } : null;
         })
         .filter((s): s is DonutSlice => s !== null),
     ].filter((s) => s.value > 0);
-    return slices.length ? slices : [{ label: "XLM", value: 1, color: ASSET_COLORS[0] }];
+    return slices.length ? slices : [{ label: "XLM", value: 1, color: ASSET_COLORS[0]! }];
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [xlmUsd, otherAssets, assetPrices]);
 
@@ -111,7 +113,7 @@ export default function WalletPortfolioPage() {
     });
   };
 
-  const isUp = history !== null && history.length >= 2 && history[history.length - 1] >= history[0];
+  const isUp = history !== null && history.length >= 2 && history[history.length - 1]! >= history[0]!;
 
   return (
     <div className="dashboard-main space-y-8 max-w-[1400px] mx-auto w-full">
@@ -268,7 +270,7 @@ export default function WalletPortfolioPage() {
                       balance={`${balance?.xlm ?? "—"} XLM`}
                       usdValue={xlmUsd}
                       pct={totalUsd > 0 ? xlmUsd / totalUsd : 1}
-                      color={ASSET_COLORS[0]}
+                      color={ASSET_COLORS[0]!}
                       network={freighterNetwork}
                     />
 
@@ -283,7 +285,7 @@ export default function WalletPortfolioPage() {
                           usdValue={usd ?? 0}
                           usdDisplay={usd !== null ? `$${usd.toFixed(2)}` : "—"}
                           pct={totalUsd > 0 && usd !== null ? usd / totalUsd : 0}
-                          color={ASSET_COLORS[(i + 1) % ASSET_COLORS.length]}
+                          color={ASSET_COLORS[(i + 1) % ASSET_COLORS.length]!}
                           issuer={asset.issuer}
                           network={freighterNetwork}
                         />

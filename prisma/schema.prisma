@@ -25,6 +25,7 @@ model User {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   notifications Notification[]
+  pushSubscriptions PushSubscription[]
   apiKeys       ApiKey[]
   sessions      UserSession[]
 
@@ -36,6 +37,7 @@ model User {
    * records to be posted to their inbox every month.
    */
   monthlyEarningsReport   Boolean   @default(false)
+  notificationPreferences Json?
   /** Last successful send, used to skip a month the cron re-runs. */
   earningsReportSentAt    DateTime?
 }
@@ -112,6 +114,20 @@ model Notification {
 
   @@index([userId, readAt, createdAt])
   @@index([userId, createdAt])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 /**
@@ -223,5 +239,47 @@ model AuditLog {
   @@index([action, timestamp])
   @@index([resource, resourceId])
   @@index([timestamp])
+}
+
+/// Full-text search index for clips (Issue #1262).
+/// This table maintains tsvector columns for efficient full-text search across clips.
+model ClipSearchIndex {
+  id         String   @id @default(cuid())
+  clipId     String   @unique
+  title      String
+  style      String?
+  tags       String?  // Stored as JSON array string
+  searchText String   // Combined text for full-text search
+  searchVector Unsupported("tsvector")?
+
+  @@index([searchVector], type: Gin)
+  @@index([clipId])
+}
+
+/// Full-text search index for projects/jobs (Issue #1262).
+model ProjectSearchIndex {
+  id         String   @id @default(cuid())
+  jobId      String   @unique
+  filename   String?
+  status     String
+  searchText String   // Combined text for full-text search
+  searchVector Unsupported("tsvector")?
+
+  @@index([searchVector], type: Gin)
+  @@index([jobId])
+}
+
+/// Full-text search index for earnings transactions (Issue #1262).
+model EarningSearchIndex {
+  id          String   @id @default(cuid())
+  transactionId String @unique
+  description String
+  platform    String?
+  status      String
+  searchText  String   // Combined text for full-text search
+  searchVector Unsupported("tsvector")?
+
+  @@index([searchVector], type: Gin)
+  @@index([transactionId])
 }
 

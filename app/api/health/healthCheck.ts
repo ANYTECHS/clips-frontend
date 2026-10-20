@@ -29,6 +29,7 @@ export interface HealthCheckResult {
   timestamp: string;
   uptime: number;
   dependencies?: Record<string, DependencyResult>;
+  jobStoreMode?: "redis" | "memory";
 }
 
 const APP_VERSION = process.env.npm_package_version ?? "0.1.0";
@@ -153,6 +154,45 @@ async function probeStorage(): Promise<DependencyResult> {
   }
 }
 
+async function probeDatabase(): Promise<DependencyResult> {
+  const start = Date.now();
+  try {
+    const { checkDatabaseHealth } = await import("@/app/lib/prisma");
+    const ok = await checkDatabaseHealth();
+    return {
+      status: ok ? "ok" : "down",
+      latencyMs: Date.now() - start,
+      message: ok ? undefined : "Prisma query failed",
+    };
+  } catch (err) {
+    return {
+      status: "down",
+      latencyMs: Date.now() - start,
+      message: err instanceof Error ? err.message : "Database connection failed",
+    };
+  }
+}
+
+async function probeStellar(): Promise<DependencyResult> {
+  const start = Date.now();
+  try {
+    const { getSorobanServer } = await import("@/app/lib/stellar");
+    const server = getSorobanServer();
+    const health = await server.getHealth();
+    const isHealthy = health?.status === "healthy" || typeof health === "object";
+    return {
+      status: isHealthy ? "ok" : "degraded",
+      latencyMs: Date.now() - start,
+    };
+  } catch (err) {
+    return {
+      status: "degraded",
+      latencyMs: Date.now() - start,
+      message: err instanceof Error ? err.message : "Stellar RPC unreachable",
+    };
+  }
+}
+
 // ─── Aggregation helpers ──────────────────────────────────────────────────────
 
 function aggregate(
@@ -177,14 +217,18 @@ export function livenessCheck(): HealthCheckResult {
 }
 
 /** Full readiness check — probes all external dependencies concurrently. */
-export async function readinessCheck(): Promise<HealthCheckResult> {
-  const [redis, aiBackend, storage] = await Promise.all([
+export async function readinessCheck(): Promise<HealthCheckResult & { checks?: Record<string, DependencyResult> }> {
+  const [database, stellar, redis, aiBackend, storage] = await Promise.all([
+    probeDatabase(),
+    probeStellar(),
     probeRedis(),
     probeAiBackend(),
     probeStorage(),
   ]);
 
   const dependencies: Record<string, DependencyResult> = {
+    database,
+    stellar,
     redis,
     aiBackend,
     storage,
@@ -192,11 +236,25 @@ export async function readinessCheck(): Promise<HealthCheckResult> {
 
   const status = aggregate(dependencies);
 
+  // Get job store mode
+  let jobStoreMode: "redis" | "memory" = "memory";
+  try {
+    const { jobStore } = await import("@/app/api/jobs/shared/jobStore");
+    jobStoreMode = jobStore.getMode();
+  } catch (error) {
+    // If jobStore fails to load, default to memory
+  }
+
   return {
     status,
     version: APP_VERSION,
     timestamp: new Date().toISOString(),
     uptime: Math.floor(process.uptime()),
     dependencies,
+    checks: dependencies,
+    jobStoreMode,
   };
 }
+
+export { probeDatabase, probeStellar, probeRedis, probeAiBackend, probeStorage };
+

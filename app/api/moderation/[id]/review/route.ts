@@ -20,7 +20,7 @@ import { prisma } from "@/app/lib/prisma";
 
 export const ReviewSchema = z.object({
   /** The reviewer's verdict. `pending` is not a decision a human can make. */
-  status: z.enum(["approved", "rejected"]),
+  status: z.enum(["approved", "flagged", "rejected"]),
   /** Why — shown to the creator, so it is required rather than optional. */
   reason: z.string().min(1).max(2_000),
 });
@@ -74,6 +74,80 @@ export async function POST(
         status: parsed.data.status,
         // A human decision carries no model confidence; recording a score here
         // would imply one existed.
+        categories: original.categories ?? undefined,
+        score: null,
+        source: "manual",
+        provider: null,
+        reason: parsed.data.reason,
+        reviewerId: session.user.id,
+        supersedesId: id,
+      },
+    });
+
+    logger.info(
+      `[moderation] ${original.contentId} reviewed by ${session.user.id}: ${parsed.data.status}`,
+    );
+
+    return NextResponse.json({ success: true, decision }, { status: 201 });
+  } catch (error) {
+    Sentry.captureException(error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/moderation/[id]/review
+ *
+ * Allows a reviewer to set status: approved | flagged | rejected with a reason and reviewerId.
+ * Creates a new ModerationDecision row with source: manual that supersedesId the previous decision.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const csrfError = checkCsrf(request);
+  if (csrfError) return csrfError;
+
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+
+    const parsedBody = await parseRequestJson(request);
+    if (!parsedBody.ok) return parsedBody.response;
+
+    const parsed = ReviewSchema.safeParse(parsedBody.body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", issues: parsed.error.issues },
+        { status: 422 },
+      );
+    }
+
+    const original = await prisma.moderationDecision.findUnique({ where: { id } });
+    if (!original) {
+      return NextResponse.json({ error: "Decision not found" }, { status: 404 });
+    }
+
+    const alreadyReviewed = await prisma.moderationDecision.findFirst({
+      where: { supersedesId: id },
+    });
+    if (alreadyReviewed) {
+      return NextResponse.json(
+        { error: "This decision has already been reviewed" },
+        { status: 409 },
+      );
+    }
+
+    const decision = await prisma.moderationDecision.create({
+      data: {
+        contentId: original.contentId,
+        contentType: original.contentType,
+        userId: original.userId,
+        status: parsed.data.status,
         categories: original.categories ?? undefined,
         score: null,
         source: "manual",

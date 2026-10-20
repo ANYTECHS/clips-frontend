@@ -245,16 +245,44 @@ export default function ActivityFeed({
     });
   }, [filters.dateRange, filters.txType, transactions]);
 
+  const [autoRefresh, setAutoRefresh] = useState(true);
+
   useEffect(() => {
     onTotalCountChange?.(filteredTransactions.length);
   }, [filteredTransactions.length, onTotalCountChange]);
 
+  useEffect(() => {
+    if (!autoRefresh) return;
+    const interval = setInterval(() => {
+      void loadInitial();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [autoRefresh, loadInitial]);
+
   return (
     <section className="space-y-4">
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div>
-          <p className="text-sm text-muted">Total transactions</p>
-          <p className="text-xl font-bold text-white">{filteredTransactions.length}</p>
+        <div className="flex items-center gap-3">
+          <div>
+            <p className="text-sm text-muted">Total transactions</p>
+            <p className="text-xl font-bold text-white">{filteredTransactions.length}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setAutoRefresh(!autoRefresh)}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all ${
+              autoRefresh
+                ? "bg-brand/10 border-brand/30 text-brand"
+                : "bg-white/5 border-white/10 text-white/40"
+            }`}
+          >
+            <span
+              className={`w-2 h-2 rounded-full ${
+                autoRefresh ? "bg-brand animate-pulse" : "bg-white/40"
+              }`}
+            />
+            {autoRefresh ? "Live (15s)" : "Paused"}
+          </button>
         </div>
 
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -318,7 +346,7 @@ export default function ActivityFeed({
           renderItem={(transaction) => (
             <div
               role="listitem"
-              className="flex h-full items-start justify-between gap-3 overflow-hidden rounded-xl border border-border bg-surface-hover/40 px-4 py-3 contain-layout-style"
+              className="flex h-full items-start justify-between gap-3 rounded-xl border border-border bg-surface-hover/40 px-4 py-3"
             >
               <div className="min-w-0 space-y-1">
                 <p className="truncate text-sm font-semibold text-white">
