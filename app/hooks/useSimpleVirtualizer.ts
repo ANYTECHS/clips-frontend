@@ -16,6 +16,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type RefObject } from "react";
+import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
 export interface VirtualItem {
   index: number;
@@ -36,7 +37,7 @@ export interface UseSimpleVirtualizerOptions {
 export function useSimpleVirtualizer({
   count,
   estimateSize,
-  overscan = 3,
+  overscan = VIRTUALIZATION_CONFIG.overscanItems,
   getScrollElement,
   containerRef,
 }: UseSimpleVirtualizerOptions) {

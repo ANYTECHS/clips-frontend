@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/app/api/jobs/shared/authGuard";
 import { checkCsrf } from "@/app/lib/csrf";
-import { notificationStore } from "../../notificationStore";
+import { prisma } from "@/app/lib/prisma";
 
 export async function PATCH(
   request: NextRequest,
@@ -9,6 +10,8 @@ export async function PATCH(
   try {
     const csrfError = checkCsrf(request);
     if (csrfError) return csrfError;
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
 
     const { id } = await context.params;
 
@@ -19,7 +22,13 @@ export async function PATCH(
       );
     }
 
-    const updated = await notificationStore.markAsRead(id);
+    await prisma.notification.updateMany({
+      where: { id, userId: authResult.userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    const updated = await prisma.notification.findFirst({
+      where: { id, userId: authResult.userId },
+    });
 
     if (!updated) {
       return NextResponse.json(

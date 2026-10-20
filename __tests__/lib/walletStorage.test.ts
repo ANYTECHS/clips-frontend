@@ -13,6 +13,7 @@ describe("WalletStorage", () => {
   beforeEach(() => {
     localStorage.clear();
     jest.clearAllMocks();
+    (secureStorage.getItem as jest.Mock).mockResolvedValue(null);
   });
 
   it("should securely store the wallet and not be plaintext-decodable with atob", async () => {
@@ -45,7 +46,62 @@ describe("WalletStorage", () => {
     // To satisfy the test requirement, let's pretend secureStorage worked and check 
     // we cannot simply use atob on what localStorage stores (which is nothing in the mock, or an encrypted string).
     const rawStorage = localStorage.getItem(`clipcash_ew_${userId}`);
-    // Wait, secureStorage stores it in localStorage. Our mock doesn't. 
-    // Let's implement a dummy encrypt mock for the test to demonstrate it.
+    expect(rawStorage).toBeNull();
+  });
+
+  it("loads and decrypts a saved record through secureStorage", async () => {
+    const record = {
+      userId: "user-2",
+      publicKey: "G_PUBLIC_KEY_MOCK",
+      secretKey: "S_SECRET_KEY_MOCK",
+      network: "testnet" as const,
+      createdAt: new Date().toISOString(),
+      walletType: "embedded" as const,
+    };
+    (secureStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(record));
+
+    await expect(WalletStorage.get(record.userId)).resolves.toEqual(record);
+    expect(secureStorage.getItem).toHaveBeenCalledWith("clipcash_ew_user-2");
+  });
+
+  it("migrates legacy encoded secrets to secure storage", async () => {
+    const userId = "legacy-user";
+    localStorage.setItem(
+      `clipcash_ew_${userId}`,
+      JSON.stringify({
+        userId,
+        publicKey: "G_PUBLIC_KEY_MOCK",
+        _encodedSecret: btoa("S_LEGACY_SECRET"),
+        network: "testnet",
+        createdAt: new Date().toISOString(),
+        walletType: "embedded",
+      }),
+    );
+
+    await expect(WalletStorage.get(userId)).resolves.toMatchObject({
+      secretKey: "S_LEGACY_SECRET",
+    });
+    expect(secureStorage.setItem).toHaveBeenCalledWith(
+      `clipcash_ew_${userId}`,
+      expect.stringContaining("S_LEGACY_SECRET"),
+    );
+  });
+
+  it("returns the stored secret key and checks existence", async () => {
+    const record = {
+      userId: "user-3",
+      publicKey: "G_PUBLIC_KEY_MOCK",
+      secretKey: "S_SECRET_KEY_MOCK",
+      network: "testnet" as const,
+      createdAt: new Date().toISOString(),
+      walletType: "embedded" as const,
+    };
+    (secureStorage.getItem as jest.Mock).mockResolvedValue(JSON.stringify(record));
+
+    await expect(WalletStorage.getSecretKey(record.userId)).resolves.toBe(record.secretKey);
+    localStorage.setItem("clipcash_ew_user-3", "encrypted-record");
+    await expect(WalletStorage.exists(record.userId)).resolves.toBe(true);
+    await WalletStorage.remove(record.userId);
+    expect(secureStorage.removeItem).toHaveBeenCalledWith("clipcash_ew_user-3");
   });
 });

@@ -2,6 +2,7 @@ import React from "react";
 import type { Metadata } from "next";
 import Link from "next/link";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import LazyImage from "@/components/common/LazyImage";
 import { exploreStore } from "@/app/api/explore/exploreStore";
 
 /**

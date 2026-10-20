@@ -2,12 +2,12 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { Zap, Menu, X, User, ChevronDown, LogOut, LayoutDashboard } from "lucide-react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { sanitize } from "@/app/lib/sanitize";
-import { DEFAULT_BLUR_PLACEHOLDER, SIZES_AVATAR_SM, SIZES_AVATAR_MD } from "@/app/lib/imageUtils";
+import { SIZES_AVATAR_SM, SIZES_AVATAR_MD } from "@/app/lib/imageUtils";
+import LazyImage from "@/components/common/LazyImage";
 
 /**
  * Public-facing Navbar used on /, /login, /onboarding and other public pages.
@@ -282,17 +282,15 @@ function AvatarDisplay({ avatarUrl, displayName, size }: AvatarDisplayProps) {
 
   if (avatarUrl) {
     return (
-      <Image
-        src={avatarUrl}
-        alt={`${sanitize(displayName)} avatar`}
-        width={size}
-        height={size}
-        sizes={size <= 32 ? SIZES_AVATAR_SM : SIZES_AVATAR_MD}
-        placeholder="blur"
-        blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
-        className="rounded-full object-cover shrink-0"
-        style={{ width: size, height: size }}
-      />
+      <span className="relative block shrink-0 overflow-hidden rounded-full" style={{ width: size, height: size }}>
+        <LazyImage
+          src={avatarUrl}
+          alt={`${sanitize(displayName)} avatar`}
+          fill
+          sizes={size <= 32 ? SIZES_AVATAR_SM : SIZES_AVATAR_MD}
+          className="rounded-full object-cover"
+        />
+      </span>
     );
   }
 

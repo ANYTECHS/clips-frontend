@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
 import { validateRequiredEnv } from "./app/lib/validateEnv";
+import { immutableCache, shortCache } from "./app/lib/cacheHeaders";
 import withBundleAnalyzer from "@next/bundle-analyzer";
 
 validateRequiredEnv();
@@ -111,18 +112,22 @@ async function securityHeaders() {
     {
       source: "/_next/static/:path*",
       headers: [
-        { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+        { key: "Cache-Control", value: immutableCache() },
       ],
     },
     // Public folder media — not content-hashed but rarely changes.
     {
-      source: "/:path*\\.(ico|png|jpg|jpeg|gif|svg|webp|avif|woff|woff2|ttf|otf|eot)",
+      source: "/:path*\\.(ico|png|jpg|jpeg|gif|svg|webp|avif)",
       headers: [
         {
           key: "Cache-Control",
-          value: "public, max-age=86400, stale-while-revalidate=604800",
+          value: shortCache(86400, 604800),
         },
       ],
+    },
+    {
+      source: "/:path*\\.(woff|woff2|ttf|otf|eot)",
+      headers: [{ key: "Cache-Control", value: immutableCache() }],
     },
     // Service worker - always revalidate
     {
@@ -130,18 +135,6 @@ async function securityHeaders() {
       headers: [
         { key: "Cache-Control", value: "public, max-age=0, must-revalidate" },
         { key: "Service-Worker-Allowed", value: "/" },
-      ],
-    },
-    // API responses with conditional requests support
-    {
-      source: "/api/:path*",
-      headers: [
-        {
-          key: "Cache-Control",
-          value: "public, max-age=60, stale-while-revalidate=300",
-        },
-        // Enable ETag-based conditional requests for cache revalidation
-        { key: "Vary", value: "Accept-Encoding" },
       ],
     },
     // HTML pages - must revalidate

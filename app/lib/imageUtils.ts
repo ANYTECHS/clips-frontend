@@ -2,7 +2,7 @@
  * imageUtils.ts
  *
  * Shared image utilities for next/image:
- *  - Blur placeholder data URIs (static dark SVG + shimmer variant)
+ *  - Source-derived blur placeholder data URIs (20px worker downsample)
  *  - Typed `sizes` string constants for every responsive grid used in the app
  *  - ImageLoadingState type consumed by load/error handlers
  *
@@ -197,10 +197,11 @@ export function getBlurPlaceholder(
   height = 10,
 ): string {
   if (typeof window === "undefined") return DEFAULT_BLUR_PLACEHOLDER;
-  if (blurCache.has(imageUrl)) return blurCache.get(imageUrl)!;
+  const cacheKey = `${imageUrl}:${width}x${height}`;
+  if (blurCache.has(cacheKey)) return blurCache.get(cacheKey)!;
 
   const placeholder = generateBlurPlaceholder(width, height);
-  blurCache.set(imageUrl, placeholder);
+  blurCache.set(cacheKey, placeholder);
   return placeholder;
 }
 
@@ -255,9 +256,9 @@ export function generateBlurPlaceholderAsync(width = 10, height = 10): Promise<s
 }
 
 /**
- * Get or generate a cached blur placeholder keyed by image URL, generating
- * off the main thread via `generateBlurPlaceholderAsync`.
- * Client-only — resolves to DEFAULT_BLUR_PLACEHOLDER on the server.
+ * Get or generate a source-derived low-quality image placeholder. It returns
+ * immediately on the server and falls back to a tiny static data URI when the
+ * source cannot be fetched (for example because a remote host disallows CORS).
  */
 export async function getBlurPlaceholderAsync(
   imageUrl: string,
@@ -265,9 +266,37 @@ export async function getBlurPlaceholderAsync(
   height = 10,
 ): Promise<string> {
   if (typeof window === "undefined") return DEFAULT_BLUR_PLACEHOLDER;
-  if (blurCache.has(imageUrl)) return blurCache.get(imageUrl)!;
+  const cacheKey = `${imageUrl}:${width}x${height}`;
+  if (blurCache.has(cacheKey)) return blurCache.get(cacheKey)!;
 
   const placeholder = await generateBlurPlaceholderAsync(width, height);
-  blurCache.set(imageUrl, placeholder);
+  blurCache.set(cacheKey, placeholder);
   return placeholder;
+}
+
+/**
+ * Fetch an image and generate a 20px source-derived placeholder in the worker.
+ * A static data URI is returned on SSR, failed requests, or unsupported APIs.
+ */
+export async function getBlurDataURL(src: string): Promise<string> {
+  if (typeof window === "undefined" || !src) return DEFAULT_BLUR_PLACEHOLDER;
+  const cacheKey = `${src}:20x20`;
+  const cached = blurCache.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await fetch(src, { mode: "cors", credentials: "same-origin", cache: "force-cache" });
+    if (!response.ok) return DEFAULT_BLUR_PLACEHOLDER;
+    const source = await createImageBitmap(await response.blob());
+    const requestId = ++blurRequestId;
+    const worker = getBlurWorker();
+    const dataUrl = await new Promise<string>((resolve) => {
+      pendingBlurRequests.set(requestId, resolve);
+      worker.postMessage({ requestId, width: 20, height: 20, source }, [source]);
+    });
+    blurCache.set(cacheKey, dataUrl);
+    return dataUrl;
+  } catch {
+    return DEFAULT_BLUR_PLACEHOLDER;
+  }
 }

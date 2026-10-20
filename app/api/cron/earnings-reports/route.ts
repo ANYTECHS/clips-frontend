@@ -57,10 +57,17 @@ function isAuthorized(request: NextRequest): boolean {
   return request.headers.get("authorization") === `Bearer ${cronSecret}`;
 }
 
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  return POST(request);
+}
+
 export async function POST(request: NextRequest): Promise<NextResponse> {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const { searchParams } = new URL(request.url);
+  const isWeekly = searchParams.get("type") === "weekly";
 
   const period = previousMonth();
   const appUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";

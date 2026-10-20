@@ -13,12 +13,30 @@
  * See: https://web.dev/articles/http-cache
  */
 
+export function immutableCache(): string {
+  return "public, max-age=31536000, immutable";
+}
+
+export function shortCache(seconds: number, staleWhileRevalidateSeconds = Math.max(60, seconds * 7)): string {
+  const maxAge = Math.max(0, Math.floor(seconds));
+  const stale = Math.max(0, Math.floor(staleWhileRevalidateSeconds));
+  return `public, max-age=${maxAge}, stale-while-revalidate=${stale}`;
+}
+
+export function noCache(): string {
+  return "private, no-store";
+}
+
+export function apiListCache(): string {
+  return "private, max-age=0, stale-while-revalidate=60";
+}
+
 export const CACHE_STRATEGIES = {
   // Immutable assets - Next.js content-hashes these, safe for aggressive caching
   immutable: {
     name: "immutable",
     maxAge: 31536000, // 1 year in seconds
-    directive: "public, max-age=31536000, immutable",
+    directive: immutableCache(),
   },
 
   // Static media assets that rarely change but are not content-hashed
@@ -26,14 +44,14 @@ export const CACHE_STRATEGIES = {
     name: "static",
     maxAge: 86400, // 24 hours
     staleTtl: 604800, // 7 days
-    directive: "public, max-age=86400, stale-while-revalidate=604800",
+    directive: shortCache(86400, 604800),
   },
 
   // Fonts - similar to static but slightly longer TTL
   fonts: {
     name: "fonts",
     maxAge: 31536000, // 1 year
-    directive: "public, max-age=31536000, immutable",
+    directive: immutableCache(),
   },
 
   // API responses - shorter cache with revalidation window
@@ -41,14 +59,14 @@ export const CACHE_STRATEGIES = {
     name: "api",
     maxAge: 60, // 1 minute
     staleTtl: 300, // 5 minutes stale
-    directive: "public, max-age=60, stale-while-revalidate=300",
+    directive: apiListCache(),
   },
 
   // User-specific or sensitive data - no public caching
   private: {
     name: "private",
-    maxAge: 3600, // 1 hour
-    directive: "private, max-age=3600, must-revalidate",
+    maxAge: 0,
+    directive: noCache(),
   },
 
   // HTML pages - must validate cache freshness
@@ -97,7 +115,7 @@ export function getCacheStrategy(pathname: string): (typeof CACHE_STRATEGIES)[ke
 
   // API routes
   if (pathname.startsWith("/api/")) {
-    return CACHE_STRATEGIES.api;
+    return CACHE_STRATEGIES.private;
   }
 
   // Default: HTML with revalidation

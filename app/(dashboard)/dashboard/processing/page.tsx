@@ -15,7 +15,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import React, { useEffect, useState } from "react";
 
 import { useProcessingStatus } from "@/app/hooks/useProcessingStatus";
-import { notifyClipsReady,sendNotification } from "@/app/lib/notifications";
+import { notifyClipsReady, sendBrowserNotification } from "@/app/lib/browserNotifications";
 import { selectHasHydrated,selectProcess, useProcessStore } from "@/app/store/processStore";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 
@@ -48,7 +48,7 @@ export default function ProcessingPage() {
       setNotificationSent(true);
 
       // Browser push notification
-      sendNotification("Your clips are ready!");
+      sendBrowserNotification("Your clips are ready!");
       notifyClipsReady(momentsFound, "/projects");
 
       // In-app server-side notification (shown in the DashboardHeader bell)

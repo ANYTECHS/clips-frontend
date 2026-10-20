@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import Image from "next/image";
 import { sanitize } from "@/app/lib/sanitize";
-import { DEFAULT_BLUR_PLACEHOLDER, type ImageLoadingState } from "@/app/lib/imageUtils";
+import { type ImageLoadingState } from "@/app/lib/imageUtils";
+import LazyImage from "@/components/common/LazyImage";
 
 interface NFTCardProps {
   id: string;
@@ -57,17 +57,15 @@ export default function NFTCard({ id, title, thumbnail, viralityScore, mintStatu
     <div className="bg-input border border-white/10 rounded-[20px] overflow-hidden contain-layout-style hover:border-brand/50 transition-colors">
       {/* Thumbnail */}
       <div className="aspect-video w-full relative">
-        <Image
+        <LazyImage
           src={thumbnail}
           alt={sanitize(title)}
           fill
           className={`object-cover transition-all duration-300 ${
             imageState === 'loaded' ? 'opacity-100' : 'opacity-80 blur-sm'
           }`}
-          placeholder="blur"
-          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
-          onLoad={handleImageLoad}
-          onError={handleImageError}
+          onLoadingComplete={handleImageLoad}
+          onLoadError={handleImageError}
           sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
         />
         {imageState === 'error' && (

@@ -15,7 +15,11 @@ const customJestConfig = {
     "^@/app/(.*)$": "<rootDir>/app/$1",
     "^@/(.*)$": "<rootDir>/$1",
   },
-  testMatch: ["**/__tests__/**/*.test.[jt]s?(x)", "**/?(*.)+(spec|test).[jt]s?(x)"],
+  testMatch: [
+    "**/__tests__/**/*.test.[jt]s?(x)",
+    "**/?(*.)+(spec|test).[jt]s?(x)",
+    "**/tests/fuzz/**/*.fuzz.ts",
+  ],
   testPathIgnorePatterns: [
     "<rootDir>/node_modules/",
     "<rootDir>/tests/e2e/",

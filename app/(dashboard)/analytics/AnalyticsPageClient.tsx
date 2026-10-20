@@ -10,15 +10,21 @@
 
 import { AlertCircle,BarChart3, Clock, Download, Eye } from "lucide-react";
 import React, { useEffect, useRef,useState } from "react";
+import dynamic from "next/dynamic";
 
 import analytics from "@/app/lib/analytics";
 import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import type { AnalyticsData } from "@/app/lib/serverData";
 import StatCard from "@/components/dashboard/StatCard";
 
-import AdvancedAnalyticsPanel from "./AdvancedAnalyticsPanel";
-import ApiUsagePanel from "./ApiUsagePanel";
-import RateLimitMonitoringPanel from "./RateLimitMonitoringPanel";
+const panelLoading = () => <div className="h-56 rounded-xl bg-white/5 animate-pulse" />;
+const AdvancedAnalyticsPanel = dynamic(() => import("./AdvancedAnalyticsPanel"), {
+  loading: panelLoading,
+});
+const ApiUsagePanel = dynamic(() => import("./ApiUsagePanel"), { loading: panelLoading });
+const RateLimitMonitoringPanel = dynamic(() => import("./RateLimitMonitoringPanel"), {
+  loading: panelLoading,
+});
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 

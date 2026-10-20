@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { exploreStore, privacyStore } from "./exploreStore";
 import type { ApiResponse } from "../types";
+import { publicCdnCacheHeaders } from "@/app/lib/cdn";
 
 /**
  * GET /api/explore/trending
@@ -66,5 +67,7 @@ export async function GET(request: NextRequest) {
     error: null,
   };
 
-  return NextResponse.json(body);
+  return NextResponse.json(body, {
+    headers: publicCdnCacheHeaders("explore-clips", 60, 300),
+  });
 }

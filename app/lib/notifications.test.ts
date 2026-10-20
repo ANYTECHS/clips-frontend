@@ -3,7 +3,7 @@ import {
   getNotificationSettingsUrl,
   requestNotificationPermission,
   storePermission,
-} from "./notifications";
+} from "./browserNotifications";
 
 describe("notifications permission flow", () => {
   const originalNotification = window.Notification;

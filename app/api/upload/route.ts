@@ -55,6 +55,8 @@ import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
 import { logger } from "@/app/lib/logger";
 import { templatesStore, type TemplateScope } from "@/app/api/templates/templatesStore";
 import type { TemplateSettings } from "@/app/api/schemas/templates.schema";
+import { deprecatedAlias } from "@/app/api/versioning";
+import type { ApiResponse } from "@/app/api/types";
 
 export { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST };
 export { ALLOWED_TYPES, ALLOWED_EXTENSIONS, validateMagicBytes };
@@ -70,7 +72,7 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export async function POST(request: NextRequest) {
+async function upload(request: NextRequest) {
   try {
     const rateLimited = await applyCustomRateLimit(request, "/api/upload");
     if (rateLimited) return rateLimited;
@@ -169,7 +171,8 @@ export async function POST(request: NextRequest) {
     );
 
     // Return the first jobId as the primary reference (for single-file flows)
-    const primaryJobId = results[0].jobId;
+    const primaryJobId = results[0]?.jobId;
+    if (!primaryJobId) throw new Error("Upload completed without a primary job result");
 
     // Persist jobs to the store and dispatch each one to the AI backend.
     const callbackBase =
@@ -261,4 +264,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(body, { status: 500 });
   }
 }
+
+export const POST = deprecatedAlias(upload);
 

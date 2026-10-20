@@ -42,19 +42,11 @@ import {
   storePermission,
   syncNotificationPermission,
   watchNotificationPermission,
-} from "@/app/lib/notifications";
-import { sanitize } from "@/app/lib/sanitize";
-import {
-  defaultUserPreferences,
-  getSupportedTimezones,
-  MAX_AVATAR_BYTES,
-  UserPreferences,
-  validateAvatarFile,
-  validateTimezone,
-} from "@/app/lib/userPreferences";
+} from "@/app/lib/browserNotifications";
 import { useAuth } from "@/components/auth/AuthProvider";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import MonthlyReportSetting from "@/components/settings/MonthlyReportSetting";
+import { NotificationChannelSettings } from "@/components/settings/NotificationChannelSettings";
 import PrivacySettings from "@/components/settings/PrivacySettings";
 import { Theme, useTheme } from "@/components/theme-provider";
 import Skeleton from "@/components/ui/Skeleton";
@@ -1140,17 +1132,9 @@ export function SettingsPage({ initialTab = "profile" }: SettingsPageProps) {
                   </div>
                 </div>
 
-                {/* Per-event / Per-channel Matrix Table */}
-                <div className="bg-surface border border-white/5 rounded-2xl p-6 space-y-4">
-                  <div>
-                    <h3 className="font-bold text-white text-base">
-                      Event Notification Preferences
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Configure how you receive updates for each event type
-                      across Email, Browser Push, and In-App alerts.
-                    </p>
-                  </div>
+            <NotificationChannelSettings />
+
+            <PrivacySettings />
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs border-collapse">

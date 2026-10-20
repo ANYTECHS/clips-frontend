@@ -2,17 +2,16 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
 import { ArrowLeft, Pencil, Trash2, Play, Sparkles } from "lucide-react";
 import { useToast } from "@/hooks/useToast";
 import type { Clip } from "@/components/projects/ClipGrid";
 import {
-  DEFAULT_BLUR_PLACEHOLDER,
   SIZES_PROJECT_HERO,
   SIZES_CLIP_GRID,
 } from "@/app/lib/imageUtils";
 import { sanitize } from "@/app/lib/sanitize";
+import LazyImage from "@/components/common/LazyImage";
 
 interface ProjectDetail {
   id: string;
@@ -123,13 +122,11 @@ export default function ProjectDetailClient({
       </div>
 
       <div className="relative aspect-video max-w-2xl rounded-2xl overflow-hidden bg-black group">
-        <Image
+        <LazyImage
           src={project.thumbnailUrl}
           alt={sanitize(project.name)}
           fill
           sizes={SIZES_PROJECT_HERO}
-          placeholder="blur"
-          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
           className="object-cover opacity-60 group-hover:opacity-40 transition-opacity"
         />
         <div className="absolute inset-0 flex items-center justify-center">
@@ -156,13 +153,11 @@ export default function ProjectDetailClient({
             {initialClips.map((clip) => (
               <div key={clip.id} className="group rounded-2xl overflow-hidden border border-white/10 bg-white/5 hover:border-white/20 transition-all hover:shadow-lg hover:shadow-black/20">
                 <div className="aspect-[9/16] relative overflow-hidden">
-                  <Image
+                  <LazyImage
                     src={clip.thumbnail}
                     alt={sanitize(clip.title)}
                     fill
                     sizes={SIZES_CLIP_GRID}
-                    placeholder="blur"
-                    blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
                     className="object-cover group-hover:scale-105 transition-transform duration-500"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />

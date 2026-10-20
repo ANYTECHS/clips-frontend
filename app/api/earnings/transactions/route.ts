@@ -22,6 +22,7 @@ import { earningsStore } from "../earningsStore";
 import type { ApiResponse } from "../../types";
 import type { EarningsResponse, EarningTransaction } from "../types";
 import { paginateItems, parsePaginationParams } from "../../pagination";
+import { noCache } from "@/app/lib/cacheHeaders";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -150,5 +151,5 @@ export async function GET(request: NextRequest) {
   };
 
   const body: ApiResponse<EarningsResponse> = { data: responseData, error: null, meta };
-  return NextResponse.json(body);
+  return NextResponse.json(body, { headers: { "Cache-Control": noCache() } });
 }

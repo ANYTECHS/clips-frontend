@@ -76,7 +76,7 @@ jest.mock("@/components/LocaleSwitcher", () => ({
   default: () => <div data-testid="locale-switcher-mock">Locale Switcher</div>,
 }));
 
-jest.mock("@/app/lib/notifications", () => ({
+jest.mock("@/app/lib/browserNotifications", () => ({
   getStoredPermission: () => "default",
   getNotificationSettingsInstructions: () => "Open browser settings.",
   getNotificationSettingsUrl: () => null,
@@ -86,7 +86,11 @@ jest.mock("@/app/lib/notifications", () => ({
   watchNotificationPermission: () => jest.fn(),
 }));
 
-describe("SettingsPage Component", () => {
+jest.mock("@/components/settings/NotificationChannelSettings", () => ({
+  NotificationChannelSettings: () => null,
+}));
+
+describe("SettingsPage", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     global.fetch = jest.fn((url: RequestInfo | URL, init?: RequestInit) => {
