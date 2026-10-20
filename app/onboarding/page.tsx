@@ -1,4 +1,4 @@
-/* eslint-disable react/no-unescaped-entities */
+
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
@@ -139,7 +139,7 @@ export default function OnboardingPage() {
     e.preventDefault();
     if (!user) return;
 
-    // Mark all as touched
+   
     const allTouched = Object.fromEntries(Object.keys(step1Form).map(k => [k, true]));
     setTouched(allTouched);
 
