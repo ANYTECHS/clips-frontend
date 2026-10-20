@@ -5,12 +5,18 @@ interface OnboardingProgressProps {
   currentStep: number;
   totalSteps: number;
   stepLabel: string;
+  steps?: { title: string; isCompleted: boolean }[];
 }
 
 export default function OnboardingProgress({
   currentStep,
   totalSteps,
   stepLabel,
+  steps = [
+    { title: "Profile", isCompleted: currentStep > 1 },
+    { title: "Socials", isCompleted: currentStep > 2 },
+    { title: "Wallet", isCompleted: currentStep > 3 },
+  ],
 }: OnboardingProgressProps) {
   const progressPercentage = Math.round((currentStep / totalSteps) * 100);
 
@@ -27,11 +33,42 @@ export default function OnboardingProgress({
           {progressPercentage}%
         </div>
       </div>
-      <div className="w-full h-[10px] bg-input rounded-full overflow-hidden">
+
+      <div className="w-full h-[10px] bg-input rounded-full overflow-hidden mb-4">
         <div
-          className="h-full bg-brand rounded-full shadow-[0_0_10px_rgba(0,229,143,0.5)]"
+          className="h-full bg-brand rounded-full shadow-[0_0_10px_rgba(0,229,143,0.5)] transition-all duration-300"
           style={{ width: `${progressPercentage}%` }}
         />
+      </div>
+
+      {/* Step Breakdown Indicators */}
+      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-white/5">
+        {steps.map((st, idx) => {
+          const stepNum = idx + 1;
+          const isActive = currentStep === stepNum;
+          return (
+            <div key={st.title} className="flex items-center gap-1.5 text-xs">
+              <span
+                className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold ${
+                  st.isCompleted
+                    ? "bg-brand text-black"
+                    : isActive
+                      ? "bg-white/20 text-white border border-brand/50"
+                      : "bg-white/5 text-white/40"
+                }`}
+              >
+                {st.isCompleted ? "✓" : stepNum}
+              </span>
+              <span
+                className={`text-[11px] truncate ${
+                  isActive ? "text-white font-semibold" : "text-white/40"
+                }`}
+              >
+                {st.title}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
