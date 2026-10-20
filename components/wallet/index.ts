@@ -6,3 +6,4 @@ export { default as AssetRow } from './AssetRow';
 export { default as TrustlineManager } from './TrustlineManager';
 export { default as TransactionHistoryViewer } from './TransactionHistoryViewer';
 export { default as ActivityFeed } from './ActivityFeed';
+export { default as XlmBalanceDisplay } from './XlmBalanceDisplay';

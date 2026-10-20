@@ -1,9 +1,9 @@
 "use client";
 
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
-import React, { useEffect, useMemo } from "react";
+import { ChevronLeft, ChevronRight, X, Download, FileText } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
 
-import type { EarningsSummary,EarningTransaction } from "@/app/api/earnings/types";
+import type { EarningsSummary, EarningTransaction } from "@/app/api/earnings/types";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
 
 interface EarningsTableProps {
@@ -37,6 +37,7 @@ export default function EarningsTable({
   pagination,
   onPageChange,
 }: EarningsTableProps) {
+  const [showTaxReport, setShowTaxReport] = useState(false);
   const { filters, updateFilters, resetFilters } = useFilterQueryState({
     search: "",
     startDate: "",
@@ -68,6 +69,35 @@ export default function EarningsTable({
   }, [filtered, onFilteredTransactionsChange]);
 
   const hasDates = startDate || endDate;
+
+  const exportToCsv = () => {
+    const headers = ["ID", "Date", "Description", "Platform", "Type", "Amount", "CryptoAmount", "CryptoCurrency", "Status", "TaxID"];
+    const rows = filtered.map((tx) => [
+      tx.id,
+      tx.date,
+      `"${tx.description.replace(/"/g, '""')}"`,
+      tx.platform,
+      tx.type,
+      tx.amount.toFixed(2),
+      tx.cryptoAmount ?? "",
+      tx.cryptoCurrency ?? "",
+      tx.status,
+      tx.taxId ?? "",
+    ]);
+    const csvContent = [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `earnings-report-${new Date().toISOString().split("T")[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const totalGross = filtered.reduce((s, tx) => s + tx.amount, 0);
+  const estimatedTaxWithholding = totalGross * 0.15;
+  const netEarnings = totalGross - estimatedTaxWithholding;
 
   return (
     <div className="rounded-2xl bg-surface border border-white/5 overflow-hidden">
@@ -123,11 +153,58 @@ export default function EarningsTable({
           )}
         </div>
 
+        {/* Action buttons: CSV Export & Tax Report */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={exportToCsv}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-white/5 hover:bg-white/10 text-white border border-white/10 disabled:opacity-40 transition-colors"
+          >
+            <Download className="w-3.5 h-3.5 text-brand" />
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowTaxReport(!showTaxReport)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-colors ${
+              showTaxReport
+                ? "bg-brand/20 border-brand/40 text-brand"
+                : "bg-white/5 hover:bg-white/10 text-white/80 border-white/10"
+            }`}
+          >
+            <FileText className="w-3.5 h-3.5" />
+            Tax Report
+          </button>
+        </div>
+
         {/* Count */}
         <span className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
           {filtered.length} of {transactions.length} transactions
         </span>
       </div>
+
+      {/* Tax Report Summary Panel */}
+      {showTaxReport && (
+        <div className="bg-black/40 border-b border-white/10 px-5 py-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
+          <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+            <span className="block text-[11px] text-white/50 uppercase font-semibold">Gross Taxable Income</span>
+            <span className="text-lg font-bold text-white">${totalGross.toFixed(2)}</span>
+          </div>
+          <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+            <span className="block text-[11px] text-white/50 uppercase font-semibold">Est. Tax Withheld (15%)</span>
+            <span className="text-lg font-bold text-amber-400">-${estimatedTaxWithholding.toFixed(2)}</span>
+          </div>
+          <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+            <span className="block text-[11px] text-white/50 uppercase font-semibold">Est. Net Creator Payout</span>
+            <span className="text-lg font-bold text-brand">${netEarnings.toFixed(2)}</span>
+          </div>
+          <div className="bg-white/5 p-3 rounded-xl border border-white/5">
+            <span className="block text-[11px] text-white/50 uppercase font-semibold">Tax Reporting Year</span>
+            <span className="text-lg font-bold text-white">2026 (Form 1099-NEC)</span>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto">
