@@ -82,6 +82,12 @@ class Analytics {
     if (typeof window === 'undefined') return;
 
     try {
+      const optOut = localStorage.getItem('clipcash_analytics_opt_out');
+      if (optOut === 'true') {
+        this.consentGiven = false;
+        return;
+      }
+
       const savedConsent = localStorage.getItem('cookie-consent');
       if (savedConsent) {
         const consent: CookieConsent = JSON.parse(savedConsent);
@@ -94,12 +100,30 @@ class Analytics {
   }
 
   /**
+   * Set opt-out preference explicitly
+   */
+  public setOptOut(optOut: boolean): void {
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('clipcash_analytics_opt_out', String(optOut));
+      if (optOut) {
+        this.consentGiven = false;
+      } else {
+        this.checkConsent();
+      }
+    } catch (error) {
+      logger.error('Failed to update analytics opt out preference:', error);
+    }
+  }
+
+  /**
    * Handle consent update events
    * @param event - Custom event carrying updated user cookie choices.
    */
   private handleConsentUpdate(event: Event): void {
     const customEvent = event as CustomEvent<CookieConsent>;
-    this.consentGiven = customEvent.detail.analytics === true;
+    const optOut = typeof window !== 'undefined' && localStorage.getItem('clipcash_analytics_opt_out') === 'true';
+    this.consentGiven = !optOut && customEvent.detail.analytics === true;
     
     if (this.consentGiven && !this.isInitialized) {
       this.initialize();
@@ -512,6 +536,7 @@ class Analytics {
 const analytics = new Analytics();
 
 // Export the instance and types
+export { analytics };
 export default analytics;
 export type { EventProperties, AnalyticsProvider };
 

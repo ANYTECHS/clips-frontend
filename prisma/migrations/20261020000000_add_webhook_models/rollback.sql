@@ -1,0 +1,7 @@
+BEGIN;
+
+DROP TABLE IF EXISTS "WebhookDelivery" CASCADE;
+DROP TABLE IF EXISTS "WebhookEndpoint" CASCADE;
+ALTER TABLE "User" DROP COLUMN IF EXISTS "preferences";
+
+COMMIT;

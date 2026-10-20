@@ -33,6 +33,20 @@
   --color-text: #FFFFFF;
 }
 
+.dark,
+[data-theme="dark"] {
+  --color-background: #080C0B;
+  --color-surface: #101614;
+  --color-surface-hover: #161D1A;
+  --color-border: #1E2923;
+  --color-input: #0B100E;
+  --color-muted: #8e9895;
+  --color-muted-foreground: #5A6F65;
+  --color-subtle: #4A5D54;
+  --color-text: #FFFFFF;
+}
+
+.light,
 [data-theme="light"] {
   --color-background: #F8FAF9;
   --color-surface: #FFFFFF;

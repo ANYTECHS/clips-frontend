@@ -22,12 +22,14 @@ model User {
   planUsagePercent Int         @default(0)
   onboardingStep Int           @default(0)
   onboardingData Json?
+  preferences   Json?
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   notifications Notification[]
   pushSubscriptions PushSubscription[]
   apiKeys       ApiKey[]
   sessions      UserSession[]
+  webhookEndpoints WebhookEndpoint[]
 
   /**
    * Opt-in to the monthly earnings report email (Issue #820).
@@ -281,5 +283,49 @@ model EarningSearchIndex {
 
   @@index([searchVector], type: Gin)
   @@index([transactionId])
+}
+
+/// Outbound webhook subscription endpoint (Issue #1251).
+model WebhookEndpoint {
+  id          String            @id @default(cuid())
+  userId      String
+  url         String
+  secret      String
+  events      String[]
+  active      Boolean           @default(true)
+  description String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deliveries  WebhookDelivery[]
+
+  @@index([userId])
+}
+
+/// Outbound webhook delivery attempt and history (Issue #1251).
+model WebhookDelivery {
+  id            String          @id @default(cuid())
+  endpointId    String
+  eventType     String
+  eventId       String
+  payload       Json
+  attempt       Int             @default(1)
+  status        String          @default("pending") // pending | delivered | failed | dead_letter
+  statusCode    Int?
+  response      String?
+  error         String?
+  isDeadLetter  Boolean         @default(false)
+  nextAttemptAt DateTime?
+  attemptedAt   DateTime?
+  deliveredAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  endpoint      WebhookEndpoint @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([endpointId, createdAt])
+  @@index([status, nextAttemptAt])
+  @@index([isDeadLetter, createdAt])
 }
 

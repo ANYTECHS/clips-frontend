@@ -1,11 +1,19 @@
 /**
- * Webhook event types — the full set of events an external integration can
- * subscribe to. Naming mirrors the existing Notification.type values
- * (job_complete | transform_complete | mint_success | earnings_received)
- * but uses dot-separated names, the convention external webhook consumers
- * expect (Stripe, GitHub, etc.).
+ * Webhook event types and data contracts — Issue #1251.
+ *
+ * Supported canonical events:
+ *   - job_complete
+ *   - transform_complete
+ *   - mint_success
+ *   - earnings_received
  */
+
 export const WEBHOOK_EVENT_TYPES = [
+  "job_complete",
+  "transform_complete",
+  "mint_success",
+  "earnings_received",
+  // Dot-separated aliases for backwards compatibility with external integrators
   "job.completed",
   "transform.completed",
   "clip.minted",
@@ -14,33 +22,58 @@ export const WEBHOOK_EVENT_TYPES = [
 
 export type WebhookEventType = (typeof WEBHOOK_EVENT_TYPES)[number];
 
-export interface WebhookEndpoint {
+export const CANONICAL_WEBHOOK_EVENTS = [
+  "job_complete",
+  "transform_complete",
+  "mint_success",
+  "earnings_received",
+] as const;
+
+export type CanonicalWebhookEventType = (typeof CANONICAL_WEBHOOK_EVENTS)[number];
+
+export function normalizeWebhookEventType(event: string): string {
+  if (event === "job.completed") return "job_complete";
+  if (event === "transform.completed") return "transform_complete";
+  if (event === "clip.minted") return "mint_success";
+  if (event === "earnings.received") return "earnings_received";
+  return event;
+}
+
+export type WebhookDeliveryStatus = "pending" | "delivered" | "failed" | "dead_letter";
+
+export interface WebhookEndpointDto {
   id: string;
   userId: string;
   url: string;
-  events: WebhookEventType[];
-  /** HMAC signing secret — returned to the caller only at creation time. */
-  secret: string;
+  events: string[];
   active: boolean;
+  description?: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 export interface WebhookEventPayload {
   id: string;
-  type: WebhookEventType;
+  type: string;
   createdAt: string;
   data: Record<string, unknown>;
 }
 
-export type WebhookDeliveryStatus = "pending" | "succeeded" | "failed";
-
-export interface WebhookDelivery {
+export interface WebhookDeliveryDto {
   id: string;
   endpointId: string;
-  event: WebhookEventPayload;
+  eventType: string;
+  eventId: string;
+  payload: Record<string, unknown>;
+  attempt: number;
   status: WebhookDeliveryStatus;
-  attempts: number;
-  lastAttemptAt: string | null;
-  lastStatusCode: number | null;
-  lastError: string | null;
+  statusCode: number | null;
+  response: string | null;
+  error: string | null;
+  isDeadLetter: boolean;
+  nextAttemptAt: string | null;
+  attemptedAt: string | null;
+  deliveredAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }

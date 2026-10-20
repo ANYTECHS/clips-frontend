@@ -57,6 +57,9 @@ class MapEarningsStore implements EarningsStore {
   addTransaction(userId: string, tx: EarningTransaction): void {
     const existing = this.getTransactions(userId);
     this.map.set(userId, [tx, ...existing]);
+    void import("@/app/lib/webhooks/delivery").then(({ triggerWebhookEvent }) => {
+      void triggerWebhookEvent(userId, "earnings_received", { transaction: tx });
+    }).catch(() => {});
   }
 
   setTransactions(userId: string, txs: EarningTransaction[]): void {

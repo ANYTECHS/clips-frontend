@@ -88,6 +88,9 @@ class NotificationStore {
       createdAt: new Date().toISOString(),
     };
     this.notifications.set(id, newItem);
+    void import("@/app/lib/webhooks/delivery").then(({ triggerWebhookEvent }) => {
+      void triggerWebhookEvent(userId, type, payload || { title, message });
+    }).catch(() => {});
     return newItem;
   }
 }
