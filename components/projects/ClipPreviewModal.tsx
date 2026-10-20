@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from "react";
-import { X, Play, Pause, Volume2, VolumeX, Share2, TrendingUp } from "lucide-react";
+import { X, Play, Pause, Volume2, VolumeX, Share2, TrendingUp, CheckSquare, Square } from "lucide-react";
 import type { Clip } from "./ClipGrid";
 import { useWillChange } from "@/app/hooks/useWillChange";
 import { useVideoRelease } from "@/app/hooks/useVideoRelease";
@@ -9,9 +9,16 @@ import { useVideoRelease } from "@/app/hooks/useVideoRelease";
 export interface ClipPreviewModalProps {
   clip: Clip;
   onClose: () => void;
+  isSelected?: boolean;
+  onToggleSelect?: (clipId: string) => void;
 }
 
-export default function ClipPreviewModal({ clip, onClose }: ClipPreviewModalProps) {
+export default function ClipPreviewModal({
+  clip,
+  onClose,
+  isSelected = false,
+  onToggleSelect,
+}: ClipPreviewModalProps) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -174,14 +181,40 @@ export default function ClipPreviewModal({ clip, onClose }: ClipPreviewModalProp
             </div>
           </div>
 
-          <div className="pt-6 mt-6 flex gap-3">
-            <button className="flex-1 py-3.5 rounded-xl text-sm font-medium bg-white/5 text-white hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
-              <Share2 className="w-4 h-4" />
-              Share
-            </button>
-            <button className="flex-1 py-3.5 rounded-xl text-sm font-bold bg-brand text-black hover:bg-brand-hover transition-colors shadow-[0_0_15px_rgba(var(--brand),0.3)]">
-              Mint as NFT
-            </button>
+          <div className="pt-6 mt-6 flex flex-col gap-3">
+            {onToggleSelect && (
+              <button
+                type="button"
+                onClick={() => onToggleSelect(clip.id)}
+                className={`w-full py-3 px-4 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 border transition-all ${
+                  isSelected
+                    ? "bg-brand/10 border-brand text-brand"
+                    : "bg-white/5 border-white/10 text-white/70 hover:text-white"
+                }`}
+              >
+                {isSelected ? (
+                  <>
+                    <CheckSquare className="w-4 h-4 text-brand" />
+                    Selected for bulk actions
+                  </>
+                ) : (
+                  <>
+                    <Square className="w-4 h-4" />
+                    Select this clip
+                  </>
+                )}
+              </button>
+            )}
+
+            <div className="flex gap-3">
+              <button className="flex-1 py-3.5 rounded-xl text-sm font-medium bg-white/5 text-white hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
+                <Share2 className="w-4 h-4" />
+                Share
+              </button>
+              <button className="flex-1 py-3.5 rounded-xl text-sm font-bold bg-brand text-black hover:bg-brand-hover transition-colors shadow-[0_0_15px_rgba(var(--brand),0.3)]">
+                Mint as NFT
+              </button>
+            </div>
           </div>
         </div>
       </div>

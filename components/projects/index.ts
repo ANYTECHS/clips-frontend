@@ -8,3 +8,4 @@ export { default as ProjectFilters } from "./ProjectFilters";
 export { default as ScoreBreakdownTooltip } from "./ScoreBreakdownTooltip";
 export { default as SelectionFooter } from "./SelectionFooter";
 export { default as TagsFilter } from "./TagsFilter";
+export { default as FolderManager } from "./FolderManager";

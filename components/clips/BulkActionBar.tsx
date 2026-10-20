@@ -13,11 +13,11 @@
  */
 
 import React, { useState } from "react";
-import { Download, Loader2, Send, Tag, Trash2, X } from "lucide-react";
+import { Download, Loader2, Send, Tag, Trash2, X, Sparkles, FolderPlus, LayoutTemplate, CheckSquare } from "lucide-react";
 
 import type { BulkProgress } from "@/app/hooks/useBulkOperation";
 
-export type BulkActionId = "delete" | "export" | "post" | "tag";
+export type BulkActionId = "delete" | "export" | "post" | "tag" | "mint" | "download" | "moveToProject" | "applyTemplate";
 
 export interface BulkActionBarProps {
   selectedCount: number;
@@ -29,6 +29,11 @@ export interface BulkActionBarProps {
   onPost: () => void;
   onTag: () => void;
   onClear: () => void;
+  onSelectAll?: () => void;
+  onMint?: () => void;
+  onDownload?: () => void;
+  onMoveToProject?: () => void;
+  onApplyTemplate?: () => void;
   onCancel?: () => void;
   /** Actions to hide — e.g. posting is meaningless in an archive view. */
   disabledActions?: readonly BulkActionId[];
@@ -43,6 +48,11 @@ export default function BulkActionBar({
   onPost,
   onTag,
   onClear,
+  onSelectAll,
+  onMint,
+  onDownload,
+  onMoveToProject,
+  onApplyTemplate,
   onCancel,
   disabledActions = [],
 }: BulkActionBarProps) {
@@ -111,6 +121,17 @@ export default function BulkActionBar({
                 ({offPageCount} on other pages)
               </span>
             )}
+            {onSelectAll && (
+              <button
+                type="button"
+                onClick={onSelectAll}
+                disabled={busy}
+                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-white/60 transition-colors hover:text-white disabled:opacity-40"
+              >
+                <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
+                Select all
+              </button>
+            )}
             <button
               type="button"
               onClick={onClear}
@@ -118,22 +139,46 @@ export default function BulkActionBar({
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-white/60 transition-colors hover:text-white disabled:opacity-40"
             >
               <X className="h-3.5 w-3.5" aria-hidden="true" />
-              Clear
+              Clear selection
             </button>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {onMint && (
+              <BulkButton
+                icon={<Sparkles className="h-4 w-4" aria-hidden="true" />}
+                label="Mint"
+                onClick={onMint}
+                disabled={isDisabled("mint")}
+              />
+            )}
+            <BulkButton
+              icon={<Download className="h-4 w-4" aria-hidden="true" />}
+              label="Download"
+              onClick={onDownload ?? onExport}
+              disabled={isDisabled("download") && isDisabled("export")}
+            />
+            {onMoveToProject && (
+              <BulkButton
+                icon={<FolderPlus className="h-4 w-4" aria-hidden="true" />}
+                label="Move to Project"
+                onClick={onMoveToProject}
+                disabled={isDisabled("moveToProject")}
+              />
+            )}
+            {onApplyTemplate && (
+              <BulkButton
+                icon={<LayoutTemplate className="h-4 w-4" aria-hidden="true" />}
+                label="Apply Template"
+                onClick={onApplyTemplate}
+                disabled={isDisabled("applyTemplate")}
+              />
+            )}
             <BulkButton
               icon={<Tag className="h-4 w-4" aria-hidden="true" />}
               label="Tag"
               onClick={onTag}
               disabled={isDisabled("tag")}
-            />
-            <BulkButton
-              icon={<Download className="h-4 w-4" aria-hidden="true" />}
-              label="Export"
-              onClick={onExport}
-              disabled={isDisabled("export")}
             />
             <BulkButton
               icon={<Send className="h-4 w-4" aria-hidden="true" />}
