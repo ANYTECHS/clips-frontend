@@ -15,6 +15,13 @@ const NOTIFICATION_TYPES: NotificationType[] = [
   "earnings_received",
 ];
 
+const NOTIFICATION_TYPES: NotificationType[] = [
+  "job_complete",
+  "transform_complete",
+  "mint_success",
+  "earnings_received",
+];
+
 export async function GET(request: NextRequest) {
   try {
     const authResult = await requireAuth();
