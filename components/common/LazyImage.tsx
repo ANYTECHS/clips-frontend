@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Image, { type ImageProps } from "next/image";
 import { ImageOff } from "lucide-react";
 import { useIntersectionObserver } from "@/app/hooks/useIntersectionObserver";
-import { DEFAULT_BLUR_PLACEHOLDER } from "@/app/lib/imageUtils";
+import { DEFAULT_BLUR_PLACEHOLDER, getBlurDataURL } from "@/app/lib/imageUtils";
 import { aspectRatioClass, type AspectRatioKey, ASPECT_RATIOS } from "@/app/lib/layoutShiftPrevention";
 
 export interface LazyImageProps extends Omit<ImageProps, "onLoad" | "onError" | "placeholder" | "blurDataURL"> {
@@ -46,6 +46,19 @@ export default function LazyImage({
 }: LazyImageProps) {
   const { ref, isIntersecting } = useIntersectionObserver<HTMLDivElement>({ rootMargin, once: true });
   const [status, setStatus] = useState<"pending" | "loaded" | "error">("pending");
+  const [blurDataURL, setBlurDataURL] = useState(DEFAULT_BLUR_PLACEHOLDER);
+  const src = typeof imageProps.src === "string" ? imageProps.src : null;
+
+  useEffect(() => {
+    if (!isIntersecting || !src) return;
+    let active = true;
+    void getBlurDataURL(src).then((dataUrl) => {
+      if (active) setBlurDataURL(dataUrl);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isIntersecting, src]);
 
   // Calculate aspect ratio class for CLS prevention
   const aspectRatioValue = typeof aspectRatio === "string" 
@@ -63,7 +76,7 @@ export default function LazyImage({
           {...imageProps}
           alt={alt}
           placeholder="blur"
-          blurDataURL={DEFAULT_BLUR_PLACEHOLDER}
+          blurDataURL={blurDataURL}
           className={`transition-opacity duration-300 ${status === "loaded" ? "opacity-100" : "opacity-0"} ${className ?? ""}`}
           onLoad={() => {
             setStatus("loaded");

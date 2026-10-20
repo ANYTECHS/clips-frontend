@@ -7,6 +7,8 @@ import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { sanitize } from "@/app/lib/sanitize";
 import { selectUserName,useUserStore } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
+import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
+import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
 interface NotificationItem {
   id: string;
@@ -32,6 +34,13 @@ const DashboardHeader = memo(function DashboardHeader({
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
+  const notificationListRef = useRef<HTMLDivElement>(null);
+  const notificationVirtualizer = useSimpleVirtualizer({
+    count: notifications.length,
+    estimateSize: VIRTUALIZATION_CONFIG.rowHeight.notifications,
+    overscan: VIRTUALIZATION_CONFIG.overscanItems,
+    getScrollElement: () => notificationListRef.current,
+  });
 
   const fetchNotifications = useCallback(async () => {
     try {
@@ -166,34 +175,43 @@ const DashboardHeader = memo(function DashboardHeader({
                 )}
               </div>
 
-              <div className="max-h-80 overflow-y-auto divide-y divide-white/5">
-                {notifications.length === 0 ? (
-                  <div className="p-6 text-center text-xs text-zinc-400">
-                    {t("notifications.no_notifications")}
+              {notifications.length === 0 ? (
+                <div className="p-6 text-center text-xs text-zinc-400">
+                  {t("notifications.no_notifications")}
+                </div>
+              ) : (
+                <div ref={notificationListRef} className="h-80 overflow-y-auto divide-y divide-white/5">
+                  <div style={{ height: notificationVirtualizer.getTotalSize(), position: "relative" }} role="list">
+                    {notificationVirtualizer.getVirtualItems().map(({ index, start, size }) => {
+                      const item = notifications[index];
+                      if (!item) return null;
+                      return (
+                        <div
+                          key={item.id}
+                          role="listitem"
+                          style={{ position: "absolute", top: start, left: 0, right: 0, height: size }}
+                          className="p-4 hover:bg-white/5 transition-colors flex items-start justify-between gap-3 overflow-hidden"
+                        >
+                          <div className="min-w-0 space-y-1 text-left">
+                            <p className="truncate text-xs font-bold text-white">{sanitize(item.title)}</p>
+                            <p className="line-clamp-2 text-[11px] text-zinc-400 leading-snug">
+                              {sanitize(item.message)}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleMarkAsRead(item.id)}
+                            aria-label={t("notifications.mark_as_read")}
+                            className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-brand transition-colors shrink-0"
+                          >
+                            <Check className="w-4 h-4" />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : (
-                  notifications.map((item) => (
-                    <div
-                      key={item.id}
-                      className="p-4 hover:bg-white/5 transition-colors flex items-start justify-between gap-3"
-                    >
-                      <div className="space-y-1 text-left">
-                        <p className="text-xs font-bold text-white">{sanitize(item.title)}</p>
-                        <p className="text-[11px] text-zinc-400 leading-snug">
-                          {sanitize(item.message)}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleMarkAsRead(item.id)}
-                        aria-label={t("notifications.mark_as_read")}
-                        className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-brand transition-colors shrink-0"
-                      >
-                        <Check className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))
-                )}
+                </div>
+              )}
               </div>
             </div>
           )}

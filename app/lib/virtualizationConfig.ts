@@ -11,6 +11,15 @@ export const VIRTUALIZATION_CONFIG = {
    * flash of empty space before the next row mounts.
    */
   overscanPx: 600,
+  /** Number of extra rows mounted before and after the visible range. */
+  overscanItems: 5,
   /** Minimum item count before a list is considered "heavy" enough to virtualize. */
-  virtualizeThreshold: 30,
+  virtualizeThreshold: 100,
+  /** Stable row estimates; list content should clamp or truncate to these bounds. */
+  rowHeight: {
+    clips: 400,
+    transactions: 112,
+    activity: 92,
+    notifications: 88,
+  },
 } as const;

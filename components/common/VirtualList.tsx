@@ -1,7 +1,7 @@
 "use client";
 
-import React from "react";
-import { useWindowVirtualizer } from "@/app/hooks/useWindowVirtualizer";
+import React, { useRef } from "react";
+import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
 import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
 export interface VirtualListProps<T> {
@@ -46,12 +46,13 @@ export default function VirtualList<T>({
   className,
   ariaRole,
 }: VirtualListProps<T>) {
-  const { containerRef, totalHeight, virtualRows } = useWindowVirtualizer({
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rowStride = rowHeight + gap;
+  const { getTotalSize, getVirtualItems } = useSimpleVirtualizer({
     count: items.length,
-    columns: 1,
-    rowHeight,
-    gap,
-    overscanPx,
+    estimateSize: rowStride,
+    overscan: Math.ceil(overscanPx / rowStride),
+    containerRef,
   });
 
   return (
@@ -59,15 +60,15 @@ export default function VirtualList<T>({
       ref={containerRef}
       className={className}
       role={ariaRole}
-      style={{ position: "relative", height: totalHeight }}
+      style={{ position: "relative", height: Math.max(0, getTotalSize() - gap) }}
     >
-      {virtualRows.map(({ rowIndex, top }) => {
-        const item = items[rowIndex];
+      {getVirtualItems().map(({ index, start }) => {
+        const item = items[index];
         if (item === undefined) return null;
 
         return (
-          <div key={itemKey(item, rowIndex)} style={{ position: "absolute", top, left: 0, right: 0, height: rowHeight }}>
-            {renderItem(item, rowIndex)}
+          <div key={itemKey(item, index)} style={{ position: "absolute", top: start, left: 0, right: 0, height: rowHeight }}>
+            {renderItem(item, index)}
           </div>
         );
       })}
