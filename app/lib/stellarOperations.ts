@@ -234,6 +234,20 @@ export function createAddSignerOp(params: {
   });
 }
 
+export function createRemoveSignerOp(params: {
+  ed25519PublicKey: string;
+  source?: string;
+}): SetOptionsOperation {
+  return createSetOptionsOp({
+    signer: {
+      ed25519PublicKey: params.ed25519PublicKey,
+      weight: 0,
+    },
+    source: params.source,
+  });
+}
+
+
 export function createMultisigThresholdsOp(params: {
   lowThreshold: number;
   medThreshold: number;

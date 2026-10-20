@@ -13,6 +13,7 @@ import { createAddSignerOp, createMultisigThresholdsOp } from "@/app/lib/stellar
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useWalletSelector } from "@/components/wallet/WalletProvider";
 import { useToast } from "@/hooks/useToast";
+import MultisigManager from "@/components/wallet/MultisigManager";
 
 export default function MultisigPage() {
   const { user } = useAuth();
@@ -376,6 +377,10 @@ export default function MultisigPage() {
           </div>
         </div>
       )}
+
+      {/* Advanced Multisig Management (Signers, Proposals & Approvals) */}
+      <MultisigManager sourceAccount={sourcePublicKey || address || ""} />
     </div>
   );
 }
+
