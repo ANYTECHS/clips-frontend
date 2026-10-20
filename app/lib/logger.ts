@@ -10,6 +10,7 @@ interface LogEntry {
   timestamp: string;
   service: string;
   traceId?: string;
+  correlationId?: string;
   [key: string]: any;
 }
 
@@ -32,12 +33,16 @@ function serializeArgs(args: any[]): string {
 }
 
 function createLogEntry(level: LogLevel, args: any[]): LogEntry {
+  const metadataObj = args.find((a) => a && typeof a === "object" && !(a instanceof Error));
+  const correlationId = metadataObj?.correlationId ?? metadataObj?.requestId;
+
   const entry: LogEntry = {
     level,
     message: serializeArgs(args),
     timestamp: new Date().toISOString(),
     service: "clipcash-frontend",
     traceId: getTraceId(),
+    correlationId,
   };
 
   const error = args.find((arg) => arg instanceof Error);

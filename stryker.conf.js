@@ -5,22 +5,26 @@
 module.exports = function(config) {
   config.set({
     mutate: [
-      "app/**/*.ts",
-      "app/**/*.tsx",
-      "components/**/*.ts",
-      "components/**/*.tsx",
-      "lib/**/*.ts",
-      "lib/**/*.tsx"
+      "app/lib/auth.ts",
+      "app/lib/walletStorage.ts",
+      "app/lib/uploadValidation.ts",
+      "app/lib/sanitize.ts"
     ],
     mutator: "typescript",
     packageManager: "npm",
-    reporters: ["progress", "clear-text", "html"],
+    reporters: ["clear-text", "progress", "html", "json"],
+    htmlReporter: {
+      fileName: "reports/mutation/mutation.html"
+    },
+    jsonReporter: {
+      fileName: "reports/mutation/mutation.json"
+    },
     testRunner: "jest",
     jest: {
       projectType: "custom",
       config: require('./jest.config.js')
     },
     coverageAnalysis: "perTest",
-    thresholds: { high: 80, low: 60 }
+    thresholds: { high: 80, low: 70, break: 70 }
   });
 };

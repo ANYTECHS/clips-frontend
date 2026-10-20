@@ -152,7 +152,7 @@ export function canSendNotification(): boolean {
 /**
  * Send a browser notification
  */
-export function sendNotification(
+export function sendBrowserNotification(
   title: string,
   options?: NotificationOptions & { onClickPath?: string }
 ): Notification | null {
@@ -178,7 +178,7 @@ export function sendNotification(
  * Notify user that clips are ready
  */
 export function notifyClipsReady(momentsFound: number, onClickPath: string = "/projects") {
-  return sendNotification("Your clips are ready!", {
+  return sendBrowserNotification("Your clips are ready!", {
     body: `Found ${momentsFound} viral moment${momentsFound !== 1 ? "s" : ""} from your video`,
     tag: "processing-complete",
     onClickPath,
@@ -202,3 +202,5 @@ export async function registerNotificationServiceWorker() {
     return null;
   }
 }
+
+export { sendNotification } from "./notificationDelivery";

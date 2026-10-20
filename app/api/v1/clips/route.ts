@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { authenticateApiKey, checkScope, logApiUsage } from "@/app/lib/apiAuth";
 import { logger } from "@/app/lib/logger";
 import { prisma } from "@/app/lib/prisma";
+import { versionedRoute } from "@/app/api/versioning";
 
-export async function GET(req: NextRequest) {
+async function getClips(req: NextRequest) {
   const startTime = Date.now();
 
   const auth = await authenticateApiKey(req);
@@ -42,7 +43,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-export async function POST(req: NextRequest) {
+async function createClip(req: NextRequest) {
   const startTime = Date.now();
 
   const auth = await authenticateApiKey(req);
@@ -86,3 +87,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create clip" }, { status: 500 });
   }
 }
+
+export const GET = versionedRoute("v1", getClips);
+export const POST = versionedRoute("v1", createClip);

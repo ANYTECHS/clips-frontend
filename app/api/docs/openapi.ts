@@ -766,4 +766,95 @@ export const openApiSpec = {
   },
 } as const;
 
+const versionedV1Paths = {
+  "/upload": openApiSpec.paths["/upload"],
+  "/clips": {
+    get: {
+      tags: ["clips"],
+      summary: "List clips for the authenticated API key",
+      operationId: "listClipsV1",
+      security: [{ bearerSecret: [] }],
+      responses: {
+        "200": { description: "Clip list" },
+        "401": { $ref: "#/components/responses/Unauthorized" },
+        "403": { $ref: "#/components/responses/Forbidden" },
+      },
+    },
+    post: {
+      tags: ["clips"],
+      summary: "Create a clip record",
+      operationId: "createClipV1",
+      security: [{ bearerSecret: [] }],
+      responses: {
+        "201": { description: "Clip created" },
+        "401": { $ref: "#/components/responses/Unauthorized" },
+        "403": { $ref: "#/components/responses/Forbidden" },
+      },
+    },
+  },
+  "/jobs/{id}": {
+    get: {
+      tags: ["jobs"],
+      summary: "Get processing job status",
+      operationId: "getJobV1",
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: {
+        "200": { description: "Current processing status" },
+        "401": { $ref: "#/components/responses/Unauthorized" },
+        "404": { $ref: "#/components/responses/NotFound" },
+      },
+    },
+    post: {
+      tags: ["jobs"],
+      summary: "Restart a processing job",
+      operationId: "restartJobV1",
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: {
+        "200": { description: "Job restarted" },
+        "401": { $ref: "#/components/responses/Unauthorized" },
+        "404": { $ref: "#/components/responses/NotFound" },
+      },
+    },
+  },
+  "/jobs/{id}/stream": {
+    get: {
+      tags: ["jobs"],
+      summary: "Stream processing job updates",
+      operationId: "streamJobV1",
+      parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
+      responses: {
+        "200": {
+          description: "Server-sent event stream of job status updates",
+          content: { "text/event-stream": { schema: { type: "string" } } },
+        },
+        "401": { $ref: "#/components/responses/Unauthorized" },
+      },
+    },
+  },
+} as const;
+
+/** Version-specific OpenAPI documents are served with `?version=v1|v2`. */
+export const versionedOpenApiSpecs = {
+  v1: {
+    ...openApiSpec,
+    info: {
+      ...openApiSpec.info,
+      version: "1.0.0",
+      description: `${openApiSpec.info.description} This document describes the stable v1 URL-prefix API.`,
+    },
+    servers: [{ url: "/api/v1", description: "ClipCash API v1" }],
+    paths: versionedV1Paths,
+  },
+  v2: {
+    ...openApiSpec,
+    info: {
+      ...openApiSpec.info,
+      version: "2.0.0",
+      description: `${openApiSpec.info.description} No v2 operations are published yet.`,
+    },
+    servers: [{ url: "/api/v2", description: "ClipCash API v2" }],
+    paths: {},
+  },
+} as const;
+
 export type OpenApiSpec = typeof openApiSpec;

@@ -1,0 +1,52 @@
+name: Mutation Testing
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mutation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CI: true
+      GOOGLE_CLIENT_ID: ci-google-client-id
+      GOOGLE_CLIENT_SECRET: ci-google-client-secret
+      APPLE_ID: ci.apple.service.id
+      APPLE_TEAM_ID: ci-apple-team-id
+      APPLE_KEY_ID: ci-apple-key-id
+      APPLE_PRIVATE_KEY: ci-apple-private-key
+      NEXTAUTH_SECRET: ci-nextauth-secret
+      NEXTAUTH_URL: http://localhost:3000
+      NEXT_PUBLIC_SENTRY_DSN: https://examplePublicKey@o0.ingest.sentry.io/0
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install dependencies
+        run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
+      - name: Run targeted mutation tests
+        run: npm run mutation
+      - name: Record measured mutation score
+        if: always() && hashFiles('reports/mutation/mutation.json') != ''
+        run: node scripts/record-mutation-baseline.js
+      - name: Upload Stryker report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mutation-report-${{ github.run_id }}
+          path: |
+            reports/mutation/
+            mutation-baseline.json
+          if-no-files-found: warn
+          retention-days: 90

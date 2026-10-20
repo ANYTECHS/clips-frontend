@@ -234,6 +234,20 @@ export function createAddSignerOp(params: {
   });
 }
 
+export function createRemoveSignerOp(params: {
+  ed25519PublicKey: string;
+  source?: string;
+}): SetOptionsOperation {
+  return createSetOptionsOp({
+    signer: {
+      ed25519PublicKey: params.ed25519PublicKey,
+      weight: 0,
+    },
+    source: params.source,
+  });
+}
+
+
 export function createMultisigThresholdsOp(params: {
   lowThreshold: number;
   medThreshold: number;
@@ -399,7 +413,7 @@ export function validateOperations(operations: StellarOperation[]): void {
         if (!op.destination) {
           throw new BatchValidationError(i, "payment requires a destination address.");
         }
-        if (!op.amount || isNaN(Number(op.amount)) || Number(op.amount) <= 0) {
+        if (!op.amount || !Number.isFinite(Number(op.amount)) || Number(op.amount) <= 0) {
           throw new BatchValidationError(i, "payment requires a positive numeric amount.");
         }
         if (op.assetCode && !op.assetIssuer) {
@@ -421,7 +435,7 @@ export function validateOperations(operations: StellarOperation[]): void {
 
       case "manage_sell_offer":
       case "manage_buy_offer":
-        if (!op.price || isNaN(Number(op.price)) || Number(op.price) <= 0) {
+        if (!op.price || !Number.isFinite(Number(op.price)) || Number(op.price) <= 0) {
           throw new BatchValidationError(i, `${op.type} requires a positive numeric price.`);
         }
         break;

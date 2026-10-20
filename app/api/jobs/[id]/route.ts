@@ -5,6 +5,7 @@ import { checkCsrf } from "@/app/lib/csrf";
 import { dispatchJob } from "@/app/lib/aiBackend";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
+import { deprecatedAlias } from "@/app/api/versioning";
 
 /** Accepts UUID (with or without hyphens) or alphanumeric slugs up to 64 chars. */
 const JOB_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -18,7 +19,7 @@ function validateJobId(id: string): NextResponse | null {
 
 // ─── GET /api/jobs/[id] ───────────────────────────────────────────────────────
 
-export async function GET(
+async function getJob(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -48,7 +49,7 @@ export async function GET(
 // Restart a job: resets its state to "queued" and re-dispatches it to the AI
 // backend. The job must already exist (i.e. the file was already uploaded).
 
-export async function POST(
+async function restartJob(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -113,3 +114,6 @@ function buildCallbackUrl(request: NextRequest, jobId: string): string {
     `${request.nextUrl.protocol}//${request.nextUrl.host}`;
   return `${base}/api/jobs/${jobId}/callback`;
 }
+
+export const GET = deprecatedAlias(getJob);
+export const POST = deprecatedAlias(restartJob);

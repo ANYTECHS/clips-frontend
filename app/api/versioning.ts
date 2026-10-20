@@ -145,6 +145,10 @@ export function addVersionHeaders(
 
   response.headers.set("API-Version", version);
   response.headers.set("X-API-Latest", CURRENT_VERSION);
+  response.headers.set(
+    "Link",
+    `</api/docs/openapi.json?version=${version}>; rel="describedby"; type="application/json"`
+  );
 
   if (meta && meta.status === "deprecated") {
     response.headers.set("Deprecation", "true");
@@ -213,4 +217,83 @@ export async function withVersioning(
 
   const response = await handler(version);
   return addVersionHeaders(response, version);
+}
+
+type ApiRouteHandler<Args extends unknown[]> = (
+  request: NextRequest,
+  ...args: Args
+) => Response | Promise<Response>;
+
+function toNextResponse(response: Response): NextResponse {
+  if (response instanceof NextResponse) return response;
+  return new NextResponse(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: response.headers,
+  });
+}
+
+/** Wrap a route handler with version negotiation and response metadata. */
+export function versionedRoute<Args extends unknown[]>(
+  version: ApiVersion,
+  handler: ApiRouteHandler<Args>,
+): (request: NextRequest, ...args: Args) => Promise<NextResponse> {
+  return async (request, ...args) => {
+    const negotiation = negotiateVersion(request);
+    if (negotiation.status === "unsupported") {
+      return rejectUnsupportedVersion(negotiation);
+    }
+    if (negotiation.version !== version) {
+      return NextResponse.json(
+        {
+          data: null,
+          error: `Requested API version '${negotiation.version}' does not match route version '${version}'.`,
+          code: "API_VERSION_MISMATCH",
+        },
+        { status: 400, headers: { "API-Version": version, "X-API-Latest": CURRENT_VERSION } },
+      );
+    }
+
+    const retired = rejectRetiredVersion(version);
+    if (retired) return retired;
+
+    const response = toNextResponse(await handler(request, ...args));
+    response.headers.delete("Deprecation");
+    response.headers.delete("Deprecation-Notice");
+    response.headers.delete("Sunset");
+    return addVersionHeaders(response, version);
+  };
+}
+
+/** Add the published v1 migration headers to an unversioned compatibility route. */
+export function deprecatedAlias<Args extends unknown[]>(
+  handler: ApiRouteHandler<Args>,
+): (request: NextRequest, ...args: Args) => Promise<NextResponse> {
+  return async (request, ...args) => {
+    const negotiation = negotiateVersion(request);
+    if (negotiation.status === "unsupported") {
+      return rejectUnsupportedVersion(negotiation);
+    }
+    if (negotiation.version !== "v1") {
+      return NextResponse.json(
+        {
+          data: null,
+          error: "Unversioned routes only support v1. Use the corresponding versioned URL.",
+          code: "API_VERSION_MISMATCH",
+        },
+        { status: 400, headers: { "API-Version": "v1", "X-API-Latest": CURRENT_VERSION } },
+      );
+    }
+
+    const response = await withVersioning(request, async () =>
+      toNextResponse(await handler(request, ...args)),
+    );
+    response.headers.set("Deprecation", "true");
+    response.headers.set("Sunset", "2027-10-16T00:00:00.000Z");
+    response.headers.set(
+      "Link",
+      '</api/docs/openapi.json?version=v1>; rel="successor-version"; type="application/json"',
+    );
+    return response;
+  };
 }
