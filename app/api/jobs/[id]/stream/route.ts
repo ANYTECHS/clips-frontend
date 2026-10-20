@@ -17,6 +17,7 @@ import { jobStore } from "../../shared/jobStore";
 import { requireJobOwner } from "../../shared/authGuard";
 import { logger } from "@/app/lib/logger";
 import type { Job } from "../../shared/jobStore";
+import { deprecatedAlias } from "@/app/api/versioning";
 
 const POLL_INTERVAL_MS = 1_000;
 /**
@@ -25,7 +26,7 @@ const POLL_INTERVAL_MS = 1_000;
  */
 const MAX_STORE_ERRORS = 5;
 
-export async function GET(
+async function getJobStream(
   request: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
@@ -168,3 +169,5 @@ function sendErrorEvent(
   });
   controller.enqueue(new TextEncoder().encode(`data: ${payload}\n\n`));
 }
+
+export const GET = deprecatedAlias(getJobStream);

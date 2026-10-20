@@ -29,7 +29,10 @@ import {
   GetObjectCommand,
   ListObjectsV2Command,
 } from "@aws-sdk/client-s3";
+import type { PutObjectCommandInput } from "@aws-sdk/client-s3";
+import { getSignedUrl as presignS3Request } from "@aws-sdk/s3-request-presigner";
 import { randomUUID } from "crypto";
+import { Readable } from "node:stream";
 import { withRetry } from "./retryUtils";
 import { getCircuitBreaker } from "./circuitBreaker";
 import { logger } from "./logger";
@@ -82,16 +85,44 @@ function requireEnv(name: string): string {
  *
  * @returns An authenticated S3Client service instance.
  */
-function buildS3Client(): S3Client {
-  const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
+export type StorageProviderName = "s3" | "r2" | "gcs";
+
+function getProviderEndpoint(provider: StorageProviderName): string | undefined {
+  return (
+    process.env.CLOUD_STORAGE_ENDPOINT ??
+    (provider === "r2" && process.env.CLOUDFLARE_ACCOUNT_ID
+      ? `https://${process.env.CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com`
+      : provider === "gcs"
+        ? "https://storage.googleapis.com"
+        : undefined)
+  );
+}
+
+export function createStorageProvider(
+  provider: StorageProviderName = (process.env.CLOUD_STORAGE_PROVIDER ?? "s3") as StorageProviderName,
+): S3Client {
+  if (!["s3", "r2", "gcs"].includes(provider)) {
+    throw new Error(`Unsupported cloud storage provider: ${provider}`);
+  }
+  const endpoint = getProviderEndpoint(provider);
+  if (provider === "r2" && !endpoint) {
+    throw new Error("CLOUD_STORAGE_ENDPOINT or CLOUDFLARE_ACCOUNT_ID is required for R2");
+  }
   return new S3Client({
-    region: process.env.CLOUD_STORAGE_REGION ?? "us-east-1",
+    region:
+      provider === "r2" || provider === "gcs"
+        ? "auto"
+        : process.env.CLOUD_STORAGE_REGION ?? "us-east-1",
     ...(endpoint ? { endpoint, forcePathStyle: true } : {}),
     credentials: {
       accessKeyId: requireEnv("AWS_ACCESS_KEY_ID"),
       secretAccessKey: requireEnv("AWS_SECRET_ACCESS_KEY"),
     },
   });
+}
+
+function buildS3Client(): S3Client {
+  return createStorageProvider();
 }
 
 const BUCKET = () => requireEnv("CLOUD_STORAGE_BUCKET");
@@ -121,7 +152,8 @@ export function buildExportObjectKey(
  */
 export function buildObjectUrl(objectKey: string): string {
   const bucket = process.env.CLOUD_STORAGE_BUCKET;
-  const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
+  const provider = (process.env.CLOUD_STORAGE_PROVIDER ?? "s3") as StorageProviderName;
+  const endpoint = getProviderEndpoint(provider);
   const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
 
   if (!bucket) {
@@ -132,6 +164,9 @@ export function buildObjectUrl(objectKey: string): string {
     return `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`;
   }
 
+  if (provider === "gcs") {
+    return `https://storage.googleapis.com/${bucket}/${objectKey}`;
+  }
   return `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
 }
 
@@ -309,6 +344,56 @@ async function uploadMultipart(
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+/** Upload an object under an explicit key, consistently across configured providers. */
+export async function upload(
+  key: string,
+  body: PutObjectCommandInput["Body"],
+  contentType: string,
+): Promise<void> {
+  const client = createStorageProvider();
+  await client.send(
+    new PutObjectCommand({
+      Bucket: BUCKET(),
+      Key: key,
+      Body: body,
+      ContentType: contentType,
+      ...(Buffer.isBuffer(body) || body instanceof Uint8Array
+        ? { ContentLength: body.length }
+        : {}),
+    }),
+  );
+}
+
+/** Download an object as a Node readable stream. */
+export async function download(key: string): Promise<Readable> {
+  const response = await createStorageProvider().send(
+    new GetObjectCommand({ Bucket: BUCKET(), Key: key }),
+  );
+  if (!response.Body) throw new Error(`Storage object not found: ${key}`);
+  return response.Body as Readable;
+}
+
+/** Delete an object, throwing when the provider reports a failure. */
+export async function deleteStorageObject(key: string): Promise<void> {
+  await createStorageProvider().send(
+    new DeleteObjectCommand({ Bucket: BUCKET(), Key: key }),
+  );
+}
+
+export { deleteStorageObject as delete };
+
+/** Create a short-lived download URL, valid for at most seven days. */
+export async function getSignedUrl(key: string, expiresInSeconds: number): Promise<string> {
+  if (!Number.isInteger(expiresInSeconds) || expiresInSeconds < 1 || expiresInSeconds > 604800) {
+    throw new RangeError("expiresInSeconds must be an integer between 1 and 604800");
+  }
+  return presignS3Request(
+    createStorageProvider(),
+    new GetObjectCommand({ Bucket: BUCKET(), Key: key }),
+    { expiresIn: expiresInSeconds },
+  );
+}
+
 /**
  * Upload a file buffer to cloud storage.
  *
@@ -341,11 +426,7 @@ export async function uploadFile(
       await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
     }
 
-    const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
-    const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
-    const url = endpoint
-      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`
-      : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+    const url = buildObjectUrl(objectKey);
 
     return { jobId, objectKey, url, filename, size: buffer.length, contentType };
   });
@@ -427,11 +508,7 @@ export async function moveFromQuarantine(jobId: string, filename: string): Promi
       { maxAttempts: 3, baseDelayMs: 300, shouldAbort: isNonRetryableS3Error },
     );
 
-    const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
-    const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
-    const url = endpoint
-      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${finalKey}`
-      : `https://${bucket}.s3.${region}.amazonaws.com/${finalKey}`;
+    const url = buildObjectUrl(finalKey);
 
     return {
       jobId,
@@ -503,11 +580,7 @@ export async function uploadTransformResult(
       await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
     }
 
-    const endpoint = process.env.CLOUD_STORAGE_ENDPOINT;
-    const region = process.env.CLOUD_STORAGE_REGION ?? "us-east-1";
-    const url = endpoint
-      ? `${endpoint.replace(/\/$/, "")}/${bucket}/${objectKey}`
-      : `https://${bucket}.s3.${region}.amazonaws.com/${objectKey}`;
+    const url = buildObjectUrl(objectKey);
 
     return {
       jobId,

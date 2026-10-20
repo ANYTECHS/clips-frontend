@@ -9,13 +9,25 @@
  *   - Any OpenAPI-compatible tooling (Postman, Insomnia, code generators, etc.)
  */
 
-import { NextResponse } from "next/server";
-import { openApiSpec } from "../openapi";
+import { NextRequest, NextResponse } from "next/server";
+import { openApiSpec, versionedOpenApiSpecs } from "../openapi";
 
-export const dynamic = "force-static";
+export const dynamic = "force-dynamic";
 
-export async function GET(): Promise<NextResponse> {
-  return NextResponse.json(openApiSpec, {
+export async function GET(request: NextRequest): Promise<NextResponse> {
+  const requestedVersion = request.nextUrl.searchParams.get("version");
+  const spec = requestedVersion
+    ? versionedOpenApiSpecs[requestedVersion as keyof typeof versionedOpenApiSpecs]
+    : openApiSpec;
+
+  if (!spec) {
+    return NextResponse.json(
+      { error: "Unsupported OpenAPI version. Choose v1 or v2." },
+      { status: 400 },
+    );
+  }
+
+  return NextResponse.json(spec, {
     headers: {
       "Access-Control-Allow-Origin": "*",
       "Cache-Control": "public, max-age=300, stale-while-revalidate=60",

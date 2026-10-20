@@ -34,10 +34,11 @@ import {
   storePermission,
   syncNotificationPermission,
   watchNotificationPermission,
-} from "@/app/lib/notifications";
+} from "@/app/lib/browserNotifications";
 import { useAuth } from "@/components/auth/AuthProvider";
 import LocaleSwitcher from "@/components/LocaleSwitcher";
 import MonthlyReportSetting from "@/components/settings/MonthlyReportSetting";
+import { NotificationChannelSettings } from "@/components/settings/NotificationChannelSettings";
 import PrivacySettings from "@/components/settings/PrivacySettings";
 import { useTheme } from "@/components/theme-provider";
 import Skeleton from "@/components/ui/Skeleton";
@@ -510,6 +511,8 @@ export default function SettingsPage() {
 
             {/* Monthly earnings report email — Issue #820 */}
             <MonthlyReportSetting />
+
+            <NotificationChannelSettings />
 
             <PrivacySettings />
 
