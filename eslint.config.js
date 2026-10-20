@@ -13,5 +13,6 @@ module.exports = {
     // Disallow nested ternary expressions to keep control flow readable.
     // Nested ternaries should be rewritten as if/else statements.
     'no-nested-ternary': 'error',
+    'no-explicit-any':'error',
   },
 };
