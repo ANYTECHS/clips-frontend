@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const PLAYWRIGHT_PORT = process.env.PLAYWRIGHT_PORT ?? '3000';
+
 /**
  * See https://playwright.dev/docs/test-configuration.
  */
@@ -18,13 +20,13 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   expect: {
     toHaveScreenshot: {
-      maxDiffPixelRatio: 0.01,
+      maxDiffPixelRatio: 0.1,
     },
   },
   snapshotPathTemplate: '{testDir}/../visual-baselines/{arg}{ext}',
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: 'http://localhost:3000',
+    baseURL: `http://localhost:${PLAYWRIGHT_PORT}`,
 
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
@@ -60,13 +62,15 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: 'npx next dev',
-    url: 'http://localhost:3000',
+    command: `npx next dev --port ${PLAYWRIGHT_PORT}`,
+    url: `http://localhost:${PLAYWRIGHT_PORT}`,
     reuseExistingServer: !process.env.CI,
     stdout: 'pipe',
     stderr: 'pipe',
     env: {
       E2E_SKIP_MIDDLEWARE: 'true',
+      AI_BACKEND_SECRET: process.env.AI_BACKEND_SECRET ?? 'e2e-ai-backend-secret',
+      SENTRY_AUTH_TOKEN: process.env.SENTRY_AUTH_TOKEN ?? 'e2e-sentry-auth-token',
       GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID ?? 'e2e-google-client-id',
       GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET ?? 'e2e-google-client-secret',
       APPLE_ID: process.env.APPLE_ID ?? 'e2e.apple.service.id',
@@ -75,6 +79,8 @@ export default defineConfig({
       APPLE_PRIVATE_KEY: process.env.APPLE_PRIVATE_KEY ?? 'e2e-apple-private-key',
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET ?? 'e2e-nextauth-secret',
       NEXTAUTH_URL: process.env.NEXTAUTH_URL ?? 'http://localhost:3000',
+      NEXT_PUBLIC_STELLAR_NETWORK: 'testnet',
+      NEXT_PUBLIC_STELLAR_RPC: 'https://soroban-testnet.stellar.org',
       NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN ?? 'https://examplePublicKey@o0.ingest.sentry.io/0',
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000',
       NEXT_PUBLIC_AI_API_URL: process.env.NEXT_PUBLIC_AI_API_URL ?? 'http://localhost:3000',

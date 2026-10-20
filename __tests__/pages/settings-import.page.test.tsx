@@ -33,10 +33,14 @@ jest.mock("@/components/SocialRecoveryConfig", () => ({
   default: () => null,
 }));
 
-jest.mock("@/app/lib/notifications", () => ({
+jest.mock("@/app/lib/browserNotifications", () => ({
   getStoredPermission: () => "default",
   requestNotificationPermission: jest.fn(),
   storePermission: jest.fn(),
+}));
+
+jest.mock("@/components/settings/NotificationChannelSettings", () => ({
+  NotificationChannelSettings: () => null,
 }));
 
 describe("SettingsPage import key form", () => {

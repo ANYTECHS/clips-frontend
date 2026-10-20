@@ -48,6 +48,14 @@
  * └─────────────────────────────────────────┴────────┴──────────┘
  */
 
+export interface EndpointRateLimitTiers {
+  public?: number;
+  authenticated?: number;
+  free?: number;
+  pro?: number;
+  enterprise?: number;
+}
+
 export interface EndpointRateLimit {
   /** Maximum requests per window per client. */
   limit: number;
@@ -58,6 +66,10 @@ export interface EndpointRateLimit {
    * Not sent in responses.
    */
   description?: string;
+  /**
+   * Tier-specific request limits (free vs pro, public vs authenticated).
+   */
+  tiers?: EndpointRateLimitTiers;
 }
 
 /** Default limit applied to any endpoint not explicitly registered. */
@@ -65,6 +77,13 @@ export const DEFAULT_RATE_LIMIT: EndpointRateLimit = {
   limit: 60,
   windowMs: 60_000,
   description: "Default: 60 req/min",
+  tiers: {
+    public: 30,
+    authenticated: 60,
+    free: 60,
+    pro: 180,
+    enterprise: 600,
+  },
 };
 
 /**
@@ -77,6 +96,13 @@ const ENDPOINT_LIMITS: Record<string, EndpointRateLimit> = {
     limit: 20,
     windowMs: 60_000,
     description: "20 uploads/min — prevents storage abuse",
+    tiers: {
+      public: 5,
+      authenticated: 20,
+      free: 20,
+      pro: 60,
+      enterprise: 200,
+    },
   },
 
   // ── Jobs ───────────────────────────────────────────────────────────────────

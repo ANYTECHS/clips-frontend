@@ -139,6 +139,25 @@ export function reserveHeight(height: string | number): React.CSSProperties {
 }
 
 /**
+ * Reserve space for an element by applying min-height and min-width.
+ * This prevents layout shift when the element's content loads.
+ *
+ * @param element - The DOM element to apply space reservation to
+ * @param width - Minimum width in pixels or CSS value
+ * @param height - Minimum height in pixels or CSS value
+ */
+export function reserveSpace(
+  element: HTMLElement,
+  width: number | string,
+  height: number | string
+): void {
+  if (!element) return;
+
+  element.style.minWidth = typeof width === "number" ? `${width}px` : width;
+  element.style.minHeight = typeof height === "number" ? `${height}px` : height;
+}
+
+/**
  * Reserve space for grid items with known aspect ratio and column count.
  * Prevents shift during initial grid load.
  */

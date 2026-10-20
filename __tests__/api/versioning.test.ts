@@ -12,10 +12,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 import {
   DEFAULT_VERSION,
+  deprecatedAlias,
   negotiateVersion,
   SUPPORTED_VERSIONS,
+  versionedRoute,
   withVersioning,
 } from "@/app/api/versioning";
+import { versionedOpenApiSpecs } from "@/app/api/docs/openapi";
 
 describe("API Version Negotiation (#984)", () => {
   describe("negotiateVersion", () => {
@@ -113,6 +116,36 @@ describe("API Version Negotiation (#984)", () => {
       const json = await res.json();
       expect(json.version).toBe("v1");
       expect(res.headers.get("API-Version")).toBe("v1");
+    });
+  });
+
+  describe("route wrappers", () => {
+    it("adds v1 metadata and a documentation link to versioned routes", async () => {
+      const route = versionedRoute("v1", async () => NextResponse.json({ data: "v1" }));
+      const response = await route(new NextRequest("http://localhost:3000/api/v1/upload"));
+
+      expect(response.headers.get("API-Version")).toBe("v1");
+      expect(response.headers.get("Link")).toContain("openapi.json?version=v1");
+      expect(response.headers.get("Deprecation")).toBeNull();
+    });
+
+    it("adds an ISO sunset and v1 documentation link to legacy aliases", async () => {
+      const route = deprecatedAlias(async () => NextResponse.json({ data: "legacy" }));
+      const response = await route(new NextRequest("http://localhost:3000/api/upload"));
+
+      expect(response.headers.get("API-Version")).toBe("v1");
+      expect(response.headers.get("Deprecation")).toBe("true");
+      expect(Number.isNaN(Date.parse(response.headers.get("Sunset") ?? ""))).toBe(false);
+      expect(response.headers.get("Link")).toContain("openapi.json?version=v1");
+    });
+
+    it("publishes separate OpenAPI documents for v1 and v2", () => {
+      expect(versionedOpenApiSpecs.v1.servers[0].url).toBe("/api/v1");
+      expect(Object.keys(versionedOpenApiSpecs.v1.paths)).toEqual(
+        expect.arrayContaining(["/upload", "/jobs/{id}", "/jobs/{id}/stream"]),
+      );
+      expect(versionedOpenApiSpecs.v2.servers[0].url).toBe("/api/v2");
+      expect(Object.keys(versionedOpenApiSpecs.v2.paths)).toHaveLength(0);
     });
   });
 });

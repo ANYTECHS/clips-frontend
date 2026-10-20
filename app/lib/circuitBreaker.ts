@@ -1,34 +1,7 @@
-/**
- * circuitBreaker.ts
- *
- * A process-scoped circuit breaker registry for external service calls.
- *
- * States
- * ──────
- *  CLOSED   — Normal operation. Calls pass through.
- *  OPEN     — Service is presumed down. Calls are rejected immediately
- *             (fail-fast). After `resetTimeoutMs` the breaker half-opens.
- *  HALF_OPEN — One probe call is allowed through. If it succeeds the breaker
- *             closes; if it fails it re-opens.
- *
- * Usage
- * ──────
- * ```ts
- * const cb = getCircuitBreaker("aiBackend");
- * const result = await cb.execute(
- *   () => dispatchToAI(payload),  // primary
- *   () => ({ dispatched: false, reason: "CIRCUIT_OPEN" }) // fallback
- * );
- * ```
- *
- * The registry is module-level so breakers survive across requests within
- * a single Node.js process (a Next.js server worker). They are NOT shared
- * across multiple workers — in a multi-instance deployment each worker
- * maintains its own counters, which is acceptable: a breaker that opens in
- * one worker is simply a local rate-limit, not a global lock.
- */
+
 
 import { logger } from "@/app/lib/logger";
+import * as Sentry from "@sentry/nextjs";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,7 +77,28 @@ export class CircuitBreaker {
     this.failureThreshold = options.failureThreshold ?? DEFAULT_FAILURE_THRESHOLD;
     this.successThreshold = options.successThreshold ?? DEFAULT_SUCCESS_THRESHOLD;
     this.resetTimeoutMs = options.resetTimeoutMs ?? DEFAULT_RESET_TIMEOUT_MS;
-    this.onStateChange = options.onStateChange;
+    this.onStateChange = options.onStateChange ?? this.defaultStateChangeHandler;
+  }
+
+  private defaultStateChangeHandler(
+    name: string,
+    from: CircuitState,
+    to: CircuitState
+  ): void {
+    // Send alert to Sentry on state transitions
+    Sentry.captureMessage(`Circuit breaker state change: ${name}`, {
+      level: to === "OPEN" ? "error" : "info",
+      tags: {
+        circuit_breaker: name,
+        from_state: from,
+        to_state: to,
+      },
+      extra: {
+        consecutiveFailures: this.consecutiveFailures,
+        consecutiveSuccesses: this.consecutiveSuccesses,
+        openedAt: this.openedAt,
+      },
+    });
   }
 
   // ── State transition helpers ──────────────────────────────────────────────
@@ -315,7 +309,7 @@ export const CIRCUIT_BREAKER_CONFIGS: Record<
   Required<Omit<CircuitBreakerOptions, "onStateChange">>
 > = {
   aiBackend: {
-    failureThreshold: 5,
+    failureThreshold: parseInt(process.env.CIRCUIT_BREAKER_THRESHOLD || "5", 10),
     successThreshold: 2,
     resetTimeoutMs: 60_000,
   },

@@ -225,6 +225,7 @@ Files require a valid S3-compatible bucket to upload. In development you can lea
 | `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID` | Optional | — | Soroban NFT contract address (testnet). | `C...` |
 | `NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID_MAINNET` | Optional | — | Soroban NFT contract address (mainnet). | `C...` |
 
-See **[CONTRIBUTING.md](CONTRIBUTING.md)** for onboarding, local setup, contribution guidelines, the code review process, good first issues and where to ask questions. Browse the component library with `npm run storybook`; see [STORYBOOK.md](STORYBOOK.md) for how it is deployed.
+See **[CONTRIBUTING.md](CONTRIBUTING.md)** for onboarding, local setup, contribution guidelines, the code review process, good first issues and where to ask questions. For resolving common user and environment errors, see the **[Troubleshooting Guide](docs/TROUBLESHOOTING.md)**. Browse the component library with `npm run storybook`; see [STORYBOOK.md](STORYBOOK.md) for how it is deployed.
 
 /* … truncated 5008 chars — edit only what you need near the top … */
+

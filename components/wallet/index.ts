@@ -6,3 +6,7 @@ export { default as AssetRow } from './AssetRow';
 export { default as TrustlineManager } from './TrustlineManager';
 export { default as TransactionHistoryViewer } from './TransactionHistoryViewer';
 export { default as ActivityFeed } from './ActivityFeed';
+export { default as AccountMergeModal } from './AccountMergeModal';
+export { default as MultisigManager } from './MultisigManager';
+export { default as KeystoreExportModal } from './KeystoreExportModal';
+export { default as XlmBalanceDisplay } from './XlmBalanceDisplay';

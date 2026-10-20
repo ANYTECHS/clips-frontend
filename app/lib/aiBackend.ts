@@ -133,7 +133,7 @@ export interface DispatchResult {
  */
 const DISPATCH_FALLBACK: DispatchResult = {
   dispatched: false,
-  reason: "AI_BACKEND_UNAVAILABLE",
+  reason: "AI backend temporarily unavailable",
 };
 
 /**

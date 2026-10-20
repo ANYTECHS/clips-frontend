@@ -64,7 +64,7 @@ function resolvePlanMultiplier(plan?: string): number {
 /**
  * Computes the effective rate limit for a request given the endpoint's base
  * config and the requesting user's id/plan (both optional — unauthenticated
- * requests get the base limit unmodified).
+ * requests get the base or public tier limit).
  */
 export function getEffectiveRateLimit(
   base: EndpointRateLimit,
@@ -78,6 +78,22 @@ export function getEffectiveRateLimit(
   }
   if (override?.multiplier !== undefined) {
     return { ...base, limit: Math.round(base.limit * override.multiplier) };
+  }
+
+  // If specific endpoint tiers are defined:
+  if (base.tiers) {
+    if (!userId) {
+      if (base.tiers.public !== undefined) {
+        return { ...base, limit: base.tiers.public };
+      }
+    } else {
+      if (plan && plan in base.tiers && (base.tiers as any)[plan] !== undefined) {
+        return { ...base, limit: (base.tiers as any)[plan] };
+      }
+      if (base.tiers.authenticated !== undefined) {
+        return { ...base, limit: base.tiers.authenticated };
+      }
+    }
   }
 
   const multiplier = resolvePlanMultiplier(plan);

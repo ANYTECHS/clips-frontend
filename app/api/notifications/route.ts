@@ -1,7 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
-import { notificationStore } from "./notificationStore";
+import { requireAuth } from "@/app/api/jobs/shared/authGuard";
+import { checkCsrf } from "@/app/lib/csrf";
+import { parseRequestJson } from "@/app/lib/parseRequestJson";
+import { prisma } from "@/app/lib/prisma";
+import { sendNotification } from "@/app/lib/notifications";
 import type { NotificationType } from "./notificationStore";
-import { paginateItems, parsePaginationParams } from "../pagination";
+import { parsePaginationParams } from "../pagination";
+import { paginationMeta } from "../types";
+
+const NOTIFICATION_TYPES: NotificationType[] = [
+  "job_complete",
+  "transform_complete",
+  "mint_success",
+  "earnings_received",
+];
 
 const NOTIFICATION_TYPES: NotificationType[] = [
   "job_complete",
@@ -12,20 +24,27 @@ const NOTIFICATION_TYPES: NotificationType[] = [
 
 export async function GET(request: NextRequest) {
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId") || "default_user";
-
-    const unread = await notificationStore.getUnread(userId);
-    const { items: notifications, meta } = paginateItems(
-      unread,
-      parsePaginationParams(searchParams, 50)
-    );
+    const authResult = await requireAuth();
+    if (authResult instanceof NextResponse) return authResult;
+    const { userId } = authResult;
+    const params = parsePaginationParams(new URL(request.url).searchParams);
+    const total = await prisma.notification.count({ where: { userId } });
+    const page = Math.min(params.page, Math.max(1, Math.ceil(total / params.pageSize)));
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({
+        where: { userId },
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * params.pageSize,
+        take: params.pageSize,
+      }),
+      prisma.notification.count({ where: { userId, readAt: null } }),
+    ]);
 
     return NextResponse.json({
       success: true,
       data: notifications,
-      unreadCount: unread.length,
-      meta,
+      unreadCount,
+      meta: paginationMeta({ page, pageSize: params.pageSize, total }),
     });
   } catch (error) {
     return NextResponse.json(
@@ -36,45 +55,33 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json();
-    if (typeof body !== "object" || body === null || Array.isArray(body)) {
-      return NextResponse.json(
-        { success: false, error: "A JSON object is required" },
-        { status: 400 },
-      );
-    }
+  const csrfError = checkCsrf(request);
+  if (csrfError) return csrfError;
 
-    const {
-      userId = "default_user",
-      type,
-      title,
-      message,
-      payload,
-    } = body as {
-      userId?: string;
-      type: NotificationType;
-      title: string;
-      message: string;
+  const authResult = await requireAuth();
+  if (authResult instanceof NextResponse) return authResult;
+  const parsedBody = await parseRequestJson(request);
+  if (!parsedBody.ok) return parsedBody.response;
+
+  try {
+    const { type, payload } = parsedBody.body as {
+      type?: NotificationType;
       payload?: Record<string, unknown>;
     };
 
-    if (
-      (typeof userId !== "string" || !userId.trim()) ||
-      !NOTIFICATION_TYPES.includes(type) ||
-      typeof title !== "string" || !title.trim() ||
-      typeof message !== "string" || !message.trim() ||
-      (payload !== undefined && (typeof payload !== "object" || payload === null || Array.isArray(payload)))
-    ) {
+    if (!type || !NOTIFICATION_TYPES.includes(type)) {
       return NextResponse.json(
-        { success: false, error: "Invalid notification fields" },
+        { success: false, error: "A supported notification type is required" },
         { status: 400 }
       );
     }
 
-    const notification = await notificationStore.add(userId, type, title, message, payload);
+    const result = await sendNotification(authResult.userId, type, payload ?? {});
 
-    return NextResponse.json({ success: true, data: notification }, { status: 201 });
+    return NextResponse.json(
+      { success: true, data: result.notification, delivered: result.delivered, failed: result.failed },
+      { status: 201 }
+    );
   } catch (error) {
     return NextResponse.json(
       { success: false, error: "Failed to create notification" },

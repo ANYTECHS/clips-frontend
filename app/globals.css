@@ -21,7 +21,7 @@
   --color-phantom: #AB9FF2;
   --color-metamask: #E2761B;
 
-  /* Default Dark Mode (also defined in [data-theme="dark"]) */
+ 
   --color-background: #080C0B;
   --color-surface: #101614;
   --color-surface-hover: #161D1A;
@@ -84,7 +84,7 @@
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 
-  /* Focus visible styles for keyboard navigation */
+ 
   *:focus-visible {
     outline: 2px solid var(--color-brand);
     outline-offset: 2px;
@@ -105,26 +105,14 @@
     z-index: -1;
   }
 
-  /* Glow scaling for mobile */
+ 
   @media (max-width: 640px) {
     .glow-large {
       transform: scale(0.8);
     }
   }
 
-  /*
-   * CSS containment for repeated, self-contained subtrees (grid cards, list
-   * rows). `layout` tells the browser that content inside the element can't
-   * affect layout outside it and vice versa, so adding/removing/animating
-   * one card doesn't force a layout recalculation of its siblings or
-   * ancestors; `style` scopes counters. Deliberately omits `paint` (which
-   * also clips overflow, like `overflow: hidden`) so it stays safe to apply
-   * even where a child intentionally overflows the box (tooltips, dropdown
-   * menus). See docs/css-containment-usage.md.
-   *
-   * Unsupported browsers (Safari < 15.4) ignore the `contain` declaration
-   * entirely — layout is unaffected, so no fallback is needed.
-   */
+  
   .contain-layout-style {
     contain: layout style;
   }
