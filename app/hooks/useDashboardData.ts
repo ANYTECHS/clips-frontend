@@ -54,11 +54,16 @@ export interface DashboardData {
  *
  * @returns Object context containing state indicators, processing flags, and structured payloads.
  */
-export function useDashboardData(options?: { enableStreaming?: boolean }): {
+export function useDashboardData(options?: {
+  enableStreaming?: boolean;
+  staleWhileRevalidate?: boolean;
+  revalidateIntervalMs?: number;
+}): {
   data: DashboardData | null;
   loading: boolean;
   error: Error | null;
   retry: () => void;
+  isValidating: boolean;
 } {
   const fetchDashboard = useDashboardStore((s: DashboardState & DashboardActions) => s.fetchDashboard);
   const invalidateCache = useDashboardStore((s: DashboardState & DashboardActions) => s.invalidateCache);
@@ -68,12 +73,30 @@ export function useDashboardData(options?: { enableStreaming?: boolean }): {
   // Subscribed one field at a time. A composite selector would allocate a new
   // object per store read and so never compare equal, re-rendering every
   // consumer on writes that touched neither flag.
-  const loading = useDashboardStore(selectLoading);
+  const storeLoading = useDashboardStore(selectLoading);
   const error = useDashboardStore(selectError);
+
+  const hasCachedData = stats !== null;
+  const isSWR = options?.staleWhileRevalidate ?? true;
+  // If SWR is enabled and we have cached data, do not block the UI with full-page loading state
+  const loading = isSWR && hasCachedData ? false : storeLoading;
+  const isValidating = storeLoading && hasCachedData;
 
   useEffect(() => {
     fetchDashboard();
   }, [fetchDashboard]);
+
+  // Periodic background revalidation
+  useEffect(() => {
+    const intervalMs = options?.revalidateIntervalMs;
+    if (!intervalMs || intervalMs <= 0) return;
+
+    const interval = setInterval(() => {
+      fetchDashboard();
+    }, intervalMs);
+
+    return () => clearInterval(interval);
+  }, [options?.revalidateIntervalMs, fetchDashboard]);
 
   useEffect(() => {
     if (!options?.enableStreaming) return;
@@ -175,5 +198,6 @@ export function useDashboardData(options?: { enableStreaming?: boolean }): {
     loading,
     error: errorObject,
     retry,
+    isValidating,
   };
 }
