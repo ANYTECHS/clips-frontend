@@ -75,9 +75,7 @@ function getTimeoutMs(timeoutMs: number | false | undefined): number | false {
   if (timeoutMs !== undefined) return timeoutMs;
 
   const configured = Number(process.env.API_TIMEOUT_MS);
-  return Number.isFinite(configured) && configured > 0
-    ? configured
-    : DEFAULT_API_TIMEOUT_MS;
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_API_TIMEOUT_MS;
 }
 
 // ─── Error classification ─────────────────────────────────────────────────────
@@ -216,7 +214,12 @@ export function withApiMiddleware<TParams = unknown>(
       if (shouldRequireAuth) {
         const resolved = await resolveAuthContext();
         if (!resolved) {
-          const body = { data: null, error: "Unauthorized", code: "UNAUTHORIZED" as const, meta: { timestamp: new Date().toISOString() } };
+          const body = {
+            data: null,
+            error: "Unauthorized",
+            code: "UNAUTHORIZED" as const,
+            meta: { timestamp: new Date().toISOString() },
+          };
           return NextResponse.json(body, { status: 401 });
         }
         authCtx = resolved;
@@ -226,7 +229,12 @@ export function withApiMiddleware<TParams = unknown>(
       if (requiredRoles.length > 0) {
         const hasRole = requiredRoles.some((r) => authCtx.roles.includes(r));
         if (!hasRole) {
-          const body = { data: null, error: "Forbidden", code: "FORBIDDEN" as const, meta: { timestamp: new Date().toISOString() } };
+          const body = {
+            data: null,
+            error: "Forbidden",
+            code: "FORBIDDEN" as const,
+            meta: { timestamp: new Date().toISOString() },
+          };
           return NextResponse.json(body, { status: 403 });
         }
       }

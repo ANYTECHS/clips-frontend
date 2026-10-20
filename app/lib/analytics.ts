@@ -8,7 +8,7 @@ import { scheduleWork } from "@/app/lib/mainThreadOptimization";
  */
 
 /** Valid analytics infrastructure platform destination names */
-type AnalyticsProvider = 'ga4' | 'plausible' | 'custom' | 'none';
+type AnalyticsProvider = "ga4" | "plausible" | "custom" | "none";
 
 /** Dictionary object mapping custom metadata event keys to scalar values */
 interface EventProperties {
@@ -35,7 +35,7 @@ const PII_PATTERNS = [
 ];
 
 /**
- * Core Analytics class orchestrating initialization, consent monitoring, 
+ * Core Analytics class orchestrating initialization, consent monitoring,
  * data sanitization, and event forwarding across tracking providers.
  */
 class Analytics {
@@ -49,12 +49,12 @@ class Analytics {
    */
   constructor() {
     this.provider = this.getProvider();
-    this.debugMode = process.env.NODE_ENV === 'development';
-    
+    this.debugMode = process.env.NODE_ENV === "development";
+
     // Listen for consent changes
-    if (typeof window !== 'undefined') {
+    if (typeof window !== "undefined") {
       this.checkConsent();
-      window.addEventListener('cookie-consent-updated', this.handleConsentUpdate.bind(this));
+      window.addEventListener("cookie-consent-updated", this.handleConsentUpdate.bind(this));
     }
   }
 
@@ -64,14 +64,14 @@ class Analytics {
    */
   private getProvider(): AnalyticsProvider {
     const provider = process.env.NEXT_PUBLIC_ANALYTICS_PROVIDER?.toLowerCase();
-    
+
     switch (provider) {
-      case 'ga4':
-      case 'plausible':
-      case 'custom':
+      case "ga4":
+      case "plausible":
+      case "custom":
         return provider;
       default:
-        return 'none';
+        return "none";
     }
   }
 
@@ -79,16 +79,16 @@ class Analytics {
    * Check if user has given analytics consent
    */
   private checkConsent(): void {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     try {
-      const savedConsent = localStorage.getItem('cookie-consent');
+      const savedConsent = localStorage.getItem("cookie-consent");
       if (savedConsent) {
         const consent: CookieConsent = JSON.parse(savedConsent);
         this.consentGiven = consent.analytics === true;
       }
     } catch (error) {
-      logger.error('Failed to check analytics consent:', error);
+      logger.error("Failed to check analytics consent:", error);
       this.consentGiven = false;
     }
   }
@@ -100,7 +100,7 @@ class Analytics {
   private handleConsentUpdate(event: Event): void {
     const customEvent = event as CustomEvent<CookieConsent>;
     this.consentGiven = customEvent.detail.analytics === true;
-    
+
     if (this.consentGiven && !this.isInitialized) {
       this.initialize();
     }
@@ -111,25 +111,25 @@ class Analytics {
    */
   public initialize(): void {
     if (this.isInitialized || !this.consentGiven) return;
-    if (this.provider === 'none') return;
+    if (this.provider === "none") return;
 
     try {
       switch (this.provider) {
-        case 'ga4':
+        case "ga4":
           this.initializeGA4();
           break;
-        case 'plausible':
+        case "plausible":
           this.initializePlausible();
           break;
-        case 'custom':
+        case "custom":
           this.initializeCustom();
           break;
       }
-      
+
       this.isInitialized = true;
-      this.log('Analytics initialized:', this.provider);
+      this.log("Analytics initialized:", this.provider);
     } catch (error) {
-      logger.error('Failed to initialize analytics:', error);
+      logger.error("Failed to initialize analytics:", error);
     }
   }
 
@@ -140,20 +140,22 @@ class Analytics {
     const measurementId = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
 
     if (!measurementId) {
-      logger.warn('GA4 measurement ID not configured');
+      logger.warn("GA4 measurement ID not configured");
       return;
     }
 
     // Load gtag script
-    const script = document.createElement('script');
+    const script = document.createElement("script");
     script.async = true;
     script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`;
-    script.crossOrigin = 'anonymous';
+    script.crossOrigin = "anonymous";
     // Analytics is not needed for the page to be interactive, so it's
     // deprioritized relative to the app's own scripts (#917).
-    script.setAttribute('fetchpriority', 'low');
+    script.setAttribute("fetchpriority", "low");
     script.onerror = () => {
-      logger.error('Failed to load GA4 script (network or ad-blocker); analytics disabled for this session.');
+      logger.error(
+        "Failed to load GA4 script (network or ad-blocker); analytics disabled for this session."
+      );
     };
     // Subresource Integrity (issue #801): gtag.js is served dynamically per
     // measurement ID and Google explicitly does not support pinning it with
@@ -175,10 +177,10 @@ class Analytics {
     }
     window.gtag = gtag;
 
-    gtag('js', new Date());
-    gtag('config', measurementId, {
+    gtag("js", new Date());
+    gtag("config", measurementId, {
       anonymize_ip: true,
-      cookie_flags: 'SameSite=None;Secure',
+      cookie_flags: "SameSite=None;Secure",
     });
   }
 
@@ -188,13 +190,15 @@ class Analytics {
   private initializePlausible(): void {
     const domain = process.env.NEXT_PUBLIC_PLAUSIBLE_DOMAIN || window.location.hostname;
 
-    const script = document.createElement('script');
+    const script = document.createElement("script");
     script.defer = true;
-    script.crossOrigin = 'anonymous';
-    script.setAttribute('data-domain', domain);
-    script.setAttribute('fetchpriority', 'low');
+    script.crossOrigin = "anonymous";
+    script.setAttribute("data-domain", domain);
+    script.setAttribute("fetchpriority", "low");
     script.onerror = () => {
-      logger.error('Failed to load Plausible script (network or ad-blocker); analytics disabled for this session.');
+      logger.error(
+        "Failed to load Plausible script (network or ad-blocker); analytics disabled for this session."
+      );
     };
     // Subresource Integrity (issue #801): plausible.io/js/script.js is a
     // rolling "latest" URL with no first-party version-pinned path, so
@@ -203,7 +207,8 @@ class Analytics {
     // NEXT_PUBLIC_PLAUSIBLE_SCRIPT_SRI_HASH once one has been captured (see
     // docs/SECURITY.md for the exact command). Falls back to the
     // unpinned script (current behavior) when unset.
-    script.src = process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL || 'https://plausible.io/js/script.js';
+    script.src =
+      process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_URL || "https://plausible.io/js/script.js";
     const plausibleIntegrity = process.env.NEXT_PUBLIC_PLAUSIBLE_SCRIPT_SRI_HASH;
     if (plausibleIntegrity) {
       script.integrity = plausibleIntegrity;
@@ -215,7 +220,7 @@ class Analytics {
    * Initialize custom analytics (logs to console or custom endpoint)
    */
   private initializeCustom(): void {
-    this.log('Custom analytics initialized');
+    this.log("Custom analytics initialized");
   }
 
   /**
@@ -224,26 +229,26 @@ class Analytics {
    * @returns Redacted variant safe to transport over analytics lines.
    */
   private sanitize(data: any): any {
-    if (typeof data === 'string') {
+    if (typeof data === "string") {
       let sanitized = data;
-      PII_PATTERNS.forEach(pattern => {
-        sanitized = sanitized.replace(pattern, '[REDACTED]');
+      PII_PATTERNS.forEach((pattern) => {
+        sanitized = sanitized.replace(pattern, "[REDACTED]");
       });
       return sanitized;
     }
 
-    if (typeof data === 'object' && data !== null) {
+    if (typeof data === "object" && data !== null) {
       const sanitized: any = Array.isArray(data) ? [] : {};
-      
+
       for (const key in data) {
         // Skip keys that likely contain PII
         if (/email|wallet|address|phone|ssn|card/i.test(key)) {
-          sanitized[key] = '[REDACTED]';
+          sanitized[key] = "[REDACTED]";
         } else {
           sanitized[key] = this.sanitize(data[key]);
         }
       }
-      
+
       return sanitized;
     }
 
@@ -256,7 +261,7 @@ class Analytics {
    */
   private log(...args: any[]): void {
     if (this.debugMode) {
-      logger.debug('[Analytics]', ...args);
+      logger.debug("[Analytics]", ...args);
     }
   }
 
@@ -266,7 +271,7 @@ class Analytics {
    */
   public trackPageView(path: string): void {
     if (!this.consentGiven) {
-      this.log('Page view not tracked - no consent:', path);
+      this.log("Page view not tracked - no consent:", path);
       return;
     }
 
@@ -275,32 +280,32 @@ class Analytics {
     // that triggered them.
     scheduleWork(() => {
       const sanitizedPath = this.sanitize(path);
-      this.log('Page view:', sanitizedPath);
+      this.log("Page view:", sanitizedPath);
 
       try {
         switch (this.provider) {
-          case 'ga4':
+          case "ga4":
             if (window.gtag) {
-              window.gtag('event', 'page_view', {
+              window.gtag("event", "page_view", {
                 page_path: sanitizedPath,
               });
             }
             break;
 
-          case 'plausible':
+          case "plausible":
             if (window.plausible) {
-              window.plausible('pageview', { props: { path: sanitizedPath } });
+              window.plausible("pageview", { props: { path: sanitizedPath } });
             }
             break;
 
-          case 'custom':
-            this.sendCustomEvent('page_view', { path: sanitizedPath });
+          case "custom":
+            this.sendCustomEvent("page_view", { path: sanitizedPath });
             break;
         }
       } catch (error) {
-        logger.error('Failed to track page view:', error);
+        logger.error("Failed to track page view:", error);
       }
-    }, 'background');
+    }, "background");
   }
 
   /**
@@ -310,7 +315,7 @@ class Analytics {
    */
   public trackEvent(name: string, properties?: EventProperties): void {
     if (!this.consentGiven) {
-      this.log('Event not tracked - no consent:', name);
+      this.log("Event not tracked - no consent:", name);
       return;
     }
 
@@ -318,30 +323,30 @@ class Analytics {
     // and shouldn't run in the same task as the interaction that fired it.
     scheduleWork(() => {
       const sanitizedProperties = properties ? this.sanitize(properties) : {};
-      this.log('Event:', name, sanitizedProperties);
+      this.log("Event:", name, sanitizedProperties);
 
       try {
         switch (this.provider) {
-          case 'ga4':
+          case "ga4":
             if (window.gtag) {
-              window.gtag('event', name, sanitizedProperties);
+              window.gtag("event", name, sanitizedProperties);
             }
             break;
 
-          case 'plausible':
+          case "plausible":
             if (window.plausible) {
               window.plausible(name, { props: sanitizedProperties });
             }
             break;
 
-          case 'custom':
+          case "custom":
             this.sendCustomEvent(name, sanitizedProperties);
             break;
         }
       } catch (error) {
-        logger.error('Failed to track event:', error);
+        logger.error("Failed to track event:", error);
       }
-    }, 'background');
+    }, "background");
   }
 
   /**
@@ -351,16 +356,16 @@ class Analytics {
    */
   private sendCustomEvent(name: string, properties: any): void {
     const endpoint = process.env.NEXT_PUBLIC_ANALYTICS_ENDPOINT;
-    
+
     if (!endpoint) {
-      this.log('Custom event (no endpoint):', name, properties);
+      this.log("Custom event (no endpoint):", name, properties);
       return;
     }
 
     fetch(endpoint, {
-      method: 'POST',
+      method: "POST",
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify({
         event: name,
@@ -369,8 +374,8 @@ class Analytics {
         url: window.location.href,
         referrer: document.referrer,
       }),
-    }).catch(error => {
-      logger.error('Failed to send custom event:', error);
+    }).catch((error) => {
+      logger.error("Failed to send custom event:", error);
     });
   }
 
@@ -379,7 +384,7 @@ class Analytics {
    * @param method - Authentication path technique string used by the entity.
    */
   public trackSignup(method?: string): void {
-    this.trackEvent('user_signup', { method });
+    this.trackEvent("user_signup", { method });
   }
 
   /**
@@ -388,7 +393,7 @@ class Analytics {
    * @param duration - Running time measurement specified in seconds.
    */
   public trackVideoUpload(fileSize?: number, duration?: number): void {
-    this.trackEvent('video_upload', {
+    this.trackEvent("video_upload", {
       file_size: fileSize,
       duration,
     });
@@ -399,7 +404,7 @@ class Analytics {
    * @param clipId - Documented identity identifier mapping the video component index tracking entry.
    */
   public trackNFTMint(clipId?: string): void {
-    this.trackEvent('nft_mint', {
+    this.trackEvent("nft_mint", {
       clip_id: clipId,
     });
   }
@@ -409,7 +414,7 @@ class Analytics {
    * @param format - Export container compression scheme layout format descriptor.
    */
   public trackEarningsExport(format?: string): void {
-    this.trackEvent('earnings_export', { format });
+    this.trackEvent("earnings_export", { format });
   }
 
   /**
@@ -417,7 +422,7 @@ class Analytics {
    * @param walletType - Provider framework design identifier name.
    */
   public trackWalletConnect(walletType?: string): void {
-    this.trackEvent('wallet_connect', {
+    this.trackEvent("wallet_connect", {
       wallet_type: walletType,
     });
   }
@@ -427,7 +432,7 @@ class Analytics {
    * @param walletType - Provider framework design identifier name.
    */
   public trackWalletDisconnect(walletType?: string): void {
-    this.trackEvent('wallet_disconnect', {
+    this.trackEvent("wallet_disconnect", {
       wallet_type: walletType,
     });
   }
@@ -437,7 +442,7 @@ class Analytics {
    * @param walletType - Provider framework design identifier name.
    */
   public trackWalletCreated(walletType?: string): void {
-    this.trackEvent('wallet_created', {
+    this.trackEvent("wallet_created", {
       wallet_type: walletType,
     });
   }
@@ -447,7 +452,7 @@ class Analytics {
    * @param walletType - Provider framework design identifier name.
    */
   public trackWalletImport(walletType?: string): void {
-    this.trackEvent('wallet_import', {
+    this.trackEvent("wallet_import", {
       wallet_type: walletType,
     });
   }
@@ -457,7 +462,7 @@ class Analytics {
    * @param walletType - Provider framework design identifier name.
    */
   public trackWalletFunded(walletType?: string): void {
-    this.trackEvent('wallet_funded', {
+    this.trackEvent("wallet_funded", {
       wallet_type: walletType,
     });
   }
@@ -477,9 +482,9 @@ class Analytics {
     amountBucket?: string;
     network?: string;
   }): void {
-    this.trackEvent('wallet_transaction', {
+    this.trackEvent("wallet_transaction", {
       wallet_type: params.walletType,
-      asset_code: params.assetCode ?? 'XLM',
+      asset_code: params.assetCode ?? "XLM",
       amount_bucket: params.amountBucket,
       network: params.network,
     });
@@ -494,12 +499,12 @@ class Analytics {
    * @param params.network - Node transport tracking context configuration marker.
    */
   public trackTrustlineChange(params: {
-    action: 'add' | 'remove';
+    action: "add" | "remove";
     assetCode: string;
     walletType?: string;
     network?: string;
   }): void {
-    this.trackEvent('trustline_change', {
+    this.trackEvent("trustline_change", {
       action: params.action,
       asset_code: params.assetCode,
       wallet_type: params.walletType,

@@ -1,11 +1,11 @@
 "use client";
 
 import { Bell, Check, CloudUpload, Menu } from "lucide-react";
-import React, { memo, useCallback, useEffect, useRef,useState } from "react";
+import React, { memo, useCallback, useEffect, useRef, useState } from "react";
 
 import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { sanitize } from "@/app/lib/sanitize";
-import { selectUserName,useUserStore } from "@/app/store";
+import { selectUserName, useUserStore } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
 
 interface NotificationItem {

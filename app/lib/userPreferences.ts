@@ -2,9 +2,9 @@ import type { StellarNetwork } from "./networkConfig";
 
 /**
  * User Preferences Storage
- * 
+ *
  * This module handles non-sensitive user preferences stored in localStorage.
- * Keys here do not need encryption (e.g., via secureStorage) because they 
+ * Keys here do not need encryption (e.g., via secureStorage) because they
  * do not contain sensitive user data (like private keys or auth tokens).
  */
 

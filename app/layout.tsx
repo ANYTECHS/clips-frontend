@@ -34,12 +34,12 @@ const CookieConsent = dynamic(() => import("@/components/CookieConsent"), {
  * - display: "swap" - Shows fallback immediately, swaps when loaded (FOUT strategy)
  * - preload: true - Eager load for LCP improvements
  * - adjustFontFallback: "Arial" - Smooth visual transition on swap
- * 
+ *
  * Font subsetting reduces file size by ~60% for most use cases.
  * See: https://web.dev/articles/variable-fonts-optimize-performance
  */
-const inter = Inter({ 
-  subsets: ["latin", "latin-ext"], 
+const inter = Inter({
+  subsets: ["latin", "latin-ext"],
   display: "swap",
   variable: "--font-inter",
   preload: true,
@@ -91,20 +91,20 @@ export default function RootLayout({
           <ErrorBoundary>
             <I18nProvider>
               <DataSyncProvider>
-              <AuthProvider>
-                <ToastProvider>
-                  <NetworkProvider>
-                    <WalletProvider>
-                      <StellarWalletProvider>
-                      <AnalyticsProvider />
-                      <KeyboardShortcuts />
-                      {children}
-                      <RateLimitToast />
-                      </StellarWalletProvider>
-                    </WalletProvider>
-                  </NetworkProvider>
-                </ToastProvider>
-              </AuthProvider>
+                <AuthProvider>
+                  <ToastProvider>
+                    <NetworkProvider>
+                      <WalletProvider>
+                        <StellarWalletProvider>
+                          <AnalyticsProvider />
+                          <KeyboardShortcuts />
+                          {children}
+                          <RateLimitToast />
+                        </StellarWalletProvider>
+                      </WalletProvider>
+                    </NetworkProvider>
+                  </ToastProvider>
+                </AuthProvider>
               </DataSyncProvider>
             </I18nProvider>
           </ErrorBoundary>

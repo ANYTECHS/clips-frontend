@@ -139,10 +139,7 @@ function negotiateEncoding(request: NextRequest): SupportedEncoding {
 
 type CompressionFormat = "gzip" | "deflate";
 
-async function compressBuffer(
-  input: Uint8Array,
-  format: CompressionFormat
-): Promise<Uint8Array> {
+async function compressBuffer(input: Uint8Array, format: CompressionFormat): Promise<Uint8Array> {
   if (typeof CompressionStream === "undefined") {
     // CompressionStream not available (old Node) — return as-is.
     return input;
@@ -171,10 +168,7 @@ async function compressBuffer(
   return result;
 }
 
-async function decompressBuffer(
-  input: Uint8Array,
-  format: CompressionFormat
-): Promise<Uint8Array> {
+async function decompressBuffer(input: Uint8Array, format: CompressionFormat): Promise<Uint8Array> {
   if (typeof DecompressionStream === "undefined") {
     return input;
   }
@@ -326,9 +320,7 @@ export async function decompressRequestBody(
   }
 
   const format: CompressionFormat | null =
-    contentEncoding === "gzip" ? "gzip" :
-    contentEncoding === "deflate" ? "deflate" :
-    null;
+    contentEncoding === "gzip" ? "gzip" : contentEncoding === "deflate" ? "deflate" : null;
 
   if (!format) {
     return {

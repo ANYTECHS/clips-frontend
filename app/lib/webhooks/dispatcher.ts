@@ -13,7 +13,12 @@ import crypto from "crypto";
 import { logger } from "@/app/lib/logger";
 import { webhookStore } from "./webhookStore";
 import { signWebhookPayload } from "./signing";
-import type { WebhookEndpoint, WebhookEventPayload, WebhookEventType, WebhookDelivery } from "./types";
+import type {
+  WebhookEndpoint,
+  WebhookEventPayload,
+  WebhookEventType,
+  WebhookDelivery,
+} from "./types";
 
 const MAX_ATTEMPTS = 5;
 /** Delay before each retry attempt, in ms. Index 0 = delay before attempt 2. */
@@ -52,7 +57,10 @@ export async function triggerWebhookEvent(
   }
 }
 
-async function attemptDelivery(endpoint: WebhookEndpoint, delivery: WebhookDelivery): Promise<void> {
+async function attemptDelivery(
+  endpoint: WebhookEndpoint,
+  delivery: WebhookDelivery
+): Promise<void> {
   delivery.attempts += 1;
   delivery.lastAttemptAt = new Date().toISOString();
 
@@ -105,7 +113,8 @@ function scheduleRetryOrGiveUp(endpoint: WebhookEndpoint, delivery: WebhookDeliv
     return;
   }
 
-  const delay = RETRY_DELAYS_MS[delivery.attempts - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
+  const delay =
+    RETRY_DELAYS_MS[delivery.attempts - 1] ?? RETRY_DELAYS_MS[RETRY_DELAYS_MS.length - 1];
   setTimeout(() => {
     void attemptDelivery(endpoint, delivery);
   }, delay);

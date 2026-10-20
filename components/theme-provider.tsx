@@ -31,7 +31,10 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   // Load theme from localStorage on mount
   useEffect(() => {
     const storedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme | null;
-    if (storedTheme && (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system")) {
+    if (
+      storedTheme &&
+      (storedTheme === "light" || storedTheme === "dark" || storedTheme === "system")
+    ) {
       setThemeState(storedTheme);
     }
   }, []);
@@ -40,18 +43,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const applyTheme = (themeValue: Theme) => {
       let actualTheme: "light" | "dark";
-      
+
       if (themeValue === "system") {
         actualTheme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
       } else {
         actualTheme = themeValue;
       }
-      
+
       setResolvedTheme(actualTheme);
-      
+
       // Apply data-theme attribute to document
       document.documentElement.setAttribute("data-theme", actualTheme);
-      
+
       // Update meta theme-color for mobile browsers
       const metaThemeColor = document.querySelector('meta[name="theme-color"]');
       if (metaThemeColor) {
@@ -65,7 +68,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     if (theme === "system") {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       const handleChange = () => applyTheme("system");
-      
+
       mediaQuery.addEventListener("change", handleChange);
       return () => mediaQuery.removeEventListener("change", handleChange);
     }
