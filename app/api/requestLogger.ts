@@ -96,6 +96,7 @@ function levelForStatus(status: number): "info" | "warn" | "error" {
 
 export interface RequestLogEntry {
   requestId: string;
+  correlationId: string;
   method: string;
   path: string;
   query?: Record<string, string>;
@@ -111,15 +112,21 @@ export interface RequestLogEntry {
 /**
  * Log an inbound request and return helpers to finalise the log entry.
  *
+ * @returns correlationId — Echo in the response X-Correlation-ID header.
  * @returns requestId — Echo in the response X-Request-ID header.
  * @returns logResponse — Call with the status code once the handler finishes.
  */
 export function logRequest(request: NextRequest): {
   requestId: string;
+  correlationId: string;
   logResponse: (status: number) => void;
 } {
+  const correlationId =
+    request.headers.get("x-correlation-id") ??
+    request.headers.get("x-request-id") ??
+    crypto.randomUUID();
   const requestId =
-    request.headers.get("x-request-id") ?? crypto.randomUUID();
+    request.headers.get("x-request-id") ?? correlationId;
   const startMs = Date.now();
 
   const { pathname, searchParams } = request.nextUrl;
@@ -128,6 +135,7 @@ export function logRequest(request: NextRequest): {
 
   const entry: RequestLogEntry = {
     requestId,
+    correlationId,
     method: request.method,
     path: pathname,
     ...(Object.keys(query).length ? { query } : {}),
@@ -137,6 +145,7 @@ export function logRequest(request: NextRequest): {
 
   return {
     requestId,
+    correlationId,
     logResponse(status: number) {
       const durationMs = Date.now() - startMs;
       const responseEntry = { ...entry, status, durationMs };
@@ -155,7 +164,7 @@ type RouteHandler<C = unknown> = (
 
 /**
  * Wraps a Next.js route handler with automatic request/response logging.
- * Attaches X-Request-ID to the outbound response.
+ * Attaches X-Correlation-ID and X-Request-ID to the outbound response.
  *
  * @example
  * export const GET = withRequestLogging(async (req) => {
@@ -166,7 +175,7 @@ export function withRequestLogging<C = unknown>(
   handler: RouteHandler<C>
 ): RouteHandler<C> {
   return async (request: NextRequest, context: C) => {
-    const { requestId, logResponse } = logRequest(request);
+    const { requestId, correlationId, logResponse } = logRequest(request);
 
     let response: NextResponse;
     try {
@@ -177,7 +186,8 @@ export function withRequestLogging<C = unknown>(
       throw err;
     }
 
-    // Attach request ID to response so clients can correlate logs
+    // Attach correlation and request IDs to response so clients can correlate logs
+    response.headers.set("x-correlation-id", correlationId);
     response.headers.set("x-request-id", requestId);
     logResponse(response.status);
     return response;
