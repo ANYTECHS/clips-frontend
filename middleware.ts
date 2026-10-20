@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { getMiddlewareRedirectTarget } from "@/app/lib/auth-redirect";
+import { getMiddlewareRedirectTarget } from "@/app/lib/authRedirect";
 
 let authMiddleware: ((request: NextRequest) => ReturnType<typeof NextResponse.next>) | null =
   null;

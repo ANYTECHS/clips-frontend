@@ -15,7 +15,7 @@ import AnalyticsProvider from "@/components/AnalyticsProvider";
 import ResourceHints from "@/components/ResourceHints";
 import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
-import FontPreload from "@/components/FontPreload";
+import FontPreload from "@/app/components/FontPreload";
 import DataSyncProvider from "@/components/DataSyncProvider";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
