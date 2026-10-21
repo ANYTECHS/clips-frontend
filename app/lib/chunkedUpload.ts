@@ -38,8 +38,11 @@ export function shouldChunk(file: { size: number }): boolean {
 }
 
 /** Number of chunks `size` bytes will be split into. */
-export function chunkCount(size: number): number {
-  return Math.max(1, Math.ceil(size / CHUNK_SIZE_BYTES));
+export function chunkCount(size: number, chunkSize = CHUNK_SIZE_BYTES): number {
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0) {
+    throw new RangeError("chunkSize must be a positive integer");
+  }
+  return Math.max(1, Math.ceil(size / chunkSize));
 }
 
 /**
@@ -67,6 +70,8 @@ export interface ChunkedUploadResult {
 export interface ChunkedUploadOptions {
   /** Called with 0–100 as chunks complete. */
   onProgress?: (percent: number) => void;
+  /** Chunk size in bytes. Defaults to 5 MiB and cannot exceed the server limit. */
+  chunkSize?: number;
   /** Aborts the upload. Chunks already stored stay stored, so it can resume. */
   signal?: AbortSignal;
   /** Optional saved template applied to the assembled upload. */
@@ -74,13 +79,15 @@ export interface ChunkedUploadOptions {
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;
   /** Injectable for tests. */
+  xhrFactory?: () => XMLHttpRequest;
+  /** Injectable for tests. */
   storage?: Pick<Storage, "getItem" | "setItem" | "removeItem">;
 }
 
 /** Remembered session id for a file, if one is still recorded. */
 function readStoredSession(
   storage: ChunkedUploadOptions["storage"],
-  fingerprint: string,
+  fingerprint: string
 ): string | null {
   try {
     return storage?.getItem(SESSION_STORAGE_PREFIX + fingerprint) ?? null;
@@ -94,7 +101,7 @@ function readStoredSession(
 function writeStoredSession(
   storage: ChunkedUploadOptions["storage"],
   fingerprint: string,
-  sessionId: string,
+  sessionId: string
 ): void {
   try {
     storage?.setItem(SESSION_STORAGE_PREFIX + fingerprint, sessionId);
@@ -103,10 +110,7 @@ function writeStoredSession(
   }
 }
 
-function clearStoredSession(
-  storage: ChunkedUploadOptions["storage"],
-  fingerprint: string,
-): void {
+function clearStoredSession(storage: ChunkedUploadOptions["storage"], fingerprint: string): void {
   try {
     storage?.removeItem(SESSION_STORAGE_PREFIX + fingerprint);
   } catch {
@@ -151,17 +155,23 @@ function isRetryableStatus(status: number): boolean {
  */
 export async function uploadFileInChunks(
   file: File,
-  options: ChunkedUploadOptions = {},
+  options: ChunkedUploadOptions = {}
 ): Promise<ChunkedUploadResult> {
   const {
     onProgress,
     signal,
+    chunkSize = CHUNK_SIZE_BYTES,
     fetchImpl = fetch,
+    xhrFactory = () => new XMLHttpRequest(),
     storage = typeof window !== "undefined" ? window.localStorage : undefined,
   } = options;
 
+  if (!Number.isInteger(chunkSize) || chunkSize <= 0 || chunkSize > CHUNK_SIZE_BYTES) {
+    throw new RangeError(`chunkSize must be between 1 and ${CHUNK_SIZE_BYTES} bytes`);
+  }
+
   const fingerprint = fileFingerprint(file);
-  const totalChunks = chunkCount(file.size);
+  const totalChunks = chunkCount(file.size, chunkSize);
 
   const throwIfAborted = () => {
     if (signal?.aborted) {
@@ -190,12 +200,11 @@ export async function uploadFileInChunks(
 
   if (sessionId) {
     try {
-      const response = await request(
-        `/api/upload/chunk/session?sessionId=${encodeURIComponent(sessionId)}`,
-        { method: "GET" },
-      );
+      const response = await request(`/api/upload/resume?jobId=${encodeURIComponent(sessionId)}`, {
+        method: "GET",
+      });
       const body = await response.json();
-      receivedChunks = body?.data?.receivedChunks ?? [];
+      receivedChunks = body?.data?.receivedChunkIndices ?? body?.data?.receivedChunks ?? [];
     } catch (error) {
       if (error instanceof DOMException) throw error;
       // A session the server no longer recognises just means starting over.
@@ -212,6 +221,7 @@ export async function uploadFileInChunks(
         name: file.name,
         size: file.size,
         type: file.type || "application/octet-stream",
+        chunkSize,
       }),
     });
     const body = await response.json();
@@ -222,39 +232,105 @@ export async function uploadFileInChunks(
 
   // ── Send the chunks the server does not already have ──────────────────────
 
-  const alreadyStored = new Set<number>(receivedChunks);
+  const alreadyStored = new Set<number>(
+    receivedChunks.filter(
+      (index: number) => Number.isInteger(index) && index >= 0 && index < totalChunks
+    )
+  );
   const pending = Array.from(Array(totalChunks).keys()).filter(
-    (index) => !alreadyStored.has(index),
+    (index) => !alreadyStored.has(index)
   );
 
-  let completed = alreadyStored.size;
+  const completedChunks = new Set(alreadyStored);
+  const activeChunkBytes = new Map<number, number>();
+  let lastReportedProgress = 0;
+  const chunkBytes = (index: number) =>
+    Math.max(0, Math.min(chunkSize, file.size - index * chunkSize));
   const reportProgress = () => {
-    onProgress?.(Math.round((completed / totalChunks) * 100));
+    const completedBytes = [...completedChunks].reduce(
+      (total, index) => total + chunkBytes(index),
+      0
+    );
+    const activeBytes = [...activeChunkBytes.values()].reduce((total, bytes) => total + bytes, 0);
+    const currentProgress =
+      file.size > 0 ? Math.round(((completedBytes + activeBytes) / file.size) * 100) : 100;
+    lastReportedProgress = Math.max(lastReportedProgress, currentProgress);
+    onProgress?.(lastReportedProgress);
   };
   reportProgress();
 
   const sendChunk = async (index: number) => {
     throwIfAborted();
-    const start = index * CHUNK_SIZE_BYTES;
-    const blob = file.slice(start, Math.min(start + CHUNK_SIZE_BYTES, file.size));
+    const start = index * chunkSize;
+    const blob = file.slice(start, Math.min(start + chunkSize, file.size));
 
     await withRetry(
       async () => {
         throwIfAborted();
-        await request(
-          `/api/upload/chunk?sessionId=${encodeURIComponent(sessionId as string)}&index=${index}`,
-          { method: "PUT", body: blob },
-        );
+        activeChunkBytes.set(index, 0);
+        await new Promise<void>((resolve, reject) => {
+          const xhr = xhrFactory();
+          let settled = false;
+          const finish = (error?: Error) => {
+            if (settled) return;
+            settled = true;
+            signal?.removeEventListener("abort", abortRequest);
+            if (error) reject(error);
+            else resolve();
+          };
+          const abortRequest = () => xhr.abort();
+
+          if (signal?.aborted) {
+            finish(new DOMException("Upload cancelled", "AbortError"));
+            return;
+          }
+
+          xhr.open(
+            "PUT",
+            `/api/upload/chunk?sessionId=${encodeURIComponent(sessionId as string)}&index=${index}`
+          );
+          xhr.upload.onprogress = (event) => {
+            if (event.lengthComputable) {
+              activeChunkBytes.set(index, Math.min(event.loaded, blob.size));
+              reportProgress();
+            }
+          };
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              finish();
+              return;
+            }
+
+            let message = `Chunk upload failed (HTTP ${xhr.status})`;
+            try {
+              const body = JSON.parse(xhr.responseText);
+              message = body?.error ?? body?.data?.error ?? message;
+            } catch {
+              // Keep the status-based message when the response is not JSON.
+            }
+            finish(
+              isRetryableStatus(xhr.status)
+                ? new Error(message)
+                : new NonRetryableUploadError(message)
+            );
+          };
+          xhr.onerror = () => finish(new Error("Network error during chunk upload"));
+          xhr.ontimeout = () => finish(new Error("Chunk upload timed out"));
+          xhr.onabort = () => finish(new DOMException("Upload cancelled", "AbortError"));
+          signal?.addEventListener("abort", abortRequest, { once: true });
+          xhr.send(blob);
+        });
       },
       {
         maxAttempts: CHUNK_MAX_ATTEMPTS,
         shouldAbort: (error) =>
           error instanceof NonRetryableUploadError ||
           (error instanceof DOMException && error.name === "AbortError"),
-      },
+      }
     );
 
-    completed += 1;
+    activeChunkBytes.delete(index);
+    completedChunks.add(index);
     reportProgress();
   };
 
@@ -266,9 +342,7 @@ export async function uploadFileInChunks(
       await sendChunk(pending[cursor++]);
     }
   };
-  await Promise.all(
-    Array.from({ length: Math.min(CHUNK_CONCURRENCY, pending.length) }, worker),
-  );
+  await Promise.all(Array.from({ length: Math.min(CHUNK_CONCURRENCY, pending.length) }, worker));
 
   // ── Finalise ──────────────────────────────────────────────────────────────
 
@@ -293,7 +367,7 @@ export async function uploadFileInChunks(
       shouldAbort: (error) =>
         error instanceof NonRetryableUploadError ||
         (error instanceof DOMException && error.name === "AbortError"),
-    },
+    }
   );
 
   const body = await response.json();
