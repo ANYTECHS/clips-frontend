@@ -95,9 +95,8 @@ describe("GET /api/recovery/check", () => {
     expect(json.encryptedBackup).toBeNull();
   });
 
-  test("returns encryptedBackup when threshold IS met", async () => {
+  test("reports recoverable without combining shares server-side", async () => {
     const repo = getRecoveryRepository();
-    // Two guardians approved — threshold is 2
     await repo.createSession(
       makeSampleSession({
         guardians: [
@@ -107,69 +106,19 @@ describe("GET /api/recovery/check", () => {
         ],
       })
     );
-    await repo.setShare("share-1", "hex-share-1");
-    await repo.setShare("share-2", "hex-share-2");
+    // Stored shares are guardian-encrypted ciphertext.
+    await repo.setShare("share-1", "encrypted-share-1");
+    await repo.setShare("share-2", "encrypted-share-2");
 
-    jest.spyOn(shamirRecovery, "combineShares").mockReturnValue("encrypted-backup-payload");
+    const combineSharesSpy = jest.spyOn(shamirRecovery, "combineShares");
 
     const res = await GET(makeRequest(SESSION_ID));
     expect(res.status).toBe(200);
     const json = await res.json();
     expect(json.isRecoverable).toBe(true);
     expect(json.approvedCount).toBe(2);
-    expect(json.encryptedBackup).toBe("encrypted-backup-payload");
-    expect(shamirRecovery.combineShares).toHaveBeenCalledWith(["hex-share-1", "hex-share-2"]);
-  });
-
-  test("returns 500 when combineShares throws", async () => {
-    const repo = getRecoveryRepository();
-    await repo.createSession(
-      makeSampleSession({
-        guardians: [
-          { email: "guardian1@example.com", approved: true, shareId: "share-1" },
-          { email: "guardian2@example.com", approved: true, shareId: "share-2" },
-          { email: "guardian3@example.com", approved: false, shareId: "share-3" },
-        ],
-      })
-    );
-    await repo.setShare("share-1", "hex-share-1");
-    await repo.setShare("share-2", "hex-share-2");
-
-    jest.spyOn(shamirRecovery, "combineShares").mockImplementation(() => {
-      throw new Error("share reconstruction failed");
-    });
-
-    const res = await GET(makeRequest(SESSION_ID));
-    expect(res.status).toBe(500);
-    const json = await res.json();
-    expect(json.error).toMatch(/reconstruct backup/i);
-  });
-
-  test("does not return backup when shares are missing from store", async () => {
-    const repo = getRecoveryRepository();
-    // Both approved but no shares saved in store
-    await repo.createSession(
-      makeSampleSession({
-        guardians: [
-          { email: "guardian1@example.com", approved: true, shareId: "missing-1" },
-          { email: "guardian2@example.com", approved: true, shareId: "missing-2" },
-        ],
-        threshold: 2,
-      })
-    );
-    // Shares deliberately not set
-
-    const combineSharesSpy = jest
-      .spyOn(shamirRecovery, "combineShares")
-      .mockReturnValue("should-not-be-called");
-
-    const res = await GET(makeRequest(SESSION_ID));
-    // combineShares should not be called since shareValues will be empty
-    expect(combineSharesSpy).not.toHaveBeenCalled();
-    const json = await res.json();
-    // isRecoverable true but encryptedBackup null since shares not found
-    expect(json.isRecoverable).toBe(true);
     expect(json.encryptedBackup).toBeNull();
+    expect(combineSharesSpy).not.toHaveBeenCalled();
   });
 
   test("returns guardian list with approval status", async () => {

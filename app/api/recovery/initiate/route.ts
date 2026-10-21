@@ -6,6 +6,8 @@
  * - Looks up the stored recovery config for that account.
  * - Creates a time-limited session (1 hour) with all guardians marked pending.
  * - Emails every guardian an approval link.
+ * - Emails the account owner an email verification link; recovery cannot be
+ *   completed via POST /api/recovery/recover without it.
  *
  * Auth: none required — the user is locked out of their account.
  * Rate limit: 5 requests per 10 minutes per IP.
@@ -15,10 +17,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { parseJsonRequest } from "@/app/api/jobs/shared/jsonBody";
+import { createEmailVerificationToken } from "@/app/lib/emailVerification";
 import { logger } from "@/app/lib/logger";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
 
-import { sendGuardianApprovalEmail } from "../shared/mailer";
+import { sendGuardianApprovalEmail, sendOwnerVerificationEmail } from "../shared/mailer";
 import { getRecoveryRepository, type RecoverySession } from "../shared/recoveryStore";
 
 const BodySchema = z.object({
@@ -89,6 +92,23 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
       logger.error(`[recovery/initiate] Failed to email guardian ${g.email}:`, err);
     })
   );
+
+  // The owner must prove control of the account email before shares can be
+  // combined. The token is bound to this session id.
+  try {
+    emailPromises.push(
+      sendOwnerVerificationEmail({
+        to: email,
+        sessionId,
+        verificationToken: createEmailVerificationToken(sessionId, email),
+        expiresAt: new Date(expiresAt).toISOString(),
+      }).catch((err) => {
+        logger.error("[recovery/initiate] Failed to email account owner:", err);
+      })
+    );
+  } catch (err) {
+    logger.error("[recovery/initiate] Could not create verification token:", err);
+  }
 
   // Await in parallel but don't block the response on individual failures
   await Promise.allSettled(emailPromises);
