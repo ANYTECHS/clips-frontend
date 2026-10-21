@@ -161,6 +161,14 @@ const nextConfig: NextConfig = {
   // In development (NEXT_PUBLIC_CDN_URL unset) this is undefined and Next.js
   // serves assets from the app origin as normal.
   assetPrefix: CDN_URL,
+  // gzip responses served by `next start` (CDN/edge handles brotli upstream).
+  compress: true,
+  // Don't ship source maps to browsers; Sentry uploads them privately.
+  productionBrowserSourceMaps: false,
+  // Asset versioning: tie the build ID to the commit so cache keys change
+  // exactly when code does. Falls back to Next's random ID locally.
+  generateBuildId: async () =>
+    process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.GIT_COMMIT_SHA ?? null,
   headers: securityHeaders,
   images: {
     remotePatterns: [
@@ -256,13 +264,13 @@ const nextConfig: NextConfig = {
       "zod",
       "dompurify",
       "zustand",
+      "@simplewebauthn/browser",
     ],
   },
   
   // Production-only optimizations for JavaScript parsing performance (#880)
   ...(process.env.NODE_ENV === "production" && {
-    // Enable SWC minification with aggressive optimizations
-    swcMinify: true,
+    // SWC minification is always on in Next 15+ (`swcMinify` was removed).
     compiler: {
       // Remove console.* in production except errors
       removeConsole: {

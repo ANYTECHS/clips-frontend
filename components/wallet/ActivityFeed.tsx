@@ -5,7 +5,7 @@ import { Loader2, RefreshCw } from "lucide-react";
 import { sanitize } from "@/app/lib/sanitize";
 import { formatAmount } from "@/app/lib/formatAmount";
 import { useFilterQueryState } from "@/hooks/useFilterQueryState";
-import VirtualList from "@/components/common/VirtualList";
+import { VirtualList } from "@/components/common/VirtualList";
 import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
 const DEFAULT_PAGE_SIZE = 20;

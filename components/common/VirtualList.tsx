@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
 import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
@@ -18,7 +18,14 @@ export interface VirtualListProps<T> {
   className?: string;
   /** ARIA role for the outer container, e.g. "list". Omit for none. */
   ariaRole?: string;
+  /**
+   * When set, the window scroll position is saved to sessionStorage under
+   * this key on unmount and restored on mount (e.g. back-navigation).
+   */
+  scrollRestorationKey?: string;
 }
+
+const SCROLL_KEY_PREFIX = "virtual-list-scroll:";
 
 /**
  * Windowed replacement for `items.map(...)` inside a `<ul>`/`<div>`: only
@@ -36,7 +43,7 @@ export interface VirtualListProps<T> {
  * />
  * ```
  */
-export default function VirtualList<T>({
+export function VirtualList<T>({
   items,
   itemKey,
   renderItem,
@@ -45,8 +52,27 @@ export default function VirtualList<T>({
   overscanPx = VIRTUALIZATION_CONFIG.overscanPx,
   className,
   ariaRole,
+  scrollRestorationKey,
 }: VirtualListProps<T>) {
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!scrollRestorationKey) return;
+    const storageKey = SCROLL_KEY_PREFIX + scrollRestorationKey;
+    try {
+      const saved = Number(sessionStorage.getItem(storageKey));
+      if (saved > 0) requestAnimationFrame(() => window.scrollTo(0, saved));
+    } catch {
+      // sessionStorage unavailable — skip restoration
+    }
+    return () => {
+      try {
+        sessionStorage.setItem(storageKey, String(window.scrollY));
+      } catch {
+        // ignore quota / privacy-mode errors
+      }
+    };
+  }, [scrollRestorationKey]);
   const rowStride = rowHeight + gap;
   const { getTotalSize, getVirtualItems } = useSimpleVirtualizer({
     count: items.length,
