@@ -71,7 +71,31 @@ describe("Session Security (Issue #1163)", () => {
   });
 
   describe("Concurrent Session Limits", () => {
-    it("revokes oldest session when user reaches maximum concurrent sessions", async () => {
+    it("creates a session without revocation when below the configured limit", async () => {
+      process.env.MAX_CONCURRENT_SESSIONS = "2";
+
+      (prisma.userSession.findMany as jest.Mock).mockResolvedValue([
+        { id: "sess-existing", createdAt: new Date(Date.now() - 300000) },
+      ]);
+      (prisma.userSession.create as jest.Mock).mockImplementation(({ data }) =>
+        Promise.resolve({ id: "sess-new", ...data })
+      );
+
+      const session = await createTrackedSession("user-1");
+
+      expect(session.id).toBe("sess-new");
+      expect(prisma.userSession.findMany).toHaveBeenCalledWith({
+        where: {
+          userId: "user-1",
+          revokedAt: null,
+          expiresAt: { gt: expect.any(Date) },
+        },
+        orderBy: { createdAt: "asc" },
+      });
+      expect(prisma.userSession.update).not.toHaveBeenCalled();
+    });
+
+    it("revokes the oldest active session when creating at the configured limit", async () => {
       process.env.MAX_CONCURRENT_SESSIONS = "2";
 
       const existingSessions = [
@@ -91,6 +115,33 @@ describe("Session Security (Issue #1163)", () => {
       // Oldest session should be marked revoked
       expect(prisma.userSession.update).toHaveBeenCalledWith({
         where: { id: "sess-oldest" },
+        data: { revokedAt: expect.any(Date) },
+      });
+    });
+
+    it("does not count expired sessions toward the concurrent limit", async () => {
+      process.env.MAX_CONCURRENT_SESSIONS = "1";
+      const expiredAt = new Date(Date.now() - 1000);
+      const activeAt = new Date(Date.now() + 60000);
+
+      (prisma.userSession.findMany as jest.Mock).mockResolvedValue([
+        { id: "sess-active", createdAt: new Date(), expiresAt: activeAt },
+      ]);
+      (prisma.userSession.create as jest.Mock).mockImplementation(({ data }) =>
+        Promise.resolve({ id: "sess-new", ...data })
+      );
+
+      await createTrackedSession("user-1");
+
+      const query = (prisma.userSession.findMany as jest.Mock).mock.calls[0][0];
+      expect(query.where).toMatchObject({
+        userId: "user-1",
+        revokedAt: null,
+        expiresAt: { gt: expect.any(Date) },
+      });
+      expect(query.where.expiresAt.gt.getTime()).toBeGreaterThan(expiredAt.getTime());
+      expect(prisma.userSession.update).toHaveBeenCalledWith({
+        where: { id: "sess-active" },
         data: { revokedAt: expect.any(Date) },
       });
     });

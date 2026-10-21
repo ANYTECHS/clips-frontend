@@ -32,5 +32,7 @@ declare module "next-auth/jwt" {
     accessToken?: string;
     provider?: string;
     profile?: Profile;
+    trackedSessionToken?: string;
+    sessionRevoked?: boolean;
   }
 }

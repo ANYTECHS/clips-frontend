@@ -136,7 +136,7 @@ async function getAuthMiddleware() {
     const onboardingStep = session?.user
       ? (session.user as { onboardingStep?: number }).onboardingStep
       : undefined;
-    const hasToken = !!session;
+    const hasToken = !!session?.user?.id;
 
     const redirectTarget = getMiddlewareRedirectTarget(
       pathname,
