@@ -1,6 +1,8 @@
 import crypto from "crypto";
+import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { logger } from "@/app/lib/logger";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
 
 export interface GeneratedApiKey {
   key: string;
@@ -27,6 +29,10 @@ export interface ApiKeyValidationResult {
     };
   };
   error?: "missing_key" | "invalid_format" | "not_found" | "inactive" | "expired" | "revoked";
+}
+
+export interface ApiKeyRouteContext {
+  apiKey: NonNullable<ApiKeyValidationResult["apiKey"]>;
 }
 
 /**
@@ -181,5 +187,113 @@ export async function revokeApiKey(id: string, userId: string): Promise<boolean>
  */
 export function checkApiKeyScope(scopes: string[], requiredScope: string): boolean {
   if (!scopes || !Array.isArray(scopes)) return false;
-  return scopes.includes(requiredScope) || scopes.includes("*") || scopes.includes("admin");
+  const action = requiredScope.split(":").at(-1);
+  return (
+    scopes.includes(requiredScope) ||
+    (action !== requiredScope && scopes.includes(action)) ||
+    scopes.includes("*") ||
+    scopes.includes("admin")
+  );
+}
+
+export function getApiKeyQuotaConfig() {
+  const limit = Number.parseInt(process.env.API_KEY_REQUEST_QUOTA ?? "1000", 10);
+  const windowMs = Number.parseInt(process.env.API_KEY_QUOTA_WINDOW_MS ?? "3600000", 10);
+
+  return {
+    limit: Number.isFinite(limit) && limit > 0 ? limit : 1000,
+    windowMs: Number.isFinite(windowMs) && windowMs > 0 ? windowMs : 3_600_000,
+  };
+}
+
+export function getApiKeyQuotaWindow(now = Date.now()) {
+  const { windowMs } = getApiKeyQuotaConfig();
+  const startAt = Math.floor(now / windowMs) * windowMs;
+  return { startAt, endsAt: startAt + windowMs };
+}
+
+function getRequestKey(request: NextRequest): string | null {
+  const apiKeyHeader = request.headers.get("x-api-key");
+  if (apiKeyHeader) return apiKeyHeader.trim();
+
+  const authorization = request.headers.get("authorization");
+  if (!authorization) return null;
+
+  const [scheme, token, ...rest] = authorization.split(" ");
+  return scheme?.toLowerCase() === "bearer" && token && rest.length === 0 ? token.trim() : null;
+}
+
+function recordApiKeyUsage(
+  apiKeyId: string,
+  request: NextRequest,
+  statusCode: number,
+  startedAt: number
+) {
+  void prisma.apiUsage
+    .create({
+      data: {
+        apiKeyId,
+        endpoint: request.nextUrl.pathname,
+        method: request.method,
+        statusCode,
+        responseTime: Date.now() - startedAt,
+      },
+    })
+    .catch((error) => {
+      logger.warn("[ApiKey] Failed to record API usage:", error);
+    });
+}
+
+/** Wraps a route handler with API-key scope checks, quota enforcement, and usage logging. */
+export function requireScope(scope: string) {
+  return function <Context extends object = Record<string, never>>(
+    handler: (
+      request: NextRequest,
+      context: Context & ApiKeyRouteContext
+    ) => Response | Promise<Response>
+  ) {
+    return async (request: NextRequest, context?: Context): Promise<Response> => {
+      const startedAt = Date.now();
+      const rawKey = getRequestKey(request);
+
+      if (!rawKey) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+
+      const validation = await validateApiKey(rawKey);
+      if (!validation.valid || !validation.apiKey) {
+        return NextResponse.json({ error: "Invalid API key" }, { status: 401 });
+      }
+
+      const { apiKey } = validation;
+      const quota = getApiKeyQuotaConfig();
+      const quotaWindow = getApiKeyQuotaWindow(startedAt);
+      const rateLimited = await applyRateLimit(request, {
+        limit: quota.limit,
+        windowMs: Math.max(1, quotaWindow.endsAt - Date.now()),
+        key: `api-key:${apiKey.id}`,
+      });
+      if (rateLimited) {
+        recordApiKeyUsage(apiKey.id, request, 429, startedAt);
+        return rateLimited;
+      }
+
+      if (!checkApiKeyScope(apiKey.scopes, scope)) {
+        recordApiKeyUsage(apiKey.id, request, 403, startedAt);
+        return NextResponse.json({ error: "Insufficient scope", required: scope }, { status: 403 });
+      }
+
+      try {
+        const response = await handler(request, {
+          ...(context ?? ({} as Context)),
+          apiKey,
+        });
+        recordApiKeyUsage(apiKey.id, request, response.status, startedAt);
+        return response;
+      } catch (error) {
+        recordApiKeyUsage(apiKey.id, request, 500, startedAt);
+        throw error;
+      }
+    };
+  };
 }

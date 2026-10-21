@@ -10,6 +10,7 @@ import {
 } from "@/app/api/keys/[id]/route";
 import { auth } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
+import { getApiKeyQuotaConfig } from "@/app/lib/apiKey";
 
 jest.mock("@/app/lib/auth", () => ({
   auth: jest.fn(),
@@ -25,6 +26,9 @@ jest.mock("@/app/lib/prisma", () => ({
       create: jest.fn(),
       updateMany: jest.fn(),
       deleteMany: jest.fn(),
+    },
+    apiUsage: {
+      groupBy: jest.fn(),
     },
     auditLog: {
       findFirst: jest.fn(),
@@ -62,6 +66,9 @@ describe("API Keys Management API (Issue #1164)", () => {
       ];
 
       (prisma.apiKey.findMany as jest.Mock).mockResolvedValue(mockKeys);
+      (prisma.apiUsage.groupBy as jest.Mock).mockResolvedValue([
+        { apiKeyId: "key-1", _count: { _all: 3 } },
+      ]);
 
       const req = new NextRequest("http://localhost/api/keys");
       const res = await keysGET(req);
@@ -70,6 +77,17 @@ describe("API Keys Management API (Issue #1164)", () => {
       const json = await res.json();
       expect(json.apiKeys.length).toBe(1);
       expect(json.apiKeys[0].keyPrefix).toBe("ck_live_12345678");
+      expect(json.apiKeys[0].totalRequests).toBe(5);
+      expect(json.apiKeys[0].quotaRemaining).toBe(Math.max(0, getApiKeyQuotaConfig().limit - 3));
+      expect(prisma.apiUsage.groupBy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          by: ["apiKeyId"],
+          where: expect.objectContaining({
+            apiKeyId: { in: ["key-1"] },
+            createdAt: { gte: expect.any(Date) },
+          }),
+        })
+      );
       // Raw key must never be exposed in list responses
       expect(json.apiKeys[0].key).toBeUndefined();
     });

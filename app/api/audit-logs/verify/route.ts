@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
-import { authenticateApiKey } from "@/app/api/lib/apiAuth";
+import { requireScope, type ApiKeyRouteContext } from "@/app/lib/apiKey";
 import { verifyAuditLogIntegrity } from "@/app/lib/auditLog";
 import { logger } from "@/app/lib/logger";
 
@@ -9,19 +9,10 @@ import { logger } from "@/app/lib/logger";
  * Validates the cryptographic hash chain of the audit log repository.
  * Requires authenticated access.
  */
-export async function GET(req: NextRequest) {
+async function verifyAuditLogs(req: NextRequest, context?: ApiKeyRouteContext) {
   try {
-    let isAuthenticated = false;
-
-    const session = await auth();
-    if (session?.user?.id) {
-      isAuthenticated = true;
-    } else {
-      const apiAuth = await authenticateApiKey(req);
-      if (apiAuth.success) {
-        isAuthenticated = true;
-      }
-    }
+    const session = context?.apiKey ? null : await auth();
+    const isAuthenticated = Boolean(context?.apiKey.userId || session?.user?.id);
 
     if (!isAuthenticated) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -42,4 +33,12 @@ export async function GET(req: NextRequest) {
     logger.error("[AuditLog Verify API] Verification failed:", error);
     return NextResponse.json({ error: "Failed to verify audit logs" }, { status: 500 });
   }
+}
+
+const verifyAuditLogsWithScope = requireScope("audit:read")(verifyAuditLogs);
+
+export async function GET(req: NextRequest) {
+  const authorization = req.headers.get("authorization") ?? "";
+  const hasApiKey = req.headers.has("x-api-key") || /^Bearer\s+(ck_|ak_)/i.test(authorization);
+  return hasApiKey ? verifyAuditLogsWithScope(req) : verifyAuditLogs(req);
 }

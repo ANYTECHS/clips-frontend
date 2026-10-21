@@ -18,6 +18,7 @@ import { requireJobOwner } from "../../shared/authGuard";
 import { logger } from "@/app/lib/logger";
 import type { Job } from "../../shared/jobStore";
 import { deprecatedAlias } from "@/app/api/versioning";
+import type { ApiKeyRouteContext } from "@/app/lib/apiKey";
 
 const POLL_INTERVAL_MS = 1_000;
 /**
@@ -28,10 +29,10 @@ const MAX_STORE_ERRORS = 5;
 
 async function getJobStream(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> } & Partial<ApiKeyRouteContext>
 ) {
   const { id: jobId } = await context.params;
-  const result = await requireJobOwner(jobId);
+  const result = await requireJobOwner(jobId, context.apiKey?.userId);
   if (result instanceof Response) return result;
 
   const stream = new ReadableStream({
@@ -62,17 +63,17 @@ async function getJobStream(
           consecutiveStoreErrors += 1;
           logger.error(
             `[SSE:${jobId}] Store read error (${consecutiveStoreErrors}/${MAX_STORE_ERRORS}):`,
-            err,
+            err
           );
 
           if (consecutiveStoreErrors >= MAX_STORE_ERRORS) {
             logger.error(
-              `[SSE:${jobId}] Store unavailable after ${MAX_STORE_ERRORS} attempts — closing stream`,
+              `[SSE:${jobId}] Store unavailable after ${MAX_STORE_ERRORS} attempts — closing stream`
             );
             safeSendErrorEvent(
               controller,
               "STORE_UNAVAILABLE",
-              "Job store is temporarily unavailable. Please refresh to reconnect.",
+              "Job store is temporarily unavailable. Please refresh to reconnect."
             );
             clearInterval(intervalId);
             safeClose(controller);
@@ -109,7 +110,11 @@ async function getJobStream(
       // ── helpers scoped to this stream instance ──────────────────────────
       function safeSendEvent(c: ReadableStreamDefaultController, job: Job) {
         if (closed) return;
-        try { sendEvent(c, job); } catch { /* stream already closed */ }
+        try {
+          sendEvent(c, job);
+        } catch {
+          /* stream already closed */
+        }
       }
 
       function safeSendErrorEvent(
@@ -118,13 +123,21 @@ async function getJobStream(
         errorMessage: string
       ) {
         if (closed) return;
-        try { sendErrorEvent(c, errorCode, errorMessage); } catch { /* stream already closed */ }
+        try {
+          sendErrorEvent(c, errorCode, errorMessage);
+        } catch {
+          /* stream already closed */
+        }
       }
 
       function safeClose(c: ReadableStreamDefaultController) {
         if (closed) return;
         closed = true;
-        try { c.close(); } catch { /* already closed */ }
+        try {
+          c.close();
+        } catch {
+          /* already closed */
+        }
       }
     },
   });
@@ -133,7 +146,7 @@ async function getJobStream(
     headers: {
       "Content-Type": "text/event-stream",
       "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
+      Connection: "keep-alive",
       // Prevent Vercel / nginx from buffering SSE responses.
       "X-Accel-Buffering": "no",
     },

@@ -1,11 +1,18 @@
+/**
+ * @jest-environment node
+ */
+import { NextRequest, NextResponse } from "next/server";
 import {
   generateApiKey,
   hashApiKey,
   validateApiKey,
   checkApiKeyScope,
   revokeApiKey,
+  requireScope,
+  getApiKeyQuotaWindow,
 } from "@/app/lib/apiKey";
 import { prisma } from "@/app/lib/prisma";
+import { applyRateLimit } from "@/app/lib/serverRateLimit";
 
 jest.mock("@/app/lib/prisma", () => ({
   prisma: {
@@ -15,12 +22,21 @@ jest.mock("@/app/lib/prisma", () => ({
       update: jest.fn(),
       updateMany: jest.fn(),
     },
+    apiUsage: {
+      create: jest.fn(),
+    },
   },
+}));
+
+jest.mock("@/app/lib/serverRateLimit", () => ({
+  applyRateLimit: jest.fn(),
 }));
 
 describe("API Key Management (Issue #1164)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (applyRateLimit as jest.Mock).mockResolvedValue(null);
+    (prisma.apiUsage.create as jest.Mock).mockResolvedValue({});
   });
 
   describe("generateApiKey & hashApiKey", () => {
@@ -125,12 +141,136 @@ describe("API Key Management (Issue #1164)", () => {
     it("allows access when scope matches", () => {
       expect(checkApiKeyScope(["read", "write"], "read")).toBe(true);
       expect(checkApiKeyScope(["read", "write"], "write")).toBe(true);
+      expect(checkApiKeyScope(["read"], "clips:read")).toBe(true);
+      expect(checkApiKeyScope(["read"], "clips:write")).toBe(false);
       expect(checkApiKeyScope(["read"], "delete")).toBe(false);
     });
 
     it("allows access with wildcard * or admin scope", () => {
       expect(checkApiKeyScope(["*"], "delete")).toBe(true);
       expect(checkApiKeyScope(["admin"], "anything")).toBe(true);
+    });
+  });
+
+  describe("requireScope", () => {
+    const rawKey = "ck_live_scoped1234567890abcdef1234567890";
+
+    beforeEach(() => {
+      (prisma.apiKey.findUnique as jest.Mock).mockResolvedValue({
+        id: "key-scoped",
+        userId: "user-1",
+        name: "Scoped key",
+        keyPrefix: rawKey.slice(0, 16),
+        scopes: ["read"],
+        active: true,
+        revokedAt: null,
+        expiresAt: null,
+        user: { id: "user-1", email: "user@test.com", plan: "pro" },
+      });
+      (prisma.apiKey.update as jest.Mock).mockResolvedValue({});
+    });
+
+    it("returns the required scope in a 403 response and records usage", async () => {
+      const handler = jest.fn();
+      const route = requireScope("write")(handler);
+      const request = new NextRequest("http://localhost/api/v1/upload", {
+        method: "POST",
+        headers: { "x-api-key": rawKey },
+      });
+
+      const response = await route(request);
+
+      expect(response.status).toBe(403);
+      expect(await response.json()).toEqual({ error: "Insufficient scope", required: "write" });
+      expect(handler).not.toHaveBeenCalled();
+      expect(prisma.apiUsage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          apiKeyId: "key-scoped",
+          endpoint: "/api/v1/upload",
+          method: "POST",
+          statusCode: 403,
+          responseTime: expect.any(Number),
+        }),
+      });
+    });
+
+    it("does not wait for the usage write before returning a successful response", async () => {
+      (prisma.apiKey.findUnique as jest.Mock).mockImplementation(async () => ({
+        id: "key-scoped",
+        userId: "user-1",
+        scopes: ["write"],
+        active: true,
+        revokedAt: null,
+        expiresAt: null,
+      }));
+      (prisma.apiUsage.create as jest.Mock).mockReturnValue(new Promise(() => {}));
+      const handler = jest
+        .fn()
+        .mockResolvedValue(NextResponse.json({ success: true }, { status: 201 }));
+      const route = requireScope("write")(handler);
+      const request = new NextRequest("http://localhost/api/v1/upload", {
+        method: "POST",
+        headers: { "x-api-key": rawKey },
+      });
+
+      const response = await route(request);
+
+      expect(response.status).toBe(201);
+      expect(prisma.apiUsage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({
+          apiKeyId: "key-scoped",
+          endpoint: "/api/v1/upload",
+          method: "POST",
+          statusCode: 201,
+          responseTime: expect.any(Number),
+        }),
+      });
+    });
+
+    it("returns 429 with Retry-After when the key exceeds its quota", async () => {
+      (prisma.apiKey.findUnique as jest.Mock).mockImplementation(async () => ({
+        id: "key-scoped",
+        userId: "user-1",
+        scopes: ["write"],
+        active: true,
+        revokedAt: null,
+        expiresAt: null,
+      }));
+      (applyRateLimit as jest.Mock).mockResolvedValue(
+        NextResponse.json(
+          { error: "Too many requests" },
+          {
+            status: 429,
+            headers: { "Retry-After": "60" },
+          }
+        )
+      );
+      const handler = jest.fn();
+      const route = requireScope("write")(handler);
+      const request = new NextRequest("http://localhost/api/v1/upload", {
+        method: "POST",
+        headers: { "x-api-key": rawKey },
+      });
+
+      const response = await route(request);
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("60");
+      expect(handler).not.toHaveBeenCalled();
+      expect(prisma.apiUsage.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ apiKeyId: "key-scoped", statusCode: 429 }),
+      });
+    });
+
+    it("rotates quota windows at the configured reset boundary", () => {
+      const previousWindow = process.env.API_KEY_QUOTA_WINDOW_MS;
+      process.env.API_KEY_QUOTA_WINDOW_MS = "60000";
+
+      expect(getApiKeyQuotaWindow(119999)).toEqual({ startAt: 60000, endsAt: 120000 });
+      expect(getApiKeyQuotaWindow(120000)).toEqual({ startAt: 120000, endsAt: 180000 });
+
+      if (previousWindow === undefined) delete process.env.API_KEY_QUOTA_WINDOW_MS;
+      else process.env.API_KEY_QUOTA_WINDOW_MS = previousWindow;
     });
   });
 
