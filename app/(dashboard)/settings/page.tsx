@@ -50,7 +50,7 @@ import { NotificationChannelSettings } from "@/components/settings/NotificationC
 import PrivacySettings from "@/components/settings/PrivacySettings";
 import { Theme, useTheme } from "@/components/theme-provider";
 import Skeleton from "@/components/ui/Skeleton";
-import TrustlineManager from "@/components/wallet/TrustlineManager";
+import { TrustlineManager } from "@/components/wallet/TrustlineManager";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { useWallet } from "@/components/WalletProvider";
 import { useToast } from "@/hooks/useToast";

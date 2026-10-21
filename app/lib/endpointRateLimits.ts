@@ -40,6 +40,8 @@
  * │ /api/auth/passkey     (POST)            │   10   │ 1 min    │
  * │ /api/recovery         (POST)            │    5   │ 1 min    │
  * │ /api/nft/mint         (POST)            │   10   │ 1 min    │
+ * │ /api/sponsorship/sponsor (POST)         │    5   │ 1 min    │
+ * │ /api/wallet/trustline (POST/DELETE)     │   20   │ 1 min    │
  * │ /api/user/profile     (GET/PATCH)       │   30   │ 1 min    │
  * │ /api/billing          (POST/GET)        │   20   │ 1 min    │
  * │ /api/analytics        (POST)            │  100   │ 1 min    │
@@ -201,6 +203,18 @@ const ENDPOINT_LIMITS: Record<string, EndpointRateLimit> = {
     limit: 30,
     windowMs: 60_000,
     description: "30 archive actions/min",
+  },
+
+  // ── Stellar wallet / sponsorship ───────────────────────────────────────────
+  "/api/sponsorship/sponsor": {
+    limit: 5,
+    windowMs: 60_000,
+    description: "5 fee sponsorship requests/min",
+  },
+  "/api/wallet/trustline": {
+    limit: 20,
+    windowMs: 60_000,
+    description: "20 trustline builds/submissions/min",
   },
 
   // ── Search / Explore ───────────────────────────────────────────────────────

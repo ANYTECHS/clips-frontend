@@ -30,6 +30,11 @@ export interface Clip {
   archivedAt?: string | null;
   transformations?: unknown[];
   shareId?: string | null;
+  /** Token id returned by the NFT contract once the clip is minted */
+  nftTokenId?: string | null;
+  /** Hash of the mint transaction */
+  nftTxHash?: string | null;
+  mintedAt?: string | null;
 }
 
 export function clipFingerprint(clip: Clip): string {
@@ -224,6 +229,32 @@ class ClipsStore {
       return clip;
     });
     return updatedCount;
+  }
+
+  /**
+   * Marks a clip as minted and stores its NFT token id.
+   * Returns false when the clip does not exist, is deleted or is already minted.
+   */
+  markClipMinted(
+    userId: string,
+    clipId: string,
+    mint: { tokenId: string; txHash: string }
+  ): boolean {
+    let updated = false;
+    this.clips = this.clips.map((clip) => {
+      if (clip.userId === userId && clip.id === clipId && !clip.deletedAt && !clip.nftTokenId) {
+        updated = true;
+        return {
+          ...clip,
+          status: "minted",
+          nftTokenId: mint.tokenId,
+          nftTxHash: mint.txHash,
+          mintedAt: new Date().toISOString(),
+        };
+      }
+      return clip;
+    });
+    return updated;
   }
 
   /**

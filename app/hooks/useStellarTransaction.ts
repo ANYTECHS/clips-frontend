@@ -2,11 +2,17 @@
 
 import { useCallback, useRef,useState } from "react";
 
+import { requestFeeSponsorship, FeeSponsorshipError } from "@/app/hooks/useFeeSponsorship";
 import { TRANSACTION_TIMEOUT_MS } from "@/app/lib/constants";
 import { captureSorobanNotSupportedWarning } from "@/app/lib/sentry";
 import type { StellarTransactionError } from "@/app/lib/stellar";
 import { submitTransaction } from "@/app/lib/stellar";
 import type { StellarOperation } from "@/app/lib/stellarOperations";
+import {
+  canCoverFee,
+  fetchAccountXlmStatus,
+  parseTransactionXdr,
+} from "@/app/lib/stellarTransaction";
 import {
   BatchValidationError,
   INVOKE_CONTRACT_USER_MESSAGE,
@@ -21,7 +27,7 @@ export type { StellarTransactionError };
  * Stellar transaction processing lifecycle state designations.
  */
 export type StellarTransactionStatus =
-  "idle" | "building" | "signing" | "submitting" | "success" | "error";
+  "idle" | "building" | "signing" | "sponsoring" | "submitting" | "success" | "error";
 
 /**
  * Supported operational core network types.
@@ -49,6 +55,8 @@ export interface UseStellarTransactionState {
   transactionHash: string | null;
   /** Operations queued for the next batch transaction */
   queuedOperations: QueuedOperation[];
+  /** True when the platform paid the fee of the last transaction via a fee bump */
+  feeSponsored: boolean;
 }
 
 /**
@@ -65,6 +73,11 @@ export interface StellarTransactionOptions {
   onSuccess?: (result: StellarTransactionResult) => void;
   /** Optional handler callback fired on any rejection or network error */
   onError?: (error: StellarTransactionError) => void;
+  /**
+   * Request platform fee sponsorship when the user's XLM balance cannot cover
+   * the fee. Defaults to on when `NEXT_PUBLIC_SPONSOR_PUBLIC_KEY` is set.
+   */
+  enableFeeSponsorship?: boolean;
 }
 
 /**
@@ -85,6 +98,39 @@ export interface QueuedOperation {
   operation: StellarOperation;
   /** Human-readable label shown in confirmation UI (e.g. "Add USDC trustline") */
   label?: string;
+}
+
+/**
+ * Whether the user's spendable XLM (balance above the minimum reserve) is too
+ * low to pay the fee of an unsigned transaction.
+ *
+ * Fails open (returns false) when the XDR or the account cannot be inspected,
+ * so the normal unsponsored path is used.
+ *
+ * @param xdr - Unsigned transaction envelope.
+ * @param publicKey - The fee-paying user account.
+ * @param network - Active network.
+ */
+export async function needsFeeSponsorship(
+  xdr: string,
+  publicKey: string,
+  network: StellarNetwork
+): Promise<boolean> {
+  let feeStroops: number;
+  try {
+    const tx = parseTransactionXdr(xdr, network);
+    if ("innerTransaction" in tx) return false;
+    feeStroops = Number(tx.fee);
+  } catch {
+    return false;
+  }
+
+  try {
+    const accountStatus = await fetchAccountXlmStatus(publicKey, network);
+    return !canCoverFee(accountStatus, feeStroops);
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -113,6 +159,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
     maxRetries = 3,
     onSuccess,
     onError,
+    enableFeeSponsorship = Boolean(process.env.NEXT_PUBLIC_SPONSOR_PUBLIC_KEY),
   } = options;
 
   const [state, setState] = useState<UseStellarTransactionState>({
@@ -122,6 +169,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
     result: null,
     transactionHash: null,
     queuedOperations: [],
+    feeSponsored: false,
   });
 
   const retryCountRef = useRef(0);
@@ -255,6 +303,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
         error: null,
         result: null,
         transactionHash: null,
+        feeSponsored: false,
       }));
       retryCountRef.current = 0;
 
@@ -264,8 +313,31 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
 
         const publicKey = await getPublicKey();
 
+        // Check before signing so the user is not asked to sign twice
+        const sponsorFee =
+          enableFeeSponsorship && (await needsFeeSponsorship(xdr, publicKey, network));
+
         setState((prev) => ({ ...prev, status: "signing" }));
-        const signedXdr = await signTransaction(xdr, publicKey);
+        let signedXdr = await signTransaction(xdr, publicKey);
+
+        if (sponsorFee) {
+          // The inner transaction must be signed before it is wrapped in the
+          // sponsor's fee-bump envelope.
+          setState((prev) => ({ ...prev, status: "sponsoring" }));
+          try {
+            const grant = await requestFeeSponsorship({ innerXdr: signedXdr, publicKey });
+            signedXdr = grant.feeBumpXdr;
+          } catch (err) {
+            const error: StellarTransactionError = {
+              code: err instanceof FeeSponsorshipError ? `SPONSORSHIP_${err.code}` : "SPONSORSHIP_FAILED",
+              message:
+                err instanceof Error
+                  ? `Your XLM balance cannot cover the fee and sponsorship failed: ${err.message}`
+                  : "Your XLM balance cannot cover the fee and sponsorship failed.",
+            };
+            throw error;
+          }
+        }
 
         setState((prev) => ({ ...prev, status: "submitting" }));
         let result: StellarTransactionResult | null = null;
@@ -306,6 +378,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
           result,
           transactionHash: result.hash,
           queuedOperations: [],
+          feeSponsored: sponsorFee,
         });
 
         onSuccess?.(result);
@@ -351,6 +424,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
       maxRetries,
       onSuccess,
       onError,
+      enableFeeSponsorship,
     ]
   );
 
@@ -370,6 +444,7 @@ export function useStellarTransaction(options: StellarTransactionOptions = {}) {
       result: null,
       transactionHash: null,
       queuedOperations: [],
+      feeSponsored: false,
     });
     retryCountRef.current = 0;
   }, []);

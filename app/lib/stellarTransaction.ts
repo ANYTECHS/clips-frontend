@@ -35,6 +35,8 @@
  * const result = await server.submitTransaction(tx);
  */
 
+import * as StellarSdk from "@stellar/stellar-sdk";
+
 import { STELLAR_NETWORKS, StellarNetwork } from "./embeddedWallet";
 import { StellarOperation, validateOperations } from "./stellarOperations";
 import { BASE_BACKOFF_MS } from "@/app/lib/constants";
@@ -107,6 +109,12 @@ export interface HorizonAccountResponse {
   /** 64-bit sequence identifier string. */
   sequence: string;
   balances: Array<{ asset_type: string; balance: string }>;
+  /** Number of subentries (trustlines, offers, signers, data) — drives the minimum reserve. */
+  subentry_count?: number;
+  /** Number of reserves this account is sponsoring for others. */
+  num_sponsoring?: number;
+  /** Number of this account's reserves paid for by a sponsor. */
+  num_sponsored?: number;
 }
 
 /** Packaging containing confirmation markers from Horizon upon transaction processing. */
@@ -381,3 +389,352 @@ export async function submitStellarTransaction(
       };
     } catch (err) {
       if (!(err instanceof StellarTransactionError)) {
+        // Unexpected non-Stellar error — wrap and rethrow
+        throw new StellarTransactionError(
+          "unknown",
+          err instanceof Error ? err.message : "Unknown error during transaction submission",
+          false,
+          totalAttempts
+        );
+      }
+
+      // ── Sequence number conflict ──────────────────────────────────────────
+      if (isSeqError(err.code)) {
+        if (seqRetries >= MAX_SEQ_RETRIES) {
+          throw new StellarTransactionError(
+            "tx_bad_seq",
+            `Sequence number conflict persisted after ${seqRetries} retries. ` +
+              "Another transaction may be in flight. Please wait and try again.",
+            false,
+            totalAttempts
+          );
+        }
+
+        seqRetries++;
+        // Force a fresh sequence number fetch on the next iteration
+        currentSequence = null;
+
+        const nextDelayMs = 0; // Seq errors don't need backoff — just re-fetch
+        onRetry?.({ attempt: totalAttempts, reason: "tx_bad_seq", nextDelayMs });
+        continue;
+      }
+
+      // ── Transient network error ───────────────────────────────────────────
+      if (isRetryable(err.code)) {
+        if (networkRetries >= MAX_NETWORK_RETRIES) {
+          throw new StellarTransactionError(
+            err.code,
+            `Network error persisted after ${networkRetries} retries: ${err.message}`,
+            false,
+            totalAttempts
+          );
+        }
+
+        networkRetries++;
+        const nextDelayMs = BASE_BACKOFF_MS * Math.pow(2, networkRetries - 1);
+        onRetry?.({ attempt: totalAttempts, reason: err.code, nextDelayMs });
+        await backoffDelay(networkRetries - 1);
+        continue;
+      }
+
+      // ── Non-retryable error ───────────────────────────────────────────────
+      throw new StellarTransactionError(
+        err.code,
+        err.message,
+        false,
+        totalAttempts
+      );
+    }
+  }
+}
+
+// ─── User-facing error message helper ────────────────────────────────────────
+
+/**
+ * Convert a StellarTransactionError into a user-friendly message.
+ * Use this in UI components to display actionable error text.
+ */
+export function getStellarErrorMessage(error: unknown): string {
+  if (!(error instanceof StellarTransactionError)) {
+    return "An unexpected error occurred. Please try again.";
+  }
+
+  switch (error.code) {
+    case "tx_bad_seq":
+      return "Transaction failed due to a sequence number conflict. This can happen when multiple transactions are submitted at the same time. Please try again.";
+    case "tx_bad_auth":
+      return "Transaction signature is invalid. Please reconnect your wallet and try again.";
+    case "tx_insufficient_fee":
+      return "The transaction fee is too low. Please try again — the fee will be adjusted automatically.";
+    case "tx_no_account":
+      return "Your Stellar account has not been activated yet. Please fund it via Friendbot (testnet) or send at least 1 XLM to activate it.";
+    case "tx_failed":
+      return `Transaction was rejected by the network: ${error.message}`;
+    case "network_error":
+      return "Network error while submitting the transaction. Check your connection and try again.";
+    case "timeout":
+      return "Transaction submission timed out. The network may be congested — please try again.";
+    default:
+      return `Transaction failed: ${error.message}`;
+  }
+}
+
+// ─── Fee bumping (gasless transactions) ──────────────────────────────────────
+
+/** Stellar base reserve per ledger entry, in XLM. */
+export const BASE_RESERVE_XLM = 0.5;
+
+const STROOPS_PER_XLM = 10_000_000;
+
+/** Options controlling how a fee-bump envelope is built. */
+export interface FeeBumpOptions {
+  /** Fee per operation the sponsor is willing to pay, in stroops (defaults to the inner tx rate or the network minimum). */
+  baseFee?: number;
+  /** Network whose passphrase the envelope is signed for (default: testnet). */
+  network?: StellarNetwork;
+}
+
+/**
+ * Parse a base64 XDR envelope into a Transaction or FeeBumpTransaction.
+ *
+ * @param xdr - Base64-encoded transaction envelope.
+ * @param network - Network whose passphrase the envelope was built for.
+ * @throws {StellarTransactionError} When the XDR cannot be decoded.
+ */
+export function parseTransactionXdr(
+  xdr: string,
+  network: StellarNetwork
+): StellarSdk.Transaction | StellarSdk.FeeBumpTransaction {
+  try {
+    return StellarSdk.TransactionBuilder.fromXDR(xdr, STELLAR_NETWORKS[network].networkPassphrase);
+  } catch (err) {
+    throw new StellarTransactionError(
+      "unknown",
+      `Invalid transaction XDR: ${err instanceof Error ? err.message : String(err)}`,
+      false
+    );
+  }
+}
+
+/** Per-operation inclusion fee of an inner transaction, excluding any Soroban resource fee. */
+function innerInclusionFeeRate(innerTx: StellarSdk.Transaction): number {
+  const ops = Math.max(1, innerTx.operations.length);
+  let resourceFee = 0;
+  try {
+    const ext = innerTx.toEnvelope().v1().tx().ext();
+    if (ext.switch() === 1) {
+      resourceFee = Number(ext.sorobanData().resourceFee().toString());
+    }
+  } catch {
+    // Classic transaction — no Soroban resource fee
+  }
+  return Math.ceil((Number(innerTx.fee) - resourceFee) / ops);
+}
+
+/**
+ * Wrap an inner transaction in a fee-bump envelope paid for by the sponsor
+ * account, and sign the envelope with the sponsor's keypair.
+ *
+ * The inner transaction's signatures are part of the fee-bump payload, so the
+ * user must sign the inner transaction *before* it is wrapped. Server-side
+ * only — the sponsor keypair carries the sponsor's secret key.
+ *
+ * @param innerTx - The user-signed inner transaction (object or base64 XDR).
+ * @param sponsorKeypair - Keypair of the account paying the fee.
+ * @param options - Fee and network overrides.
+ * @returns The sponsor-signed fee-bump transaction.
+ * @throws {StellarTransactionError} When the inner transaction is invalid or already fee-bumped.
+ */
+export function buildFeeBumpedTx(
+  innerTx: StellarSdk.Transaction | string,
+  sponsorKeypair: StellarSdk.Keypair,
+  options: FeeBumpOptions = {}
+): StellarSdk.FeeBumpTransaction {
+  const network = options.network ?? "testnet";
+  const { networkPassphrase } = STELLAR_NETWORKS[network];
+
+  const parsed = typeof innerTx === "string" ? parseTransactionXdr(innerTx, network) : innerTx;
+  if (parsed instanceof StellarSdk.FeeBumpTransaction) {
+    throw new StellarTransactionError("unknown", "Transaction is already fee-bumped.", false);
+  }
+
+  const baseFee = Math.max(
+    Number(StellarSdk.BASE_FEE),
+    options.baseFee ?? 0,
+    innerInclusionFeeRate(parsed)
+  );
+
+  const feeBumpTx = StellarSdk.TransactionBuilder.buildFeeBumpTransaction(
+    sponsorKeypair,
+    baseFee.toString(),
+    parsed,
+    networkPassphrase
+  );
+  feeBumpTx.sign(sponsorKeypair);
+  return feeBumpTx;
+}
+
+// ─── Account fee coverage ────────────────────────────────────────────────────
+
+/** Native balance and minimum reserve of an account, in XLM. */
+export interface AccountXlmStatus {
+  /** False when the account has not been created on-chain yet. */
+  exists: boolean;
+  balance: number;
+  minReserve: number;
+  /** XLM above the minimum reserve, i.e. what the account can spend on fees. */
+  spendable: number;
+}
+
+/**
+ * Minimum XLM balance an account must hold: (2 + subentries + sponsoring - sponsored) × base reserve.
+ */
+export function computeMinReserve(
+  account: Pick<HorizonAccountResponse, "subentry_count" | "num_sponsoring" | "num_sponsored">
+): number {
+  const entries =
+    2 + (account.subentry_count ?? 0) + (account.num_sponsoring ?? 0) - (account.num_sponsored ?? 0);
+  return Math.max(0, entries) * BASE_RESERVE_XLM;
+}
+
+/**
+ * Fetch an account's native balance and minimum reserve from Horizon.
+ *
+ * @param publicKey - Account to inspect.
+ * @param network - Active network target.
+ * @returns Balance status; `exists: false` for unfunded accounts.
+ * @throws {StellarTransactionError} On Horizon connectivity failures.
+ */
+export async function fetchAccountXlmStatus(
+  publicKey: string,
+  network: StellarNetwork
+): Promise<AccountXlmStatus> {
+  const { horizonUrl } = STELLAR_NETWORKS[network];
+  const res = await fetch(`${horizonUrl}/accounts/${encodeURIComponent(publicKey)}`);
+
+  if (res.status === 404) {
+    return { exists: false, balance: 0, minReserve: 0, spendable: 0 };
+  }
+
+  if (!res.ok) {
+    throw new StellarTransactionError(
+      "network_error",
+      `Failed to fetch account balance: HTTP ${res.status}`,
+      true
+    );
+  }
+
+  const data: HorizonAccountResponse = await res.json();
+  const balance = parseFloat(data.balances.find((b) => b.asset_type === "native")?.balance ?? "0");
+  const minReserve = computeMinReserve(data);
+
+  return { exists: true, balance, minReserve, spendable: Math.max(0, balance - minReserve) };
+}
+
+/**
+ * Whether an account can pay a transaction fee from its spendable XLM.
+ *
+ * @param status - Result of `fetchAccountXlmStatus`.
+ * @param feeStroops - Transaction fee in stroops.
+ */
+export function canCoverFee(status: AccountXlmStatus, feeStroops: number): boolean {
+  return status.exists && status.spendable * STROOPS_PER_XLM >= feeStroops;
+}
+
+// ─── Trustline transactions ──────────────────────────────────────────────────
+
+/** Parameters describing a trustline change. */
+export interface ChangeTrustParams {
+  sourcePublicKey: string;
+  assetCode: string;
+  assetIssuer: string;
+  /** "add" creates/updates the trustline, "remove" sets its limit to 0. */
+  action: "add" | "remove";
+  /** Optional trust limit (only used for "add"). */
+  limit?: string;
+  network: StellarNetwork;
+}
+
+/**
+ * Build an unsigned change-trust transaction for the user to sign.
+ *
+ * @param params - Trustline change description.
+ * @returns Base64-encoded unsigned transaction envelope.
+ * @throws {StellarTransactionError} When the source account cannot be loaded.
+ */
+export async function buildChangeTrustTx(params: ChangeTrustParams): Promise<string> {
+  const { sourcePublicKey, assetCode, assetIssuer, action, limit, network } = params;
+  const { horizonUrl, networkPassphrase } = STELLAR_NETWORKS[network];
+  const server = new StellarSdk.Horizon.Server(horizonUrl);
+
+  let account: StellarSdk.Horizon.AccountResponse;
+  try {
+    account = await server.loadAccount(sourcePublicKey);
+  } catch (err) {
+    if ((err as { response?: { status?: number } }).response?.status === 404) {
+      throw new StellarTransactionError(
+        "tx_no_account",
+        `Account ${sourcePublicKey} does not exist on ${network}. Fund it first.`,
+        false
+      );
+    }
+    throw new StellarTransactionError("network_error", "Failed to load account from Horizon.", true);
+  }
+
+  let fee = Number(StellarSdk.BASE_FEE);
+  try {
+    fee = await server.fetchBaseFee();
+  } catch {
+    // Fall back to the network minimum
+  }
+
+  // Stellar memo text is limited to 28 bytes
+  const memo = (action === "add" ? `Add ${assetCode}` : `Remove ${assetCode}`).slice(0, 28);
+  const trustLimit = action === "remove" ? "0" : limit;
+
+  const tx = new StellarSdk.TransactionBuilder(account, { fee: fee.toString(), networkPassphrase })
+    .addOperation(
+      StellarSdk.Operation.changeTrust({
+        asset: new StellarSdk.Asset(assetCode, assetIssuer),
+        ...(trustLimit !== undefined ? { limit: trustLimit } : {}),
+      })
+    )
+    .addMemo(StellarSdk.Memo.text(memo))
+    .setTimeout(180)
+    .build();
+
+  return tx.toEnvelope().toXDR("base64");
+}
+
+/**
+ * Verify that a signed XDR is exactly the change-trust transaction described
+ * by `expected`, so a client cannot smuggle other operations through the
+ * trustline endpoint.
+ *
+ * @throws {StellarTransactionError} When the transaction does not match.
+ */
+export function assertChangeTrustTx(
+  signedXdr: string,
+  expected: Omit<ChangeTrustParams, "limit">
+): StellarSdk.Transaction {
+  const tx = parseTransactionXdr(signedXdr, expected.network);
+  const mismatch = (reason: string) =>
+    new StellarTransactionError("tx_failed", `Trustline transaction mismatch: ${reason}`, false);
+
+  if (tx instanceof StellarSdk.FeeBumpTransaction) throw mismatch("fee-bump envelopes are not accepted");
+  if (tx.source !== expected.sourcePublicKey) throw mismatch("unexpected source account");
+  if (tx.operations.length !== 1) throw mismatch("expected exactly one operation");
+
+  const op = tx.operations[0];
+  if (op.type !== "changeTrust" || !(op.line instanceof StellarSdk.Asset)) {
+    throw mismatch("expected a changeTrust operation");
+  }
+  if (op.source && op.source !== expected.sourcePublicKey) throw mismatch("unexpected operation source");
+  if (op.line.getCode() !== expected.assetCode || op.line.getIssuer() !== expected.assetIssuer) {
+    throw mismatch("unexpected asset");
+  }
+  const isRemoval = parseFloat(op.limit) === 0;
+  if ((expected.action === "remove") !== isRemoval) throw mismatch("unexpected trust limit");
+
+  return tx;
+}
