@@ -1,4 +1,9 @@
-import { validateRequiredEnv, REQUIRED_ENV_VARS, REQUIRED_PROD_ENV_VARS } from './validateEnv';
+import {
+  validateRequiredEnv,
+  REQUIRED_ENV_VARS,
+  REQUIRED_PROD_ENV_VARS,
+  OPTIONAL_APPLE_ENV_VARS,
+} from './validateEnv';
 
 // Helper: set all vars in a list to a dummy value.
 function setAll(vars: readonly string[]) {
@@ -22,6 +27,7 @@ describe('validateRequiredEnv', () => {
     // Start each test in a neutral (non-CI, non-production) state.
     delete process.env.CI;
     process.env.NODE_ENV = 'test';
+    deleteAll(OPTIONAL_APPLE_ENV_VARS);
   });
 
   afterAll(() => {
@@ -51,6 +57,19 @@ describe('validateRequiredEnv', () => {
       warnSpy.mockRestore();
     });
 
+    it('warns when Apple Sign-In is only partially configured', () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+      setAll(REQUIRED_ENV_VARS);
+      process.env.APPLE_ID = 'com.example.web';
+
+      expect(() => validateRequiredEnv()).not.toThrow();
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Apple Sign-In is partially configured')
+      );
+
+      warnSpy.mockRestore();
+    });
+
     it('does not check production-only vars outside prod/CI', () => {
       const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       setAll(REQUIRED_ENV_VARS);
@@ -72,6 +91,16 @@ describe('validateRequiredEnv', () => {
       deleteAll(REQUIRED_ENV_VARS);
 
       expect(() => validateRequiredEnv()).toThrow(/Missing required environment variables/);
+    });
+
+    it('throws when Apple Sign-In is only partially configured', () => {
+      setAll(REQUIRED_ENV_VARS);
+      setAll(REQUIRED_PROD_ENV_VARS);
+      process.env.APPLE_ID = 'com.example.web';
+
+      expect(() => validateRequiredEnv()).toThrow(
+        /Apple Sign-In is partially configured/
+      );
     });
 
     it('throws when production-only vars are missing', () => {
