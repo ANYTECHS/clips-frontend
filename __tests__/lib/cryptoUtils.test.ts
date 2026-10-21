@@ -1,4 +1,9 @@
-import { encryptWithPassword, decryptWithPassword } from "@/app/lib/cryptoUtils";
+import {
+  encryptWithPassword,
+  decryptWithPassword,
+  encryptToPayload,
+  decryptFromPayload,
+} from "@/app/lib/cryptoUtils";
 
 describe("encryptWithPassword / decryptWithPassword", () => {
   it("encrypts and decrypts a plaintext string correctly", async () => {
@@ -65,5 +70,44 @@ describe("encryptWithPassword / decryptWithPassword", () => {
     const encrypted = await encryptWithPassword(plaintext, password);
     const decrypted = await decryptWithPassword(encrypted, password);
     expect(decrypted).toBe(plaintext);
+  });
+});
+
+describe("encryptToPayload / decryptFromPayload", () => {
+  it("round-trips through a single serializable payload", async () => {
+    const payload = await encryptToPayload("S-SECRET", "password");
+    const restored = JSON.parse(JSON.stringify(payload));
+
+    expect(restored).toMatchObject({ v: 1, alg: "AES-GCM", kdf: "PBKDF2-SHA256" });
+    expect(restored.iterations).toBeGreaterThanOrEqual(100_000);
+    await expect(decryptFromPayload(restored, "password")).resolves.toBe("S-SECRET");
+  });
+
+  it("uses a fresh IV for every encryption", async () => {
+    const salt = new Uint8Array(16);
+    const a = await encryptToPayload("same", "pw", salt);
+    const b = await encryptToPayload("same", "pw", salt);
+    expect(a.iv).not.toBe(b.iv);
+    expect(a.ciphertext).not.toBe(b.ciphertext);
+  });
+
+  it("fails with the wrong password", async () => {
+    const payload = await encryptToPayload("S-SECRET", "right");
+    await expect(decryptFromPayload(payload, "wrong")).rejects.toThrow();
+  });
+
+  it("detects tampered ciphertext", async () => {
+    const payload = await encryptToPayload("S-SECRET", "pw");
+    const bytes = Uint8Array.from(atob(payload.ciphertext), (c) => c.charCodeAt(0));
+    bytes[bytes.length - 1] ^= 0x01;
+    const tampered = { ...payload, ciphertext: btoa(String.fromCharCode(...bytes)) };
+    await expect(decryptFromPayload(tampered, "pw")).rejects.toThrow();
+  });
+
+  it("rejects payloads with a weakened iteration count", async () => {
+    const payload = await encryptToPayload("S-SECRET", "pw");
+    await expect(decryptFromPayload({ ...payload, iterations: 1000 }, "pw")).rejects.toThrow(
+      /iteration/,
+    );
   });
 });

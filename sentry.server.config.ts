@@ -1,5 +1,5 @@
 import * as Sentry from "@sentry/nextjs";
-import { sanitizeSentryContexts } from "@/app/lib/sentryRedaction";
+import { sanitizeSentryEvent } from "@/app/lib/sentryRedaction";
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -14,11 +14,7 @@ Sentry.init({
       delete event.request.headers;
     }
 
-    if (event.contexts) {
-      sanitizeSentryContexts(event.contexts);
-    }
-
-    return event;
+    return sanitizeSentryEvent(event);
   },
 
   ignoreErrors: [

@@ -342,3 +342,122 @@ describe("migrateToMultiWallet helper", () => {
     expect(MultiWalletStorage.getAll(mockUser.id)[0].publicKey).toBe("G_M1");
   });
 });
+
+// ─── Connected Stellar wallets (#1219) ───────────────────────────────────────
+
+describe("MultiWalletProvider — connected Stellar wallets", () => {
+  function makeConnectors() {
+    const make = (publicKey: string) => ({
+      connect: jest.fn().mockResolvedValue({ publicKey }),
+      signTransaction: jest.fn(async (xdr: string, key: string) => `${xdr}:signed-by:${key}`),
+    });
+    return {
+      freighter: make("G_FREIGHTER"),
+      albedo: make("G_ALBEDO"),
+      xbull: make("G_XBULL"),
+      passkey: make("G_FREIGHTER"), // same account as Freighter — must dedupe
+    };
+  }
+
+  function renderWithConnectors(connectors = makeConnectors()) {
+    const connectorWrapper = ({ children }: { children: React.ReactNode }) => (
+      <MultiWalletProvider connectors={connectors}>{children}</MultiWalletProvider>
+    );
+    return { connectors, ...renderHook(() => useMultiWallet(), { wrapper: connectorWrapper }) };
+  }
+
+  it("connects wallets and tracks the active wallet", async () => {
+    const { result } = renderWithConnectors();
+
+    await act(async () => {
+      await result.current.connectWallet("freighter");
+      await result.current.connectWallet("albedo");
+    });
+
+    expect(result.current.connectedWallets.map((w) => [w.type, w.publicKey, w.isConnected])).toEqual([
+      ["freighter", "G_FREIGHTER", true],
+      ["albedo", "G_ALBEDO", true],
+    ]);
+    expect(result.current.getActiveWallet()?.publicKey).toBe("G_FREIGHTER");
+  });
+
+  it("deduplicates connections by public key", async () => {
+    const { result } = renderWithConnectors();
+
+    await act(async () => {
+      await result.current.connectWallet("freighter");
+      await result.current.connectWallet("passkey");
+    });
+
+    expect(result.current.connectedWallets).toHaveLength(1);
+  });
+
+  it("switches the active wallet", async () => {
+    const { result } = renderWithConnectors();
+    let albedoId = "";
+    await act(async () => {
+      await result.current.connectWallet("freighter");
+      albedoId = (await result.current.connectWallet("albedo")).id;
+    });
+
+    act(() => result.current.setActiveWallet(albedoId));
+
+    expect(result.current.activeWalletId).toBe(albedoId);
+    expect(result.current.getActiveWallet()?.type).toBe("albedo");
+  });
+
+  it("auto-selects the next wallet when the active wallet disconnects", async () => {
+    const { result } = renderWithConnectors();
+    let freighterId = "";
+    await act(async () => {
+      freighterId = (await result.current.connectWallet("freighter")).id;
+      await result.current.connectWallet("xbull");
+    });
+
+    act(() => result.current.disconnectWallet(freighterId));
+
+    expect(result.current.connectedWallets).toHaveLength(1);
+    expect(result.current.getActiveWallet()?.type).toBe("xbull");
+
+    act(() => result.current.disconnectWallet(result.current.activeWalletId!));
+    expect(result.current.activeWalletId).toBeNull();
+  });
+
+  it("signs transactions with the active wallet's connection", async () => {
+    const { result, connectors } = renderWithConnectors();
+    let xbullId = "";
+    await act(async () => {
+      await result.current.connectWallet("freighter");
+      xbullId = (await result.current.connectWallet("xbull")).id;
+    });
+    act(() => result.current.setActiveWallet(xbullId));
+
+    const signed = await result.current.signTransaction("XDR", { networkPassphrase: "Test" });
+
+    expect(signed).toBe("XDR:signed-by:G_XBULL");
+    expect(connectors.xbull.signTransaction).toHaveBeenCalledWith("XDR", "G_XBULL", {
+      networkPassphrase: "Test",
+    });
+    expect(connectors.freighter.signTransaction).not.toHaveBeenCalled();
+  });
+
+  it("refuses to sign when no wallet is active", async () => {
+    const { result } = renderWithConnectors();
+    await expect(
+      result.current.signTransaction("XDR", { networkPassphrase: "Test" }),
+    ).rejects.toThrow("No active wallet selected");
+  });
+
+  it("surfaces connection errors", async () => {
+    const connectors = makeConnectors();
+    connectors.albedo.connect.mockRejectedValueOnce(new Error("Albedo is not available"));
+    const { result } = renderWithConnectors(connectors);
+
+    await act(async () => {
+      await expect(result.current.connectWallet("albedo")).rejects.toThrow();
+    });
+
+    expect(result.current.error).toBe("Albedo is not available");
+    expect(result.current.connectedWallets).toHaveLength(0);
+  });
+});

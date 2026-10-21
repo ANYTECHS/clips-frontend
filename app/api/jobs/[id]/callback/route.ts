@@ -127,6 +127,9 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
     progress: update.progress ?? job.progress,
     momentsFound: update.momentsFound ?? job.momentsFound,
     estimatedSecondsRemaining: update.estimatedSecondsRemaining ?? job.estimatedSecondsRemaining,
+    ...(update.status === "processing" && !job.processingStartedAt
+      ? { processingStartedAt: Date.now() }
+      : {}),
     ...(update.scoreBreakdown ? { scoreBreakdown: update.scoreBreakdown } : {}),
     ...(update.errorCode ? { errorCode: update.errorCode } : {}),
     ...(update.errorMessage ? { errorMessage: update.errorMessage } : {}),

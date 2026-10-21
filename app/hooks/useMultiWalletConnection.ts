@@ -14,11 +14,19 @@
  * build, edge-case error path) the hook falls back to a short poll of the
  * context state, retrying up to MAX_POLL_ATTEMPTS times with POLL_INTERVAL_MS
  * between each attempt.
+ *
+ * Connected Stellar wallets (issue #1219):
+ * connect(type) / disconnect(id) / setActive(id) / getActive() manage the
+ * Freighter, Albedo, xBull and passkey connections held by
+ * MultiWalletProvider. signTransaction() always signs with the active
+ * wallet's own connection.
  */
 
 import { useCallback, useEffect, useRef } from "react";
 
+import { logger } from "@/app/lib/logger";
 import { WalletProviderType } from "@/app/lib/multiWalletStorage";
+import type { StellarWalletType } from "@/app/lib/multiWalletState";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useMultiWallet } from "@/components/wallet/MultiWalletProvider";
 import { migrateToMultiWallet } from "@/components/wallet/MultiWalletProvider";
@@ -229,10 +237,33 @@ export function useMultiWalletConnection() {
     [multiWallet, wallet]
   );
 
-  /** Disconnect the current wallet */
-  const disconnect = useCallback(() => {
-    wallet.disconnect();
-  }, [wallet]);
+  /**
+   * Disconnect a connected Stellar wallet by id. Without an id, disconnects
+   * the legacy single-wallet connection (previous behaviour).
+   *
+   * @param id - Id of the connected wallet to disconnect.
+   */
+  const disconnect = useCallback(
+    (id?: string) => {
+      if (id) {
+        multiWallet.disconnectWallet(id);
+        return;
+      }
+      wallet.disconnect();
+    },
+    [multiWallet, wallet]
+  );
+
+  /**
+   * Connect a Stellar wallet. Already-connected public keys are a no-op.
+   *
+   * @param type - Wallet kind to connect.
+   * @returns The connected wallet entry.
+   */
+  const connect = useCallback(
+    (type: StellarWalletType) => multiWallet.connectWallet(type),
+    [multiWallet]
+  );
 
   /** * Remove a wallet from the multi-wallet list
    * * @param walletId - Tracking ID target string slated for erasure processing.
@@ -256,6 +287,15 @@ export function useMultiWalletConnection() {
     wallets: multiWallet.wallets,
     activeWallet: multiWallet.activeWallet,
     primaryWallet: multiWallet.primaryWallet,
+
+    // Connected Stellar wallets (#1219)
+    connectedWallets: multiWallet.connectedWallets,
+    activeWalletId: multiWallet.activeWalletId,
+    connect,
+    disconnect,
+    setActive: multiWallet.setActiveWallet,
+    getActive: multiWallet.getActiveWallet,
+    signTransaction: multiWallet.signTransaction,
 
     // Multi-wallet operations
     connectMetaMask,

@@ -195,6 +195,108 @@ export interface UploadResult {
   contentType: string;
 }
 
+// ─── MIME sniffing protection (#1217) ────────────────────────────────────────
+
+/** Fallback type for content whose magic bytes match no known signature. */
+export const GENERIC_CONTENT_TYPE = "application/octet-stream";
+
+/** Number of leading bytes inspected when detecting a MIME type. */
+const MIME_SNIFF_WINDOW = 64;
+
+function bytesAt(buffer: Uint8Array, offset: number, expected: number[]): boolean {
+  return expected.every((byte, i) => buffer[offset + i] === byte);
+}
+
+/**
+ * Detect the MIME type of a buffer from its magic bytes.
+ *
+ * The declared type and filename extension are user-controlled and are never
+ * consulted here. Returns null when no known signature matches.
+ */
+export function detectMimeType(buffer: Uint8Array): string | null {
+  if (buffer.length < 12) return null;
+
+  // ISO Base Media ("ftyp" box at offset 4): MP4 or QuickTime by major brand.
+  if (bytesAt(buffer, 4, [0x66, 0x74, 0x79, 0x70])) {
+    return bytesAt(buffer, 8, [0x71, 0x74, 0x20, 0x20]) ? "video/quicktime" : "video/mp4";
+  }
+
+  // RIFF container with "AVI " sub-type.
+  if (bytesAt(buffer, 0, [0x52, 0x49, 0x46, 0x46]) && bytesAt(buffer, 8, [0x41, 0x56, 0x49, 0x20])) {
+    return "video/x-msvideo";
+  }
+
+  // EBML header: WebM declares DocType "webm", everything else is Matroska.
+  if (bytesAt(buffer, 0, [0x1a, 0x45, 0xdf, 0xa3])) {
+    const header = Buffer.from(buffer.subarray(0, MIME_SNIFF_WINDOW)).toString("latin1");
+    return header.includes("webm") ? "video/webm" : "video/x-matroska";
+  }
+
+  return null;
+}
+
+/** Containers that share a signature family and may be declared interchangeably. */
+const COMPATIBLE_MIME_FAMILIES: string[][] = [
+  ["video/mp4", "video/quicktime"],
+  ["video/webm", "video/x-matroska"],
+];
+
+function isCompatibleMimeType(declared: string, detected: string): boolean {
+  if (declared === detected) return true;
+  return COMPATIBLE_MIME_FAMILIES.some(
+    (family) => family.includes(declared) && family.includes(detected),
+  );
+}
+
+/** Thrown when an upload's content does not match its declared MIME type. */
+export class MimeTypeMismatchError extends Error {
+  constructor(
+    readonly declaredType: string,
+    readonly detectedType: string | null,
+    readonly quarantineKey?: string,
+  ) {
+    super(
+      `File content (${detectedType ?? "unknown"}) does not match declared type (${declaredType})`,
+    );
+    this.name = "MimeTypeMismatchError";
+  }
+}
+
+export interface ResolvedContentType {
+  /** Content-Type derived from magic bytes — what is actually stored. */
+  contentType: string;
+  /** False when the declared type is a specific type the bytes contradict. */
+  matchesDeclared: boolean;
+}
+
+/**
+ * Resolve the Content-Type to store for a buffer.
+ *
+ * The stored type always comes from the magic bytes. An empty or generic
+ * declared type makes no claim and so cannot mismatch.
+ */
+export function resolveContentType(buffer: Uint8Array, declaredType: string): ResolvedContentType {
+  const detected = detectMimeType(buffer);
+  const declared = declaredType.split(";")[0].trim().toLowerCase();
+  const contentType = detected ?? GENERIC_CONTENT_TYPE;
+
+  if (!declared || declared === GENERIC_CONTENT_TYPE) {
+    return { contentType, matchesDeclared: true };
+  }
+  return {
+    contentType,
+    matchesDeclared: detected !== null && isCompatibleMimeType(declared, detected),
+  };
+}
+
+/**
+ * Videos are played inline; anything else is forced to download so the
+ * browser never renders it in the app's context.
+ */
+export function getContentDisposition(contentType: string): "inline" | "attachment" {
+  return contentType.startsWith("video/") ? "inline" : "attachment";
+}
+
 // ─── S3 error classification ──────────────────────────────────────────────────
 
 /**
@@ -247,6 +349,7 @@ async function uploadSinglePart(
           Key: key,
           Body: buffer,
           ContentType: contentType,
+          ContentDisposition: getContentDisposition(contentType),
           ContentLength: buffer.length,
         }),
       ),
@@ -286,6 +389,7 @@ async function uploadMultipart(
       Bucket: bucket,
       Key: key,
       ContentType: contentType,
+      ContentDisposition: getContentDisposition(contentType),
     }),
   );
 
@@ -351,15 +455,18 @@ export async function upload(
   contentType: string,
 ): Promise<void> {
   const client = createStorageProvider();
+  const isBytes = Buffer.isBuffer(body) || body instanceof Uint8Array;
+  // Sniff in-memory bodies so the stored type reflects the content; streams
+  // cannot be inspected without buffering, so the caller's type is kept.
+  const storedType = isBytes ? (detectMimeType(body) ?? contentType) : contentType;
   await client.send(
     new PutObjectCommand({
       Bucket: BUCKET(),
       Key: key,
       Body: body,
-      ContentType: contentType,
-      ...(Buffer.isBuffer(body) || body instanceof Uint8Array
-        ? { ContentLength: body.length }
-        : {}),
+      ContentType: storedType,
+      ContentDisposition: getContentDisposition(storedType),
+      ...(isBytes ? { ContentLength: body.length } : {}),
     }),
   );
 }
@@ -419,16 +526,17 @@ export async function uploadFile(
     const jobId = `job_${randomUUID().replace(/-/g, "")}`;
     const ext = filename.split(".").pop() ?? "bin";
     const objectKey = `${KEY_PREFIX}${jobId}.${ext}`;
+    const { contentType: storedType } = resolveContentType(buffer, contentType);
 
     if (buffer.length > MULTIPART_THRESHOLD) {
-      await uploadMultipart(client, bucket, objectKey, buffer, contentType);
+      await uploadMultipart(client, bucket, objectKey, buffer, storedType);
     } else {
-      await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
+      await uploadSinglePart(client, bucket, objectKey, buffer, storedType);
     }
 
     const url = buildObjectUrl(objectKey);
 
-    return { jobId, objectKey, url, filename, size: buffer.length, contentType };
+    return { jobId, objectKey, url, filename, size: buffer.length, contentType: storedType };
   });
 }
 
@@ -438,18 +546,30 @@ export async function uploadFile(
  * Similar to uploadFile but stores in VIRUS_SCAN_QUARANTINE_PREFIX instead.
  * Returns the quarantine object key and jobId.
  *
+ * The stored Content-Type is detected from the file's magic bytes. When it
+ * contradicts the declared type, the file is kept in quarantine as an opaque
+ * `application/octet-stream` attachment and the upload is rejected.
+ *
  * @param buffer - File data memory payload array.
  * @param filename - String representation naming context.
  * @param contentType - Standard application/mime target descriptor mapping.
  * @returns Metadata object holding job records and specific safety references.
+ * @throws {MimeTypeMismatchError} When the content does not match the declared type.
  */
 export async function uploadToQuarantine(
   buffer: Buffer,
   filename: string,
   contentType: string,
-): Promise<{ jobId: string; quarantineKey: string; filename: string }> {
+): Promise<{ jobId: string; quarantineKey: string; filename: string; contentType: string }> {
+  const detectedType = detectMimeType(buffer);
+  const resolved = resolveContentType(buffer, contentType);
+  // A mismatched file is still stored, but only as an opaque download under
+  // the quarantine prefix, so it can be inspected without ever being served
+  // with the type the uploader claimed.
+  const storedType = resolved.matchesDeclared ? resolved.contentType : GENERIC_CONTENT_TYPE;
+
   const cb = getCircuitBreaker("cloudStorage");
-  return cb.executeOrThrow(async () => {
+  const stored = await cb.executeOrThrow(async () => {
     const client = buildS3Client();
     const bucket = BUCKET();
 
@@ -458,13 +578,23 @@ export async function uploadToQuarantine(
     const quarantineKey = `${QUARANTINE_PREFIX}${jobId}.${ext}`;
 
     if (buffer.length > MULTIPART_THRESHOLD) {
-      await uploadMultipart(client, bucket, quarantineKey, buffer, contentType);
+      await uploadMultipart(client, bucket, quarantineKey, buffer, storedType);
     } else {
-      await uploadSinglePart(client, bucket, quarantineKey, buffer, contentType);
+      await uploadSinglePart(client, bucket, quarantineKey, buffer, storedType);
     }
 
-    return { jobId, quarantineKey, filename };
+    return { jobId, quarantineKey, filename, contentType: storedType };
   });
+
+  // Thrown outside the circuit breaker: a rejected file is not a storage fault.
+  if (!resolved.matchesDeclared) {
+    logger.warn(
+      `[cloudStorage] MIME mismatch for ${stored.jobId}: declared=${contentType} detected=${detectedType ?? "unknown"}; quarantined at ${stored.quarantineKey}`,
+    );
+    throw new MimeTypeMismatchError(contentType, detectedType, stored.quarantineKey);
+  }
+
+  return stored;
 }
 
 /**
@@ -573,11 +703,12 @@ export async function uploadTransformResult(
 
     const ext = contentType.includes("mp4") ? "mp4" : "mp4";
     const objectKey = `${TRANSFORMS_PREFIX}${jobId}.${ext}`;
+    const { contentType: storedType } = resolveContentType(buffer, contentType);
 
     if (buffer.length > MULTIPART_THRESHOLD) {
-      await uploadMultipart(client, bucket, objectKey, buffer, contentType);
+      await uploadMultipart(client, bucket, objectKey, buffer, storedType);
     } else {
-      await uploadSinglePart(client, bucket, objectKey, buffer, contentType);
+      await uploadSinglePart(client, bucket, objectKey, buffer, storedType);
     }
 
     const url = buildObjectUrl(objectKey);
@@ -588,7 +719,7 @@ export async function uploadTransformResult(
       url,
       filename: `${jobId}.${ext}`,
       size: buffer.length,
-      contentType,
+      contentType: storedType,
     };
   });
 }
@@ -637,7 +768,8 @@ export async function putUploadChunk(
         Bucket: BUCKET(),
         Key: chunkKey(sessionId, index),
         Body: body,
-        ContentType: "application/octet-stream",
+        ContentType: GENERIC_CONTENT_TYPE,
+        ContentDisposition: "attachment",
       }),
     ),
   );
