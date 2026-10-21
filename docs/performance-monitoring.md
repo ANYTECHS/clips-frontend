@@ -32,7 +32,7 @@ rather than defaulting to `good`.
 
 ## Where it lands
 
-Every sample goes to two sinks:
+Every sample goes to three sinks:
 
 1. **Sentry** — as a measurement (`Sentry.setMeasurement`) plus a breadcrumb.
    Samples rated `poor` additionally raise
@@ -41,6 +41,9 @@ Every sample goes to two sinks:
 2. **Product analytics** — as a `performance_metric` event through
    `app/lib/analytics.ts`, so performance sits in the same funnels as the
    rest of the product telemetry and respects the same cookie consent.
+3. **First-party RUM collector** — batched and sent with
+   `navigator.sendBeacon` to `POST /api/rum` when the page is hidden or 20
+   samples are queued (#1181). See below.
 
 Each sink is wrapped so a failing transport logs and is skipped — telemetry
 never breaks a render, and one broken sink does not stop the others.
@@ -61,3 +64,24 @@ org rather than in this repo:
 
 Someone with Sentry org admin needs to create both; nothing further is needed
 on the application side.
+
+## Real User Monitoring dashboard and alerts (#1181)
+
+`/api/rum` (`app/api/rum/route.ts`, aggregation in `app/lib/rumAggregator.ts`)
+keeps a rolling window of the last 500 real-user samples per metric.
+
+- **Dashboard feed** — `GET /api/rum` (bearer `METRICS_TOKEN`, same as
+  `/api/metrics`) returns, per metric, `count`, `p75`, the p75 `rating`,
+  `poorRatio` and `alert`. Point a Grafana JSON datasource or status page at
+  it for a live Core Web Vitals view.
+- **Alerts** — a metric is in alert when it has at least 20 samples and more
+  than 25% of them are rated `poor` (`RUM_ALERT_MIN_SAMPLES`,
+  `RUM_ALERT_POOR_RATIO`). Alerting metrics are listed in the response's
+  `alerts` array and logged as `[rum] alert: ...` warnings on ingest, so a
+  log-based alert can page on them.
+- **Budgets / targets** — ratings use the same thresholds as the table at
+  the top of this file; the p75 of each Core Web Vital should stay `good`.
+  Full budgets are in `docs/PERFORMANCE_BUDGETS.md`.
+
+The window is per server instance and resets on deploy; long-term history
+lives in Sentry and analytics.

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { getStellarNetwork, type StellarNetwork } from "@/app/lib/networkConfig";
 import { NetworkPreferenceStorage } from "@/app/lib/userPreferences";
 
@@ -52,7 +52,9 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
     window.dispatchEvent(new Event("clipcash_network_changed"));
   }, []);
 
-  return <NetworkContext.Provider value={{ network, setNetwork }}>{children}</NetworkContext.Provider>;
+  const value = useMemo(() => ({ network, setNetwork }), [network, setNetwork]);
+
+  return <NetworkContext.Provider value={value}>{children}</NetworkContext.Provider>;
 }
 
 export function useNetworkContext(): NetworkContextValue {

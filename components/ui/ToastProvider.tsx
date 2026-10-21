@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo, useRef } from 'react';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -42,8 +42,10 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     dismissTimersRef.current.set(id, timer);
   }, []);
 
+  const value = useMemo(() => ({ addToast }), [addToast]);
+
   return (
-    <ToastContext.Provider value={{ addToast }}>
+    <ToastContext.Provider value={value}>
       {children}
       
       {/* Acceptance Criteria: Container element has aria-live="polite" and role="status" */}

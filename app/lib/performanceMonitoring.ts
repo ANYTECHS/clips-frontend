@@ -198,6 +198,39 @@ function reportBudgetBreach(metric: PerformanceMetric): void {
   });
 }
 
+/**
+ * Queue a metric for the first-party RUM collector (`/api/rum`).
+ *
+ * Samples are batched and flushed with `navigator.sendBeacon` when the page is
+ * hidden or the batch fills, so reporting never competes with the page for the
+ * network and survives the tab being closed.
+ */
+const RUM_ENDPOINT = "/api/rum";
+const RUM_BATCH_SIZE = 20;
+let rumQueue: Array<{ name: string; value: number; path?: string }> = [];
+let rumListenerAttached = false;
+
+function flushRum(): void {
+  if (rumQueue.length === 0 || typeof navigator === "undefined" || !navigator.sendBeacon) return;
+  const payload = JSON.stringify({ samples: rumQueue });
+  rumQueue = [];
+  navigator.sendBeacon(RUM_ENDPOINT, payload);
+}
+
+function reportToRum(metric: PerformanceMetric): void {
+  safely("rum", () => {
+    if (!rumListenerAttached) {
+      rumListenerAttached = true;
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "hidden") flushRum();
+      });
+      window.addEventListener("pagehide", flushRum);
+    }
+    rumQueue.push({ name: metric.name, value: metric.value, path: window.location.pathname });
+    if (rumQueue.length >= RUM_BATCH_SIZE) flushRum();
+  });
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /**
@@ -224,6 +257,7 @@ export function reportMetric(
   reportToSentry(metric);
   reportToAnalytics(metric);
   reportBudgetBreach(metric);
+  reportToRum(metric);
 
   return metric;
 }
