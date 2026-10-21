@@ -3,7 +3,7 @@ import { z } from "zod";
 import { auth } from "@/app/lib/auth";
 import { logger } from "@/app/lib/logger";
 import { prisma } from "@/app/lib/prisma";
-import { createApiKeyRecord } from "@/app/lib/apiKey";
+import { createApiKeyRecord, getApiKeyQuotaConfig, getApiKeyQuotaWindow } from "@/app/lib/apiKey";
 import { createAuditEvent } from "@/app/lib/auditLog";
 
 const apiKeySchema = z.object({
@@ -38,7 +38,27 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ apiKeys });
+    const quota = getApiKeyQuotaConfig();
+    const quotaWindow = getApiKeyQuotaWindow();
+    const usageByKey = apiKeys.length
+      ? await prisma.apiUsage.groupBy({
+          by: ["apiKeyId"],
+          where: {
+            apiKeyId: { in: apiKeys.map((apiKey) => apiKey.id) },
+            createdAt: { gte: new Date(quotaWindow.startAt) },
+          },
+          _count: { _all: true },
+        })
+      : [];
+    const currentUsage = new Map(usageByKey.map((usage) => [usage.apiKeyId, usage._count._all]));
+
+    const apiKeysWithUsage = apiKeys.map((apiKey) => ({
+      ...apiKey,
+      totalRequests: apiKey._count.usages,
+      quotaRemaining: Math.max(0, quota.limit - (currentUsage.get(apiKey.id) ?? 0)),
+    }));
+
+    return NextResponse.json({ apiKeys: apiKeysWithUsage });
   } catch (error) {
     logger.error("Error fetching API keys:", error);
     return NextResponse.json({ error: "Failed to fetch API keys" }, { status: 500 });

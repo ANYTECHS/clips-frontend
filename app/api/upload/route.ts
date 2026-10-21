@@ -49,7 +49,11 @@ import {
 import { checkCsrf } from "@/app/lib/csrf";
 import { jobStore } from "@/app/api/jobs/shared/jobStore";
 import { dispatchJob } from "@/app/lib/aiBackend";
-import { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST, UPLOAD_PROCESSING_CONCURRENCY } from "@/app/lib/constants";
+import {
+  MAX_UPLOAD_SIZE_BYTES,
+  MAX_FILES_PER_REQUEST,
+  UPLOAD_PROCESSING_CONCURRENCY,
+} from "@/app/lib/constants";
 import { parallelLimit } from "@/app/lib/parallelLimit";
 import { applyCustomRateLimit } from "@/app/lib/customRateLimit";
 import { logger } from "@/app/lib/logger";
@@ -57,6 +61,7 @@ import { templatesStore, type TemplateScope } from "@/app/api/templates/template
 import type { TemplateSettings } from "@/app/api/schemas/templates.schema";
 import { deprecatedAlias } from "@/app/api/versioning";
 import type { ApiResponse } from "@/app/api/types";
+import type { ApiKeyRouteContext } from "@/app/lib/apiKey";
 
 export { MAX_UPLOAD_SIZE_BYTES, MAX_FILES_PER_REQUEST };
 export { ALLOWED_TYPES, ALLOWED_EXTENSIONS, validateMagicBytes };
@@ -72,7 +77,7 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-async function upload(request: NextRequest) {
+async function upload(request: NextRequest, context?: ApiKeyRouteContext) {
   try {
     const rateLimited = await applyCustomRateLimit(request, "/api/upload");
     if (rateLimited) return rateLimited;
@@ -80,9 +85,9 @@ async function upload(request: NextRequest) {
     const csrfError = checkCsrf(request);
     if (csrfError) return csrfError;
 
-    const session = await auth();
+    const session = context?.apiKey ? null : await auth();
     const sessionUser = session?.user as { id?: string; teamId?: string } | undefined;
-    const userId = sessionUser?.id;
+    const userId = context?.apiKey.userId ?? sessionUser?.id;
     if (!userId) {
       const body: ApiResponse<null> = { data: null, error: "Unauthorized" };
       return NextResponse.json(body, { status: 401 });
@@ -99,11 +104,13 @@ async function upload(request: NextRequest) {
     const files = formData.getAll("files") as File[];
 
     const rawTemplateId = formData.get("templateId");
-    let clipTemplate: {
-      id: string;
-      version: number;
-      settings: TemplateSettings;
-    } | undefined;
+    let clipTemplate:
+      | {
+          id: string;
+          version: number;
+          settings: TemplateSettings;
+        }
+      | undefined;
     if (typeof rawTemplateId === "string" && rawTemplateId.trim()) {
       const resolved = templatesStore.getSettings(rawTemplateId.trim(), templateScope);
       if (!resolved) {
@@ -154,20 +161,18 @@ async function upload(request: NextRequest) {
     }
 
     const scanConfig = getScanConfig();
-    logger.info(`[Upload] Scanning enabled: ${scanConfig.enabled}, Provider: ${scanConfig.provider}`);
+    logger.info(
+      `[Upload] Scanning enabled: ${scanConfig.enabled}, Provider: ${scanConfig.provider}`
+    );
 
     // Process files with a concurrency cap — uncapped Promise.all can saturate
     // the virus-scan circuit breaker and S3 connection pool under burst load.
     const results = await parallelLimit(
       files.map((file) => async () => {
         const buffer = Buffer.from(await file.arrayBuffer());
-        return processUploadedBuffer(
-          buffer,
-          file.name,
-          file.type || "application/octet-stream",
-        );
+        return processUploadedBuffer(buffer, file.name, file.type || "application/octet-stream");
       }),
-      UPLOAD_PROCESSING_CONCURRENCY,
+      UPLOAD_PROCESSING_CONCURRENCY
     );
 
     // Return the first jobId as the primary reference (for single-file flows)
@@ -266,4 +271,3 @@ async function upload(request: NextRequest) {
 }
 
 export const POST = deprecatedAlias(upload);
-

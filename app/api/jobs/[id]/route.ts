@@ -6,6 +6,7 @@ import { dispatchJob } from "@/app/lib/aiBackend";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
 import { getEndpointRateLimit } from "@/app/lib/endpointRateLimits";
 import { deprecatedAlias } from "@/app/api/versioning";
+import type { ApiKeyRouteContext } from "@/app/lib/apiKey";
 
 /** Accepts UUID (with or without hyphens) or alphanumeric slugs up to 64 chars. */
 const JOB_ID_RE = /^[a-zA-Z0-9_-]{1,64}$/;
@@ -21,7 +22,7 @@ function validateJobId(id: string): NextResponse | null {
 
 async function getJob(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> } & Partial<ApiKeyRouteContext>
 ) {
   const rateLimited = await applyRateLimit(request, getEndpointRateLimit("/api/jobs/[id]"));
   if (rateLimited) return rateLimited;
@@ -30,7 +31,7 @@ async function getJob(
   const idError = validateJobId(jobId);
   if (idError) return idError;
 
-  const result = await requireJobOwner(jobId);
+  const result = await requireJobOwner(jobId, context.apiKey?.userId);
   if (result instanceof NextResponse) return result;
 
   const { job } = result;
@@ -51,7 +52,7 @@ async function getJob(
 
 async function restartJob(
   request: NextRequest,
-  context: { params: Promise<{ id: string }> }
+  context: { params: Promise<{ id: string }> } & Partial<ApiKeyRouteContext>
 ) {
   const csrfError = checkCsrf(request);
   if (csrfError) return csrfError;
@@ -60,7 +61,7 @@ async function restartJob(
   const idError = validateJobId(jobId);
   if (idError) return idError;
 
-  const result = await requireJobOwner(jobId);
+  const result = await requireJobOwner(jobId, context.apiKey?.userId);
   if (result instanceof NextResponse) return result;
 
   const { job, userId } = result;

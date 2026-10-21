@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/prisma";
-import { authenticateApiKey } from "@/app/api/lib/apiAuth";
+import { requireScope, type ApiKeyRouteContext } from "@/app/lib/apiKey";
 import { logger } from "@/app/lib/logger";
 
 /**
@@ -9,20 +9,13 @@ import { logger } from "@/app/lib/logger";
  * Retrieves paginated audit logs with filtering by actor, action, resource, date, and status.
  * Requires an authenticated user session or a valid API key with audit scopes.
  */
-export async function GET(req: NextRequest) {
+async function getAuditLogs(req: NextRequest, context?: ApiKeyRouteContext) {
   try {
-    let authenticatedUserId: string | null = null;
+    let authenticatedUserId: string | null = context?.apiKey.userId ?? null;
 
-    // 1. Check user session
-    const session = await auth();
-    if (session?.user?.id) {
-      authenticatedUserId = session.user.id;
-    } else {
-      // 2. Fall back to API Key authentication
-      const apiAuth = await authenticateApiKey(req);
-      if (apiAuth.success && apiAuth.apiKey?.userId) {
-        authenticatedUserId = apiAuth.apiKey.userId;
-      }
+    if (!authenticatedUserId) {
+      const session = await auth();
+      authenticatedUserId = session?.user?.id ?? null;
     }
 
     if (!authenticatedUserId) {
@@ -80,4 +73,12 @@ export async function GET(req: NextRequest) {
     logger.error("[AuditLogs API] Failed to fetch audit logs:", error);
     return NextResponse.json({ error: "Failed to fetch audit logs" }, { status: 500 });
   }
+}
+
+const getAuditLogsWithScope = requireScope("audit:read")(getAuditLogs);
+
+export async function GET(req: NextRequest) {
+  const authorization = req.headers.get("authorization") ?? "";
+  const hasApiKey = req.headers.has("x-api-key") || /^Bearer\s+(ck_|ak_)/i.test(authorization);
+  return hasApiKey ? getAuditLogsWithScope(req) : getAuditLogs(req);
 }

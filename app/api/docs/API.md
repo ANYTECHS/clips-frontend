@@ -25,11 +25,15 @@ https://clipcash.ai/api/v1
 ## Rate Limiting
 
 API requests are rate-limited based on your plan:
+
 - Free: 100 requests/hour
 - Pro: 1,000 requests/hour
 - Enterprise: Custom limits
 
+API-key quotas are configured per key. Defaults are 1,000 requests per 3,600,000 ms; set `API_KEY_REQUEST_QUOTA` and `API_KEY_QUOTA_WINDOW_MS` to override them.
+
 Rate limit headers are included in responses:
+
 - `X-RateLimit-Limit`: Request limit
 - `X-RateLimit-Remaining`: Remaining requests
 - `X-RateLimit-Reset`: Unix timestamp when limit resets
@@ -46,6 +50,7 @@ Authorization: Bearer ck_your_api_key_here
 ```
 
 **Response:**
+
 ```json
 {
   "data": [
@@ -80,6 +85,7 @@ Content-Type: application/json
 ```
 
 **Response:**
+
 ```json
 {
   "data": {
@@ -137,16 +143,16 @@ Authorization: Bearer ck_your_api_key_here
 
 ## Error Codes
 
-| Status Code | Description |
-|-------------|-------------|
-| 200 | Success |
-| 201 | Created |
-| 400 | Bad Request |
-| 401 | Unauthorized |
-| 403 | Forbidden |
-| 404 | Not Found |
-| 429 | Rate Limit Exceeded |
-| 500 | Internal Server Error |
+| Status Code | Description           |
+| ----------- | --------------------- |
+| 200         | Success               |
+| 201         | Created               |
+| 400         | Bad Request           |
+| 401         | Unauthorized          |
+| 403         | Forbidden             |
+| 404         | Not Found             |
+| 429         | Rate Limit Exceeded   |
+| 500         | Internal Server Error |
 
 ## Webhook Events
 
@@ -185,11 +191,11 @@ X-Webhook-Signature: sha256=abc123...
 Verify the signature using your webhook secret:
 
 ```javascript
-const crypto = require('crypto');
+const crypto = require("crypto");
 const signature = crypto
-  .createHmac('sha256', webhookSecret)
+  .createHmac("sha256", webhookSecret)
   .update(JSON.stringify(payload))
-  .digest('hex');
+  .digest("hex");
 ```
 
 ## SDKs
@@ -201,10 +207,10 @@ npm install @clipcash/sdk
 ```
 
 ```javascript
-import { ClipCashClient } from '@clipcash/sdk';
+import { ClipCashClient } from "@clipcash/sdk";
 
 const client = new ClipCashClient({
-  apiKey: 'ck_your_api_key_here'
+  apiKey: "ck_your_api_key_here",
 });
 
 const clips = await client.clips.list();

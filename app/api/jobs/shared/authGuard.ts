@@ -6,29 +6,19 @@ export async function requireAuth(): Promise<{ userId: string } | NextResponse> 
   const session = await auth();
   const userId = (session?.user as { id?: string } | undefined)?.id;
   if (!userId)
-    return NextResponse.json(
-      { error: "Unauthorized", code: "UNAUTHORIZED" },
-      { status: 401 }
-    );
+    return NextResponse.json({ error: "Unauthorized", code: "UNAUTHORIZED" }, { status: 401 });
   return { userId };
 }
 
 /** Validates session and job ownership. Returns job or a 401/403/404 response. */
-export async function requireJobOwner(jobId: string) {
-  const authRes = await requireAuth();
+export async function requireJobOwner(jobId: string, apiKeyUserId?: string) {
+  const authRes = apiKeyUserId ? { userId: apiKeyUserId } : await requireAuth();
   if (authRes instanceof NextResponse) return authRes;
 
   const job = await jobStore.get(jobId);
-  if (!job)
-    return NextResponse.json(
-      { error: "Not found", code: "NOT_FOUND" },
-      { status: 404 }
-    );
+  if (!job) return NextResponse.json({ error: "Not found", code: "NOT_FOUND" }, { status: 404 });
   if (job.userId !== authRes.userId)
-    return NextResponse.json(
-      { error: "Forbidden", code: "FORBIDDEN" },
-      { status: 403 }
-    );
+    return NextResponse.json({ error: "Forbidden", code: "FORBIDDEN" }, { status: 403 });
 
   return { job, userId: authRes.userId };
 }
