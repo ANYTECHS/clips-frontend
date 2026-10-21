@@ -4,13 +4,16 @@ import { logger } from "./logger";
 const REQUIRED_ENV_VARS = [
   'GOOGLE_CLIENT_ID',
   'GOOGLE_CLIENT_SECRET',
+  'NEXTAUTH_SECRET',
+  'NEXTAUTH_URL',
+  'NEXT_PUBLIC_SENTRY_DSN',
+] as const;
+
+const OPTIONAL_APPLE_ENV_VARS = [
   'APPLE_ID',
   'APPLE_TEAM_ID',
   'APPLE_PRIVATE_KEY',
   'APPLE_KEY_ID',
-  'NEXTAUTH_SECRET',
-  'NEXTAUTH_URL',
-  'NEXT_PUBLIC_SENTRY_DSN',
 ] as const;
 
 // Additional variables that must be present in production (and CI).
@@ -57,7 +60,7 @@ function isValidHttpUrl(value: string | undefined): boolean {
   }
 }
 
-function formatError(missing: string[], invalid: string[]): string {
+function formatError(missing: string[], invalid: string[], missingApple: string[]): string {
   const messages: string[] = [];
 
   if (missing.length > 0) {
@@ -74,6 +77,12 @@ function formatError(missing: string[], invalid: string[]): string {
     if (invalid.includes('NEXT_PUBLIC_API_URL')) {
       messages.push(`NEXT_PUBLIC_API_URL must be a valid http:// or https:// URL.`);
     }
+  }
+
+  if (missingApple.length > 0) {
+    messages.push(
+      `Apple Sign-In is partially configured. Set all Apple variables; missing: ${missingApple.join(', ')}.`
+    );
   }
 
   return (
@@ -101,6 +110,13 @@ export function validateRequiredEnv(): void {
       : [];
 
   const missing: string[] = [...missingCore, ...missingProd];
+  const configuredAppleVars = OPTIONAL_APPLE_ENV_VARS.filter(
+    (name) => !isMissing(process.env[name])
+  );
+  const missingApple =
+    configuredAppleVars.length > 0
+      ? OPTIONAL_APPLE_ENV_VARS.filter((name) => isMissing(process.env[name]))
+      : [];
   const invalid: string[] =
     isProduction || isCI
       ? process.env.REDIS_URL && !isValidRedisUrl(process.env.REDIS_URL)
@@ -115,9 +131,9 @@ export function validateRequiredEnv(): void {
     }
   }
 
-  if (missing.length === 0 && invalid.length === 0) return;
+  if (missing.length === 0 && invalid.length === 0 && missingApple.length === 0) return;
 
-  const message = formatError(missing, invalid);
+  const message = formatError(missing, invalid, missingApple);
 
   if (isDevelopment) {
     // Warn so the dev server still starts, but the problem is visible.
@@ -128,5 +144,5 @@ export function validateRequiredEnv(): void {
   }
 }
 
-export { REQUIRED_ENV_VARS, REQUIRED_PROD_ENV_VARS };
+export { REQUIRED_ENV_VARS, REQUIRED_PROD_ENV_VARS, OPTIONAL_APPLE_ENV_VARS };
 export type { RequiredVar };

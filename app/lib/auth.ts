@@ -1,6 +1,6 @@
 import type { NextAuthConfig } from "next-auth";
 import Google from "next-auth/providers/google";
-import Apple from "next-auth/providers/apple";
+import AppleProvider from "next-auth/providers/apple";
 import Twitter from "next-auth/providers/twitter";
 import Instagram from "next-auth/providers/instagram";
 import Credentials from "next-auth/providers/credentials";
@@ -63,7 +63,7 @@ export const authOptions: NextAuthConfig = {
         },
       },
     }),
-    Apple({
+    AppleProvider({
       clientId: process.env.APPLE_ID!,
       // Auth.js v5's Apple provider types declare `clientSecret` as `string`, but
       // the runtime also accepts an object with the raw key material so it can

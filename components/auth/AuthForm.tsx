@@ -44,7 +44,7 @@ export default function AuthForm({ mode = "login" }: AuthFormProps) {
     setIsLoading(true);
     setError(null);
     try {
-      await signIn(provider, { redirect: false });
+      await signIn(provider);
     } catch (err) {
       setError(safeErrorMessage(err, signInFailed(provider), "oauth sign-in"));
       setIsLoading(false);

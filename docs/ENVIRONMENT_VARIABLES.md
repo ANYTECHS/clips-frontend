@@ -36,10 +36,10 @@ cp .env.example .env.local   # .env.local is git-ignored
 | `NEXTAUTH_URL`                                    | Always      | 🔒       | —                | `http://localhost:3000`               | Canonical app origin. Used for OAuth callback URLs, Stripe redirect URLs and absolute links.                     |
 | `GOOGLE_CLIENT_ID`                                | Always      | 🔒       | —                | `1234-abc.apps.googleusercontent.com` | Google OAuth client ID.                                                                                          |
 | `GOOGLE_CLIENT_SECRET`                            | Always      | 🔒       | —                | `GOCSPX-…`                            | Google OAuth client secret.                                                                                      |
-| `APPLE_ID`                                        | Always      | 🔒       | —                | `com.clipcash.web`                    | Apple Sign In Services ID.                                                                                       |
-| `APPLE_TEAM_ID`                                   | Always      | 🔒       | —                | `ABCDE12345`                          | Apple developer team ID.                                                                                         |
-| `APPLE_KEY_ID`                                    | Always      | 🔒       | —                | `XYZ987WVU6`                          | ID of the Sign in with Apple private key.                                                                        |
-| `APPLE_PRIVATE_KEY`                               | Always      | 🔒       | —                | `-----BEGIN PRIVATE KEY-----\n…`      | PEM private key. Escape newlines as `\n` when it is on one line.                                                 |
+| `APPLE_ID`                                        | Conditional | 🔒       | —                | `com.clipcash.web`                    | Apple Sign In Services ID. Configure with all other `APPLE_*` variables to enable Apple sign-in.                |
+| `APPLE_TEAM_ID`                                   | Conditional | 🔒       | —                | `ABCDE12345`                          | Apple developer team ID.                                                                                         |
+| `APPLE_KEY_ID`                                    | Conditional | 🔒       | —                | `XYZ987WVU6`                          | ID of the Sign in with Apple private key.                                                                        |
+| `APPLE_PRIVATE_KEY`                               | Conditional | 🔒       | —                | `-----BEGIN PRIVATE KEY-----\n…`      | PEM private key. Escape newlines as `\n` when it is on one line.                                                 |
 | `TWITTER_CLIENT_ID` / `TWITTER_CLIENT_SECRET`     | Conditional | 🔒       | —                | —                                     | Needed to link X/Twitter accounts (OAuth 2.0).                                                                   |
 | `INSTAGRAM_CLIENT_ID` / `INSTAGRAM_CLIENT_SECRET` | Conditional | 🔒       | —                | —                                     | Needed to link Instagram accounts.                                                                               |
 | `TIKTOK_CLIENT_KEY` / `TIKTOK_CLIENT_SECRET`      | Conditional | 🔒       | —                | —                                     | Needed to link TikTok accounts.                                                                                  |
@@ -49,6 +49,7 @@ cp .env.example .env.local   # .env.local is git-ignored
 
 - If `NEXTAUTH_SECRET` leaks, anyone can forge a session. Rotating it signs every user out.
 - OAuth client secrets and `APPLE_PRIVATE_KEY` allow impersonating the app to the provider. Store them in the host's secret manager, never in the repo.
+- Register `${NEXTAUTH_URL}/api/auth/callback/apple` as the Apple Services ID return URL. `NEXTAUTH_URL` must be the same app origin registered with Apple.
 - Changing `WEBAUTHN_RP_ID` invalidates every passkey already registered.
 
 ## Core services and URLs
