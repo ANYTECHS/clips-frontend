@@ -1,5 +1,6 @@
 import type { Account, Profile, Session, User } from "next-auth";
 import type { JWT } from "next-auth/jwt";
+import { createTrackedSession, validateTrackedSession } from "./sessionSecurity";
 import { DEFAULT_ONBOARDING_STEP } from "./types";
 import { fetchOnboardingStep } from "./userApi";
 
@@ -48,6 +49,18 @@ export async function jwtCallback({
         );
       }
     }
+
+    const userId = user?.id ?? token.sub;
+    if (userId) {
+      const trackedSession = await createTrackedSession(userId);
+      token.trackedSessionToken = trackedSession.sessionToken;
+      token.sessionRevoked = false;
+    }
+  } else if (token.trackedSessionToken) {
+    const validation = await validateTrackedSession(token.trackedSessionToken);
+    token.sessionRevoked = !validation.valid;
+  } else if (token.sub) {
+    token.sessionRevoked = true;
   }
 
   return token;
@@ -69,6 +82,10 @@ export async function sessionCallback({
   session: Session;
   token: JWT;
 }): Promise<Session> {
+  if (token.sessionRevoked) {
+    return { ...session, user: undefined } as unknown as Session;
+  }
+
   if (session.user) {
     if (token.sub) {
       session.user.id = token.sub;

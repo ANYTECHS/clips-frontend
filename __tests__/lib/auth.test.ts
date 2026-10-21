@@ -1,14 +1,23 @@
 import { jwtCallback, sessionCallback } from "@/app/lib/authCallbacks";
 import { DEFAULT_ONBOARDING_STEP } from "@/__mocks__/app/lib/mockApi";
 import * as userApi from "@/app/lib/userApi";
+import { createTrackedSession, validateTrackedSession } from "@/app/lib/sessionSecurity";
 
 jest.mock("@/app/lib/userApi");
+jest.mock("@/app/lib/sessionSecurity", () => ({
+  createTrackedSession: jest.fn(),
+  validateTrackedSession: jest.fn(),
+}));
 const mockFetchOnboardingStep = userApi.fetchOnboardingStep as jest.MockedFunction<
   typeof userApi.fetchOnboardingStep
 >;
+const mockCreateTrackedSession = createTrackedSession as jest.Mock;
+const mockValidateTrackedSession = validateTrackedSession as jest.Mock;
 
 beforeEach(() => {
   jest.resetAllMocks();
+  mockCreateTrackedSession.mockResolvedValue({ sessionToken: "tracked-token" });
+  mockValidateTrackedSession.mockResolvedValue({ valid: true });
 });
 
 // ─── jwtCallback ─────────────────────────────────────────────────────────────
@@ -16,6 +25,7 @@ beforeEach(() => {
 describe("jwtCallback", () => {
   it("fetches onboardingStep from the backend on initial sign-in and stores it in the token", async () => {
     mockFetchOnboardingStep.mockResolvedValue(3);
+    mockCreateTrackedSession.mockResolvedValue({ sessionToken: "tracked-token" });
 
     const token = await jwtCallback({
       token: { email: "test@example.com" },
@@ -25,6 +35,8 @@ describe("jwtCallback", () => {
 
     expect(mockFetchOnboardingStep).toHaveBeenCalledWith("test@example.com", "tok");
     expect(token.onboardingStep).toBe(3);
+    expect(mockCreateTrackedSession).toHaveBeenCalledWith("test-user-id");
+    expect(token.trackedSessionToken).toBe("tracked-token");
   });
 
   it("passes the access token from the account to the backend fetch", async () => {
@@ -46,8 +58,13 @@ describe("jwtCallback", () => {
 
   it("uses email from the token when user is not present (token refresh)", async () => {
     // On token refresh account is null — fetchOnboardingStep should NOT be called.
+    mockValidateTrackedSession.mockResolvedValue({ valid: true });
     const token = await jwtCallback({
-      token: { email: "returning@example.com", onboardingStep: 5 },
+      token: {
+        email: "returning@example.com",
+        onboardingStep: 5,
+        trackedSessionToken: "tracked-token",
+      },
       account: null,
     });
 
@@ -63,6 +80,16 @@ describe("jwtCallback", () => {
     });
 
     expect(mockFetchOnboardingStep).not.toHaveBeenCalled();
+  });
+
+  it("marks a JWT invalid when its tracked session has been revoked", async () => {
+    mockValidateTrackedSession.mockResolvedValue({ valid: false, reason: "revoked" });
+
+    const token = await jwtCallback({
+      token: { sub: "user-1", trackedSessionToken: "revoked-token" },
+    });
+
+    expect(token.sessionRevoked).toBe(true);
   });
 
   it("stores provider and profile in the token on sign-in", async () => {
@@ -116,6 +143,18 @@ describe("sessionCallback", () => {
       DEFAULT_ONBOARDING_STEP
     );
     expect(mockFetchOnboardingStep).not.toHaveBeenCalled();
+  });
+
+  it("does not expose a user for a revoked tracked session", async () => {
+    const result = await sessionCallback({
+      session: {
+        user: { email: "test@example.com", name: "Test User" },
+        expires: "2099-01-01",
+      },
+      token: { sessionRevoked: true },
+    });
+
+    expect(result.user).toBeUndefined();
   });
 
   it("falls back to DEFAULT_ONBOARDING_STEP for unknown users with no token value", async () => {
