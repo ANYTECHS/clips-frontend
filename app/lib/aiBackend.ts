@@ -5,29 +5,7 @@ import { logger } from "@/app/lib/logger";
 import { getCircuitBreaker } from "@/app/lib/circuitBreaker";
 import { withRetry } from "@/app/lib/retryUtils";
 
-/**
- * aiBackend.ts — thin client for dispatching video processing jobs to the AI
- * backend service.
- *
- * The backend is expected to:
- * 1. Accept a POST to /jobs with the job payload.
- * 2. Process the video asynchronously.
- * 3. Report progress by calling back to our /api/jobs/[id]/callback endpoint
- * with a shared secret (AI_BACKEND_CALLBACK_SECRET).
- *
- * Environment variables:
- * NEXT_PUBLIC_AI_API_URL        — Base URL of the AI processing service.
- * Required in production. When absent in dev
- * the dispatch is skipped and a warning is
- * logged — the job stays in "queued" status
- * so the UI is never left in a broken state.
- * AI_BACKEND_SECRET             — Shared secret sent as a Bearer token on
- * outbound requests so the AI backend can
- * verify the call is from us.
- * AI_BACKEND_CALLBACK_SECRET    — Secret the AI backend must include when
- * calling our /api/jobs/[id]/callback route.
- * See that route for validation details.
- */
+
 
 /**
  * Payload configuration sent to the remote AI service containing job targets and tracking endpoints.
