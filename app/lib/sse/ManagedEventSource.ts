@@ -16,6 +16,8 @@
  * - every connection is registered in a process-wide pool with a hard limit, so
  *   a leak shows up as a thrown error at the point of the leak rather than as
  *   mysterious browser-level connection starvation later
+ * - the ID of the last received frame is tracked and sent back on reconnect so
+ *   the server can replay what was missed (see `lastEventIdParam`)
  * - `close()` is idempotent and tears down the socket, the pending retry timer
  *   and the pool registration together
  *
@@ -28,6 +30,7 @@ export const DEFAULT_MAX_CONNECTIONS = 4;
 export const DEFAULT_MAX_RETRIES = 5;
 export const DEFAULT_INITIAL_RETRY_DELAY_MS = 1_000;
 export const DEFAULT_MAX_RETRY_DELAY_MS = 30_000;
+export const DEFAULT_LAST_EVENT_ID_PARAM = "lastEventId";
 
 export interface ManagedEventSourceOptions {
   /** Stream URL. */
@@ -49,6 +52,18 @@ export interface ManagedEventSourceOptions {
   initialRetryDelayMs?: number;
   /** Ceiling for the backoff delay in ms. Default 30000. */
   maxRetryDelayMs?: number;
+  /**
+   * Resume point to send on the very first connection, e.g. one persisted from
+   * an earlier page load. Later connections use the last ID received.
+   */
+  initialLastEventId?: string | null;
+  /**
+   * Query parameter that carries the last event ID on reconnect. The native
+   * reconnect would send it as the `Last-Event-ID` header, but that retry is
+   * disabled here and `EventSource` cannot set headers on a fresh connection,
+   * so the ID travels in the URL instead. Default `lastEventId`.
+   */
+  lastEventIdParam?: string;
   /** Injectable for tests. */
   eventSourceFactory?: (url: string) => EventSource;
   /** Injectable for tests; must return a value in [0, 1). */
@@ -105,6 +120,7 @@ export class ManagedEventSource {
   private retryTimer: ReturnType<typeof setTimeout> | null = null;
   private attempt = 0;
   private closed = false;
+  private lastId: string | null;
 
   constructor(options: ManagedEventSourceOptions) {
     this.options = {
@@ -113,6 +129,7 @@ export class ManagedEventSource {
       maxRetryDelayMs: DEFAULT_MAX_RETRY_DELAY_MS,
       ...options,
     };
+    this.lastId = options.initialLastEventId ?? null;
 
     if (pool.size >= maxConnections) {
       throw new ConnectionPoolExhaustedError(maxConnections);
@@ -130,6 +147,22 @@ export class ManagedEventSource {
   /** Reconnection attempts made since the last successful message. */
   get retryCount(): number {
     return this.attempt;
+  }
+
+  /** ID of the most recent frame received, or `null` if none carried one. */
+  get lastEventId(): string | null {
+    return this.lastId;
+  }
+
+  /** The stream URL with the resume point appended, when there is one. */
+  private connectionUrl(): string {
+    const { url, lastEventIdParam } = this.options;
+    if (this.lastId === null) return url;
+    const [base, hash] = url.split("#", 2);
+    const separator = base.includes("?") ? "&" : "?";
+    const param = encodeURIComponent(lastEventIdParam ?? DEFAULT_LAST_EVENT_ID_PARAM);
+    const resumed = `${base}${separator}${param}=${encodeURIComponent(this.lastId)}`;
+    return hash === undefined ? resumed : `${resumed}#${hash}`;
   }
 
   /**
@@ -152,7 +185,7 @@ export class ManagedEventSource {
 
     const factory =
       this.options.eventSourceFactory ?? ((url: string) => new EventSource(url));
-    const source = factory(this.options.url);
+    const source = factory(this.connectionUrl());
     this.source = source;
 
     source.onopen = () => {
@@ -167,6 +200,7 @@ export class ManagedEventSource {
         // ladder resets — otherwise a stream that blips once an hour would
         // eventually be waiting 30 seconds to recover from each blip.
         this.attempt = 0;
+        if (event.lastEventId) this.lastId = event.lastEventId;
         handler(event.data, event);
       }) as EventListener);
     }

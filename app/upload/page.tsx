@@ -586,6 +586,12 @@ export default function UploadPage() {
 
                   <ProgressBar value={prog.percent} status={prog.status} />
 
+                  {prog.status === "uploading" && prog.retryMessage && (
+                    <p className="text-xs text-yellow-400" role="status" aria-live="polite">
+                      {prog.retryMessage}
+                    </p>
+                  )}
+
                   {prog.status === "error" && prog.error && (
                     <p className="text-xs text-red-400" role="alert">
                       {prog.error}

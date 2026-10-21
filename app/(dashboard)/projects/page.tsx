@@ -5,6 +5,7 @@ import React, { startTransition,useCallback, useEffect, useMemo, useState } from
 
 import type { Clip } from "@/components/projects/ClipGrid";
 import ProjectFilters from "@/components/projects/ProjectFilters";
+import { RankingWeightsPanel } from "@/components/projects/RankingWeightsPanel";
 
 const ClipGrid = dynamic(() => import("@/components/projects/ClipGrid"), {
   loading: () => (
@@ -39,6 +40,7 @@ import { X } from "lucide-react";
 
 import { useBatchTransform } from "@/app/hooks/useBatchTransform";
 import { useClipRanking } from "@/app/hooks/useClipRanking";
+import { parseDurationSeconds } from "@/app/lib/clipRanking";
 import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
 import { logger } from "@/app/lib/logger";
 import { selectUserPlan,useUserStore } from "@/app/store/userStore";
@@ -199,14 +201,44 @@ export default function ProjectsPage() {
     );
   }, [captionsStyle, viralityLevels, vaultFilter]);
 
-  // Clips that score at or above the recommendation threshold. Ranking runs
-  // in a web worker (#921) so scoring a large clip list doesn't block the
-  // main thread.
+  // Clips are ranked by the creator's weighted criteria, and those scoring at
+  // or above the recommendation threshold are recommended. Ranking runs in a
+  // web worker (#921) so scoring a large clip list doesn't block the main
+  // thread. Caption quality comes from the hook score and engagement from
+  // retention + emotional pull; clips without a breakdown score neutrally.
   const clipScores = useMemo(
-    () => fetchedClips.map((c) => ({ id: c.id, score: c.score })),
+    () =>
+      fetchedClips.map((c) => ({
+        id: c.id,
+        score: c.score,
+        durationSeconds: parseDurationSeconds(c.duration),
+        captionQuality: c.scoreBreakdown?.hook ?? null,
+        engagement: c.scoreBreakdown
+          ? (c.scoreBreakdown.retention + c.scoreBreakdown.emotional) / 2
+          : null,
+      })),
     [fetchedClips]
   );
-  const recommendedIds = useClipRanking(clipScores, RECOMMENDATION_THRESHOLD);
+  const {
+    recommendedIds,
+    rankedIds,
+    details: rankingDetails,
+    weights: rankingWeights,
+    preset: rankingPreset,
+    setWeights: setRankingWeights,
+    applyPreset: applyRankingPreset,
+  } = useClipRanking(clipScores, RECOMMENDATION_THRESHOLD);
+
+  // Display order follows the ranking; clips the ranker hasn't seen yet
+  // (e.g. a page that just loaded) keep their fetched order at the end.
+  const rankedClips = useMemo(() => {
+    const position = new Map(rankedIds.map((id, index) => [id, index]));
+    return [...fetchedClips].sort(
+      (a, b) =>
+        (position.get(a.id) ?? Number.MAX_SAFE_INTEGER) -
+        (position.get(b.id) ?? Number.MAX_SAFE_INTEGER)
+    );
+  }, [fetchedClips, rankedIds]);
 
   // Bulk-selection updates can re-render every card in the grid, so they run
   // as a transition (#render-scheduling): React can interrupt/deprioritize
@@ -548,12 +580,18 @@ export default function ProjectsPage() {
               />
               Keep duplicate clips
             </label>
+            <RankingWeightsPanel
+              weights={rankingWeights}
+              preset={rankingPreset}
+              onWeightsChange={setRankingWeights}
+              onPresetChange={applyRankingPreset}
+            />
             <div
               key={vaultFilter}
               className="flex-1 overflow-y-auto pr-1 scrollbar-hide pb-4 animate-in fade-in duration-500"
             >
               <ClipGrid
-                clips={fetchedClips}
+                clips={rankedClips}
                 selectedIds={selectedIds}
                 onSelect={handleSelect}
                 onSelectAll={handleSelectAll}
@@ -572,6 +610,7 @@ export default function ProjectsPage() {
                 onLoadMore={handleLoadMore}
                 hasMore={fetchedClips.length < totalClips}
                 userPlan={userPlan}
+                rankingDetails={rankingDetails}
               />
             </div>
 

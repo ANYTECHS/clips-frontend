@@ -12,7 +12,11 @@
 
 import { useState, useCallback, useRef } from "react";
 import { UPLOAD_CONCURRENCY } from "@/app/lib/constants";
-import { shouldChunk, uploadFileInChunks } from "@/app/lib/chunkedUpload";
+import {
+  formatChunkRetryMessage,
+  shouldChunk,
+  uploadFileInChunks,
+} from "@/app/lib/chunkedUpload";
 import { startMeasure } from "@/app/lib/performanceMonitoring";
 
 const UPLOAD_STALL_TIMEOUT_MS = 45_000;
@@ -28,6 +32,8 @@ export type FileProgress = {
   status: "idle" | "uploading" | "done" | "error" | "cancelled";
   /** Human-readable error message when status === "error" */
   error?: string | undefined;
+  /** "Retrying chunk X (attempt Y)..." while a chunk is backing off/retrying */
+  retryMessage?: string | undefined;
 };
 
 /** Metadata returned on a successful upload */
@@ -179,6 +185,10 @@ export function useUploadProgress(
           }, UPLOAD_STALL_TIMEOUT_MS);
         };
         armStallTimer();
+        // Chunks currently being retried, so the notice reflects the latest
+        // retry still in progress and clears once every retried chunk lands.
+        const retrying = new Map<number, string>();
+        const latestRetryMessage = () => [...retrying.values()].pop();
         const result = await uploadFileInChunks(file, {
           signal: controller.signal,
           ...(templateId ? { templateId } : {}),
@@ -186,25 +196,36 @@ export function useUploadProgress(
             armStallTimer();
             setFileProgress(file.name, { percent, status: "uploading" });
           },
+          onChunkRetry: (info) => {
+            // Backoff sleeps are expected silence, not a stall.
+            armStallTimer();
+            retrying.delete(info.chunkIndex);
+            retrying.set(info.chunkIndex, formatChunkRetryMessage(info));
+            setFileProgress(file.name, { retryMessage: latestRetryMessage() });
+          },
+          onChunkComplete: (chunkIndex) => {
+            if (!retrying.delete(chunkIndex)) return;
+            setFileProgress(file.name, { retryMessage: latestRetryMessage() });
+          },
         });
         if (stallTimer) clearTimeout(stallTimer);
-        setFileProgress(file.name, { percent: 100, status: "done" });
+        setFileProgress(file.name, { percent: 100, status: "done", retryMessage: undefined });
         endMeasure({ outcome: "success" });
         return result;
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
           if (stalled) {
             const msg = "Upload timed out because progress stalled. Retry the upload.";
-            setFileProgress(file.name, { status: "error", error: msg });
+            setFileProgress(file.name, { status: "error", error: msg, retryMessage: undefined });
             endMeasure({ outcome: "timeout" });
             throw new Error(msg);
           }
-          setFileProgress(file.name, { status: "cancelled" });
+          setFileProgress(file.name, { status: "cancelled", retryMessage: undefined });
           endMeasure({ outcome: "cancelled" });
           throw err;
         }
         const msg = err instanceof Error ? err.message : "Upload failed";
-        setFileProgress(file.name, { status: "error", error: msg });
+        setFileProgress(file.name, { status: "error", error: msg, retryMessage: undefined });
         endMeasure({ outcome: "error" });
         throw new Error(msg);
       } finally {

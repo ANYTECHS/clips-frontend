@@ -10,12 +10,18 @@
  * - Reads from the module-level cache in videoThumbnail.ts so refreshes
  *   and re-renders never regenerate existing thumbnails.
  * - Cleans up cache entries when files are removed.
+ * - Dispatches frame encoding to a web worker (app/workers/thumbnailWorker.ts)
+ *   shared by every file, so generation never blocks the main thread and
+ *   several files can be processed in parallel. Falls back to main-thread
+ *   extraction where workers / OffscreenCanvas are unavailable.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  createThumbnailWorker,
   evictThumbnailCache,
   generateVideoThumbnails,
+  type ThumbnailWorkerClient,
 } from "@/app/lib/videoThumbnail";
 
 export type ThumbnailStatus = "idle" | "loading" | "ready" | "error";
@@ -39,6 +45,17 @@ export function useVideoThumbnails(files: File[]): ThumbnailMap {
   // Track which files we've already started generating so we don't double-fire.
   const inProgress = useRef<Set<string>>(new Set());
 
+  // One worker per hook instance, created lazily and terminated on unmount.
+  // `undefined` means "not tried yet"; `null` means "unsupported, use main thread".
+  const workerRef = useRef<ThumbnailWorkerClient | null | undefined>(undefined);
+
+  useEffect(() => {
+    return () => {
+      workerRef.current?.terminate();
+      workerRef.current = undefined;
+    };
+  }, []);
+
   const setFileState = useCallback(
     (name: string, patch: Partial<FileThumbnailState>) => {
       setThumbnailMap((prev: ThumbnailMap) => ({
@@ -54,10 +71,14 @@ export function useVideoThumbnails(files: File[]): ThumbnailMap {
     for (const file of files) {
       if (inProgress.current.has(file.name)) continue;
 
+      if (workerRef.current === undefined) {
+        workerRef.current = createThumbnailWorker();
+      }
+
       inProgress.current.add(file.name);
       setFileState(file.name, { status: "loading", thumbnails: [] });
 
-      generateVideoThumbnails(file, SEEK_POSITIONS)
+      generateVideoThumbnails(file, SEEK_POSITIONS, { worker: workerRef.current })
         .then((thumbnails: string[]) => {
           setFileState(file.name, { status: "ready", thumbnails });
         })

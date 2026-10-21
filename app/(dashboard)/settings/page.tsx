@@ -245,6 +245,14 @@ export function SettingsPage({ initialTab = "profile" }: SettingsPageProps) {
                 ...defaultUserPreferences.privacy,
                 ...(data.privacy || {}),
               },
+              ranking: {
+                ...defaultUserPreferences.ranking,
+                ...(data.ranking || {}),
+                weights: {
+                  ...defaultUserPreferences.ranking.weights,
+                  ...(data.ranking?.weights || {}),
+                },
+              },
             };
             setPreferences(merged);
             setSavedPreferences(merged);
