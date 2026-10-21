@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PRICE_CACHE_TTL_MS } from "@/app/lib/constants";
+import { cachedJson } from "@/app/lib/responseCache";
 
 const COINGECKO_URL =
   "https://api.coingecko.com/api/v3/simple/price?ids=stellar&vs_currencies=usd";
@@ -15,11 +16,11 @@ interface CacheEntry {
 
 let cache: CacheEntry | null = null;
 
-export async function GET() {
+export async function GET(request?: Request) {
   const now = Date.now();
 
   if (cache && now < cache.expiresAt) {
-    return NextResponse.json({ price: cache.price, stale: false });
+    return cachedJson(request, { price: cache.price, stale: false }, { maxAge: 30, sMaxAge: 60 });
   }
 
   try {
@@ -35,7 +36,7 @@ export async function GET() {
       const price: unknown = data?.stellar?.usd;
       if (typeof price === "number") {
         cache = { price, expiresAt: now + CACHE_TTL_MS };
-        return NextResponse.json({ price, stale: false });
+        return cachedJson(request, { price, stale: false }, { maxAge: 30, sMaxAge: 60 });
       }
     }
   } catch {
