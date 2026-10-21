@@ -3,6 +3,8 @@ import { NextRequest } from "next/server";
 import { prisma } from "@/app/lib/prisma";
 import { logger } from "@/app/lib/logger";
 import { createAuditEvent } from "@/app/lib/auditLog";
+import { geolocateIp } from "@/app/lib/geoip";
+import { checkLoginAnomaly } from "@/app/lib/loginSecurity";
 
 export interface SessionSecurityConfig {
   /** Maximum lifetime of a session in seconds (default: 30 days) */
@@ -78,26 +80,40 @@ export function getSecureCookieConfig(useSecure = process.env.NODE_ENV === "prod
   };
 }
 
-function parseClientDetails(req?: NextRequest): { ipAddress: string; userAgent: string } {
+function parseClientDetails(req?: NextRequest): { ipAddress: string; userAgent: string; cfCountry: string | null } {
   if (!req) {
-    return { ipAddress: "unknown", userAgent: "unknown" };
+    return { ipAddress: "unknown", userAgent: "unknown", cfCountry: null };
   }
   const ipAddress =
     req.headers.get("x-forwarded-for")?.split(",")[0].trim() ||
     req.headers.get("x-real-ip") ||
     "unknown";
   const userAgent = req.headers.get("user-agent") || "unknown";
-  return { ipAddress, userAgent };
+  const cfCountry = req.headers.get("cf-ipcountry");
+  return { ipAddress, userAgent, cfCountry };
 }
 
 /**
  * Creates and registers a new tracked session in persistent storage.
  * Enforces concurrent session limits: if the active count exceeds limit,
  * the oldest session is automatically revoked.
+ *
+ * After creating the session the function kicks off a fire-and-forget
+ * geolocation + anomaly check that sends an alert email when a suspicious
+ * login is detected (new country or impossible travel). The check never
+ * blocks the sign-in flow.
+ *
+ * @param userId     - The authenticated user's DB id.
+ * @param req        - Incoming NextRequest, used to extract IP / user-agent.
+ * @param userEmail  - User's email address, passed to the alert mailer.
  */
-export async function createTrackedSession(userId: string, req?: NextRequest) {
+export async function createTrackedSession(
+  userId: string,
+  req?: NextRequest,
+  userEmail?: string,
+) {
   const config = getSessionSecurityConfig();
-  const { ipAddress, userAgent } = parseClientDetails(req);
+  const { ipAddress, userAgent, cfCountry } = parseClientDetails(req);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + config.sessionMaxAgeSeconds * 1000);
 
@@ -137,7 +153,13 @@ export async function createTrackedSession(userId: string, req?: NextRequest) {
     }
   }
 
-  // 2. Generate cryptographically random session token
+  // 2. Resolve geolocation for the connecting IP (best-effort, non-blocking)
+  const geo = await geolocateIp(ipAddress, cfCountry).catch((err) => {
+    logger.warn("[SessionSecurity] Geolocation lookup failed", { ipAddress, err });
+    return null;
+  });
+
+  // 3. Generate cryptographically random session token
   const sessionToken = `sess_${crypto.randomBytes(32).toString("hex")}`;
 
   const newSession = await prisma.userSession.create({
@@ -148,10 +170,15 @@ export async function createTrackedSession(userId: string, req?: NextRequest) {
       userAgent,
       lastActivityAt: now,
       expiresAt,
+      // Geo fields — null when lookup failed or IP is private
+      country: geo?.country ?? null,
+      city: geo?.city ?? null,
+      latitude: geo?.latitude ?? null,
+      longitude: geo?.longitude ?? null,
     },
   });
 
-  // Audit event for new session
+  // 4. Audit event for new session
   await createAuditEvent({
     actorId: userId,
     action: "session.created",
@@ -160,7 +187,24 @@ export async function createTrackedSession(userId: string, req?: NextRequest) {
     ipAddress,
     userAgent,
     status: "success",
+    metadata: geo
+      ? { country: geo.country, city: geo.city }
+      : undefined,
   });
+
+  // 5. Suspicious-login anomaly check — fire-and-forget, never blocks sign-in
+  if (userEmail) {
+    checkLoginAnomaly({
+      userId,
+      userEmail,
+      newSessionId: newSession.id,
+      newGeo: geo,
+      ipAddress,
+      userAgent,
+    }).catch((err) => {
+      logger.error("[SessionSecurity] Anomaly check failed", { userId, err });
+    });
+  }
 
   return newSession;
 }
@@ -337,6 +381,8 @@ export async function revokeAllUserSessions(userId: string, exceptSessionToken?:
 
 /**
  * Lists all active non-revoked sessions for a user.
+ * Returns geo location, suspicious flag, and step-up verification state
+ * so the sessions dashboard can surface anomalous sessions to the user.
  */
 export async function getUserActiveSessions(userId: string, currentSessionToken?: string) {
   const sessions = await prisma.userSession.findMany({
@@ -351,6 +397,10 @@ export async function getUserActiveSessions(userId: string, currentSessionToken?
       sessionToken: true,
       ipAddress: true,
       userAgent: true,
+      country: true,
+      city: true,
+      suspicious: true,
+      stepUpVerified: true,
       lastActivityAt: true,
       expiresAt: true,
       createdAt: true,
@@ -361,6 +411,10 @@ export async function getUserActiveSessions(userId: string, currentSessionToken?
     id: s.id,
     ipAddress: s.ipAddress,
     userAgent: s.userAgent,
+    country: s.country,
+    city: s.city,
+    suspicious: s.suspicious,
+    stepUpVerified: s.stepUpVerified,
     lastActivityAt: s.lastActivityAt,
     createdAt: s.createdAt,
     expiresAt: s.expiresAt,

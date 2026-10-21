@@ -11,6 +11,7 @@ import { apiFetch } from "@/app/lib/apiError";
 import AsyncBoundary from "@/components/common/AsyncBoundary";
 import LazyImage from "@/components/common/LazyImage";
 import VirtualGrid from "@/components/common/VirtualGrid";
+import { sanitize } from "@/app/lib/sanitize";
 
 interface TrendingClip {
   id: string;
@@ -43,6 +44,11 @@ function ClipCard({ clip, onClick }: { clip: TrendingClip; onClick: () => void }
   const platform = clip.platform ?? "TikTok";
   const views = clip.views ?? Math.floor(clip.score * 120);
 
+  const safeTitle = sanitize(clip.title);
+  const safeCreator = sanitize(clip.creatorUsername);
+  const safeStyle = sanitize(clip.style);
+  const safeDuration = sanitize(clip.duration);
+
   return (
     <Link
       href={`/share/${clip.shareId}`}
@@ -52,7 +58,7 @@ function ClipCard({ clip, onClick }: { clip: TrendingClip; onClick: () => void }
       <div className="aspect-[9/16] relative">
         <LazyImage
           src={clip.thumbnail}
-          alt={clip.title}
+          alt={safeTitle}
           fill
           sizes={SIZES_CLIP_GRID}
           placeholder="blur"
@@ -70,13 +76,13 @@ function ClipCard({ clip, onClick }: { clip: TrendingClip; onClick: () => void }
           </span>
         </div>
         <div className="absolute bottom-3 left-3 right-3">
-          <h3 className="text-white font-bold text-sm line-clamp-2 mb-1">{clip.title}</h3>
+          <h3 className="text-white font-bold text-sm line-clamp-2 mb-1">{safeTitle}</h3>
           <div className="flex items-center justify-between text-xs text-white/60">
-            <span>@{clip.creatorUsername}</span>
+            <span>@{safeCreator}</span>
             <span className="text-[11px] text-brand/90 font-medium">{views.toLocaleString()} views</span>
           </div>
           <p className="text-white/40 text-[10px] mt-1">
-            {clip.style} · {clip.duration}
+            {safeStyle} · {safeDuration}
           </p>
         </div>
       </div>
