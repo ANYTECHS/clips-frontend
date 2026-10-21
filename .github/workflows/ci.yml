@@ -153,6 +153,8 @@ jobs:
         run: npm run migrate:test
       - name: Dependency vulnerability scan
         run: npm run security:scan
+      - name: Sanitization audit
+        run: npm run audit:sanitize
       - name: Accessibility tests
         run: npm run test:a11y
       - name: Check for changeset

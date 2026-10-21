@@ -43,6 +43,81 @@ const SENSITIVE_PATH = /\/auth(?:\/|$)|\/api\/auth(?:\/|$)/i;
 const mutationInflight = new Map<string, Promise<MutateResult<unknown>>>();
 let autoSyncStop: (() => void) | null = null;
 
+// ─── In-memory access token store ────────────────────────────────────────────
+//
+// The access token lives only in module memory — never in localStorage or a
+// cookie — so it is invisible to XSS.  The refresh token lives in an httpOnly
+// Secure SameSite=Strict cookie managed entirely by the server.
+//
+// Thread-safety: JS is single-threaded; concurrent refresh calls are serialised
+// by the `refreshInFlight` promise guard below.
+
+let _accessToken: string | null = null;
+let refreshInFlight: Promise<string | null> | null = null;
+
+/** Returns the current in-memory access token (may be null before first login). */
+export function getAccessToken(): string | null {
+  return _accessToken;
+}
+
+/** Stores a new access token after a successful login or refresh. */
+export function setAccessToken(token: string | null): void {
+  _accessToken = token;
+}
+
+/**
+ * Calls POST /api/auth/refresh (sends the httpOnly `rt` cookie automatically).
+ * On success, stores the new access token in memory and returns it.
+ * On failure, clears the in-memory token and returns null.
+ *
+ * Concurrent callers share one in-flight request — the promise is cached until
+ * it settles to prevent a thundering herd of parallel refreshes.
+ */
+async function attemptTokenRefresh(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch("/api/auth/refresh", {
+        method: "POST",
+        credentials: "include",   // sends the httpOnly rt cookie
+        headers: { "Content-Type": "application/json" },
+      });
+
+      if (!response.ok) {
+        _accessToken = null;
+        return null;
+      }
+
+      const body = await response.json() as { accessToken?: string };
+      if (typeof body.accessToken === "string") {
+        _accessToken = body.accessToken;
+        return _accessToken;
+      }
+
+      _accessToken = null;
+      return null;
+    } catch {
+      _accessToken = null;
+      return null;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
+}
+
+/**
+ * Redirects to /login.  Works both in browser (window.location) and in
+ * environments where window is not defined (SSR/tests — no-op).
+ */
+function redirectToLogin(): void {
+  if (typeof window !== "undefined") {
+    window.location.href = "/login?reason=session_expired";
+  }
+}
+
 export function isSensitiveUrl(url: string): boolean {
   return SENSITIVE_PATH.test(url);
 }
@@ -104,10 +179,16 @@ async function performFetch(input: {
     extras["Content-Type"] = "application/json";
   }
 
+  // Inject the in-memory access token when available and the request is not
+  // itself an auth endpoint (prevents recursive refresh loops).
+  const token = _accessToken;
+  const isAuthEndpoint = isSensitiveUrl(input.url);
+  if (token && !isAuthEndpoint && !input.headers?.["Authorization"] && !input.headers?.["authorization"]) {
+    extras["Authorization"] = `Bearer ${token}`;
+  }
+
   const headers = buildHeaders(input.headers, extras);
-  const init: RequestInit = {
-    method: input.method,
-  };
+  const init: RequestInit = { method: input.method };
   if (Object.keys(headers).length > 0) init.headers = headers;
   if (serialized !== undefined) init.body = serialized;
   if (input.credentials) init.credentials = input.credentials;
@@ -115,6 +196,45 @@ async function performFetch(input: {
 
   const response = await fetch(input.url, init);
   const data = await response.json().catch(() => undefined);
+
+  // ── 401 interception: attempt token refresh then retry once ───────────────
+  // Only retry non-auth endpoints to avoid infinite loops.
+  if (response.status === 401 && !isAuthEndpoint) {
+    const newToken = await attemptTokenRefresh();
+
+    if (!newToken) {
+      // Refresh failed — send the user back to login.
+      redirectToLogin();
+      // Return the original 401 so callers can handle it synchronously.
+      return { response, data };
+    }
+
+    // Retry with the new token (no further retry — prevent loops).
+    const retryExtras: Record<string, string> = { Authorization: `Bearer ${newToken}` };
+    if (input.idempotencyKey) retryExtras["Idempotency-Key"] = input.idempotencyKey;
+    if (serialized !== undefined && !input.headers?.["Content-Type"] && !input.headers?.["content-type"]) {
+      retryExtras["Content-Type"] = "application/json";
+    }
+
+    const retryHeaders = buildHeaders(input.headers, retryExtras);
+    const retryInit: RequestInit = { method: input.method };
+    if (Object.keys(retryHeaders).length > 0) retryInit.headers = retryHeaders;
+    if (serialized !== undefined) retryInit.body = serialized;
+    if (input.credentials) retryInit.credentials = input.credentials;
+    if (input.signal) retryInit.signal = input.signal;
+
+    const retryResponse = await fetch(input.url, retryInit);
+    const retryData = await retryResponse.json().catch(() => undefined);
+
+    if (retryResponse.status === 401) {
+      // Even the retried request failed — clear token and redirect.
+      _accessToken = null;
+      redirectToLogin();
+    }
+
+    return { response: retryResponse, data: retryData };
+  }
+
   return { response, data };
 }
 
@@ -506,4 +626,6 @@ export function resetClientForTests(): void {
   mutationInflight.clear();
   autoSyncStop?.();
   autoSyncStop = null;
+  _accessToken = null;
+  refreshInFlight = null;
 }

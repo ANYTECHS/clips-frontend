@@ -5,7 +5,9 @@ import Twitter from "next-auth/providers/twitter";
 import Instagram from "next-auth/providers/instagram";
 import Credentials from "next-auth/providers/credentials";
 import { jwtCallback, sessionCallback } from "./authCallbacks";
-import { getSecureCookieConfig, getSessionSecurityConfig } from "./sessionSecurity";
+import { getSecureCookieConfig, getSessionSecurityConfig, createTrackedSession } from "./sessionSecurity";
+import { prisma } from "@/app/lib/prisma";
+import { logger } from "@/app/lib/logger";
 // eslint-disable-next-line no-restricted-imports -- TODO: replace MockApi with real recovery API (tracked separately)
 import { MockApi } from "@/__mocks__/app/lib/mockApi";
 
@@ -166,6 +168,52 @@ export const authOptions: NextAuthConfig = {
   callbacks: {
     jwt: jwtCallback,
     session: sessionCallback,
+  },
+  /**
+   * Auth.js v5 lifecycle events — fired after the action completes.
+   *
+   * signIn: Called on every successful authentication (OAuth, credentials, magic link).
+   * We use it to create a tracked UserSession row and trigger the suspicious-login
+   * detector.  The event callback does not receive the raw Request object, so IP and
+   * user-agent are read from the user's most-recent session row instead of the headers.
+   *
+   * NOTE: Auth.js v5 event handlers receive { user, account, isNewUser }.
+   * They are fire-and-forget — errors here are logged but do not fail the login.
+   */
+  events: {
+    async signIn({ user }) {
+      if (!user?.id || !user?.email) return;
+
+      try {
+        // createTrackedSession without a req — IP/UA will be "unknown" here
+        // because Auth.js events don't expose the raw Request.  The session
+        // will still be created and geo/anomaly checks are skipped for unknown
+        // IPs.  For full IP capture, callers can also invoke createTrackedSession
+        // directly from an instrumented route handler that has access to req.
+        await createTrackedSession(user.id, undefined, user.email);
+      } catch (err) {
+        logger.error("[Auth] Failed to create tracked session on signIn", {
+          userId: user.id,
+          err,
+        });
+      }
+    },
+    async signOut(message) {
+      // Best-effort: look up the user and revoke their active sessions.
+      // In JWT strategy the message contains { token: JWT }.
+      // token.sub is the user id.
+      const token = "token" in message ? message.token : null;
+      const userId = token?.sub;
+      if (!userId) return;
+      try {
+        await prisma.userSession.updateMany({
+          where: { userId, revokedAt: null },
+          data: { revokedAt: new Date() },
+        });
+      } catch (err) {
+        logger.error("[Auth] Failed to revoke sessions on signOut", { userId, err });
+      }
+    },
   },
   session: {
     strategy: "jwt",

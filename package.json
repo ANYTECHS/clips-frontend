@@ -17,6 +17,7 @@
     "migrate:rollback": "node scripts/migrate-rollback.js",
     "migrate:test": "node scripts/test-migrations.js",
     "security:scan": "node scripts/dependency-scan.js",
+    "audit:sanitize": "node scripts/audit-sanitization.js",
     "audit:ci": "npm audit --audit-level=high",
     "audit:prune": "node scripts/prune-audit-logs.js",
     "format": "prettier --write .",

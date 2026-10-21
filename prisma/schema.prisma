@@ -30,6 +30,7 @@ model User {
   apiKeys       ApiKey[]
   sessions      UserSession[]
   webhookEndpoints WebhookEndpoint[]
+  refreshTokens RefreshToken[]
 
   /**
    * Opt-in to the monthly earnings report email (Issue #820).
@@ -199,12 +200,25 @@ model ApiUsage {
 }
 
 /// Server-side tracked session supporting rotation, timeouts, and concurrent session limits (Issue #1163).
+/// Extended with geolocation and suspicious-login detection fields.
 model UserSession {
   id             String    @id @default(cuid())
   userId         String
   sessionToken   String    @unique
   ipAddress      String?
   userAgent      String?
+  /// ISO 3166-1 alpha-2 country code resolved from ipAddress at session creation (e.g. "US", "DE").
+  country        String?
+  /// Human-readable city name resolved from ipAddress, for display in alert emails.
+  city           String?
+  /// Approximate latitude used for impossible-travel distance calculation.
+  latitude       Float?
+  /// Approximate longitude used for impossible-travel distance calculation.
+  longitude      Float?
+  /// True when this session was flagged by the impossible-travel or new-country detector.
+  suspicious     Boolean   @default(false)
+  /// True when the user has completed the step-up authentication challenge for this session.
+  stepUpVerified Boolean   @default(false)
   lastActivityAt DateTime  @default(now())
   expiresAt      DateTime
   revokedAt      DateTime?
@@ -215,6 +229,7 @@ model UserSession {
 
   @@index([userId, expiresAt])
   @@index([sessionToken])
+  @@index([userId, createdAt])
 }
 
 /// Tamper-evident security audit trail with cryptographic hash chaining (Issue #1162).
@@ -327,5 +342,35 @@ model WebhookDelivery {
   @@index([endpointId, createdAt])
   @@index([status, nextAttemptAt])
   @@index([isDeadLetter, createdAt])
+}
+
+/// Refresh token for JWT rotation with reuse detection.
+///
+/// Only the SHA-256 hash of the opaque token is stored — the plaintext token
+/// is never persisted.  Each row belongs to a "family" (a chain of rotations
+/// originating from a single initial authentication).  If a revoked token in
+/// a family is presented, all tokens in that family are revoked immediately
+/// (silent compromise detection).
+model RefreshToken {
+  id             String    @id @default(cuid())
+  userId         String
+  /// SHA-256 hex digest of the plaintext opaque token.  Never store plaintext.
+  tokenHash      String    @unique
+  /// Groups the full rotation chain so the entire family can be revoked on
+  /// reuse detection.  Set to the first token's id and inherited by all
+  /// successors in the chain.
+  familyId       String
+  /// Hash of the token that this row replaces, forming an auditable chain.
+  replacedByHash String?
+  expiresAt      DateTime
+  revokedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([familyId])
+  @@index([tokenHash])
+  @@index([expiresAt])
 }
 

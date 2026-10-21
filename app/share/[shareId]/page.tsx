@@ -4,6 +4,7 @@ import Link from "next/link";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
 import LazyImage from "@/components/common/LazyImage";
 import { exploreStore } from "@/app/api/explore/exploreStore";
+import { sanitize } from "@/app/lib/sanitize";
 
 /**
  * Shape of a shared clip. Sourced from a mock today; the fetch below is the
@@ -127,6 +128,7 @@ export default async function SharePage({
   return (
     <>
       {jsonLd && (
+        // audit-sanitization: safe — value is JSON.stringify of a plain object with no user-controlled HTML markup
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -170,7 +172,7 @@ export default async function SharePage({
               {/* Clip Info */}
               <div className="flex items-start justify-between">
                 <div>
-                  <h1 className="text-2xl font-bold mb-2">{clip?.title ?? "Shared Clip"}</h1>
+                  <h1 className="text-2xl font-bold mb-2">{sanitize(clip?.title ?? "Shared Clip")}</h1>
                   {clip ? (
                     <div className="flex items-center gap-4 text-sm text-muted">
                       <span className="flex items-center gap-1">
@@ -179,7 +181,7 @@ export default async function SharePage({
                         </svg>
                         Viral Score: {clip.score}/100
                       </span>
-                      {clip.style ? <span>{clip.style}</span> : null}
+                      {clip.style ? <span>{sanitize(clip.style)}</span> : null}
                     </div>
                   ) : null}
                 </div>
