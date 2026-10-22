@@ -7,15 +7,26 @@
  * canvas, and exports it as a JPEG data URI. All three steps (load, seek,
  * draw) happen off-screen; no DOM insertion is needed.
  *
+ * When a `ThumbnailWorkerClient` is supplied (see `createThumbnailWorker`),
+ * each seeked frame is grabbed with `createImageBitmap` and transferred to
+ * app/workers/thumbnailWorker.ts, which scales and encodes it on an
+ * `OffscreenCanvas`. The main thread then only seeks — the synchronous
+ * draw + `toDataURL` work that caused jank on large videos moves off it.
+ * Without a worker (unsupported browser, SSR, jsdom) the original
+ * main-thread canvas path is used.
+ *
  * Results are cached by a stable file key (name + size + lastModified) so
  * repeated calls for the same File never re-seek.
  */
 
-/** JPEG quality for exported thumbnails — 0.75 balances size vs. fidelity. */
-const THUMBNAIL_QUALITY = 0.75;
-
-/** Thumbnail width in pixels; height is derived from the video's aspect ratio. */
-const THUMBNAIL_WIDTH = 320;
+import {
+  THUMBNAIL_MIME_TYPE,
+  THUMBNAIL_QUALITY,
+  THUMBNAIL_WIDTH,
+  thumbnailDimensions,
+  type ThumbnailWorkerRequest,
+  type ThumbnailWorkerResponse,
+} from "@/app/workers/thumbnailWorker";
 
 /** Maximum time (ms) to wait for a seek to settle. */
 const SEEK_TIMEOUT_MS = 8_000;
@@ -53,10 +64,11 @@ function seekTo(video: HTMLVideoElement, time: number): Promise<void> {
  * Draw the current video frame onto a canvas and return a JPEG data URI.
  */
 function captureFrame(video: HTMLVideoElement): string {
-  const aspectRatio =
-    video.videoHeight > 0 ? video.videoWidth / video.videoHeight : 16 / 9;
-  const width = THUMBNAIL_WIDTH;
-  const height = Math.round(width / aspectRatio);
+  const { width, height } = thumbnailDimensions(
+    video.videoWidth,
+    video.videoHeight,
+    THUMBNAIL_WIDTH,
+  );
 
   const canvas = document.createElement("canvas");
   canvas.width = width;
@@ -67,7 +79,93 @@ function captureFrame(video: HTMLVideoElement): string {
     ctx.drawImage(video, 0, 0, width, height);
   }
 
-  return canvas.toDataURL("image/jpeg", THUMBNAIL_QUALITY);
+  return canvas.toDataURL(THUMBNAIL_MIME_TYPE, THUMBNAIL_QUALITY);
+}
+
+// ─── Worker client ────────────────────────────────────────────────────────────
+
+/** Handle to a thumbnail worker; see `createThumbnailWorker`. */
+export interface ThumbnailWorkerClient {
+  /** Encode decoded frames into JPEG data URIs. Frames are transferred to the worker. */
+  encode(video: Blob, frames: ImageBitmap[]): Promise<string[]>;
+  terminate(): void;
+}
+
+/** True when frames can be grabbed and encoded off the main thread. */
+export function supportsThumbnailWorker(): boolean {
+  return (
+    typeof window !== "undefined" &&
+    typeof Worker !== "undefined" &&
+    typeof OffscreenCanvas !== "undefined" &&
+    typeof createImageBitmap !== "undefined"
+  );
+}
+
+/**
+ * Spawn a thumbnail worker, or return `null` where workers / OffscreenCanvas
+ * are unavailable so callers fall back to main-thread extraction. Requests
+ * are multiplexed by id, so concurrent `encode` calls don't wait on each other.
+ */
+export function createThumbnailWorker(): ThumbnailWorkerClient | null {
+  if (!supportsThumbnailWorker()) return null;
+
+  let worker: Worker;
+  try {
+    worker = new Worker(new URL("../workers/thumbnailWorker.ts", import.meta.url));
+  } catch {
+    return null;
+  }
+
+  let nextRequestId = 0;
+  const pending = new Map<
+    number,
+    { resolve: (thumbnails: string[]) => void; reject: (err: Error) => void }
+  >();
+
+  worker.onmessage = (event: MessageEvent<ThumbnailWorkerResponse>) => {
+    const request = pending.get(event.data.requestId);
+    if (!request) return;
+    pending.delete(event.data.requestId);
+    if (event.data.ok) {
+      request.resolve(event.data.thumbnails);
+    } else {
+      request.reject(new Error(event.data.error));
+    }
+  };
+
+  worker.onerror = (event: ErrorEvent) => {
+    const error = new Error(event.message || "Thumbnail worker crashed");
+    for (const request of pending.values()) request.reject(error);
+    pending.clear();
+  };
+
+  return {
+    encode(video, frames) {
+      const requestId = ++nextRequestId;
+      return new Promise<string[]>((resolve, reject) => {
+        pending.set(requestId, { resolve, reject });
+        const message: ThumbnailWorkerRequest = {
+          requestId,
+          video,
+          frames,
+          width: THUMBNAIL_WIDTH,
+          quality: THUMBNAIL_QUALITY,
+        };
+        worker.postMessage(message, frames);
+      });
+    },
+    terminate() {
+      worker.terminate();
+      const error = new Error("Thumbnail worker terminated");
+      for (const request of pending.values()) request.reject(error);
+      pending.clear();
+    },
+  };
+}
+
+export interface GenerateVideoThumbnailsOptions {
+  /** Encode frames off the main thread. Omit (or pass null) for main-thread extraction. */
+  worker?: ThumbnailWorkerClient | null;
 }
 
 /**
@@ -78,10 +176,12 @@ function captureFrame(video: HTMLVideoElement): string {
  *
  * @param file       The video File to extract frames from.
  * @param positions  Fractional seek positions, e.g. [0.05, 0.5, 0.95].
+ * @param options    `worker` to encode frames off the main thread.
  */
 export async function generateVideoThumbnails(
   file: File,
   positions: number[] = [0.05, 0.5, 0.95],
+  options: GenerateVideoThumbnailsOptions = {},
 ): Promise<string[]> {
   const key = fileKey(file);
 
@@ -114,12 +214,32 @@ export async function generateVideoThumbnails(
       throw new Error("Could not determine video duration");
     }
 
-    const thumbnails: string[] = [];
+    const times = positions.map((pos) =>
+      Math.max(0, Math.min(duration * pos, duration - 0.1)),
+    );
 
-    for (const pos of positions) {
-      const time = Math.max(0, Math.min(duration * pos, duration - 0.1));
-      await seekTo(video, time);
-      thumbnails.push(captureFrame(video));
+    let thumbnails: string[] | null = null;
+
+    if (options.worker) {
+      try {
+        const frames: ImageBitmap[] = [];
+        for (const time of times) {
+          await seekTo(video, time);
+          frames.push(await createImageBitmap(video));
+        }
+        thumbnails = await options.worker.encode(file, frames);
+      } catch {
+        // Worker or bitmap capture failed — fall back to the main thread.
+        thumbnails = null;
+      }
+    }
+
+    if (!thumbnails) {
+      thumbnails = [];
+      for (const time of times) {
+        await seekTo(video, time);
+        thumbnails.push(captureFrame(video));
+      }
     }
 
     thumbnailCache.set(key, thumbnails);

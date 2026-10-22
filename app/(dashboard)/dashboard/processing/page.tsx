@@ -7,6 +7,7 @@ import {
   RefreshCw,
   RotateCcw,
   Sparkles,
+  WifiOff,
   X,
   Zap,
 } from "lucide-react";
@@ -39,7 +40,7 @@ export default function ProcessingPage() {
   const resetProcess = useProcessStore((s) => s.resetProcess);
 
   // Start polling if we have a jobId
-  const { stopPolling } = useProcessingStatus(jobId || id || null, !!jobId || !!id);
+  const { stopPolling, connectionState } = useProcessingStatus(jobId || id || null, !!jobId || !!id);
 
   // Handle completion notification
   useEffect(() => {
@@ -252,6 +253,18 @@ export default function ProcessingPage() {
               </div>
               <span className="text-3xl font-black text-brand">{progress}%</span>
             </div>
+
+            {connectionState === "reconnecting" && (
+              <div
+                role="status"
+                aria-live="polite"
+                data-testid="sse-reconnecting"
+                className="flex items-center gap-2 text-xs font-semibold text-yellow-400"
+              >
+                <WifiOff className="w-3.5 h-3.5" />
+                <span>Reconnecting...</span>
+              </div>
+            )}
 
             {/* Progress Bar Container */}
             <div

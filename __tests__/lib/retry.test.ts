@@ -5,7 +5,14 @@
  */
 
 import { ApiError } from "@/app/lib/apiError";
-import { isRetryableError, retryOperation } from "@/app/lib/retry";
+import {
+  BACKOFF_RETRY_OPTIONS,
+  computeBackoffDelay,
+  isRetryableError,
+  isRetryableStatus,
+  retryOperation,
+  retryWithBackoff,
+} from "@/app/lib/retry";
 
 describe("isRetryableError", () => {
   it("classifies network errors (status 0) as retryable", () => {
@@ -156,5 +163,85 @@ describe("retryOperation", () => {
 
     expect(caughtError).toBeDefined();
     expect(fn).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("retryWithBackoff", () => {
+  beforeEach(() => {
+    jest.useFakeTimers();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it("starts at 1s and doubles, capped at 30s", () => {
+    const noJitter = { ...BACKOFF_RETRY_OPTIONS, jitterRatio: 0 };
+    expect(computeBackoffDelay(1, noJitter)).toBe(1_000);
+    expect(computeBackoffDelay(2, noJitter)).toBe(2_000);
+    expect(computeBackoffDelay(3, noJitter)).toBe(4_000);
+    expect(computeBackoffDelay(4, noJitter)).toBe(8_000);
+    expect(computeBackoffDelay(6, noJitter)).toBe(30_000);
+    expect(computeBackoffDelay(10, noJitter)).toBe(30_000);
+  });
+
+  it("adds 0–50% jitter on top of the delay", () => {
+    expect(computeBackoffDelay(1, { ...BACKOFF_RETRY_OPTIONS, random: () => 0 })).toBe(1_000);
+    expect(computeBackoffDelay(1, { ...BACKOFF_RETRY_OPTIONS, random: () => 0.5 })).toBe(1_250);
+    expect(computeBackoffDelay(1, { ...BACKOFF_RETRY_OPTIONS, random: () => 0.999 })).toBe(1_500);
+    expect(computeBackoffDelay(6, { ...BACKOFF_RETRY_OPTIONS, random: () => 0.999 })).toBe(44_985);
+  });
+
+  it("retries with the backoff sequence and reports each delay", async () => {
+    const fn = jest
+      .fn()
+      .mockRejectedValueOnce(new ApiError("Server error", 500))
+      .mockRejectedValueOnce(new ApiError("Bad gateway", 502))
+      .mockResolvedValueOnce("ok");
+    const onRetry = jest.fn();
+
+    const promise = retryWithBackoff(fn, { random: () => 0, onRetry });
+    await jest.advanceTimersByTimeAsync(1_000);
+    await jest.advanceTimersByTimeAsync(2_000);
+
+    await expect(promise).resolves.toBe("ok");
+    expect(onRetry).toHaveBeenNthCalledWith(1, expect.any(ApiError), 1, 1_000);
+    expect(onRetry).toHaveBeenNthCalledWith(2, expect.any(ApiError), 2, 2_000);
+  });
+
+  it("gives up after 3 retries by default", async () => {
+    const fn = jest.fn().mockRejectedValue(new ApiError("Unavailable", 503));
+
+    const promise = retryWithBackoff(fn, { random: () => 0 });
+    promise.catch(() => {});
+    await jest.advanceTimersByTimeAsync(1_000 + 2_000 + 4_000);
+
+    await expect(promise).rejects.toThrow("Unavailable");
+    expect(fn).toHaveBeenCalledTimes(4);
+  });
+
+  it.each([400, 401, 403, 413])("fails immediately on %i", async (status) => {
+    const fn = jest.fn().mockRejectedValue(new ApiError("Rejected", status));
+
+    await expect(retryWithBackoff(fn)).rejects.toThrow("Rejected");
+    expect(fn).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([500, 502, 503, 504])("retries on %i", async (status) => {
+    const fn = jest
+      .fn()
+      .mockRejectedValueOnce(new ApiError("Transient", status))
+      .mockResolvedValueOnce("ok");
+
+    const promise = retryWithBackoff(fn, { random: () => 0 });
+    await jest.advanceTimersByTimeAsync(1_000);
+
+    await expect(promise).resolves.toBe("ok");
+    expect(fn).toHaveBeenCalledTimes(2);
+  });
+
+  it("classifies statuses for upload retries", () => {
+    for (const status of [500, 502, 503, 504]) expect(isRetryableStatus(status)).toBe(true);
+    for (const status of [400, 401, 403, 413]) expect(isRetryableStatus(status)).toBe(false);
   });
 });

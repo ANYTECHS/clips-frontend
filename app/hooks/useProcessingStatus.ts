@@ -1,9 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useCallback } from "react";
+import { useEffect, useRef, useCallback, useState } from "react";
 import { useProcessStore, selectHasHydrated } from "@/app/store/processStore";
 import { ProcessStatus } from "@/app/store/types";
 import { logger } from "@/app/lib/logger";
+import {
+  DEFAULT_MAX_RETRIES,
+  openManagedEventSource,
+  type ManagedEventSource,
+} from "@/app/lib/sse/ManagedEventSource";
 
 /** Real-time data schema updating background pipeline progress metrics */
 interface JobStatus {
@@ -18,69 +23,62 @@ interface JobStatus {
 }
 
 /**
- * Hook to get job status from the backend (uses SSE first, falls back to polling)
- * * @param jobId - The job ID to poll
- * @param enabled - Whether polling is enabled (default: true)
- * @returns Interface actions enabling consumers to explicitly suspend active transport listeners.
+ * Transport state, for surfacing connection health in the UI.
+ *
+ * - `connecting`: first SSE connection is being opened
+ * - `connected`: SSE stream is open
+ * - `reconnecting`: the stream dropped and a backoff retry is pending
+ * - `polling`: SSE gave up; status comes from `GET /api/jobs/[id]`
+ * - `idle`: nothing is being watched (disabled, no job, or job finished)
  */
-export function useProcessingStatus(jobId: string | null, enabled: boolean = true, maxReconnectAttempts: number = 3) {
-  const hasHydrated = useProcessStore(selectHasHydrated);
-  const { update, startProcess, resetProcess } = useProcessStore();
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const isPollingRef = useRef(false);
-  const reconnectAttemptsRef = useRef(0);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const enabledRef = useRef(enabled);
-  const jobIdRef = useRef(jobId);
-  const isDestroyedRef = useRef(false);
-  const startSSERef = useRef<(() => void) | null>(null);
-  const startPollingFallbackRef = useRef<(() => void) | null>(null);
+export type ProcessingConnectionState =
+  | "idle"
+  | "connecting"
+  | "connected"
+  | "reconnecting"
+  | "polling";
 
-  // Don't start polling until the store is hydrated
-  if (!hasHydrated) {
-    return { stopPolling: () => {} };
-  }
+const POLL_INTERVAL_MS = 3_000;
+
+/**
+ * Hook to get job status from the backend.
+ *
+ * Streams over SSE first. If the connection drops it reconnects with
+ * exponential backoff (1s, 2s, 4s, 8s, … capped at 30s) and resumes from the
+ * last received event ID so no updates are missed. After `maxReconnectAttempts`
+ * failed reconnects it falls back to polling `GET /api/jobs/[id]`.
+ *
+ * @param jobId - The job ID to watch
+ * @param enabled - Whether watching is enabled (default: true)
+ * @param maxReconnectAttempts - SSE reconnects before falling back to polling (default: 5)
+ * @returns `stopPolling` to stop all transports, and the current `connectionState`.
+ */
+export function useProcessingStatus(
+  jobId: string | null,
+  enabled: boolean = true,
+  maxReconnectAttempts: number = DEFAULT_MAX_RETRIES
+) {
+  const hasHydrated = useProcessStore(selectHasHydrated);
+  const update = useProcessStore((s) => s.update);
+  const [connectionState, setConnectionState] = useState<ProcessingConnectionState>("idle");
+  const streamRef = useRef<ManagedEventSource | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const fetchInFlightRef = useRef(false);
+  const isDestroyedRef = useRef(false);
 
   /**
-   * Suspends long-polling intervals, turning off active HTTP loop updates.
+   * Stops the SSE stream and the polling fallback together.
    */
-  const stopPolling = useCallback(() => {
+  const stopAll = useCallback(() => {
+    isDestroyedRef.current = true;
+    streamRef.current?.close();
+    streamRef.current = null;
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    isPollingRef.current = false;
+    setConnectionState("idle");
   }, []);
-
-  const stopReconnect = useCallback(() => {
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
-    }
-    reconnectAttemptsRef.current = 0;
-  }, []);
-
-  /**
-   * Disconnects continuous EventSource contexts, discarding open stream descriptors.
-   */
-  const stopSSE = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-    reconnectAttemptsRef.current = 0;
-  }, []);
-
-  /**
-   * Unified cleanup execution block killing both SSE pipes and manual fallback loops simultaneously.
-   */
-  const stopAll = useCallback(() => {
-    stopSSE();
-    stopPolling();
-    stopReconnect();
-    isDestroyedRef.current = true;
-  }, [stopSSE, stopPolling, stopReconnect]);
 
   /**
    * Parses current chunk payloads, pushing update mutations down into central store layers.
@@ -107,99 +105,82 @@ export function useProcessingStatus(jobId: string | null, enabled: boolean = tru
    * Manual fallback runner executing singular HTTP fetch requests to resolve pipeline states.
    */
   const fetchStatus = useCallback(async () => {
-    if (!jobId || isPollingRef.current) return;
+    if (!jobId || fetchInFlightRef.current || isDestroyedRef.current) return;
+    fetchInFlightRef.current = true;
 
     try {
       const response = await fetch(`/api/jobs/${jobId}`);
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch job status: ${response.statusText}`);
       }
 
       const data: JobStatus = await response.json();
-      updateFromData(data);
+      if (!isDestroyedRef.current) updateFromData(data);
     } catch (error) {
       logger.error("Error fetching job status:", error);
+    } finally {
+      fetchInFlightRef.current = false;
     }
   }, [jobId, updateFromData]);
 
   useEffect(() => {
+    // Don't start watching until the store is hydrated
+    if (!hasHydrated || !enabled || !jobId) return;
+
     isDestroyedRef.current = false;
-    enabledRef.current = enabled;
-    jobIdRef.current = jobId;
-
-    if (!enabled || !jobId) {
-      stopAll();
-      return;
-    }
-
-    const startSSE = () => {
-      if (isDestroyedRef.current) return;
-
-      const es = new EventSource(`/api/jobs/${jobIdRef.current}/stream`);
-      eventSourceRef.current = es;
-      reconnectAttemptsRef.current = 0;
-
-      es.onmessage = (event) => {
-        try {
-          const data: JobStatus = JSON.parse(event.data);
-          updateFromData(data);
-          // Reset reconnection counter on successful message
-          reconnectAttemptsRef.current = 0;
-        } catch (error) {
-          logger.error("Error parsing SSE data:", error);
-        }
-      };
-
-      es.onerror = () => {
-        if (isDestroyedRef.current) return;
-
-        // Immediately close the EventSource to prevent native auto-reconnect
-        es.close();
-        eventSourceRef.current = null;
-
-        reconnectAttemptsRef.current += 1;
-        const attempt = reconnectAttemptsRef.current;
-
-        logger.warn(`SSE connection error (attempt ${attempt}/${maxReconnectAttempts})`);
-
-        if (attempt >= maxReconnectAttempts) {
-          // Max attempts reached, fall back to polling
-          logger.warn("SSE max reconnect attempts reached, falling back to polling");
-          startPollingFallbackRef.current?.();
-        } else {
-          // Exponential backoff: 1s, 2s, 4s, ...
-          const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
-          logger.info(`Reconnecting SSE in ${delay}ms (attempt ${attempt + 1}/${maxReconnectAttempts})`);
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (!isDestroyedRef.current) {
-              startSSERef.current?.();
-            }
-          }, delay);
-        }
-      };
-    };
 
     const startPollingFallback = () => {
-      isPollingRef.current = true;
+      if (isDestroyedRef.current || intervalRef.current) return;
+      setConnectionState("polling");
       fetchStatus();
-      intervalRef.current = setInterval(fetchStatus, 3000);
+      intervalRef.current = setInterval(fetchStatus, POLL_INTERVAL_MS);
     };
 
-    startSSERef.current = startSSE;
-    startPollingFallbackRef.current = startPollingFallback;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setConnectionState("connecting");
+    let stream: ManagedEventSource | null = null;
+    try {
+      stream = openManagedEventSource({
+        url: `/api/jobs/${encodeURIComponent(jobId)}/stream`,
+        maxRetries: maxReconnectAttempts,
+        listeners: {
+          message: (raw) => {
+            setConnectionState("connected");
+            try {
+              updateFromData(JSON.parse(raw) as JobStatus);
+            } catch (error) {
+              logger.error("Error parsing SSE data:", error);
+            }
+          },
+        },
+        onOpen: () => setConnectionState("connected"),
+        onError: (attempt, willRetry) => {
+          if (!willRetry) return;
+          logger.warn(`SSE connection dropped, reconnecting (attempt ${attempt}/${maxReconnectAttempts})`);
+          setConnectionState("reconnecting");
+        },
+        onGiveUp: () => {
+          logger.warn("SSE max reconnect attempts reached, falling back to polling");
+          streamRef.current = null;
+          startPollingFallback();
+        },
+      });
+    } catch (error) {
+      // Connection pool exhausted — polling still keeps the UI current.
+      logger.error("Unable to open SSE stream:", error);
+    }
 
-    // Start with SSE
-    startSSERef.current();
+    if (stream) {
+      streamRef.current = stream;
+    } else {
+      startPollingFallback();
+    }
 
     return () => {
       stopAll();
-      startSSERef.current = null;
-      startPollingFallbackRef.current = null;
     };
-  }, [jobId, enabled, maxReconnectAttempts, fetchStatus, updateFromData, stopAll, stopReconnect]);
+  }, [hasHydrated, jobId, enabled, maxReconnectAttempts, fetchStatus, updateFromData, stopAll]);
 
-  return { stopPolling: stopAll };
+  return { stopPolling: stopAll, connectionState };
 }
-
-

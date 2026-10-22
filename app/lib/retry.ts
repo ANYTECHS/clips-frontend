@@ -11,6 +11,13 @@ export interface RetryOptions {
   maxDelayMs?: number;
   /** Exponential backoff multiplier. Default 2. */
   backoffFactor?: number;
+  /**
+   * Maximum random jitter added on top of each delay, as a fraction of it
+   * (0.5 adds 0–50%). Default 0 (no jitter).
+   */
+  jitterRatio?: number;
+  /** Random source in [0, 1) used for jitter. Injectable for tests. Default Math.random. */
+  random?: () => number;
   /** Custom predicate to determine whether an error should be retried. */
   shouldRetry?: (error: unknown, attempt: number) => boolean;
   /** Callback triggered before entering backoff sleep for a retry. */
@@ -20,12 +27,64 @@ export interface RetryOptions {
 }
 
 /** Default retry configuration values. */
-export const DEFAULT_RETRY_OPTIONS: Required<Omit<RetryOptions, "shouldRetry" | "onRetry" | "signal">> = {
+export const DEFAULT_RETRY_OPTIONS: Required<
+  Omit<RetryOptions, "shouldRetry" | "onRetry" | "signal" | "random">
+> = {
   maxRetries: 3,
   baseDelayMs: 500,
   maxDelayMs: 10_000,
   backoffFactor: 2,
+  jitterRatio: 0,
 };
+
+/**
+ * Backoff profile for `retryWithBackoff`: 1s doubling to a 30s cap, with up
+ * to 50% random jitter so clients that failed together don't all retry at the
+ * same instant when the server recovers (thundering herd).
+ */
+export const BACKOFF_RETRY_OPTIONS = {
+  maxRetries: 3,
+  baseDelayMs: 1_000,
+  maxDelayMs: 30_000,
+  backoffFactor: 2,
+  jitterRatio: 0.5,
+} as const;
+
+/** HTTP statuses that fail immediately: re-sending the same request can't succeed. */
+export const NON_RETRYABLE_STATUS_CODES: readonly number[] = [400, 401, 403, 413];
+
+/** HTTP statuses that are transient and trigger the backoff sequence. */
+export const RETRYABLE_STATUS_CODES: readonly number[] = [408, 429, 500, 502, 503, 504];
+
+/**
+ * Whether an HTTP status is worth another attempt: the transient statuses in
+ * RETRYABLE_STATUS_CODES plus any other 5xx. Every other 4xx — including the
+ * explicit NON_RETRYABLE_STATUS_CODES — is final.
+ */
+export function isRetryableStatus(status: number): boolean {
+  if (NON_RETRYABLE_STATUS_CODES.includes(status)) return false;
+  if (RETRYABLE_STATUS_CODES.includes(status)) return true;
+  return status >= 500 && status <= 599;
+}
+
+/**
+ * Delay before retry number `attempt` (1-based): exponential from
+ * `baseDelayMs`, capped at `maxDelayMs`, plus `jitterRatio` × random of it.
+ */
+export function computeBackoffDelay(
+  attempt: number,
+  options: Pick<RetryOptions, "baseDelayMs" | "maxDelayMs" | "backoffFactor" | "jitterRatio" | "random"> = {},
+): number {
+  const baseDelayMs = options.baseDelayMs ?? DEFAULT_RETRY_OPTIONS.baseDelayMs;
+  const maxDelayMs = options.maxDelayMs ?? DEFAULT_RETRY_OPTIONS.maxDelayMs;
+  const backoffFactor = options.backoffFactor ?? DEFAULT_RETRY_OPTIONS.backoffFactor;
+  const jitterRatio = options.jitterRatio ?? DEFAULT_RETRY_OPTIONS.jitterRatio;
+  const random = options.random ?? Math.random;
+
+  const capped = Math.min(baseDelayMs * Math.pow(backoffFactor, attempt - 1), maxDelayMs);
+  const jitter = jitterRatio > 0 ? capped * jitterRatio * random() : 0;
+  return Math.round(capped + jitter);
+}
 
 /**
  * Determine if an error represents a transient failure that should be retried.
@@ -49,11 +108,11 @@ export function isRetryableError(error: unknown): boolean {
 
   if (error instanceof ApiError) {
     // Network failures (status 0) and 429 Rate Limit are retryable
-    if (error.status === 0 || error.status === 429) {
+    if (error.status === 0) {
       return true;
     }
-    // Server errors (5xx) are retryable
-    if (error.status >= 500 && error.status <= 599) {
+    // Transient statuses (408, 429, 5xx) are retryable
+    if (isRetryableStatus(error.status)) {
       return true;
     }
     // Client errors (4xx except 429) are non-retryable
@@ -88,9 +147,6 @@ export async function retryOperation<T>(
   options: RetryOptions = {},
 ): Promise<T> {
   const maxRetries = options.maxRetries ?? DEFAULT_RETRY_OPTIONS.maxRetries;
-  const baseDelayMs = options.baseDelayMs ?? DEFAULT_RETRY_OPTIONS.baseDelayMs;
-  const maxDelayMs = options.maxDelayMs ?? DEFAULT_RETRY_OPTIONS.maxDelayMs;
-  const backoffFactor = options.backoffFactor ?? DEFAULT_RETRY_OPTIONS.backoffFactor;
   const signal = options.signal;
 
   let attempt = 0;
@@ -117,8 +173,8 @@ export async function retryOperation<T>(
         throw error;
       }
 
-      const delayMs = Math.min(baseDelayMs * Math.pow(backoffFactor, attempt), maxDelayMs);
       attempt += 1;
+      const delayMs = computeBackoffDelay(attempt, options);
 
       options.onRetry?.(error, attempt, delayMs);
 
@@ -149,6 +205,27 @@ export async function retryOperation<T>(
       });
     }
   }
+}
+
+/**
+ * Run `fn` with exponential backoff and jitter: 1s, 2s, 4s, … capped at 30s,
+ * each plus a random 0–50%, up to 3 retries by default. Any of those can be
+ * overridden through `options`.
+ *
+ * Errors are classified by `isRetryableError` unless `shouldRetry` is given:
+ * network failures and 408/429/5xx retry; 400/401/403/413 and other 4xx fail
+ * immediately; aborts are never retried.
+ */
+export function retryWithBackoff<T>(
+  fn: (signal?: AbortSignal) => Promise<T>,
+  options: RetryOptions = {},
+): Promise<T> {
+  // Explicitly-undefined fields must not knock out the backoff defaults.
+  const merged: RetryOptions = { ...BACKOFF_RETRY_OPTIONS };
+  for (const [key, value] of Object.entries(options)) {
+    if (value !== undefined) (merged as Record<string, unknown>)[key] = value;
+  }
+  return retryOperation(fn, merged);
 }
 
 /**

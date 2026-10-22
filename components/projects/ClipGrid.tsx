@@ -5,12 +5,14 @@ import React, { memo,useEffect, useRef, useState } from "react";
 
 import { useRenderTiming } from "@/app/hooks/useRenderTiming";
 import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
+import type { ClipRankingDetails } from "@/app/lib/clipRanking";
 import { type ImageLoadingState } from "@/app/lib/imageUtils";
 import { isClipMintable } from "@/app/lib/mintUtils";
 import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 import LazyImage from "@/components/common/LazyImage";
 
 import ExportDropdown from "./ExportDropdown";
+import { RankExplanationTooltip } from "./RankExplanationTooltip";
 import ScoreBreakdownTooltip, { ScoreBreakdown } from "./ScoreBreakdownTooltip";
 
 export interface Clip {
@@ -52,6 +54,16 @@ export interface ClipGridProps {
   onLoadMore: () => void;
   hasMore: boolean;
   userPlan?: "free" | "pro" | "enterprise";
+  /** Per-clip ranking breakdown; enables the "Why this rank?" tooltip. */
+  rankingDetails?: Record<string, ClipRankingDetails>;
+}
+
+/**
+ * View Transition name for a clip card, so re-sorting animates each card from
+ * its old position to its new one. Names must be valid CSS identifiers.
+ */
+function clipTransitionName(id: string): string {
+  return `clip-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
 /**
@@ -83,6 +95,7 @@ function ClipGrid({
   onLoadMore,
   hasMore,
   userPlan = "free",
+  rankingDetails,
 }: ClipGridProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [imageStates, setImageStates] = useState<Record<string, ImageLoadingState>>({});
@@ -240,6 +253,7 @@ function ClipGrid({
                       <div
                         key={clip.id}
                         data-tour="clip-preview"
+                        style={{ viewTransitionName: clipTransitionName(clip.id) } as React.CSSProperties}
                         className={`group relative rounded-2xl overflow-hidden contain-layout-style transition-all duration-300 border-2 ${isSelected ? "border-brand shadow-[0_0_20px_rgba(var(--brand),0.3)]" : "border-transparent hover:border-white/20"}`}
                       >
                         <div
@@ -317,6 +331,14 @@ function ClipGrid({
                           </div>
 
                           <div className="absolute bottom-3 left-3 right-3">
+                            {rankingDetails?.[clip.id] && (
+                              <div className="mb-1.5" onClick={(e) => e.stopPropagation()}>
+                                <RankExplanationTooltip
+                                  details={rankingDetails[clip.id]}
+                                  totalClips={clips.length}
+                                />
+                              </div>
+                            )}
                             <h4 className="text-white font-bold text-sm mb-1 line-clamp-2">
                               {clip.title}
                             </h4>

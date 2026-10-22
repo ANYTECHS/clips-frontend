@@ -50,10 +50,15 @@ import { NotificationChannelSettings } from "@/components/settings/NotificationC
 import PrivacySettings from "@/components/settings/PrivacySettings";
 import { Theme, useTheme } from "@/components/theme-provider";
 import Skeleton from "@/components/ui/Skeleton";
-import { TrustlineManager } from "@/components/wallet/TrustlineManager";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { useWallet } from "@/components/WalletProvider";
 import { useToast } from "@/hooks/useToast";
+
+// Stellar trustline UI pulls in the SDK; split it out of the settings chunk.
+const TrustlineManager = dynamic(
+  () => import("@/components/wallet/TrustlineManager"),
+  { ssr: false, loading: () => <Skeleton className="h-32 w-full" /> },
+);
 
 const SocialRecoveryConfig = dynamic(
   () => import("@/components/SocialRecoveryConfig"),
@@ -244,6 +249,14 @@ export function SettingsPage({ initialTab = "profile" }: SettingsPageProps) {
               privacy: {
                 ...defaultUserPreferences.privacy,
                 ...(data.privacy || {}),
+              },
+              ranking: {
+                ...defaultUserPreferences.ranking,
+                ...(data.ranking || {}),
+                weights: {
+                  ...defaultUserPreferences.ranking.weights,
+                  ...(data.ranking?.weights || {}),
+                },
               },
             };
             setPreferences(merged);
@@ -939,6 +952,8 @@ export function SettingsPage({ initialTab = "profile" }: SettingsPageProps) {
                         <img
                           src={avatarPreview}
                           alt="Avatar preview"
+                          loading="lazy"
+                          decoding="async"
                           className="w-full h-full object-cover"
                         />
                       ) : (

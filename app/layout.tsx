@@ -17,6 +17,7 @@ import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 import FontPreload from "@/app/components/FontPreload";
 import DataSyncProvider from "@/components/DataSyncProvider";
+import { ServiceWorkerRegistrar } from "@/app/components/ServiceWorkerRegistrar";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"), {
@@ -111,6 +112,7 @@ export default function RootLayout({
                       <WalletProvider>
                         <StellarWalletProvider>
                           <AnalyticsProvider />
+                          <ServiceWorkerRegistrar />
                           <KeyboardShortcuts />
                           {children}
                           <RateLimitToast />

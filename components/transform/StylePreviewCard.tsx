@@ -84,6 +84,8 @@ export function StylePreviewCard({
             <img
               src={beforeUrl}
               alt="Original clip preview"
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
             />
           </div>
@@ -97,6 +99,8 @@ export function StylePreviewCard({
             <img
               src={afterUrl}
               alt={`${sanitize(styleLabel)} style preview`}
+              loading="lazy"
+              decoding="async"
               className="h-full w-full object-cover"
             />
             {isLoading && (
