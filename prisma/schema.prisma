@@ -156,6 +156,7 @@ model EarningsReportDelivery {
 
   @@unique([userId, period])
   @@index([period])
+  @@index([status, createdAt])
 }
 
 /// Secure API Key for authenticated API access (Issue #1164).
@@ -197,6 +198,8 @@ model ApiUsage {
 
   @@index([apiKeyId])
   @@index([createdAt])
+  // Per-key usage over a time window (#1174)
+  @@index([apiKeyId, createdAt])
 }
 
 /// Server-side tracked session supporting rotation, timeouts, and concurrent session limits (Issue #1163).

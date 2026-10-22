@@ -282,6 +282,10 @@ const nextConfig: NextConfig = {
               ? config.optimization.splitChunks
               : {}),
             chunks: "all",
+            // Cap chunk size so large vendors split into cacheable pieces (#1173)
+            maxInitialRequests: 25,
+            minSize: 20000,
+            maxSize: 244000,
             cacheGroups: {
               ...(typeof config.optimization?.splitChunks === "object"
                 ? config.optimization.splitChunks.cacheGroups
