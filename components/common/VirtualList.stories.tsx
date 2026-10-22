@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import VirtualList from "./VirtualList";
+import { VirtualList } from "./VirtualList";
 
 interface Row {
   id: number;
