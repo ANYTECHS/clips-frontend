@@ -58,7 +58,7 @@ jest.mock("@/components/SocialRecoveryConfig", () => ({
 
 jest.mock("@/components/wallet/TrustlineManager", () => ({
   __esModule: true,
-  default: () => <div data-testid="trustline-manager-mock">Trustline Manager Mock</div>,
+  TrustlineManager: () => <div data-testid="trustline-manager-mock">Trustline Manager Mock</div>,
 }));
 
 jest.mock("@/components/settings/MonthlyReportSetting", () => ({

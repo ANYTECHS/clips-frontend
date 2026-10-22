@@ -35,6 +35,80 @@ export interface FeeSponsorshipState {
 const DEFAULT_SPONSOR_PUBLIC_KEY =
   process.env.NEXT_PUBLIC_SPONSOR_PUBLIC_KEY ?? "";
 
+/** Sponsor-signed fee-bump envelope returned by `POST /api/sponsorship/sponsor` */
+export interface FeeSponsorshipGrant {
+  /** Fee-bump transaction XDR, signed by the sponsor and ready to submit */
+  feeBumpXdr: string;
+  /** Hash of the fee-bump transaction */
+  hash: string;
+  /** Total fee paid by the sponsor, in stroops */
+  feeStroops: string;
+  /** Account paying the fee */
+  sponsorPublicKey: string;
+  /** Sponsorships left for this user in the current month */
+  remaining: number;
+}
+
+/** Error thrown when the platform declines or fails to sponsor a transaction */
+export class FeeSponsorshipError extends Error {
+  /**
+   * @param code - Machine-readable reason from the sponsorship endpoint (e.g. "BUDGET_EXCEEDED").
+   * @param message - Human-readable explanation.
+   * @param status - HTTP status returned by the endpoint.
+   */
+  constructor(
+    public readonly code: string,
+    message: string,
+    public readonly status: number
+  ) {
+    super(message);
+    this.name = "FeeSponsorshipError";
+  }
+}
+
+/**
+ * Ask the platform to pay the fee for a user-signed transaction.
+ *
+ * Calls `POST /api/sponsorship/sponsor`, which validates eligibility and the
+ * monthly budget, then wraps the inner transaction in a sponsor-signed
+ * fee-bump envelope.
+ *
+ * @param params.innerXdr - The inner transaction XDR, already signed by the user.
+ * @param params.publicKey - The user's Stellar public key.
+ * @returns The sponsor-signed fee-bump envelope.
+ * @throws {FeeSponsorshipError} When the request is rejected or fails.
+ */
+export async function requestFeeSponsorship(params: {
+  innerXdr: string;
+  publicKey: string;
+}): Promise<FeeSponsorshipGrant> {
+  let res: Response;
+  try {
+    res = await fetch("/api/sponsorship/sponsor", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch (err) {
+    throw new FeeSponsorshipError(
+      "NETWORK_ERROR",
+      err instanceof Error ? err.message : "Failed to reach the sponsorship service",
+      0
+    );
+  }
+
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || !body?.data?.feeBumpXdr) {
+    throw new FeeSponsorshipError(
+      body?.code ?? "SPONSORSHIP_FAILED",
+      body?.error ?? `Fee sponsorship failed (HTTP ${res.status})`,
+      res.status
+    );
+  }
+
+  return body.data as FeeSponsorshipGrant;
+}
+
 /**
  * Hook to check and monitor fee sponsorship availability.
  *
@@ -112,6 +186,7 @@ export function useFeeSponsorship(operationCount: number = 1) {
     ...state,
     sponsorPublicKey: DEFAULT_SPONSOR_PUBLIC_KEY,
     refresh: checkSponsorship,
+    requestSponsorship: requestFeeSponsorship,
     isSponsored: state.status === "available",
     isTestnet: getStellarNetwork() === "testnet",
   };

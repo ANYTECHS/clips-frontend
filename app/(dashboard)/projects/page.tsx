@@ -60,6 +60,10 @@ const ClipPreviewModal = dynamic(() => import("@/components/projects/ClipPreview
 const ClipComparisonView = dynamic(() => import("@/components/projects/ClipComparisonView"), {
   ssr: false,
 });
+const MintNftModal = dynamic(
+  () => import("@/components/projects/MintNftModal").then((m) => m.MintNftModal),
+  { ssr: false }
+);
 const BatchTransformModal = dynamic(
   () => import("@/components/transform/BatchTransformModal").then((m) => m.BatchTransformModal),
   { ssr: false }
@@ -132,6 +136,7 @@ export default function ProjectsPage() {
   const [keepDuplicates, setKeepDuplicates] = useState(false);
   const [editingClip, setEditingClip] = useState<Clip | null>(null);
   const [previewClip, setPreviewClip] = useState<Clip | null>(null);
+  const [mintingClip, setMintingClip] = useState<Clip | null>(null);
 
   // Fetch clips from API
   const fetchClips = useCallback(
@@ -362,6 +367,24 @@ export default function ProjectsPage() {
       if (clip) setPreviewClip(clip);
     },
     [fetchedClips]
+  );
+
+  const handleMintNft = useCallback(
+    (id: string) => {
+      const clip = fetchedClips.find((c) => c.id === id);
+      if (clip) setMintingClip(clip);
+    },
+    [fetchedClips]
+  );
+
+  const handleNftMinted = useCallback(
+    (clipId: string, tokenId: string) => {
+      setFetchedClips((prev) =>
+        prev.map((c) => (c.id === clipId ? { ...c, status: "minted", nftTokenId: tokenId } : c))
+      );
+      showToast(`Clip minted as NFT #${tokenId}`, "success");
+    },
+    [showToast]
   );
 
   const handleMint = useCallback(async () => {
@@ -604,6 +627,7 @@ export default function ProjectsPage() {
                 onAutoSelect={handleAutoSelect}
                 onEdit={handleEdit}
                 onPreview={handlePreview}
+                onMintNft={handleMintNft}
                 loading={loading}
                 totalClips={totalClips}
                 loadingNextPage={loadingNextPage}
@@ -662,6 +686,13 @@ export default function ProjectsPage() {
         />
       )}
       {previewClip && <ClipPreviewModal clip={previewClip} onClose={() => setPreviewClip(null)} />}
+      {mintingClip && (
+        <MintNftModal
+          clip={mintingClip}
+          onClose={() => setMintingClip(null)}
+          onMinted={handleNftMinted}
+        />
+      )}
       {/* Batch Transform Modal */}
       {showTransformModal && (
         <BatchTransformModal
