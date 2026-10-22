@@ -11,11 +11,17 @@
  *   the server is asked what it already holds, so only the gaps are re-sent.
  * - **Bounded memory**, since only the chunks in flight are read from disk.
  *
+ * Each chunk (and the final assembly request) is wrapped in
+ * `retryWithBackoff()`: 1s doubling to a 30s cap with 0–50% jitter, so a
+ * fleet of clients that lost the server together doesn't hammer it in
+ * lockstep when it comes back. 400/401/403/413 fail immediately; network
+ * errors and 5xx retry, up to CHUNK_MAX_RETRIES times.
+ *
  * Small files keep the single-request path: chunking costs a round trip per
  * chunk plus an assembly pass, which is not worth it below the threshold.
  */
 
-import { withRetry } from "@/app/lib/retryUtils";
+import { isRetryableStatus, retryWithBackoff, type RetryOptions } from "@/app/lib/retry";
 
 /** Size of one chunk, in bytes. Must match the server's `CHUNK_SIZE_BYTES`. */
 export const CHUNK_SIZE_BYTES = 5 * 1024 * 1024;
@@ -26,8 +32,11 @@ export const CHUNKED_UPLOAD_THRESHOLD_BYTES = 10 * 1024 * 1024;
 /** How many chunks of one file are uploaded at once. */
 export const CHUNK_CONCURRENCY = 3;
 
+/** Retries per chunk after the first attempt fails. */
+export const CHUNK_MAX_RETRIES = 3;
+
 /** Attempts per chunk, including the first. */
-export const CHUNK_MAX_ATTEMPTS = 4;
+export const CHUNK_MAX_ATTEMPTS = CHUNK_MAX_RETRIES + 1;
 
 /** localStorage key prefix for resumable session ids. */
 const SESSION_STORAGE_PREFIX = "clipcash.upload.session.";
@@ -60,6 +69,26 @@ export function fileFingerprint(file: {
   return `${file.name}:${file.size}:${file.lastModified ?? 0}`;
 }
 
+/** Details of a chunk retry, for "Retrying chunk X (attempt Y)..." UI. */
+export interface ChunkRetryInfo {
+  /** 0-based chunk index. */
+  chunkIndex: number;
+  /** 1-based chunk number, for display. */
+  chunkNumber: number;
+  totalChunks: number;
+  /** The attempt about to be made (2 for the first retry). */
+  attempt: number;
+  maxAttempts: number;
+  /** Backoff before that attempt, in ms (jitter included). */
+  delayMs: number;
+  error: unknown;
+}
+
+/** "Retrying chunk 3 (attempt 2)..." */
+export function formatChunkRetryMessage(info: Pick<ChunkRetryInfo, "chunkNumber" | "attempt">): string {
+  return `Retrying chunk ${info.chunkNumber} (attempt ${info.attempt})...`;
+}
+
 /** Result of a completed upload. */
 export interface ChunkedUploadResult {
   jobId: string;
@@ -76,6 +105,15 @@ export interface ChunkedUploadOptions {
   signal?: AbortSignal;
   /** Optional saved template applied to the assembled upload. */
   templateId?: string;
+  /** Called before each chunk retry, after the backoff delay is chosen. */
+  onChunkRetry?: (info: ChunkRetryInfo) => void;
+  /** Called when a chunk has been stored, e.g. to clear its retry notice. */
+  onChunkComplete?: (chunkIndex: number) => void;
+  /**
+   * Overrides for the backoff (`maxRetries` defaults to CHUNK_MAX_RETRIES).
+   * Mostly for tests, which inject short delays and a fixed `random`.
+   */
+  retry?: Pick<RetryOptions, "maxRetries" | "baseDelayMs" | "maxDelayMs" | "jitterRatio" | "random">;
   /** Injectable for tests. */
   fetchImpl?: typeof fetch;
   /** Injectable for tests. */
@@ -131,20 +169,49 @@ async function errorMessage(response: Response): Promise<string> {
 /**
  * A failure that retrying cannot fix — a rejected file, a bad session.
  *
- * Client errors other than 408/429 are final: re-sending the same bytes will
- * get the same answer, so the retry loop stops immediately.
+ * Client errors other than 408/429 (notably 400, 401, 403 and 413) are final:
+ * re-sending the same bytes will get the same answer, so the retry loop stops
+ * immediately.
  */
 export class NonRetryableUploadError extends Error {
-  constructor(message: string) {
+  constructor(message: string, readonly status?: number) {
     super(message);
     this.name = "NonRetryableUploadError";
   }
 }
 
-/** Whether an HTTP status is worth another attempt. */
-function isRetryableStatus(status: number): boolean {
-  if (status === 408 || status === 429) return true;
-  return status >= 500;
+/** A transient failure (network error, 5xx) that the backoff loop retries. */
+export class RetryableUploadError extends Error {
+  /** HTTP status, or 0 for network errors and timeouts. */
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "RetryableUploadError";
+  }
+}
+
+/** Raised once a chunk has used up every retry. Wraps the last failure. */
+export class ChunkUploadFailedError extends Error {
+  constructor(
+    message: string,
+    readonly chunkIndex: number,
+    readonly attempts: number,
+    readonly lastError: unknown
+  ) {
+    super(message);
+    this.name = "ChunkUploadFailedError";
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException || error instanceof Error) &&
+    (error as { name?: string }).name === "AbortError"
+  );
+}
+
+/** Retry anything except rejections the server will repeat, and cancellations. */
+function shouldRetryUpload(error: unknown): boolean {
+  return !(error instanceof NonRetryableUploadError) && !isAbortError(error);
 }
 
 /**
@@ -184,9 +251,9 @@ export async function uploadFileInChunks(
     if (!response.ok) {
       const message = await errorMessage(response);
       if (!isRetryableStatus(response.status)) {
-        throw new NonRetryableUploadError(message);
+        throw new NonRetryableUploadError(message, response.status);
       }
-      throw new Error(message);
+      throw new RetryableUploadError(message, response.status);
     }
     return response;
   };
@@ -259,78 +326,112 @@ export async function uploadFileInChunks(
   };
   reportProgress();
 
+  const maxRetries = options.retry?.maxRetries ?? CHUNK_MAX_RETRIES;
+  const backoff: RetryOptions = {
+    ...options.retry,
+    maxRetries,
+    signal,
+    shouldRetry: shouldRetryUpload,
+  };
+
   const sendChunk = async (index: number) => {
     throwIfAborted();
     const start = index * chunkSize;
     const blob = file.slice(start, Math.min(start + chunkSize, file.size));
 
-    await withRetry(
-      async () => {
-        throwIfAborted();
-        activeChunkBytes.set(index, 0);
-        await new Promise<void>((resolve, reject) => {
-          const xhr = xhrFactory();
-          let settled = false;
-          const finish = (error?: Error) => {
-            if (settled) return;
-            settled = true;
-            signal?.removeEventListener("abort", abortRequest);
-            if (error) reject(error);
-            else resolve();
-          };
-          const abortRequest = () => xhr.abort();
+    try {
+      await retryWithBackoff(
+        async () => {
+          throwIfAborted();
+          activeChunkBytes.set(index, 0);
+          await new Promise<void>((resolve, reject) => {
+            const xhr = xhrFactory();
+            let settled = false;
+            const finish = (error?: Error) => {
+              if (settled) return;
+              settled = true;
+              signal?.removeEventListener("abort", abortRequest);
+              if (error) reject(error);
+              else resolve();
+            };
+            const abortRequest = () => xhr.abort();
 
-          if (signal?.aborted) {
-            finish(new DOMException("Upload cancelled", "AbortError"));
-            return;
-          }
-
-          xhr.open(
-            "PUT",
-            `/api/upload/chunk?sessionId=${encodeURIComponent(sessionId as string)}&index=${index}`
-          );
-          xhr.upload.onprogress = (event) => {
-            if (event.lengthComputable) {
-              activeChunkBytes.set(index, Math.min(event.loaded, blob.size));
-              reportProgress();
-            }
-          };
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              finish();
+            if (signal?.aborted) {
+              finish(new DOMException("Upload cancelled", "AbortError"));
               return;
             }
 
-            let message = `Chunk upload failed (HTTP ${xhr.status})`;
-            try {
-              const body = JSON.parse(xhr.responseText);
-              message = body?.error ?? body?.data?.error ?? message;
-            } catch {
-              // Keep the status-based message when the response is not JSON.
-            }
-            finish(
-              isRetryableStatus(xhr.status)
-                ? new Error(message)
-                : new NonRetryableUploadError(message)
+            xhr.open(
+              "PUT",
+              `/api/upload/chunk?sessionId=${encodeURIComponent(sessionId as string)}&index=${index}`
             );
-          };
-          xhr.onerror = () => finish(new Error("Network error during chunk upload"));
-          xhr.ontimeout = () => finish(new Error("Chunk upload timed out"));
-          xhr.onabort = () => finish(new DOMException("Upload cancelled", "AbortError"));
-          signal?.addEventListener("abort", abortRequest, { once: true });
-          xhr.send(blob);
-        });
-      },
-      {
-        maxAttempts: CHUNK_MAX_ATTEMPTS,
-        shouldAbort: (error) =>
-          error instanceof NonRetryableUploadError ||
-          (error instanceof DOMException && error.name === "AbortError"),
-      }
-    );
+            xhr.upload.onprogress = (event) => {
+              if (event.lengthComputable) {
+                activeChunkBytes.set(index, Math.min(event.loaded, blob.size));
+                reportProgress();
+              }
+            };
+            xhr.onload = () => {
+              if (xhr.status >= 200 && xhr.status < 300) {
+                finish();
+                return;
+              }
+
+              let message = `Chunk upload failed (HTTP ${xhr.status})`;
+              try {
+                const body = JSON.parse(xhr.responseText);
+                message = body?.error ?? body?.data?.error ?? message;
+              } catch {
+                // Keep the status-based message when the response is not JSON.
+              }
+              finish(
+                isRetryableStatus(xhr.status)
+                  ? new RetryableUploadError(message, xhr.status)
+                  : new NonRetryableUploadError(message, xhr.status)
+              );
+            };
+            xhr.onerror = () =>
+              finish(new RetryableUploadError("Network error during chunk upload", 0));
+            xhr.ontimeout = () => finish(new RetryableUploadError("Chunk upload timed out", 0));
+            xhr.onabort = () => finish(new DOMException("Upload cancelled", "AbortError"));
+            signal?.addEventListener("abort", abortRequest, { once: true });
+            xhr.send(blob);
+          });
+        },
+        {
+          ...backoff,
+          onRetry: (error, retry, delayMs) => {
+            // The partially-sent bytes of the failed attempt no longer count.
+            activeChunkBytes.set(index, 0);
+            options.onChunkRetry?.({
+              chunkIndex: index,
+              chunkNumber: index + 1,
+              totalChunks,
+              attempt: retry + 1,
+              maxAttempts: maxRetries + 1,
+              delayMs,
+              error,
+            });
+          },
+        }
+      );
+    } catch (error) {
+      activeChunkBytes.delete(index);
+      if (isAbortError(error) || error instanceof NonRetryableUploadError) throw error;
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new ChunkUploadFailedError(
+        `Upload failed: chunk ${index + 1} of ${totalChunks} could not be sent after ` +
+          `${maxRetries} ${maxRetries === 1 ? "retry" : "retries"} (${reason}). ` +
+          "Check your connection and retry the upload — chunks already sent will be kept.",
+        index,
+        maxRetries + 1,
+        error
+      );
+    }
 
     activeChunkBytes.delete(index);
     completedChunks.add(index);
+    options.onChunkComplete?.(index);
     reportProgress();
   };
 
@@ -348,7 +449,7 @@ export async function uploadFileInChunks(
 
   throwIfAborted();
 
-  const response = await withRetry(
+  const response = await retryWithBackoff(
     () =>
       request("/api/upload/chunk/complete", {
         method: "POST",
@@ -362,12 +463,7 @@ export async function uploadFileInChunks(
           ...(options.templateId ? { templateId: options.templateId } : {}),
         }),
       }),
-    {
-      maxAttempts: CHUNK_MAX_ATTEMPTS,
-      shouldAbort: (error) =>
-        error instanceof NonRetryableUploadError ||
-        (error instanceof DOMException && error.name === "AbortError"),
-    }
+    backoff
   );
 
   const body = await response.json();

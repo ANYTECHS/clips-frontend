@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { StellarNetwork } from "./networkConfig";
+import { DEFAULT_RANKING_WEIGHTS, type RankingWeights } from "./clipRanking";
 
 /**
  * User Preferences — Issue #1240.
@@ -28,6 +29,65 @@ export type ThemePreference = "light" | "dark" | "system";
 export type LanguagePreference = "en" | "es" | "fr" | "pt";
 export type GasPreference = "slow" | "medium" | "fast";
 
+// ─── Clip Ranking Presets ─────────────────────────────────────────────────────
+
+export const RANKING_PRESET_IDS = [
+  "balanced",
+  "viral",
+  "shortForm",
+  "captions",
+  "engagement",
+] as const;
+
+export type RankingPresetId = (typeof RANKING_PRESET_IDS)[number];
+
+export interface RankingPreset {
+  id: RankingPresetId;
+  label: string;
+  description: string;
+  weights: RankingWeights;
+}
+
+/** Built-in weight presets for clip ranking, matching common content strategies. */
+export const RANKING_WEIGHT_PRESETS: Record<RankingPresetId, RankingPreset> = {
+  balanced: {
+    id: "balanced",
+    label: "Balanced",
+    description: "Default mix of every criterion",
+    weights: DEFAULT_RANKING_WEIGHTS,
+  },
+  viral: {
+    id: "viral",
+    label: "Max virality",
+    description: "Prioritise the AI virality score",
+    weights: { virality: 0.7, duration: 0.1, captionQuality: 0.1, engagement: 0.1 },
+  },
+  shortForm: {
+    id: "shortForm",
+    label: "Short-form first",
+    description: "Favour clips in the 15–60 s sweet spot",
+    weights: { virality: 0.3, duration: 0.5, captionQuality: 0.1, engagement: 0.1 },
+  },
+  captions: {
+    id: "captions",
+    label: "Caption quality",
+    description: "Favour clips with strong captions and hooks",
+    weights: { virality: 0.25, duration: 0.1, captionQuality: 0.5, engagement: 0.15 },
+  },
+  engagement: {
+    id: "engagement",
+    label: "Engagement",
+    description: "Favour clips predicted to hold attention",
+    weights: { virality: 0.25, duration: 0.1, captionQuality: 0.15, engagement: 0.5 },
+  },
+};
+
+export interface RankingPreferences {
+  /** Selected preset, or "custom" once the creator edits individual weights. */
+  preset: RankingPresetId | "custom";
+  weights: RankingWeights;
+}
+
 export interface UserPreferences {
   profile: {
     displayName: string;
@@ -53,6 +113,7 @@ export interface UserPreferences {
     dataExportStatus?: "idle" | "requested" | "processing" | "ready";
     dataExportRequestedAt?: string | null;
   };
+  ranking: RankingPreferences;
 }
 
 export const DEFAULT_USER_PREFERENCES: UserPreferences = {
@@ -94,6 +155,10 @@ export const DEFAULT_USER_PREFERENCES: UserPreferences = {
     analyticsOptOut: false,
     dataExportStatus: "idle",
     dataExportRequestedAt: null,
+  },
+  ranking: {
+    preset: "balanced",
+    weights: DEFAULT_RANKING_WEIGHTS,
   },
 };
 
@@ -267,6 +332,20 @@ export const UserPreferencesSchema = z.object({
       dataExportRequestedAt: z.string().nullable().optional(),
     })
     .optional(),
+  ranking: z
+    .object({
+      preset: z.enum([...RANKING_PRESET_IDS, "custom"]).optional(),
+      weights: z
+        .object({
+          virality: z.number().min(0).max(1),
+          duration: z.number().min(0).max(1),
+          captionQuality: z.number().min(0).max(1),
+          engagement: z.number().min(0).max(1),
+        })
+        .partial()
+        .optional(),
+    })
+    .optional(),
 });
 
 export type UserPreferencesPatch = z.infer<typeof UserPreferencesSchema>;
@@ -311,6 +390,30 @@ export const UserPreferencesStorage = {
     } catch {
       // Ignore storage errors
     }
+  },
+};
+
+/**
+ * Persisted clip-ranking weights. Stored inside the user preferences blob so
+ * they survive reloads and sync with the rest of the user's settings.
+ */
+export const RankingPreferenceStorage = {
+  get(): RankingPreferences {
+    return UserPreferencesStorage.get().ranking;
+  },
+
+  set(ranking: RankingPreferences): void {
+    UserPreferencesStorage.set({ ranking });
+  },
+
+  /** Apply a built-in preset and persist it. */
+  applyPreset(presetId: RankingPresetId): RankingPreferences {
+    const ranking: RankingPreferences = {
+      preset: presetId,
+      weights: { ...RANKING_WEIGHT_PRESETS[presetId].weights },
+    };
+    RankingPreferenceStorage.set(ranking);
+    return ranking;
   },
 };
 
