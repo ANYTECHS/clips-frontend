@@ -1,5 +1,5 @@
 import { addWalletBreadcrumb } from "@/app/lib/walletErrorTracking";
-import { sanitizeBreadcrumb } from "@/app/lib/sentryRedaction";
+import { sanitizeBreadcrumb, sanitizeSentryEvent } from "@/app/lib/sentryRedaction";
 
 const captureException = jest.fn();
 const addBreadcrumb = jest.fn();
@@ -53,5 +53,25 @@ describe("Sentry breadcrumb PII redaction", () => {
     expect(sanitized.data?.public_key).not.toBe(
       "GABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890ABCDEF"
     );
+  });
+});
+
+describe("sanitizeSentryEvent", () => {
+  it("redacts privateKey, secretKey and seed from every event section", () => {
+    const event = sanitizeSentryEvent({
+      extra: { privateKey: "PK", nested: { seed: "word word" }, list: [{ secretKey: "SK" }] },
+      contexts: { wallet: { secretKey: "SK", private_key: "PK" } },
+      tags: { seed: "word" },
+      request: { data: { secret_key: "SK" } },
+      breadcrumbs: [{ message: "sign", data: { privateKey: "PK" } }],
+    });
+
+    const serialized = JSON.stringify(event);
+    expect(serialized).not.toContain('"PK"');
+    expect(serialized).not.toContain('"SK"');
+    expect(serialized).not.toContain("word");
+    expect(event.extra?.privateKey).toBe("[REDACTED]");
+    expect(event.contexts?.wallet?.secretKey).toBe("[REDACTED]");
+    expect(event.breadcrumbs?.[0].data?.privateKey).toBe("[REDACTED]");
   });
 });

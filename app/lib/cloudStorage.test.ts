@@ -30,12 +30,30 @@ import {
   uploadToQuarantine,
   moveFromQuarantine,
   deleteFile,
+  detectMimeType,
+  getContentDisposition,
+  MimeTypeMismatchError,
 } from "./cloudStorage";
 
 jest.mock("@aws-sdk/client-s3");
 jest.mock("@aws-sdk/s3-request-presigner", () => ({
   getSignedUrl: jest.fn(),
 }));
+
+/** Zero-filled buffer of `size` bytes whose leading bytes are an MP4 ftyp box. */
+function mp4Buffer(size: number): Buffer {
+  const buffer = Buffer.alloc(size);
+  Buffer.from([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d]).copy(buffer);
+  return buffer;
+}
+
+/** EBML header carrying the "webm" DocType. */
+function webmBuffer(): Buffer {
+  const buffer = Buffer.alloc(64);
+  Buffer.from([0x1a, 0x45, 0xdf, 0xa3, 0x9f, 0x42, 0x86, 0x81, 0x01, 0x42, 0x82, 0x84]).copy(buffer);
+  Buffer.from("webm", "latin1").copy(buffer, 12);
+  return buffer;
+}
 
 describe("cloudStorage", () => {
   const mockS3Client = {
@@ -170,7 +188,7 @@ describe("cloudStorage", () => {
     });
 
     it("uses PutObjectCommand for files ≤ 50 MB (single-part upload)", async () => {
-      const buffer = Buffer.alloc(25 * 1024 * 1024); // 25 MB
+      const buffer = mp4Buffer(25 * 1024 * 1024); // 25 MB
       mockS3Client.send.mockResolvedValue({});
 
       const result = await uploadFile(buffer, "test.mp4", "video/mp4");
@@ -200,7 +218,7 @@ describe("cloudStorage", () => {
     });
 
     it("uses multipart upload for files > 50 MB", async () => {
-      const buffer = Buffer.alloc(60 * 1024 * 1024); // 60 MB
+      const buffer = mp4Buffer(60 * 1024 * 1024); // 60 MB
       const uploadId = "upload-123";
       const etags = ["etag-1", "etag-2", "etag-3", "etag-4", "etag-5", "etag-6"];
 
@@ -343,7 +361,7 @@ describe("cloudStorage", () => {
 
   describe("uploadToQuarantine", () => {
     it("uses PutObjectCommand for small files in quarantine", async () => {
-      const buffer = Buffer.alloc(10 * 1024 * 1024); // 10 MB
+      const buffer = mp4Buffer(10 * 1024 * 1024); // 10 MB
       mockS3Client.send.mockResolvedValue({});
 
       const result = await uploadToQuarantine(buffer, "test.mp4", "video/mp4");
@@ -364,7 +382,7 @@ describe("cloudStorage", () => {
     });
 
     it("uses multipart upload for large files in quarantine", async () => {
-      const buffer = Buffer.alloc(60 * 1024 * 1024); // 60 MB
+      const buffer = mp4Buffer(60 * 1024 * 1024); // 60 MB
       const uploadId = "upload-123";
 
       mockS3Client.send
@@ -418,6 +436,77 @@ describe("cloudStorage", () => {
         objectKey: "uploads/job_abc123.mp4",
         url: expect.stringContaining("uploads/job_abc123.mp4"),
       });
+    });
+  });
+
+  describe("MIME sniffing protection", () => {
+    it("detects MP4 and WebM from magic bytes", () => {
+      expect(detectMimeType(mp4Buffer(64))).toBe("video/mp4");
+      expect(detectMimeType(webmBuffer())).toBe("video/webm");
+      expect(detectMimeType(Buffer.from("<html><script>alert(1)</script></html>"))).toBeNull();
+    });
+
+    it("plays videos inline and forces everything else to download", () => {
+      expect(getContentDisposition("video/mp4")).toBe("inline");
+      expect(getContentDisposition("video/webm")).toBe("inline");
+      expect(getContentDisposition("application/octet-stream")).toBe("attachment");
+      expect(getContentDisposition("text/html")).toBe("attachment");
+    });
+
+    it("stores an MP4 upload with ContentType video/mp4 and inline disposition", async () => {
+      mockS3Client.send.mockResolvedValue({});
+
+      await uploadToQuarantine(mp4Buffer(1024), "clip.mp4", "video/mp4");
+
+      expect(mockS3Client.send.mock.calls[0][0].input).toMatchObject({
+        ContentType: "video/mp4",
+        ContentDisposition: "inline",
+      });
+    });
+
+    it("stores a WebM upload with ContentType video/webm and inline disposition", async () => {
+      mockS3Client.send.mockResolvedValue({});
+
+      const result = await uploadToQuarantine(webmBuffer(), "clip.webm", "video/webm");
+
+      expect(result.contentType).toBe("video/webm");
+      expect(mockS3Client.send.mock.calls[0][0].input).toMatchObject({
+        ContentType: "video/webm",
+        ContentDisposition: "inline",
+      });
+    });
+
+    it("uses the detected type rather than the declared extension", async () => {
+      mockS3Client.send.mockResolvedValue({});
+
+      const result = await uploadFile(webmBuffer(), "clip.mp4", "application/octet-stream");
+
+      expect(result.contentType).toBe("video/webm");
+      expect(mockS3Client.send.mock.calls[0][0].input.ContentType).toBe("video/webm");
+    });
+
+    it("quarantines and rejects a file whose content does not match its declared type", async () => {
+      mockS3Client.send.mockResolvedValue({});
+      const html = Buffer.from("<!doctype html><html><script>alert(1)</script></html>");
+
+      const attempt = uploadToQuarantine(html, "clip.mp4", "video/mp4");
+
+      await expect(attempt).rejects.toBeInstanceOf(MimeTypeMismatchError);
+      await attempt.catch((err: MimeTypeMismatchError) => {
+        expect(err.quarantineKey).toMatch(/^uploads\/quarantine\/job_[a-f0-9]+\.mp4$/);
+      });
+      expect(mockS3Client.send.mock.calls[0][0].input).toMatchObject({
+        ContentType: "application/octet-stream",
+        ContentDisposition: "attachment",
+      });
+    });
+
+    it("rejects a WebM file declared as MP4", async () => {
+      mockS3Client.send.mockResolvedValue({});
+
+      await expect(
+        uploadToQuarantine(webmBuffer(), "clip.mp4", "video/mp4"),
+      ).rejects.toBeInstanceOf(MimeTypeMismatchError);
     });
   });
 

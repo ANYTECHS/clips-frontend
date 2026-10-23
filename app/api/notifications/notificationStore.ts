@@ -1,5 +1,6 @@
 export type NotificationType =
   | "job_complete"
+  | "job_failed"
   | "transform_complete"
   | "mint_success"
   | "earnings_received";

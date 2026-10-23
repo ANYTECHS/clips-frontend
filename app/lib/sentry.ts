@@ -12,7 +12,7 @@ import {
   redactAddress,
   redactEmail,
   sanitizeBreadcrumbPayload,
-  sanitizeSentryContexts,
+  sanitizeSentryEvent,
 } from "@/app/lib/sentryRedaction";
 import {
   INVOKE_CONTRACT_NOT_SUPPORTED_CODE,
@@ -54,11 +54,7 @@ export function initSentry() {
       }
       
       // Sanitize wallet addresses and keys
-      if (event.contexts) {
-        sanitizeSentryContexts(event.contexts);
-      }
-      
-      return event;
+      return sanitizeSentryEvent(event);
     },
     
     // Ignore specific errors

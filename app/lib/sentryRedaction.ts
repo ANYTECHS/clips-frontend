@@ -15,10 +15,21 @@ export function redactEmail(email: string): string {
 const SENSITIVE_KEY_PATTERNS =
   /secret|private|mnemonic|seed|password|passphrase|recovery/i;
 
+/**
+ * Wallet key fields that must never reach Sentry, in any casing or
+ * snake_case form (#1218). Matched exactly in addition to the pattern above
+ * so the guarantee does not depend on the pattern staying broad.
+ */
+const WALLET_KEY_FIELDS = new Set(["privatekey", "secretkey", "seed"]);
+
+function isWalletKeyField(key: string): boolean {
+  return WALLET_KEY_FIELDS.has(key.replace(/[_-]/g, "").toLowerCase());
+}
+
 export function redactSensitiveValue(key: string, value: unknown): unknown {
   if (value === null || value === undefined) return value;
 
-  if (SENSITIVE_KEY_PATTERNS.test(key)) {
+  if (isWalletKeyField(key) || SENSITIVE_KEY_PATTERNS.test(key)) {
     return "[REDACTED]";
   }
 
@@ -43,7 +54,15 @@ export function sanitizeContextObject(
 
   for (const key of Object.keys(sanitized)) {
     const value = sanitized[key];
-    if (typeof value === "object" && value !== null && !Array.isArray(value)) {
+    if (isWalletKeyField(key)) {
+      sanitized[key] = "[REDACTED]";
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.map((item) =>
+        typeof item === "object" && item !== null
+          ? sanitizeContextObject(item as Record<string, unknown>)
+          : item,
+      );
+    } else if (typeof value === "object" && value !== null) {
       sanitized[key] = sanitizeContextObject(value as Record<string, unknown>);
     } else {
       sanitized[key] = redactSensitiveValue(key, value);
@@ -51,6 +70,32 @@ export function sanitizeContextObject(
   }
 
   return sanitized;
+}
+
+/**
+ * Redacts sensitive fields (including `privateKey`, `secretKey` and `seed`)
+ * from every part of a Sentry event that can carry arbitrary data: contexts,
+ * extra, tags, request body and breadcrumbs.
+ */
+export function sanitizeSentryEvent<T extends Event>(event: T): T {
+  if (event.contexts) sanitizeSentryContexts(event.contexts);
+  if (event.extra) {
+    event.extra = sanitizeContextObject(event.extra as Record<string, unknown>);
+  }
+  if (event.tags) {
+    event.tags = sanitizeContextObject(
+      event.tags as Record<string, unknown>,
+    ) as Event["tags"];
+  }
+  if (event.request?.data && typeof event.request.data === "object") {
+    event.request.data = sanitizeContextObject(
+      event.request.data as Record<string, unknown>,
+    );
+  }
+  if (event.breadcrumbs) {
+    event.breadcrumbs = event.breadcrumbs.map(sanitizeBreadcrumb);
+  }
+  return event;
 }
 
 export function sanitizeSentryContexts(contexts: Event["contexts"]): void {
