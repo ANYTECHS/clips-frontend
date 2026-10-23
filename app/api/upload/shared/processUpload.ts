@@ -250,7 +250,8 @@ export async function processUploadedBuffer(
   return {
     name: finalResult.filename,
     size: buffer.length,
-    type: contentType,
+    // The type detected from magic bytes, not the user-declared one.
+    type: quarantine.contentType,
     jobId: finalResult.jobId,
     objectKey: finalResult.objectKey,
     url: finalResult.url,

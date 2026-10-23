@@ -6,6 +6,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
 import { StellarWalletProvider } from "@/components/StellarWalletProvider";
 import { NetworkProvider } from "@/app/context/NetworkContext";
+import { MainnetBanner } from "@/components/MainnetBanner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { I18nProvider } from "@/app/lib/i18n/I18nProvider";
@@ -17,6 +18,7 @@ import CryptoSaltInitializer from "@/components/CryptoSaltInitializer";
 import PerformanceMonitor from "@/components/PerformanceMonitor";
 import FontPreload from "@/app/components/FontPreload";
 import DataSyncProvider from "@/components/DataSyncProvider";
+import { ServiceWorkerRegistrar } from "@/app/components/ServiceWorkerRegistrar";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const KeyboardShortcuts = dynamic(() => import("@/components/KeyboardShortcuts"), {
@@ -111,7 +113,9 @@ export default function RootLayout({
                       <WalletProvider>
                         <StellarWalletProvider>
                           <AnalyticsProvider />
+                          <ServiceWorkerRegistrar />
                           <KeyboardShortcuts />
+                          <MainnetBanner />
                           {children}
                           <RateLimitToast />
                         </StellarWalletProvider>

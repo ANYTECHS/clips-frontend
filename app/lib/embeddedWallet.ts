@@ -238,7 +238,7 @@ export async function createEmbeddedWallet(
   const secretKey = keypair.secret();
   const createdAt = new Date().toISOString();
 
-  // Persist to storage (secret key is obfuscated at rest)
+  // Persist to storage (secret key is AES-GCM encrypted at rest)
   await WalletStorage.save(userId, {
     userId,
     publicKey,

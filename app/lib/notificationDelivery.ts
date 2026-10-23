@@ -29,6 +29,12 @@ const templates: Record<NotificationType, NotificationTemplate> = {
       return `Found ${moments} viral moment${moments === "1" ? "" : "s"} from your video.`;
     },
   },
+  job_failed: {
+    title: "Your video job failed",
+    subject: "Your ClipCash video job failed",
+    message: (payload) =>
+      `${readValue(payload, "reason") ?? "Processing failed"}. You can retry the job from your dashboard without re-uploading.`,
+  },
   transform_complete: {
     title: "Style transformation complete",
     subject: "Your ClipCash transformation is complete",

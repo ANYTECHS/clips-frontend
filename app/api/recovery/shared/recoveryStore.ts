@@ -24,6 +24,8 @@ export type RecoveryConfig = {
   /** Account owner email. */
   email: string;
   threshold: number;
+  /** Number of shares the secret was split into (defaults to guardians.length). */
+  totalShares?: number;
   guardians: GuardianEntry[];
 };
 

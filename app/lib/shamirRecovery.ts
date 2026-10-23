@@ -1,6 +1,8 @@
 import secrets from "secrets.js-grempe";
 
 const BITS = 8;
+/** With 8-bit fields secrets.js supports at most 2^8 - 1 shares. */
+const MAX_SHARES = 255;
 
 /**
  * Converts a raw string secret into a hexadecimal string representations required by the underlying cryptographic engine.
@@ -42,24 +44,41 @@ export type ShamirSplitOptions = {
  * Splits a raw secret string into an array of cryptographic hexadecimal shares using Shamir's Secret Sharing scheme.
  *
  * @param secret - The core sensitive credentials passphrase string to fractionally distribute.
- * @param options - Structuring constraints detailing target share counts and quorum boundaries.
+ * @param totalShares - Total number of shares to generate (or a legacy options object).
+ * @param threshold - Minimum number of shares required to reconstruct the secret.
  * @returns An array of cryptographically isolated hexadecimal shard pieces.
  * @throws {Error} Thrown if the recovery threshold is less than 2, or if total shares are less than the quorum threshold.
  * @example
  * ```typescript
- * const shares = splitSecret("my_secret_key", { shares: 5, threshold: 3 });
+ * const shares = splitSecret("my_secret_key", 5, 3);
  * ```
  */
+export function splitSecret(secret: string, totalShares: number, threshold: number): string[];
+export function splitSecret(secret: string, options: ShamirSplitOptions): string[];
 export function splitSecret(
   secret: string,
-  options: ShamirSplitOptions
+  totalSharesOrOptions: number | ShamirSplitOptions,
+  thresholdArg?: number
 ): string[] {
-  const { shares, threshold } = options;
+  const { shares, threshold } =
+    typeof totalSharesOrOptions === "number"
+      ? { shares: totalSharesOrOptions, threshold: thresholdArg ?? NaN }
+      : totalSharesOrOptions;
+
+  if (!secret) {
+    throw new Error("Secret must not be empty.");
+  }
+  if (!Number.isInteger(shares) || !Number.isInteger(threshold)) {
+    throw new Error("Share count and threshold must be integers.");
+  }
   if (threshold < 2) {
     throw new Error("Recovery threshold must be at least 2.");
   }
   if (shares < threshold) {
     throw new Error("Number of guardians must be at least the recovery threshold.");
+  }
+  if (shares > MAX_SHARES) {
+    throw new Error(`Number of shares cannot exceed ${MAX_SHARES}.`);
   }
 
   secrets.init(BITS);
@@ -69,16 +88,33 @@ export function splitSecret(
 /**
  * Combines an array of cryptographic hexadecimal shard pieces to reassemble the original raw secret text.
  *
+ * Note: Shamir's scheme cannot detect on its own that too few shares were
+ * supplied — combining below the threshold yields garbage, not an error. Pass
+ * `threshold` whenever it is known so insufficient input fails loudly.
+ *
  * @param shareHexValues - Collection of unique hexadecimal share string markers provided by threshold guardians.
+ * @param threshold - Optional minimum number of distinct shares required.
  * @returns The original plaintext key string output.
+ * @throws {Error} Thrown when fewer than `threshold` distinct shares are supplied or a share is malformed.
  * @example
  * ```typescript
  * const recovered = combineShares([share1, share2, share3]);
  * ```
  */
-export function combineShares(shareHexValues: string[]): string {
+export function combineShares(shareHexValues: string[], threshold?: number): string {
+  const unique = Array.from(new Set(shareHexValues.map((s) => s.trim()).filter(Boolean)));
+  if (unique.length < Math.max(2, threshold ?? 2)) {
+    throw new Error(
+      `Insufficient shares: ${unique.length} provided, ${Math.max(2, threshold ?? 2)} required.`
+    );
+  }
+
   secrets.init(BITS);
-  return fromHex(secrets.combine(shareHexValues));
+  // extractShareComponents throws on malformed input, surfacing bad shares early.
+  for (const share of unique) {
+    secrets.extractShareComponents(share);
+  }
+  return fromHex(secrets.combine(unique));
 }
 
 /**

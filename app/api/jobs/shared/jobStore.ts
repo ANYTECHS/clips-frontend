@@ -31,6 +31,17 @@ export interface Job {
   /** Human-readable error message set by the AI backend on failure. */
   errorCode?: AiErrorCode;
   errorMessage?: string;
+  /**
+   * When the job first entered "processing". Used by the cron timeout sweep
+   * to detect jobs the AI backend has stopped reporting on.
+   */
+  processingStartedAt?: number;
+  /** Source video metadata persisted at upload so the job can be retried. */
+  objectKey?: string;
+  contentType?: string;
+  filename?: string;
+  /** Id of the failed job this job was created to retry. */
+  retriedFrom?: string;
 }
 
 /**

@@ -1,15 +1,18 @@
 "use client";
 
-import { BarChart3,Check, Edit2, Play, Sparkles } from "lucide-react";
+import { BarChart3,Check, Coins, Edit2, Play, Sparkles } from "lucide-react";
 import React, { memo,useEffect, useRef, useState } from "react";
 
 import { useRenderTiming } from "@/app/hooks/useRenderTiming";
 import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
+import type { ClipRankingDetails } from "@/app/lib/clipRanking";
 import { type ImageLoadingState } from "@/app/lib/imageUtils";
+import { isClipMintable } from "@/app/lib/mintUtils";
 import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 import LazyImage from "@/components/common/LazyImage";
 
 import ExportDropdown from "./ExportDropdown";
+import { RankExplanationTooltip } from "./RankExplanationTooltip";
 import ScoreBreakdownTooltip, { ScoreBreakdown } from "./ScoreBreakdownTooltip";
 
 export interface Clip {
@@ -25,6 +28,8 @@ export interface Clip {
   videoUrl: string;
   scoreBreakdown?: ScoreBreakdown;
   tags?: string[];
+  /** NFT token id once the clip has been minted */
+  nftTokenId?: string | null;
 }
 
 export interface ClipGridProps {
@@ -41,12 +46,24 @@ export interface ClipGridProps {
   onAutoSelect: () => void;
   onEdit: (id: string) => void;
   onPreview: (id: string) => void;
+  /** Opens the NFT mint flow for a completed clip; the button is hidden when omitted */
+  onMintNft?: (id: string) => void;
   loading: boolean;
   totalClips: number;
   loadingNextPage: boolean;
   onLoadMore: () => void;
   hasMore: boolean;
   userPlan?: "free" | "pro" | "enterprise";
+  /** Per-clip ranking breakdown; enables the "Why this rank?" tooltip. */
+  rankingDetails?: Record<string, ClipRankingDetails>;
+}
+
+/**
+ * View Transition name for a clip card, so re-sorting animates each card from
+ * its old position to its new one. Names must be valid CSS identifiers.
+ */
+function clipTransitionName(id: string): string {
+  return `clip-${id.replace(/[^a-zA-Z0-9_-]/g, "_")}`;
 }
 
 /**
@@ -71,12 +88,14 @@ function ClipGrid({
   onAutoSelect,
   onEdit,
   onPreview,
+  onMintNft,
   loading,
   totalClips,
   loadingNextPage,
   onLoadMore,
   hasMore,
   userPlan = "free",
+  rankingDetails,
 }: ClipGridProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
   const [imageStates, setImageStates] = useState<Record<string, ImageLoadingState>>({});
@@ -234,6 +253,7 @@ function ClipGrid({
                       <div
                         key={clip.id}
                         data-tour="clip-preview"
+                        style={{ viewTransitionName: clipTransitionName(clip.id) } as React.CSSProperties}
                         className={`group relative rounded-2xl overflow-hidden contain-layout-style transition-all duration-300 border-2 ${isSelected ? "border-brand shadow-[0_0_20px_rgba(var(--brand),0.3)]" : "border-transparent hover:border-white/20"}`}
                       >
                         <div
@@ -295,6 +315,14 @@ function ClipGrid({
                                 <Sparkles className="w-3 h-3" /> Top Pick
                               </div>
                             )}
+                            {clip.nftTokenId && (
+                              <div
+                                className="bg-black/70 text-brand border border-brand/40 px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1"
+                                title={`NFT token #${clip.nftTokenId}`}
+                              >
+                                <Coins className="w-3 h-3" /> Minted
+                              </div>
+                            )}
                           </div>
                           <div
                             className={`absolute top-3 right-3 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${isSelected ? "bg-brand border-brand" : "border-white/50 bg-black/50 group-hover:border-white"} ${isRecommended ? "top-10" : ""}`}
@@ -303,6 +331,14 @@ function ClipGrid({
                           </div>
 
                           <div className="absolute bottom-3 left-3 right-3">
+                            {rankingDetails?.[clip.id] && (
+                              <div className="mb-1.5" onClick={(e) => e.stopPropagation()}>
+                                <RankExplanationTooltip
+                                  details={rankingDetails[clip.id]}
+                                  totalClips={clips.length}
+                                />
+                              </div>
+                            )}
                             <h4 className="text-white font-bold text-sm mb-1 line-clamp-2">
                               {clip.title}
                             </h4>
@@ -352,6 +388,18 @@ function ClipGrid({
                           >
                             <Edit2 className="w-4 h-4" /> Edit
                           </button>
+                          {onMintNft && isClipMintable(clip) && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onMintNft(clip.id);
+                              }}
+                              className="flex-1 bg-brand/20 hover:bg-brand/30 text-brand py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors"
+                              aria-label="Mint as NFT"
+                            >
+                              <Coins className="w-4 h-4" /> Mint as NFT
+                            </button>
+                          )}
                           <ExportDropdown clipId={clip.id} userPlan={userPlan} />
                           <a
                             href={`/analytics?clipId=${clip.id}`}

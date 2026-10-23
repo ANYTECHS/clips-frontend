@@ -3,370 +3,139 @@
 /**
  * TransactionHistoryViewer
  *
- * Displays paginated, filterable on-chain transaction history for MetaMask
- * (Ethereum) and Phantom (Solana) wallets.
+ * Displays the connected Stellar wallet's transaction history with
+ * cursor-based infinite scroll and filters.
  *
- * Spec requirements implemented:
- * - Req 1:  wallet detection via useWallet()
- * - Req 2/3: Ethereum / Solana fetching via useTransactionHistory
- * - Req 4:  display — timestamp, amount, direction, status, fees, confirmations
- * - Req 5:  filter tabs (All / Sent / Received) with sessionStorage persistence
- * - Req 6:  pagination (20 per page, Prev/Next, page count)
- * - Req 7:  auto-refresh every 30 s; new-tx banner; manual refresh button
- * - Req 8:  blockchain explorer links (Etherscan / Solscan)
- * - Req 9:  empty state per filter
- * - Req 10: full-page skeleton on initial load; inline spinner for pagination/refresh
- * - Req 11: error state with retry; non-intrusive auto-refresh error notification
- * - Req 12: sanitize all user-derived strings; no private keys; no address logging
- * - Req 14: ARIA labels, keyboard nav, focus indicators, live regions
- * - Req 15: responsive — vertical stack on mobile, horizontal on desktop
+ * - Data: useStellarTransactionHistory → GET /api/wallet/transactions
+ *   (cursor + limit), with recent pages cached in app/lib/txHistory.ts
+ * - Infinite scroll: a sentinel watched by useIntersectionObserver loads the
+ *   next page as it nears the viewport (a "Load more" button is kept as a
+ *   keyboard / no-IntersectionObserver fallback)
+ * - Filters: transaction type (payment, mint, trustline), date range, asset
+ * - Rows: date, type, amount, asset, counterparty, status, Stellar Explorer link
+ *   (testnet vs public explorer follows the active network)
+ * - Loading: SkeletonTable while the first page is fetched
+ * - All user/chain-derived strings are sanitized before rendering
  */
 
-import React, { memo, useCallback, useEffect, useRef } from "react";
-import {
-  ArrowDownLeft,
-  ArrowUpRight,
-  ArrowLeftRight,
-  ExternalLink,
-  RefreshCw,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle,
-  Loader2,
-  History,
-  Wallet,
-  Bell,
-} from "lucide-react";
+import { AlertCircle, ExternalLink, History, Loader2, RefreshCw, Wallet } from "lucide-react";
+import React, { memo, useEffect, useState } from "react";
 
-import { useWallet } from "@/components/wallet/WalletProvider";
-import { useTransactionHistory, PAGE_SIZE } from "@/app/hooks/useTransactionHistory";
-import { formatTxTimestamp, type Transaction, type TxFilter, type TxStatus, type TxDirection } from "@/app/lib/txHistory";
-import { sanitize } from "@/app/lib/sanitize";
-import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
+import { useOptionalNetworkContext } from "@/app/context/NetworkContext";
+import { useDebounce } from "@/app/hooks/useDebounce";
+import { useIntersectionObserver } from "@/app/hooks/useIntersectionObserver";
 import { useRenderTiming } from "@/app/hooks/useRenderTiming";
-import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
+import { useStellarTransactionHistory } from "@/app/hooks/useTransactionHistory";
+import { getStellarNetwork } from "@/app/lib/networkConfig";
+import { sanitize } from "@/app/lib/sanitize";
+import { truncateStellarAddress } from "@/app/lib/stringUtils";
+import {
+  formatTxTimestamp,
+  getStellarTxExplorerUrl,
+  type StellarNetworkName,
+  type StellarTransaction,
+  type StellarTxType,
+} from "@/app/lib/txHistory";
+import SkeletonTable from "@/components/ui/SkeletonTable";
+import { useWallet } from "@/components/wallet/WalletProvider";
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────
 
-function statusColor(status: TxStatus): string {
-  if (status === "confirmed") return "text-brand";
-  if (status === "pending")   return "text-warning";
-  return "text-error";
-}
+const TYPE_LABELS: Record<StellarTxType, string> = {
+  payment: "Payment",
+  mint: "Mint",
+  trustline: "Trustline",
+  other: "Other",
+};
 
-function statusLabel(status: TxStatus): string {
-  if (status === "confirmed") return "Confirmed";
-  if (status === "pending")   return "Pending";
-  return "Failed";
-}
+const TYPE_OPTIONS: { value: StellarTxType | "all"; label: string }[] = [
+  { value: "all", label: "All types" },
+  { value: "payment", label: "Payment" },
+  { value: "mint", label: "Mint" },
+  { value: "trustline", label: "Trustline" },
+];
 
-function directionIcon(direction: TxDirection, status: TxStatus) {
-  const base = "w-4 h-4 shrink-0";
-  if (direction === "incoming") return <ArrowDownLeft className={`${base} text-brand`} aria-hidden />;
-  if (direction === "outgoing") return <ArrowUpRight   className={`${base} ${status === "failed" ? "text-error" : "text-muted"}`} aria-hidden />;
-  return <ArrowLeftRight className={`${base} text-muted`} aria-hidden />;
-}
+const STELLAR_ADDRESS_RE = /^G[A-Z2-7]{55}$/;
 
-function directionLabel(direction: TxDirection): string {
-  if (direction === "incoming") return "Received";
-  if (direction === "outgoing") return "Sent";
-  return "Self-transfer";
-}
+const inputClass =
+  "bg-input border border-border rounded-xl px-3 py-1.5 text-[12px] text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40";
 
-// ─── Skeleton rows ─────────────────────────────────────────────────────────────
+// ─── Row ───────────────────────────────────────────────────────────────────────
 
-function SkeletonRow() {
-  return (
-    <div
-      className="flex items-center gap-3 p-3 sm:p-4 rounded-xl border border-border animate-pulse"
-      aria-hidden
-    >
-      <div className="w-8 h-8 rounded-full bg-surface-hover shrink-0" />
-      <div className="flex-1 space-y-2 min-w-0">
-        <div className="h-3.5 w-32 rounded bg-surface-hover" />
-        <div className="h-3 w-48 rounded bg-surface-hover" />
-      </div>
-      <div className="hidden sm:block space-y-2 text-right">
-        <div className="h-3.5 w-20 rounded bg-surface-hover ml-auto" />
-        <div className="h-3 w-14 rounded bg-surface-hover ml-auto" />
-      </div>
-    </div>
-  );
-}
-
-function SkeletonList() {
-  return (
-    <div className="space-y-2" aria-busy="true" aria-label="Loading transactions">
-      {Array.from({ length: 6 }).map((_, i) => (
-        <SkeletonRow key={i} />
-      ))}
-    </div>
-  );
-}
-
-// ─── Individual transaction row ────────────────────────────────────────────────
-
-interface TxRowProps {
-  tx: Transaction;
-}
-
-const TxRow = memo(function TxRow({ tx }: TxRowProps) {
-  const safeFrom = sanitize(tx.fromAddress);
-  const safeTo   = sanitize(tx.toAddress);
-  const safeAmt  = sanitize(tx.amount);
-  const safeSym  = sanitize(tx.assetSymbol);
-  const safeFee  = tx.fee ? sanitize(tx.fee) : null;
-
-  const isIncoming = tx.direction === "incoming";
-  const amountSign = isIncoming ? "+" : tx.direction === "outgoing" ? "−" : "";
-  const amountColor = isIncoming ? "text-brand" : tx.direction === "outgoing" && tx.status !== "failed" ? "text-white" : "text-error";
-
-  const dirLabel = directionLabel(tx.direction);
-  const statLabel = statusLabel(tx.status);
+const TxRow = memo(function TxRow({
+  tx,
+  network,
+}: {
+  tx: StellarTransaction;
+  network: StellarNetworkName;
+}) {
+  const counterparty = tx.counterparty ? sanitize(tx.counterparty) : null;
+  const hash = sanitize(tx.hash);
 
   return (
-    <div
-      className="flex items-start gap-3 p-3 sm:p-4 rounded-xl border border-border bg-surface hover:bg-surface-hover transition-colors focus-within:ring-2 focus-within:ring-brand/40"
-      role="row"
-    >
-      {/* Direction icon */}
-      <div className="mt-0.5" aria-label={dirLabel}>
-        {directionIcon(tx.direction, tx.status)}
-      </div>
-
-      {/* Left column — addresses & timestamp */}
-      <div className="flex-1 min-w-0 space-y-1">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-white text-[13px] font-semibold">{dirLabel}</span>
-          <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full border ${
-            tx.status === "confirmed" ? "border-brand/30 text-brand bg-brand/5"
-            : tx.status === "pending"  ? "border-warning/30 text-warning bg-warning/5"
-            : "border-error/30 text-error bg-error/5"
+    <tr className="border-b border-border hover:bg-surface-hover transition-colors" data-testid="tx-row">
+      <td className="px-4 py-3 text-muted-foreground text-[12px] whitespace-nowrap">
+        <time dateTime={sanitize(tx.createdAt)}>{formatTxTimestamp(Date.parse(tx.createdAt))}</time>
+      </td>
+      <td className="px-4 py-3 text-white text-[12px] font-semibold">{TYPE_LABELS[tx.type]}</td>
+      <td className="px-4 py-3 text-white text-[12px] font-mono text-right">
+        {tx.amount !== null ? sanitize(tx.amount) : "—"}
+      </td>
+      <td className="px-4 py-3 text-white text-[12px]">{sanitize(tx.asset)}</td>
+      <td className="px-4 py-3 text-muted text-[12px] font-mono" title={counterparty ?? undefined}>
+        {counterparty ? truncateStellarAddress(counterparty) : "—"}
+      </td>
+      <td className="px-4 py-3">
+        <span
+          className={`text-[11px] font-medium px-1.5 py-0.5 rounded-full border ${
+            tx.status === "success"
+              ? "border-brand/30 text-brand bg-brand/5"
+              : "border-error/30 text-error bg-error/5"
           }`}
-            aria-label={`Status: ${statLabel}`}
-          >
-            {statLabel}
-          </span>
-          {typeof tx.blockConfirmations === "number" && tx.status !== "confirmed" && (
-            <span className="text-[11px] text-muted-foreground">
-              {tx.blockConfirmations} confirm{tx.blockConfirmations !== 1 ? "s" : ""}
-            </span>
-          )}
-        </div>
-
-        <p className="text-muted text-[11px] sm:text-[12px] font-mono truncate">
-          {isIncoming
-            ? <><span className="text-muted-foreground">From</span> {safeFrom}</>
-            : <><span className="text-muted-foreground">To</span> {safeTo}</>
-          }
-        </p>
-
-        <p className="text-muted-foreground text-[11px]">
-          <time dateTime={new Date(tx.timestamp).toISOString()}>
-            {formatTxTimestamp(tx.timestamp)}
-          </time>
-        </p>
-      </div>
-
-      {/* Right column — amount, fee, explorer */}
-      <div className="text-right space-y-1 shrink-0">
-        <p className={`text-[14px] font-bold font-mono ${amountColor}`}>
-          {amountSign}{safeAmt} {safeSym}
-        </p>
-        {safeFee && tx.direction === "outgoing" && (
-          <p className="text-muted-foreground text-[11px] font-mono">
-            Fee: {safeFee} {safeSym}
-          </p>
-        )}
+        >
+          {tx.status === "success" ? "Success" : "Failed"}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-right">
         <a
-          href={sanitize(tx.explorerUrl)}
+          href={getStellarTxExplorerUrl(tx.hash, network)}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1 text-[11px] text-muted hover:text-brand transition-colors"
-          aria-label={`View transaction ${tx.id.slice(0, 8)}… on blockchain explorer (opens in new tab)`}
+          aria-label={`View transaction ${hash.slice(0, 8)}… on Stellar Explorer (opens in new tab)`}
         >
           Explorer <ExternalLink className="w-3 h-3" aria-hidden />
         </a>
-      </div>
-    </div>
+      </td>
+    </tr>
   );
 });
 
-// ─── Filter tabs ───────────────────────────────────────────────────────────────
+// ─── Empty / no-wallet states ──────────────────────────────────────────────────
 
-interface FilterTabsProps {
-  active: TxFilter;
-  onChange: (f: TxFilter) => void;
-  counts: Record<TxFilter, number>;
-}
-
-const FILTERS: { id: TxFilter; label: string }[] = [
-  { id: "all",      label: "All" },
-  { id: "sent",     label: "Sent" },
-  { id: "received", label: "Received" },
-];
-
-function FilterTabs({ active, onChange, counts }: FilterTabsProps) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Filter transactions"
-      className="flex gap-1 p-1 bg-input rounded-xl border border-border"
-    >
-      {FILTERS.map(({ id, label }) => (
-        <button
-          key={id}
-          role="tab"
-          aria-selected={active === id}
-          onClick={() => onChange(id)}
-          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-[12px] font-semibold transition-all cursor-pointer ${
-            active === id
-              ? "bg-brand text-black shadow-sm"
-              : "text-muted hover:text-white hover:bg-surface-hover"
-          }`}
-        >
-          {label}
-          {counts[id] > 0 && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
-              active === id ? "bg-black/20 text-black" : "bg-surface-hover text-muted"
-            }`}>
-              {counts[id]}
-            </span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ─── Pagination controls ───────────────────────────────────────────────────────
-
-interface PaginationProps {
-  currentPage: number;
-  totalPages: number;
-  onPrev: () => void;
-  onNext: () => void;
-  isLoading: boolean;
-}
-
-function Pagination({ currentPage, totalPages, onPrev, onNext, isLoading }: PaginationProps) {
-  if (totalPages <= 1) return null;
-
-  return (
-    <div className="flex items-center justify-between pt-4 border-t border-border">
-      <button
-        onClick={onPrev}
-        disabled={currentPage <= 1 || isLoading}
-        aria-label="Previous page"
-        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-muted text-[12px] font-medium hover:text-white hover:border-brand/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-      >
-        <ChevronLeft className="w-4 h-4" aria-hidden />
-        Previous
-      </button>
-
-      <span className="text-muted text-[12px]" aria-live="polite" aria-atomic>
-        Page {currentPage} of {totalPages}
-      </span>
-
-      <button
-        onClick={onNext}
-        disabled={currentPage >= totalPages || isLoading}
-        aria-label="Next page"
-        className="flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-muted text-[12px] font-medium hover:text-white hover:border-brand/30 disabled:opacity-40 disabled:cursor-not-allowed transition-all cursor-pointer"
-      >
-        Next
-        <ChevronRight className="w-4 h-4" aria-hidden />
-      </button>
-    </div>
-  );
-}
-
-function VirtualTransactionList({ transactions, isLoading }: { transactions: Transaction[], isLoading: boolean }) {
-  const parentRef = useRef<HTMLDivElement>(null);
-
-  useRenderTiming("TransactionHistoryViewer", [transactions.length, isLoading]);
-
-  const rowVirtualizer = useSimpleVirtualizer({
-    count: transactions.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: VIRTUALIZATION_CONFIG.rowHeight.transactions,
-    overscan: VIRTUALIZATION_CONFIG.overscanItems,
-  });
-
-  return (
-    <div
-      ref={parentRef}
-      className={`h-[400px] overflow-auto ${isLoading ? "opacity-50 pointer-events-none" : ""}`}
-    >
-      <div
-        style={{
-          height: `${rowVirtualizer.getTotalSize()}px`,
-          width: "100%",
-          position: "relative",
-        }}
-        role="table"
-        aria-label="Transaction history"
-      >
-        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-          const tx = transactions[virtualRow.index];
-          return (
-            <div
-              key={tx.id}
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                width: "100%",
-                height: `${virtualRow.size}px`,
-                transform: `translateY(${virtualRow.start}px)`,
-                paddingBottom: "8px",
-              }}
-            >
-              <TxRow tx={tx} />
-            </div>
-          );
-        })}
-      </div>
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-          <Loader2 className="w-6 h-6 text-brand animate-spin" />
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Empty state ───────────────────────────────────────────────────────────────
-
-function EmptyState({ filter }: { filter: TxFilter }) {
-  const message =
-    filter === "sent"     ? "No sent transactions found."
-    : filter === "received" ? "No received transactions found."
-    : "No transactions found for this wallet.";
-
-  const suggestion =
-    filter !== "all"
-      ? "Try switching to the "All" tab, or verify your wallet is connected correctly."
-      : "Once you make transactions, they'll appear here.";
-
+function EmptyState({ filtered }: { filtered: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <History className="w-10 h-10 text-muted mx-auto mb-4" aria-hidden />
-      <p className="text-white font-bold text-[16px] mb-2">{message}</p>
-      <p className="text-muted text-[13px] max-w-xs">{suggestion}</p>
+      <p className="text-white font-bold text-[16px] mb-2">
+        {filtered ? "No transactions match these filters." : "No transactions found for this wallet."}
+      </p>
+      <p className="text-muted text-[13px] max-w-xs">
+        {filtered
+          ? "Try widening the date range or clearing the type and asset filters."
+          : "Once you make payments, mint NFTs or add trustlines, they'll appear here."}
+      </p>
     </div>
   );
 }
-
-// ─── No wallet state ───────────────────────────────────────────────────────────
 
 function NoWalletState() {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <Wallet className="w-10 h-10 text-muted mx-auto mb-4" aria-hidden />
-      <p className="text-white font-bold text-[16px] mb-2">No supported wallet connected</p>
+      <p className="text-white font-bold text-[16px] mb-2">No Stellar wallet connected</p>
       <p className="text-muted text-[13px] max-w-xs">
-        Connect MetaMask or Phantom from the wallet menu to view transaction history.
+        Connect a Stellar wallet from the wallet menu to view transaction history.
       </p>
     </div>
   );
@@ -380,53 +149,59 @@ export interface TransactionHistoryViewerProps {
 }
 
 export default function TransactionHistoryViewer({ className = "" }: TransactionHistoryViewerProps) {
-  const { address, walletType, isConnected } = useWallet();
+  const { address, isConnected } = useWallet();
+  const network = useOptionalNetworkContext()?.network ?? getStellarNetwork();
+  const stellarAddress =
+    isConnected && address && STELLAR_ADDRESS_RE.test(address) ? address : null;
 
-  // Only MetaMask and Phantom are supported (per requirements)
-  const supportedWalletType =
-    walletType === "metamask" ? "metamask"
-    : walletType === "phantom" ? "phantom"
-    : null;
-
-  const { chainId } = useWallet();
+  const [type, setType] = useState<StellarTxType | "all">("all");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [assetInput, setAssetInput] = useState("");
+  const asset = useDebounce(assetInput.trim(), 400);
 
   const {
     transactions,
-    filter,
-    setFilter,
-    currentPage,
-    totalPages,
-    goToPage,
-    isInitialLoading,
-    isRefreshing,
-    isAutoRefreshing,
-    isSlowRequest,
+    setFilters,
+    isLoading,
+    isLoadingMore,
+    hasMore,
     error,
-    newTxCount,
-    jumpToNewTransactions,
+    loadMore,
     refresh,
-  } = useTransactionHistory({
-    walletType: supportedWalletType,
-    address: isConnected ? address : null,
-    chainId,
+  } = useStellarTransactionHistory({ address: stellarAddress, network });
+
+  useEffect(() => {
+    setFilters({
+      type,
+      asset: asset || undefined,
+      from: from || undefined,
+      to: to || undefined,
+    });
+  }, [type, asset, from, to, setFilters]);
+
+  useRenderTiming("TransactionHistoryViewer", [transactions.length, isLoading]);
+
+  // Infinite scroll sentinel — keeps observing so each page that leaves the
+  // sentinel in view triggers the next one.
+  const { ref: sentinelRef, isIntersecting } = useIntersectionObserver<HTMLDivElement>({
+    rootMargin: "200px",
+    once: false,
+    enabled: hasMore,
   });
 
-  // Remove scroll to top since we are doing infinite scrolling
-  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (isIntersecting && hasMore && !isLoadingMore && !isLoading) loadMore();
+  }, [isIntersecting, hasMore, isLoadingMore, isLoading, loadMore]);
 
-  const handlePrev = useCallback(() => goToPage(currentPage - 1), [currentPage, goToPage]);
-  const handleNext = useCallback(() => goToPage(currentPage + 1), [currentPage, goToPage]);
+  const isFiltered = type !== "all" || !!asset || !!from || !!to;
 
-  // Count filter options
-  // These are derived from ALL transactions across all loaded pages for the badge
-  const allTxs = transactions; // already filtered for display, counts shown on tabs are approximate
-  const counts: Record<TxFilter, number> = {
-    all:      transactions.length,
-    sent:     transactions.filter((t) => t.direction === "outgoing").length,
-    received: transactions.filter((t) => t.direction === "incoming").length,
+  const clearFilters = () => {
+    setType("all");
+    setFrom("");
+    setTo("");
+    setAssetInput("");
   };
-
-  const isLoading = isRefreshing || (isInitialLoading && transactions.length === 0);
 
   return (
     <section
@@ -435,117 +210,155 @@ export default function TransactionHistoryViewer({ className = "" }: Transaction
     >
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2.5">
-          <h2 className="text-[15px] font-extrabold text-white uppercase tracking-wider">
-            Transaction History
-          </h2>
-          {isAutoRefreshing && (
-            <Loader2
-              className="w-3.5 h-3.5 text-muted animate-spin"
-              aria-label="Auto-refreshing"
-            />
-          )}
-        </div>
+        <h2 className="text-[15px] font-extrabold text-white uppercase tracking-wider">
+          Transaction History
+        </h2>
 
         <button
           onClick={refresh}
-          disabled={isInitialLoading || isRefreshing}
+          disabled={isLoading || !stellarAddress}
           aria-label="Refresh transaction history"
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border text-muted hover:text-white hover:border-brand/30 text-[12px] font-medium transition-all cursor-pointer disabled:opacity-50"
         >
-          <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? "animate-spin" : ""}`} aria-hidden />
+          <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
         </button>
       </div>
 
-      {/* ── New transactions banner ─────────────────────────────────────────── */}
-      {newTxCount > 0 && currentPage > 1 && (
-        <div
-          role="status"
-          aria-live="polite"
-          className="flex items-center justify-between gap-3 px-4 py-3 bg-brand/10 border border-brand/30 rounded-xl"
-        >
-          <div className="flex items-center gap-2 text-brand text-[13px] font-medium">
-            <Bell className="w-4 h-4" aria-hidden />
-            {newTxCount} new transaction{newTxCount !== 1 ? "s" : ""} available
-          </div>
-          <button
-            onClick={jumpToNewTransactions}
-            className="text-brand text-[12px] font-semibold hover:underline cursor-pointer"
-          >
-            View
-          </button>
-        </div>
-      )}
-
-      {/* ── Slow-request notice ─────────────────────────────────────────────── */}
-      {isSlowRequest && (
-        <p role="status" aria-live="polite" className="text-muted text-[12px]">
-          This is taking longer than expected. Please wait…
-        </p>
-      )}
-
-      {/* ── Error banner ────────────────────────────────────────────────────── */}
-      {error && (
-        <div
-          role="alert"
-          className="flex items-start justify-between gap-3 px-4 py-3 bg-error/10 border border-error/30 rounded-xl"
-        >
-          <div className="flex items-start gap-2 min-w-0">
-            <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" aria-hidden />
-            <div>
-              <p className="text-error text-[13px] font-medium">
-                {error.code === "RATE_LIMITED"
-                  ? "Rate limit exceeded."
-                  : error.code === "NETWORK_ERROR"
-                  ? "Network error — check your connection."
-                  : error.code === "INVALID_ADDRESS"
-                  ? "Wallet connection issue — reconnect your wallet."
-                  : "Failed to load transactions."}
-              </p>
-              <p className="text-error/70 text-[12px] mt-0.5">{sanitize(error.message)}</p>
-            </div>
-          </div>
-          <button
-            onClick={refresh}
-            className="shrink-0 text-error text-[12px] font-semibold hover:underline cursor-pointer"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {/* ── No wallet ───────────────────────────────────────────────────────── */}
-      {!isConnected || !supportedWalletType ? (
+      {!stellarAddress ? (
         <NoWalletState />
       ) : (
         <>
-          {/* ── Filter tabs (hidden when loading initial data) ─────────────── */}
-          {!isInitialLoading && (
-            <FilterTabs active={filter} onChange={setFilter} counts={counts} />
-          )}
-
-          {/* ── Transaction list ────────────────────────────────────────────── */}
-          <div ref={listRef} className="max-h-[600px] overflow-auto">
-            {isInitialLoading ? (
-              <SkeletonList />
-            ) : transactions.length === 0 ? (
-              <EmptyState filter={filter} />
-            ) : (
-              <VirtualTransactionList transactions={transactions} isLoading={isLoading} />
+          {/* ── Filters ────────────────────────────────────────────────────── */}
+          <div className="flex flex-wrap items-end gap-3" role="group" aria-label="Filter transactions">
+            <label className="flex flex-col gap-1 text-[11px] text-muted">
+              Type
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as StellarTxType | "all")}
+                className={inputClass}
+              >
+                {TYPE_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>
+                    {o.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-muted">
+              From
+              <input
+                type="date"
+                value={from}
+                max={to || undefined}
+                onChange={(e) => setFrom(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-muted">
+              To
+              <input
+                type="date"
+                value={to}
+                min={from || undefined}
+                onChange={(e) => setTo(e.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className="flex flex-col gap-1 text-[11px] text-muted">
+              Asset
+              <input
+                type="text"
+                placeholder="e.g. XLM"
+                value={assetInput}
+                maxLength={12}
+                onChange={(e) => setAssetInput(e.target.value)}
+                className={`${inputClass} w-28`}
+              />
+            </label>
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="text-[12px] text-muted hover:text-white underline cursor-pointer pb-1.5"
+              >
+                Clear filters
+              </button>
             )}
           </div>
 
-          {/* ── Infinite Scroll Trigger ───────────────────────────────────────── */}
-          {!isInitialLoading && transactions.length > 0 && currentPage < totalPages && (
-            <div className="py-4 flex justify-center">
+          {/* ── Error banner ────────────────────────────────────────────────── */}
+          {error && (
+            <div
+              role="alert"
+              className="flex items-start justify-between gap-3 px-4 py-3 bg-error/10 border border-error/30 rounded-xl"
+            >
+              <div className="flex items-start gap-2 min-w-0">
+                <AlertCircle className="w-4 h-4 text-error shrink-0 mt-0.5" aria-hidden />
+                <div>
+                  <p className="text-error text-[13px] font-medium">
+                    {error.code === "RATE_LIMITED"
+                      ? "Rate limit exceeded."
+                      : "Failed to load transactions."}
+                  </p>
+                  <p className="text-error/70 text-[12px] mt-0.5">{sanitize(error.message)}</p>
+                </div>
+              </div>
               <button
-                onClick={handleNext}
-                disabled={isLoading}
-                className="px-4 py-2 bg-surface-hover rounded-xl text-[12px] font-medium text-white hover:bg-brand/20 transition-colors"
+                onClick={refresh}
+                className="shrink-0 text-error text-[12px] font-semibold hover:underline cursor-pointer"
               >
-                {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : "Load More"}
+                Retry
               </button>
+            </div>
+          )}
+
+          {/* ── List ────────────────────────────────────────────────────────── */}
+          {isLoading ? (
+            <SkeletonTable rows={6} cols={7} showFilterBar={false} />
+          ) : transactions.length === 0 ? (
+            !error && <EmptyState filtered={isFiltered} />
+          ) : (
+            <div className="max-h-[600px] overflow-auto rounded-xl border border-border">
+              <table className="w-full text-left" aria-label="Transaction history">
+                <thead className="sticky top-0 bg-surface">
+                  <tr className="border-b border-border text-[11px] uppercase tracking-wider text-muted">
+                    <th scope="col" className="px-4 py-2 font-semibold">Date</th>
+                    <th scope="col" className="px-4 py-2 font-semibold">Type</th>
+                    <th scope="col" className="px-4 py-2 font-semibold text-right">Amount</th>
+                    <th scope="col" className="px-4 py-2 font-semibold">Asset</th>
+                    <th scope="col" className="px-4 py-2 font-semibold">Counterparty</th>
+                    <th scope="col" className="px-4 py-2 font-semibold">Status</th>
+                    <th scope="col" className="px-4 py-2 font-semibold text-right">
+                      <span className="sr-only">Explorer link</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map((tx) => (
+                    <TxRow key={tx.id} tx={tx} network={network} />
+                  ))}
+                </tbody>
+              </table>
+
+              {/* ── Infinite scroll sentinel ───────────────────────────────── */}
+              <div ref={sentinelRef} data-testid="tx-scroll-sentinel" aria-hidden className="h-px" />
+
+              {hasMore && (
+                <div className="py-4 flex justify-center">
+                  <button
+                    onClick={loadMore}
+                    disabled={isLoadingMore}
+                    className="px-4 py-2 bg-surface-hover rounded-xl text-[12px] font-medium text-white hover:bg-brand/20 transition-colors cursor-pointer"
+                  >
+                    {isLoadingMore ? (
+                      <Loader2 className="w-4 h-4 animate-spin" aria-label="Loading more" />
+                    ) : (
+                      "Load more"
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </>

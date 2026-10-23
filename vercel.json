@@ -39,6 +39,10 @@
   },
   "crons": [
     {
+      "path": "/api/cron",
+      "schedule": "*/5 * * * *"
+    },
+    {
       "path": "/api/cron/requeue-stalled-jobs",
       "schedule": "*/5 * * * *"
     },

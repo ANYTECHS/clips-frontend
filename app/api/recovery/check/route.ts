@@ -3,10 +3,9 @@
  *
  * Polls the status of a social recovery session.
  * - Returns approval counts and per-guardian status.
- * - When the approval threshold is met, reconstructs the encrypted backup
- *   from the guardian shares using Shamir's Secret Sharing and returns it.
- *   The client then decrypts the backup with their recovery password (fully
- *   client-side — the server never sees the plaintext key).
+ * - Stored shares are encrypted to each guardian's public key, so the server
+ *   cannot reconstruct anything here. Once enough guardians have released
+ *   their shares, the client submits them to POST /api/recovery/recover.
  *
  * Auth: the sessionId acts as a shared secret (only the account owner who
  *       initiated recovery has it — treat it like a short-lived token).
@@ -16,9 +15,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 
-import { logger } from "@/app/lib/logger";
 import { applyRateLimit } from "@/app/lib/serverRateLimit";
-import { combineShares } from "@/app/lib/shamirRecovery";
 
 import { getRecoveryRepository } from "../shared/recoveryStore";
 
@@ -58,31 +55,6 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   const totalCount = session.guardians.length;
   const isRecoverable = approvedCount >= session.threshold;
 
-  let encryptedBackup: string | null = null;
-
-  if (isRecoverable) {
-    // Collect the minimum number of shares needed to reconstruct the secret
-    const shareIds = approvedGuardians.slice(0, session.threshold).map((g) => g.shareId);
-
-    const shareValues: string[] = [];
-    for (const shareId of shareIds) {
-      const share = await repo.getShare(shareId);
-      if (share) shareValues.push(share);
-    }
-
-    if (shareValues.length >= session.threshold) {
-      try {
-        encryptedBackup = combineShares(shareValues.slice(0, session.threshold));
-      } catch (err) {
-        logger.error("[recovery/check] Failed to combine shares:", err);
-        return NextResponse.json(
-          { error: "Failed to reconstruct backup. Contact support." },
-          { status: 500 }
-        );
-      }
-    }
-  }
-
   return NextResponse.json({
     success: true,
     isRecoverable,
@@ -93,6 +65,8 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
       email: g.email,
       approved: g.approved,
     })),
-    encryptedBackup,
+    // Kept for response-shape compatibility; recombination now happens in
+    // POST /api/recovery/recover with guardian-released shares.
+    encryptedBackup: null,
   });
 }

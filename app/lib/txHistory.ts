@@ -412,3 +412,165 @@ export function formatTxTimestamp(ms: number): string {
     hour12: true,
   });
 }
+
+// ─── Stellar (GET /api/wallet/transactions) ────────────────────────────────────
+
+export type StellarTxType = "payment" | "mint" | "trustline" | "other";
+export type StellarTxStatus = "success" | "failed";
+export type StellarNetworkName = "testnet" | "mainnet";
+
+export interface StellarTransaction {
+  /** Horizon operation id (unique per row). */
+  id: string;
+  /** Transaction hash, used for explorer links. */
+  hash: string;
+  type: StellarTxType;
+  /** ISO-8601 timestamp. */
+  createdAt: string;
+  /** Human-readable amount, or null for operations without one (e.g. trustlines). */
+  amount: string | null;
+  /** Asset code, e.g. "XLM" or "USDC". */
+  asset: string;
+  /** The other party of the operation, when there is one. */
+  counterparty: string | null;
+  status: StellarTxStatus;
+  /** Horizon paging token — the cursor for the next page. */
+  pagingToken: string;
+}
+
+export interface StellarTxFilters {
+  type?: StellarTxType | "all";
+  asset?: string;
+  /** Inclusive start date (YYYY-MM-DD). */
+  from?: string;
+  /** Inclusive end date (YYYY-MM-DD). */
+  to?: string;
+}
+
+export interface StellarTxPage {
+  transactions: StellarTransaction[];
+  /** Pass back as `cursor` to load the next page; null when exhausted. */
+  nextCursor: string | null;
+}
+
+export const DEFAULT_STELLAR_TX_LIMIT = 20;
+
+/**
+ * Stellar Expert transaction URL for the given network. Defaults to the
+ * network configured by NEXT_PUBLIC_STELLAR_NETWORK.
+ */
+export function getStellarTxExplorerUrl(
+  hash: string,
+  network: StellarNetworkName = process.env.NEXT_PUBLIC_STELLAR_NETWORK === "mainnet"
+    ? "mainnet"
+    : "testnet"
+): string {
+  const segment = network === "mainnet" ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${segment}/tx/${encodeURIComponent(hash)}`;
+}
+
+/**
+ * Apply type / asset / date-range filters to Stellar transactions.
+ * Shared by the API route and the client so both agree on semantics.
+ */
+export function filterStellarTransactions(
+  txs: StellarTransaction[],
+  filters: StellarTxFilters
+): StellarTransaction[] {
+  const asset = filters.asset?.trim().toUpperCase();
+  const fromMs = filters.from ? Date.parse(`${filters.from}T00:00:00.000Z`) : null;
+  const toMs = filters.to ? Date.parse(`${filters.to}T23:59:59.999Z`) : null;
+
+  return txs.filter((tx) => {
+    if (filters.type && filters.type !== "all" && tx.type !== filters.type) return false;
+    if (asset && tx.asset.toUpperCase() !== asset) return false;
+    const ts = Date.parse(tx.createdAt);
+    if (fromMs !== null && !Number.isNaN(fromMs) && ts < fromMs) return false;
+    if (toMs !== null && !Number.isNaN(toMs) && ts > toMs) return false;
+    return true;
+  });
+}
+
+const STELLAR_CACHE_TTL_MS = 30_000;
+const STELLAR_CACHE_MAX_ENTRIES = 50;
+const stellarCache = new Map<string, { data: StellarTxPage; cachedAt: number }>();
+
+function stellarCacheKey(params: Record<string, string>): string {
+  return Object.keys(params)
+    .sort()
+    .map((k) => `${k}=${params[k]}`)
+    .join("&");
+}
+
+/** Clear cached Stellar pages (all, or only those for one address). */
+export function clearStellarTxCache(address?: string): void {
+  if (!address) {
+    stellarCache.clear();
+    return;
+  }
+  for (const key of stellarCache.keys()) {
+    if (key.includes(`publicKey=${address}`)) stellarCache.delete(key);
+  }
+}
+
+/**
+ * Fetch one cursor-paginated page of Stellar transactions from
+ * GET /api/wallet/transactions. Recent pages are cached for 30 s so
+ * re-renders, filter toggles and remounts don't re-hit the API.
+ */
+export async function fetchStellarTransactions(options: {
+  address: string;
+  network: StellarNetworkName;
+  cursor?: string | null;
+  limit?: number;
+  filters?: StellarTxFilters;
+  /** Skip the cache (e.g. manual refresh). */
+  force?: boolean;
+}): Promise<StellarTxPage> {
+  const { address, network, cursor, limit = DEFAULT_STELLAR_TX_LIMIT, filters = {}, force } =
+    options;
+  if (!address) {
+    throw new TxHistoryError("No wallet address provided.", "INVALID_ADDRESS");
+  }
+
+  const params: Record<string, string> = {
+    publicKey: address,
+    network,
+    limit: String(limit),
+  };
+  if (cursor) params.cursor = cursor;
+  if (filters.type && filters.type !== "all") params.type = filters.type;
+  if (filters.asset) params.asset = filters.asset.trim();
+  if (filters.from) params.from = filters.from;
+  if (filters.to) params.to = filters.to;
+
+  const key = stellarCacheKey(params);
+  const cached = stellarCache.get(key);
+  if (!force && cached && Date.now() - cached.cachedAt <= STELLAR_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
+  const res = await fetch(`/api/wallet/transactions?${new URLSearchParams(params).toString()}`);
+  if (res.status === 429) {
+    throw new TxHistoryError(
+      "Rate limit exceeded. Please wait a moment before retrying.",
+      "RATE_LIMITED"
+    );
+  }
+  if (!res.ok) {
+    throw new TxHistoryError(`Transaction request failed: ${res.status}`, "API_ERROR");
+  }
+
+  const data = (await res.json()) as StellarTxPage;
+  const page: StellarTxPage = {
+    transactions: Array.isArray(data.transactions) ? data.transactions : [],
+    nextCursor: data.nextCursor ?? null,
+  };
+
+  if (stellarCache.size >= STELLAR_CACHE_MAX_ENTRIES) {
+    const oldest = stellarCache.keys().next().value;
+    if (oldest !== undefined) stellarCache.delete(oldest);
+  }
+  stellarCache.set(key, { data: page, cachedAt: Date.now() });
+  return page;
+}

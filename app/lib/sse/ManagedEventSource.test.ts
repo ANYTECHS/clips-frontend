@@ -33,9 +33,9 @@ class FakeEventSource {
     this.closed = true;
   }
 
-  emit(type: string, data: string) {
+  emit(type: string, data: string, lastEventId = "") {
     for (const listener of this.listeners.get(type) ?? []) {
-      listener({ data } as unknown as Event);
+      listener({ data, lastEventId } as unknown as Event);
     }
   }
 
@@ -248,6 +248,61 @@ describe("ManagedEventSource", () => {
       FakeEventSource.latest.fail();
       jest.advanceTimersByTime(1_000);
       expect(FakeEventSource.instances).toHaveLength(before + 1);
+    });
+  });
+
+  describe("resuming with Last-Event-ID", () => {
+    it("does not send a resume point on a fresh connection", () => {
+      create();
+      expect(FakeEventSource.latest.url).toBe("/api/stream");
+    });
+
+    it("tracks the id of the last received frame", () => {
+      const connection = create({ listeners: { message: jest.fn() } });
+
+      FakeEventSource.latest.emit("message", "{}", "41");
+      FakeEventSource.latest.emit("message", "{}", "42");
+
+      expect(connection.lastEventId).toBe("42");
+    });
+
+    it("ignores frames without an id", () => {
+      const connection = create({ listeners: { message: jest.fn() } });
+
+      FakeEventSource.latest.emit("message", "{}", "7");
+      FakeEventSource.latest.emit("message", "{}");
+
+      expect(connection.lastEventId).toBe("7");
+    });
+
+    it("reconnects with the last event id so the server can replay missed frames", () => {
+      create({ initialRetryDelayMs: 1_000, listeners: { message: jest.fn() } });
+
+      FakeEventSource.latest.emit("message", "{}", "42");
+      FakeEventSource.latest.fail();
+      jest.advanceTimersByTime(1_000);
+
+      expect(FakeEventSource.latest.url).toBe("/api/stream?lastEventId=42");
+    });
+
+    it("appends to an existing query string and honours a custom parameter", () => {
+      create({
+        url: "/api/stream?userId=u1",
+        lastEventIdParam: "resume",
+        initialRetryDelayMs: 10,
+        listeners: { message: jest.fn() },
+      });
+
+      FakeEventSource.latest.emit("message", "{}", "5");
+      FakeEventSource.latest.fail();
+      jest.advanceTimersByTime(10);
+
+      expect(FakeEventSource.latest.url).toBe("/api/stream?userId=u1&resume=5");
+    });
+
+    it("uses initialLastEventId on the first connection", () => {
+      create({ initialLastEventId: "9" });
+      expect(FakeEventSource.latest.url).toBe("/api/stream?lastEventId=9");
     });
   });
 

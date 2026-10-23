@@ -2,12 +2,9 @@
 
 import { useEffect,useState } from "react";
 
+import { useOptionalNetworkContext } from "@/app/context/NetworkContext";
 import { FAILURE_MESSAGES, safeErrorMessage } from "@/app/lib/errorMessages";
-import {
-  getActiveNetworkConfig,
-  getFreighterNetwork,
-  getStellarNetwork,
-} from "@/app/lib/networkConfig";
+import { getFreighterNetwork, getStellarNetwork, NETWORK_CONFIGS } from "@/app/lib/networkConfig";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 import { Balance,getBalance } from "./useBalance";
@@ -50,8 +47,14 @@ export function useAutoStellarWallet(): AutoStellarWallet {
   // Derive public key from auth context (stored during signup/onboarding)
   const publicKey: string | null = (user?.profile?.stellarPublicKey as string) ?? null;
 
-  // Resolve the Horizon-compatible network identifier from the env config
-  const horizonNetwork = getFreighterNetwork(getStellarNetwork());
+  // Follow the runtime network switcher when available; otherwise fall back
+  // to the persisted override / NEXT_PUBLIC_STELLAR_NETWORK.
+  const networkContext = useOptionalNetworkContext();
+  const network = networkContext?.network ?? getStellarNetwork();
+  const walletDataVersion = networkContext?.walletDataVersion ?? 0;
+
+  // Resolve the Horizon-compatible network identifier from the active network
+  const horizonNetwork = getFreighterNetwork(network);
 
   useEffect(() => {
     if (!publicKey) {
@@ -86,12 +89,13 @@ export function useAutoStellarWallet(): AutoStellarWallet {
     return () => {
       cancelled = true;
     };
-  }, [publicKey, horizonNetwork]);
+    // walletDataVersion forces a reload after every network switch.
+  }, [publicKey, horizonNetwork, walletDataVersion]);
 
   return {
     publicKey,
-    network: getStellarNetwork(),
-    networkLabel: getActiveNetworkConfig().label,
+    network,
+    networkLabel: NETWORK_CONFIGS[network].label,
     status,
     balance,
     error,

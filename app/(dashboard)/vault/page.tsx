@@ -5,6 +5,8 @@ import dynamic from "next/dynamic";
 import VaultSidebar from "@/components/vault/VaultSidebar";
 import NFTGrid from "@/components/vault/NFTGrid";
 import { ChevronRight } from "lucide-react";
+import { useOptionalNetworkContext } from "@/app/context/NetworkContext";
+import { getFreighterNetwork, getStellarNetwork } from "@/app/lib/networkConfig";
 
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const MintConfigForm = dynamic(() => import("@/components/projects/MintConfigForm"), {
@@ -20,6 +22,7 @@ const MintConfigForm = dynamic(() => import("@/components/projects/MintConfigFor
 });
 
 export default function VaultPage() {
+  const network = useOptionalNetworkContext()?.network ?? getStellarNetwork();
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState<"pending" | "listed" | "history">("pending");
   const [showMintPanel, setShowMintPanel] = useState(false);
@@ -49,7 +52,7 @@ export default function VaultPage() {
       const buildRes = await fetch("/api/nft/mint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, publicKey })
+        body: JSON.stringify({ ...data, publicKey, network })
       });
       if (!buildRes.ok) {
         const errorData = await buildRes.json();
@@ -59,7 +62,7 @@ export default function VaultPage() {
 
       // 3. Sign the transaction
       const signedXdr = await freighter.signTransaction(xdr, {
-        network: "TESTNET", // or use networkPassphrase to derive it
+        network: getFreighterNetwork(network),
         accountToSign: publicKey
       });
       if (!signedXdr) throw new Error("Failed to sign transaction.");
@@ -68,7 +71,7 @@ export default function VaultPage() {
       const submitRes = await fetch("/api/nft/mint", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...data, signedXdr })
+        body: JSON.stringify({ ...data, signedXdr, network })
       });
       if (!submitRes.ok) {
         const errorData = await submitRes.json();

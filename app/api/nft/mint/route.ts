@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/app/lib/auth";
 import { STELLAR_NETWORKS, StellarNetwork } from "@/app/lib/embeddedWallet";
 import { logger } from "@/app/lib/logger";
+import { getNftContractId } from "@/app/lib/networkConfig";
 import { buildTransactionEnvelope, submitEnvelope } from "@/app/lib/stellarTransaction";
 
 // Helper to simulate the response logic since we might not have a real Soroban contract deployed in tests
@@ -17,8 +18,15 @@ export async function POST(request: NextRequest) {
     const { publicKey, signedXdr, collectionName, description, listingPrice, creatorRoyalty } =
       body;
 
-    const network = (process.env.NEXT_PUBLIC_STELLAR_NETWORK || "testnet") as StellarNetwork;
-    const contractId = process.env.NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID || "CC_MOCK_CONTRACT_ID";
+    // Honour the client's runtime network switch; fall back to the env default.
+    const requestedNetwork = body.network;
+    const network = (
+      requestedNetwork === "mainnet" || requestedNetwork === "testnet"
+        ? requestedNetwork
+        : process.env.NEXT_PUBLIC_STELLAR_NETWORK || "testnet"
+    ) as StellarNetwork;
+    // NEXT_PUBLIC_STELLAR_NFT_CONTRACT_ID_MAINNET on mainnet, the testnet ID otherwise.
+    const contractId = getNftContractId(network) || "CC_MOCK_CONTRACT_ID";
 
     // 1. Build Phase
     if (!signedXdr) {

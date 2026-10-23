@@ -15,14 +15,25 @@
  *
  * Pagination: each page requests 50 txs from the API and then slices them
  * into PAGE_SIZE (20) display rows, following spec req 6.1.
+ *
+ * useStellarTransactionHistory (below) is the Stellar variant: it loads
+ * cursor-paginated pages from GET /api/wallet/transactions, supports
+ * type / date-range / asset filters, and exposes `loadMore` for infinite
+ * scroll.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  clearStellarTxCache,
+  clearTxCache,
+  DEFAULT_STELLAR_TX_LIMIT,
+  fetchStellarTransactions,
   fetchTransactionHistory,
   filterTransactions,
-  clearTxCache,
   TxHistoryError,
+  type StellarNetworkName,
+  type StellarTransaction,
+  type StellarTxFilters,
   type Transaction,
   type TxFilter,
   type WalletType,
@@ -348,6 +359,148 @@ export function useTransactionHistory({
     error,
     newTxCount,
     jumpToNewTransactions,
+    refresh,
+  };
+}
+
+// ─── Stellar history (cursor pagination) ───────────────────────────────────────
+
+export interface UseStellarTransactionHistoryOptions {
+  address: string | null;
+  network: StellarNetworkName;
+  /** Page size requested from the API. */
+  limit?: number;
+  initialFilters?: StellarTxFilters;
+}
+
+export interface UseStellarTransactionHistoryResult {
+  transactions: StellarTransaction[];
+  filters: StellarTxFilters;
+  setFilters: (filters: StellarTxFilters) => void;
+  /** True while the first page for the current filters is loading. */
+  isLoading: boolean;
+  /** True while a subsequent page is loading. */
+  isLoadingMore: boolean;
+  hasMore: boolean;
+  error: TxHistoryError | null;
+  /** Fetch the next page, if any. Safe to call repeatedly. */
+  loadMore: () => void;
+  /** Drop cached pages and reload from the first page. */
+  refresh: () => void;
+}
+
+function toTxError(err: unknown): TxHistoryError {
+  return err instanceof TxHistoryError
+    ? err
+    : new TxHistoryError(err instanceof Error ? err.message : "Unknown error", "UNKNOWN");
+}
+
+export function useStellarTransactionHistory({
+  address,
+  network,
+  limit = DEFAULT_STELLAR_TX_LIMIT,
+  initialFilters = { type: "all" },
+}: UseStellarTransactionHistoryOptions): UseStellarTransactionHistoryResult {
+  const [transactions, setTransactions] = useState<StellarTransaction[]>([]);
+  const [filters, setFiltersState] = useState<StellarTxFilters>(initialFilters);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [error, setError] = useState<TxHistoryError | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Bumped on every reset so responses for stale filters/addresses are dropped.
+  const requestIdRef = useRef(0);
+  const loadingMoreRef = useRef(false);
+  const forceRef = useRef(false);
+
+  const filterKey = JSON.stringify(filters);
+
+  // First page whenever the address, network or filters change.
+  useEffect(() => {
+    const requestId = ++requestIdRef.current;
+    setTransactions([]);
+    setNextCursor(null);
+    setHasMore(false);
+    setError(null);
+    loadingMoreRef.current = false;
+    setIsLoadingMore(false);
+
+    if (!address) {
+      setIsLoading(false);
+      return;
+    }
+
+    const force = forceRef.current;
+    forceRef.current = false;
+    setIsLoading(true);
+    fetchStellarTransactions({ address, network, limit, filters, force })
+      .then((page) => {
+        if (requestId !== requestIdRef.current) return;
+        setTransactions(page.transactions);
+        setNextCursor(page.nextCursor);
+        setHasMore(page.nextCursor !== null);
+      })
+      .catch((err) => {
+        if (requestId !== requestIdRef.current) return;
+        const txErr = toTxError(err);
+        logger.error("[useStellarTransactionHistory] fetch error:", txErr);
+        setError(txErr);
+      })
+      .finally(() => {
+        if (requestId === requestIdRef.current) setIsLoading(false);
+      });
+    // filterKey stands in for `filters` so a new-but-equal object doesn't refetch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address, network, limit, filterKey, reloadKey]);
+
+  const loadMore = useCallback(() => {
+    if (!address || !nextCursor || loadingMoreRef.current || isLoading) return;
+    const requestId = requestIdRef.current;
+    loadingMoreRef.current = true;
+    setIsLoadingMore(true);
+
+    fetchStellarTransactions({ address, network, limit, filters, cursor: nextCursor })
+      .then((page) => {
+        if (requestId !== requestIdRef.current) return;
+        setTransactions((prev) => {
+          const seen = new Set(prev.map((tx) => tx.id));
+          return [...prev, ...page.transactions.filter((tx) => !seen.has(tx.id))];
+        });
+        setNextCursor(page.nextCursor);
+        setHasMore(page.nextCursor !== null);
+      })
+      .catch((err) => {
+        if (requestId !== requestIdRef.current) return;
+        setError(toTxError(err));
+      })
+      .finally(() => {
+        if (requestId !== requestIdRef.current) return;
+        loadingMoreRef.current = false;
+        setIsLoadingMore(false);
+      });
+  }, [address, network, limit, filters, nextCursor, isLoading]);
+
+  const setFilters = useCallback((next: StellarTxFilters) => {
+    setFiltersState(next);
+  }, []);
+
+  const refresh = useCallback(() => {
+    if (address) clearStellarTxCache(address);
+    forceRef.current = true;
+    setReloadKey((k) => k + 1);
+  }, [address]);
+
+  return {
+    transactions,
+    filters,
+    setFilters,
+    isLoading,
+    isLoadingMore,
+    hasMore,
+    error,
+    loadMore,
     refresh,
   };
 }

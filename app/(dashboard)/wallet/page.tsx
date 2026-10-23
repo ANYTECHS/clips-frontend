@@ -41,6 +41,14 @@ const AssetRow = dynamic(() => import("@/components/wallet/AssetRow"), {
   loading: () => <div className="h-14 border-b border-border animate-pulse" />,
 });
 
+const TrustlineManager = dynamic(
+  () => import("@/components/wallet/TrustlineManager").then((m) => m.TrustlineManager),
+  {
+    ssr: false,
+    loading: () => <div className="bg-surface border border-border rounded-[24px] h-[160px] animate-pulse" />,
+  }
+);
+
 const ASSET_COLORS = ["#00FF9D", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#06B6D4"];
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -300,6 +308,9 @@ export default function WalletPortfolioPage() {
                   </>
                 )}
               </div>
+
+              {/* Trustlines */}
+              <TrustlineManager publicKey={publicKey} />
             </>
           )}
         </div>

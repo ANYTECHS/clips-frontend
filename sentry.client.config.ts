@@ -13,7 +13,7 @@
 import * as Sentry from "@sentry/nextjs";
 import {
   sanitizeBreadcrumb,
-  sanitizeSentryContexts,
+  sanitizeSentryEvent,
 } from "@/app/lib/sentryRedaction";
 
 Sentry.init({
@@ -32,11 +32,7 @@ Sentry.init({
       delete event.request.headers;
     }
 
-    if (event.contexts) {
-      sanitizeSentryContexts(event.contexts);
-    }
-
-    return event;
+    return sanitizeSentryEvent(event);
   },
 
   beforeBreadcrumb(breadcrumb) {

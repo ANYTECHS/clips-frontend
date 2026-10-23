@@ -55,12 +55,13 @@ function hasEncryptedWalletEntries(): boolean {
 }
 
 /**
- * Derives a symmetric AES-GCM encryption key using the Web Crypto API, PBKDF2, and a persistent salt.
+ * Returns the persistent base64 salt managed by CryptoSaltInitializer,
+ * creating it on first use.
  *
- * @returns Resolves with the derived CryptoKey instance configured for symmetric encryption and decryption.
- * @throws {Error} Thrown if window context elements or modern cryptography primitives are absent.
+ * @returns The base64-encoded salt string.
+ * @throws {Error} Thrown outside a browser context.
  */
-const getCryptoKey = async (): Promise<CryptoKey> => {
+export function getCryptoSalt(): string {
   if (typeof window === 'undefined') throw new Error('Crypto not available');
   migrateCryptoSalt();
   let salt = localStorage.getItem(CRYPTO_SALT_KEY);
@@ -73,6 +74,17 @@ const getCryptoKey = async (): Promise<CryptoKey> => {
         'Unable to decrypt stored wallet data. Close this tab and reopen the app in the same browser session, or restore your wallet from backup.';
     }
   }
+  return salt;
+}
+
+/**
+ * Derives a symmetric AES-GCM encryption key using the Web Crypto API, PBKDF2, and a persistent salt.
+ *
+ * @returns Resolves with the derived CryptoKey instance configured for symmetric encryption and decryption.
+ * @throws {Error} Thrown if window context elements or modern cryptography primitives are absent.
+ */
+const getCryptoKey = async (): Promise<CryptoKey> => {
+  const salt = getCryptoSalt();
   const appId = 'clipcash-secure-storage-v1';
   const passwordMaterial = await crypto.subtle.importKey(
     'raw',
