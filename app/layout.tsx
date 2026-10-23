@@ -6,6 +6,7 @@ import { AuthProvider } from "@/components/auth/AuthProvider";
 import { WalletProvider } from "@/components/wallet/WalletProvider";
 import { StellarWalletProvider } from "@/components/StellarWalletProvider";
 import { NetworkProvider } from "@/app/context/NetworkContext";
+import { MainnetBanner } from "@/components/MainnetBanner";
 import { ThemeProvider } from "@/components/theme-provider";
 import { ToastProvider } from "@/components/ToastProvider";
 import { I18nProvider } from "@/app/lib/i18n/I18nProvider";
@@ -114,6 +115,7 @@ export default function RootLayout({
                           <AnalyticsProvider />
                           <ServiceWorkerRegistrar />
                           <KeyboardShortcuts />
+                          <MainnetBanner />
                           {children}
                           <RateLimitToast />
                         </StellarWalletProvider>

@@ -31,7 +31,7 @@ export default function TransactionHistoryPage() {
             Transaction History
           </h1>
           <p className="text-muted text-[13px] mt-1">
-            Your on-chain activity from MetaMask and Phantom wallets
+            Payments, NFT mints and trustlines from your Stellar wallet
           </p>
         </div>
       </div>

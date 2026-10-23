@@ -129,5 +129,11 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
   guardian.approved = true;
   await repo.saveSession(sessionId, session);
 
-  return NextResponse.redirect(`${appUrl}/recovery?approval=success`);
+  // Hand the guardian off to the share tool so they can decrypt their share.
+  const params = new URLSearchParams({
+    approval: "success",
+    session: sessionId,
+    guardian: guardian.email,
+  });
+  return NextResponse.redirect(`${appUrl}/recovery?${params.toString()}`);
 }

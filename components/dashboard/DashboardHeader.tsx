@@ -7,6 +7,8 @@ import { useI18n } from "@/app/lib/i18n/I18nProvider";
 import { sanitize } from "@/app/lib/sanitize";
 import { selectUserName, useUserStore } from "@/app/store";
 import PlanUsage from "@/components/dashboard/PlanUsage";
+import { useTheme } from "@/components/theme-provider";
+import { NetworkSwitcher } from "@/components/wallet/NetworkSwitcher";
 import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
 import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
 
@@ -141,6 +143,9 @@ const DashboardHeader = memo(function DashboardHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        {/* Active Stellar network — mainnet requires typed confirmation */}
+        <NetworkSwitcher />
+
         {/* Theme Toggle */}
         <button
           type="button"
@@ -228,7 +233,6 @@ const DashboardHeader = memo(function DashboardHeader({
                   </div>
                 </div>
               )}
-              </div>
             </div>
           )}
         </div>

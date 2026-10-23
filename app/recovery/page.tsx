@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import React, { useRef,useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { decryptWithPassword } from "@/app/lib/cryptoUtils";
 import { FAILURE_MESSAGES, safeErrorMessage, VALIDATION_MESSAGES } from "@/app/lib/errorMessages";
@@ -24,6 +24,7 @@ import { secureStorage } from "@/app/lib/secureStorage";
 import { restoreWalletFromMnemonic } from "@/app/lib/stellar";
 import { useAuth } from "@/components/auth/AuthProvider";
 import BackgroundOrbs from "@/components/layout/BackgroundOrbs";
+import { GuardianShareTool } from "@/components/SocialRecoveryConfig/GuardianShareTool";
 import { useWalletActions } from "@/components/wallet/WalletProvider";
 
 export default function RecoveryPage() {
@@ -33,7 +34,9 @@ export default function RecoveryPage() {
   // changes (connection status, address, etc.) elsewhere in the app.
   const { importStellarKey, connectStellar } = useWalletActions();
 
-  const [activeTab, setActiveTab] = useState<"mnemonic" | "social" | "encrypted">("mnemonic");
+  const [activeTab, setActiveTab] = useState<"mnemonic" | "social" | "encrypted" | "guardian">(
+    "mnemonic"
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -54,10 +57,57 @@ export default function RecoveryPage() {
   const [recoveryGuardianCount, setRecoveryGuardianCount] = useState(0);
   const [isRecoverable, setIsRecoverable] = useState(false);
   const [recoveryPassword, setRecoveryPassword] = useState("");
-  const [simulating, setSimulating] = useState(false);
-  // Next.js replaces process.env.NODE_ENV at build time, so this button is
-  // compiled out entirely in production builds — it never ships to users.
-  const isDev = process.env.NODE_ENV !== "production";
+  const [verificationToken, setVerificationToken] = useState("");
+  const [guardianShares, setGuardianShares] = useState<Record<string, string>>({});
+  const [refreshing, setRefreshing] = useState(false);
+  const [guardianLink, setGuardianLink] = useState({ session: "", guardian: "" });
+
+  const collectedShares = Object.values(guardianShares)
+    .map((s) => s.trim())
+    .filter(Boolean);
+
+  const applyStatus = (status: {
+    guardians: { email: string; approved: boolean }[];
+    threshold: number;
+    totalCount: number;
+    isRecoverable: boolean;
+  }) => {
+    setGuardians(status.guardians.map((g) => ({ email: g.email, approved: g.approved })));
+    setRecoveryThreshold(status.threshold);
+    setRecoveryGuardianCount(status.totalCount);
+    setIsRecoverable(status.isRecoverable);
+  };
+
+  // Deep links: guardians land here from their approval email, and the owner
+  // lands here from their email verification link. Read from window.location
+  // so the page does not need a Suspense boundary for useSearchParams.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const session = params.get("session") ?? "";
+    const guardian = params.get("guardian");
+    const verify = params.get("verify");
+
+    if (guardian) {
+      setGuardianLink({ session, guardian });
+      setActiveTab("guardian");
+      return;
+    }
+
+    if (session && verify) {
+      setActiveTab("social");
+      setSessionId(session);
+      setVerificationToken(verify);
+      fetch(`/api/recovery/check?sessionId=${encodeURIComponent(session)}`)
+        .then(async (r) => {
+          if (!r.ok) throw new Error((await r.json()).error ?? "Recovery check failed");
+          applyStatus(await r.json());
+        })
+        .catch((err) => {
+          setSessionId("");
+          setError(safeErrorMessage(err, FAILURE_MESSAGES.findSocialRecovery, "load recovery"));
+        });
+    }
+  }, []);
 
   const handleMnemonicRecovery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -135,6 +185,7 @@ export default function RecoveryPage() {
       setRecoveryThreshold(res.threshold);
       setRecoveryGuardianCount(res.guardianCount);
       setIsRecoverable(false);
+      setGuardianShares({});
     } catch (err: any) {
       setError(safeErrorMessage(err, FAILURE_MESSAGES.findSocialRecovery, "find social recovery"));
     } finally {
@@ -142,50 +193,18 @@ export default function RecoveryPage() {
     }
   };
 
-  const handleSimulateApprovals = async () => {
-    if (!sessionId || guardians.length === 0) return;
-    setSimulating(true);
+  const handleRefreshApprovals = async () => {
+    if (!sessionId) return;
+    setRefreshing(true);
     setError("");
-
     try {
-      // Simulate Guardian 1 approving
-      await new Promise((r) => setTimeout(r, 1000));
-      let r = await fetch("/api/recovery/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, guardianEmail: guardians[0].email }),
-      });
-      let res = await r.json();
-      setGuardians(
-        res.guardians.map((g: { email: string; approved: boolean }) => ({
-          email: g.email,
-          approved: g.approved,
-        }))
-      );
-
-      await new Promise((r) => setTimeout(r, 1200));
-      r = await fetch("/api/recovery/approve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, guardianEmail: guardians[1].email }),
-      });
-      res = await r.json();
-      setGuardians(
-        res.guardians.map((g: { email: string; approved: boolean }) => ({
-          email: g.email,
-          approved: g.approved,
-        }))
-      );
-
-      // Verify recovery capability
-      const statusR = await fetch(`/api/recovery/check?sessionId=${encodeURIComponent(sessionId)}`);
-      const status = await statusR.json();
-      setIsRecoverable(status.isRecoverable);
-      setSuccess("Threshold reached! Guardians have approved your request.");
+      const r = await fetch(`/api/recovery/check?sessionId=${encodeURIComponent(sessionId)}`);
+      if (!r.ok) throw new Error((await r.json()).error ?? "Recovery check failed");
+      applyStatus(await r.json());
     } catch (err: any) {
-      setError(safeErrorMessage(err, FAILURE_MESSAGES.simulationFailed, "simulate recovery"));
+      setError(safeErrorMessage(err, FAILURE_MESSAGES.findSocialRecovery, "refresh approvals"));
     } finally {
-      setSimulating(false);
+      setRefreshing(false);
     }
   };
 
@@ -194,6 +213,16 @@ export default function RecoveryPage() {
     setError("");
     setSuccess("");
 
+    if (!verificationToken.trim()) {
+      setError("Open the verification link sent to your email, or paste its token below.");
+      return;
+    }
+    if (collectedShares.length < recoveryThreshold) {
+      setError(
+        `Collect at least ${recoveryThreshold} guardian shares (${collectedShares.length} entered).`
+      );
+      return;
+    }
     if (!recoveryPassword) {
       setError(VALIDATION_MESSAGES.recoveryPasswordRequired);
       return;
@@ -201,16 +230,23 @@ export default function RecoveryPage() {
 
     setLoading(true);
     try {
-      // 1. Fetch encrypted backup from session
-      const r = await fetch(`/api/recovery/check?sessionId=${encodeURIComponent(sessionId)}`);
-      if (!r.ok) throw new Error((await r.json()).error ?? "Recovery check failed");
-      const status = await r.json();
-      if (!status.isRecoverable || !status.encryptedBackup) {
-        throw new Error("Social recovery is not approved yet.");
+      // 1. Combine the guardian-released shares server-side (email verified)
+      const r = await fetch("/api/recovery/recover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          sessionId,
+          verificationToken: verificationToken.trim(),
+          shares: collectedShares,
+        }),
+      });
+      const res = await r.json();
+      if (!r.ok || !res.recoveredKey) {
+        throw new Error(res.error ?? "Recovery failed");
       }
 
-      // 2. Decrypt the key using user's password
-      const decryptedBackup = await decryptWithPassword(status.encryptedBackup, recoveryPassword);
+      // 2. Decrypt the recovered backup locally with the user's password
+      const decryptedBackup = await decryptWithPassword(res.recoveredKey, recoveryPassword);
 
       // 3. Restore and set session
       let wallet;
@@ -398,6 +434,20 @@ export default function RecoveryPage() {
             </button>
           </div>
 
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab("guardian");
+              setError("");
+              setSuccess("");
+            }}
+            className={`w-full -mt-3 mb-6 text-[10px] font-bold transition-colors cursor-pointer ${
+              activeTab === "guardian" ? "text-brand" : "text-muted-foreground hover:text-white"
+            }`}
+          >
+            Are you a guardian? Manage your guardian key or release a share
+          </button>
+
           {error && (
             <div className="mb-5 p-4 rounded-xl bg-red-950/45 border border-red-500/20 flex gap-2.5 items-start">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
@@ -537,6 +587,13 @@ export default function RecoveryPage() {
             </form>
           )}
 
+          {activeTab === "guardian" && (
+            <GuardianShareTool
+              initialSessionId={guardianLink.session}
+              initialGuardianEmail={guardianLink.guardian}
+            />
+          )}
+
           {/* Tab 3: Social Recovery Form */}
           {activeTab === "social" && (
             <div className="space-y-5">
@@ -581,96 +638,139 @@ export default function RecoveryPage() {
                 </form>
               ) : (
                 <div className="space-y-6">
-                  {/* Guardian approval tracking */}
+                  {/* Step 1: email verification */}
+                  <div className="space-y-2">
+                    <label
+                      htmlFor="verification-token"
+                      className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5"
+                    >
+                      <Mail className="w-3.5 h-3.5 text-brand" /> 1. Verify your email
+                    </label>
+                    <p className="text-[10px] text-muted-foreground leading-normal">
+                      We sent a verification link to your account email. Open it on this device,
+                      or paste the token from the link here.
+                    </p>
+                    <input
+                      id="verification-token"
+                      type="text"
+                      placeholder="Verification token"
+                      value={verificationToken}
+                      onChange={(e) => setVerificationToken(e.target.value)}
+                      className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors font-mono"
+                    />
+                  </div>
+
+                  {/* Step 2: request shares from guardians */}
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-                        <Users className="w-3.5 h-3.5 text-brand" /> Guardian Approvals
+                        <Users className="w-3.5 h-3.5 text-brand" /> 2. Collect guardian shares
                       </span>
                       <span className="text-[10px] font-mono text-brand font-bold bg-brand/10 border border-brand/20 px-2.5 py-0.5 rounded-full">
-                        {guardians.filter((g) => g.approved).length} / {recoveryThreshold} required
-                        ({recoveryThreshold}-of-{recoveryGuardianCount})
+                        {collectedShares.length} / {recoveryThreshold} required ({recoveryThreshold}
+                        -of-{recoveryGuardianCount})
                       </span>
                     </div>
+                    <p className="text-[10px] text-muted-foreground leading-normal">
+                      Each guardian received an approval email. After approving, they decrypt
+                      their share with their guardian key and send it to you. Ask at least{" "}
+                      {recoveryThreshold} guardians, then paste each share below. Session ID to
+                      share with guardians: <span className="font-mono text-white">{sessionId}</span>
+                    </p>
 
                     <div className="bg-[#111613] border border-white/5 rounded-xl divide-y divide-white/5 overflow-hidden">
                       {guardians.map((guardian, i) => (
-                        <div
-                          key={i}
-                          className="px-4 py-3 flex items-center justify-between text-xs"
-                        >
-                          <span className="text-white font-medium truncate max-w-[200px]">
-                            {guardian.email}
-                          </span>
-                          <span
-                            className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase ${
-                              guardian.approved
-                                ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
-                                : "bg-yellow-500/5 text-yellow-400 border border-yellow-500/20"
-                            }`}
-                          >
-                            {guardian.approved ? "Approved" : "Pending"}
-                          </span>
+                        <div key={guardian.email} className="px-4 py-3 space-y-2 text-xs">
+                          <div className="flex items-center justify-between">
+                            <span className="text-white font-medium truncate max-w-[200px]">
+                              {guardian.email}
+                            </span>
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase ${
+                                guardianShares[guardian.email]?.trim()
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/25"
+                                  : guardian.approved
+                                    ? "bg-brand/10 text-brand border border-brand/25"
+                                    : "bg-yellow-500/5 text-yellow-400 border border-yellow-500/20"
+                              }`}
+                            >
+                              {guardianShares[guardian.email]?.trim()
+                                ? "Share received"
+                                : guardian.approved
+                                  ? "Approved"
+                                  : "Pending"}
+                            </span>
+                          </div>
+                          <textarea
+                            aria-label={`Share from guardian ${i + 1}`}
+                            rows={2}
+                            placeholder="Paste the share this guardian sent you"
+                            value={guardianShares[guardian.email] ?? ""}
+                            onChange={(e) =>
+                              setGuardianShares((prev) => ({
+                                ...prev,
+                                [guardian.email]: e.target.value,
+                              }))
+                            }
+                            className="w-full bg-black/30 border border-white/5 text-white focus:border-brand/40 rounded-lg px-3 py-2 text-[10px] font-mono focus:outline-none focus-visible:ring-2 focus-visible:ring-brand resize-none"
+                          />
                         </div>
                       ))}
                     </div>
-                  </div>
 
-                  {isDev && !isRecoverable && (
                     <button
                       type="button"
-                      onClick={handleSimulateApprovals}
-                      disabled={simulating}
-                      className="w-full py-3.5 rounded-xl bg-white text-black font-extrabold text-xs hover:bg-zinc-200 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
+                      onClick={handleRefreshApprovals}
+                      disabled={refreshing}
+                      className="w-full py-3 rounded-xl bg-white/5 border border-white/5 text-white font-bold text-xs hover:border-brand/25 transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
                     >
-                      {simulating ? (
+                      <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} />
+                      Refresh guardian approvals
+                      {isRecoverable ? " (threshold approved)" : ""}
+                    </button>
+                  </div>
+
+                  {/* Step 3: combine + decrypt */}
+                  <form
+                    onSubmit={handleCompleteSocialRecovery}
+                    className="space-y-4 pt-2 border-t border-white/5"
+                  >
+                    <div className="space-y-2">
+                      <label
+                        htmlFor="recovery-password"
+                        className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"
+                      >
+                        <Lock className="w-3.5 h-3.5 text-brand" /> 3. Decrypt Recovery Secret
+                      </label>
+                      <input
+                        id="recovery-password"
+                        type="password"
+                        placeholder="Enter your recovery password"
+                        value={recoveryPassword}
+                        onChange={(e) => setRecoveryPassword(e.target.value)}
+                        className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={
+                        loading ||
+                        !recoveryPassword ||
+                        !verificationToken ||
+                        collectedShares.length < recoveryThreshold
+                      }
+                      className="w-full py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-40"
+                    >
+                      {loading ? (
                         <>
-                          <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Gathering Guardian
-                          Signatures...
+                          <Loader2 className="w-4 h-4 animate-spin" /> Recovering Keypair...
                         </>
                       ) : (
-                        "Simulate Guardian Approvals"
+                        "Combine Shares & Restore Wallet"
                       )}
                     </button>
-                  )}
-
-                  {isRecoverable && (
-                    <form
-                      onSubmit={handleCompleteSocialRecovery}
-                      className="space-y-4 pt-2 border-t border-white/5 animate-in fade-in slide-in-from-top-2 duration-300"
-                    >
-                      <div className="space-y-2">
-                        <label
-                          htmlFor="recovery-password"
-                          className="block text-[11px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-1"
-                        >
-                          <Lock className="w-3.5 h-3.5 text-brand" /> Decrypt Recovery Secret
-                        </label>
-                        <input
-                          id="recovery-password"
-                          type="password"
-                          placeholder="Enter your recovery password"
-                          value={recoveryPassword}
-                          onChange={(e) => setRecoveryPassword(e.target.value)}
-                          className="w-full bg-[#111613] border border-white/5 text-white focus:border-brand/40 rounded-xl px-4 py-3.5 text-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-brand transition-colors"
-                        />
-                      </div>
-
-                      <button
-                        type="submit"
-                        disabled={loading || !recoveryPassword}
-                        className="w-full py-4 rounded-xl bg-brand hover:bg-brand-hover text-black font-extrabold text-[14px] flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer"
-                      >
-                        {loading ? (
-                          <>
-                            <Loader2 className="w-4 h-4 animate-spin" /> Decrypting Keypair...
-                          </>
-                        ) : (
-                          "Decrypt & Restore Wallet"
-                        )}
-                      </button>
-                    </form>
-                  )}
+                  </form>
                 </div>
               )}
             </div>

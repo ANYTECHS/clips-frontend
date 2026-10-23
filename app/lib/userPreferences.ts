@@ -427,9 +427,21 @@ export const NetworkPreferenceStorage = {
     return null;
   },
 
+  /**
+   * Persists the active network both as the user's `wallet.defaultNetwork`
+   * preference and under the legacy override key read at startup.
+   */
   set: (network: StellarNetwork): void => {
     if (typeof window !== "undefined") {
-      localStorage.setItem(NETWORK_OVERRIDE_KEY, network);
+      const current = UserPreferencesStorage.get();
+      UserPreferencesStorage.set({ wallet: { ...current.wallet, defaultNetwork: network } });
+      // UserPreferencesStorage.set swallows storage errors; write the
+      // override key directly too so the switch still applies this session.
+      try {
+        localStorage.setItem(NETWORK_OVERRIDE_KEY, network);
+      } catch {
+        // Ignore storage errors
+      }
     }
   },
 

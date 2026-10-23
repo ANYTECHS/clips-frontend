@@ -55,3 +55,32 @@ export async function sendGuardianApprovalEmail(payload: GuardianEmailPayload): 
   );
   return true;
 }
+
+export interface OwnerVerificationEmailPayload {
+  /** Account owner's email address. */
+  to: string;
+  /** Recovery session the verification token is bound to. */
+  sessionId: string;
+  /** Signed email verification token (see app/lib/emailVerification.ts). */
+  verificationToken: string;
+  /** ISO timestamp when the session expires. */
+  expiresAt: string;
+}
+
+/**
+ * Sends the account owner a link proving they control the account email.
+ * `POST /api/recovery/recover` refuses to combine shares without this token.
+ */
+export async function sendOwnerVerificationEmail(
+  payload: OwnerVerificationEmailPayload
+): Promise<boolean> {
+  const { to, sessionId, verificationToken, expiresAt } = payload;
+  const appUrl = process.env.NEXTAUTH_URL ?? "http://localhost:3000";
+  const verifyUrl =
+    `${appUrl}/recovery?session=${encodeURIComponent(sessionId)}` +
+    `&verify=${encodeURIComponent(verificationToken)}`;
+
+  // Stub: logs instead of sending, so this is safe to run with no email setup.
+  logger.info(`[recovery-mailer] Owner verification to=${to} | url=${verifyUrl} | expires=${expiresAt}`);
+  return true;
+}

@@ -2,6 +2,7 @@ import type { Preview } from "@storybook/nextjs-vite";
 import "../app/globals.css";
 import { SessionProvider } from "next-auth/react";
 import type { Session } from "next-auth";
+import { NetworkProvider } from "../app/context/NetworkContext";
 import { I18nProvider } from "../app/lib/i18n/I18nProvider";
 import { AuthProvider } from "../components/auth/AuthProvider";
 
@@ -44,14 +45,16 @@ const preview: Preview = {
   },
   decorators: [
     // App-wide providers that components read from via hooks
-    // (useSession, useAuth, useI18n).
+    // (useSession, useAuth, useI18n, useNetworkContext).
     (Story) => (
       <SessionProvider session={mockSession} refetchOnWindowFocus={false}>
         <AuthProvider>
           <I18nProvider>
-            <div className="min-h-screen bg-background text-white p-8">
-              <Story />
-            </div>
+            <NetworkProvider>
+              <div className="min-h-screen bg-background text-white p-8">
+                <Story />
+              </div>
+            </NetworkProvider>
           </I18nProvider>
         </AuthProvider>
       </SessionProvider>
