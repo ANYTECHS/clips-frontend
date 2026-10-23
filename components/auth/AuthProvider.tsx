@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { persistClipcashUser, loadClipcashUser, clearClipcashUser } from "@/app/lib/authUser";
 
@@ -120,8 +120,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await signOut({ redirect: false });
   }, []);
 
+  const value = useMemo(() => ({ user, isLoading, setUser, logout }), [user, isLoading, setUser, logout]);
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, setUser, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );

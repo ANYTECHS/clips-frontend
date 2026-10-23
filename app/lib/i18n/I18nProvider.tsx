@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useMemo } from "react";
 import type { Locale, I18nContextType, LocaleConfig } from "./types";
 import {
   translate,
@@ -135,19 +135,22 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     [locale]
   );
 
+  const value = useMemo(
+    () => ({
+          locale,
+          setLocale,
+          t,
+          locales,
+          dir,
+          isRTL: dir === "rtl",
+          registerLocale,
+          detectedLocale,
+    }),
+    [locale, setLocale, t, locales, dir, registerLocale, detectedLocale]
+  );
+
   return (
-    <I18nContext.Provider
-      value={{
-        locale,
-        setLocale,
-        t,
-        locales,
-        dir,
-        isRTL: dir === "rtl",
-        registerLocale,
-        detectedLocale,
-      }}
-    >
+    <I18nContext.Provider value={value}>
       {children}
     </I18nContext.Provider>
   );
