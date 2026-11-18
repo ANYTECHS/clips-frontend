@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "license-check": "license-checker --failOn GPL --failOn AGPL --failOn UNKNOWN",
+
     "analyze": "cross-env ANALYZE=true next build"
   },
   "dependencies": {

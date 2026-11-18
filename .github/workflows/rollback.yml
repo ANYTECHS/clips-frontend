@@ -1,0 +1,7 @@
+name: rollback
+on: [deployment_status]
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Auto-rollback placeholder on failed health check"
