@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:migrate:deploy": "prisma migrate deploy",
+
     "analyze": "cross-env ANALYZE=true next build"
   },
   "dependencies": {
