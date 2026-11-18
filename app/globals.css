@@ -1,111 +1,39 @@
 @import "tailwindcss";
 
-:root {
-  --color-brand: #00E58F;
-  --color-brand-hover: #00DE8A;
-  --color-warning: #FACC15;
-  --color-error: #EF4444;
-  --color-tips: #3B82F6;
-  --color-legendary-from: #FFD700;
-  --color-legendary-to: #FFA500;
-  --color-epic-from: #9D4EDD;
-  --color-epic-to: #7209B7;
-  --color-uncommon: #3A86FF;
-  --color-tiktok: #EE1D52;
-  --color-tiktok-accent: #69C9D0;
-  --color-youtube: #FF0000;
-  --color-instagram: #E1306C;
-  --color-instagram-start: #f09433;
-  --color-instagram-mid: #dc2743;
-  --color-instagram-end: #bc1888;
-  --color-phantom: #AB9FF2;
-  --color-metamask: #E2761B;
-
- 
-  --color-background: #080C0B;
-  --color-surface: #101614;
-  --color-surface-hover: #161D1A;
-  --color-border: #1E2923;
-  --color-input: #0B100E;
-  --color-muted: #8e9895;
-  --color-muted-foreground: #5A6F65;
-  --color-subtle: #4A5D54;
-  --color-text: #FFFFFF;
-}
-
-.dark,
-[data-theme="dark"] {
-  --color-background: #080C0B;
-  --color-surface: #101614;
-  --color-surface-hover: #161D1A;
-  --color-border: #1E2923;
-  --color-input: #0B100E;
-  --color-muted: #8e9895;
-  --color-muted-foreground: #5A6F65;
-  --color-subtle: #4A5D54;
-  --color-text: #FFFFFF;
-}
-
-.light,
-[data-theme="light"] {
-  --color-background: #F8FAF9;
-  --color-surface: #FFFFFF;
-  --color-surface-hover: #F1F5F3;
-  --color-border: #E2E8E5;
-  --color-input: #F1F5F3;
-  --color-muted: #64748B;
-  --color-muted-foreground: #475569;
-  --color-subtle: #94A3B8;
-  --color-text: #080C0B;
+.root {
+  background-color: #020D08;
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
 @theme {
-  --color-brand: var(--color-brand);
-  --color-brand-hover: var(--color-brand-hover);
-  --color-background: var(--color-background);
-  --color-surface: var(--color-surface);
-  --color-surface-hover: var(--color-surface-hover);
-  --color-border: var(--color-border);
-  --color-input: var(--color-input);
-  --color-muted: var(--color-muted);
-  --color-muted-foreground: var(--color-muted-foreground);
-  --color-subtle: var(--color-subtle);
-  --color-warning: var(--color-warning);
-  --color-error: var(--color-error);
-  --color-tips: var(--color-tips);
-  --color-legendary-from: var(--color-legendary-from);
-  --color-legendary-to: var(--color-legendary-to);
-  --color-epic-from: var(--color-epic-from);
-  --color-epic-to: var(--color-epic-to);
-  --color-uncommon: var(--color-uncommon);
-  --color-tiktok: var(--color-tiktok);
-  --color-tiktok-accent: var(--color-tiktok-accent);
-  --color-youtube: var(--color-youtube);
-  --color-instagram: var(--color-instagram);
-  --color-instagram-start: var(--color-instagram-start);
-  --color-instagram-mid: var(--color-instagram-mid);
-  --color-instagram-end: var(--color-instagram-end);
-  --color-phantom: var(--color-phantom);
-  --color-metamask: var(--color-metamask);
+  --color-brand: #B6FF4A;
+  --color-brand-hover: #c6ff6b;
+  --color-primary-green: #00C853;
+  --color-neon: #39FF14;
+  --color-accent: #B6FF4A;
+  --color-background: #020D08;
+  --color-surface: #06351C;
+  --color-surface-hover: #084223;
+  --color-surface-card: #06351C;
+  --color-surface-panel: #042413;
+  --color-border: #0e4d2a;
+  --color-border-hover: #39FF14;
+  --color-input: #031e10;
+  --color-text-main: #F4F7EF;
+  --color-text-muted: #90A89C;
 }
 
 @layer base {
   body {
-    background-color: var(--color-background);
-    color: var(--color-text);
-    font-family: var(--font-inter), system-ui, -apple-system, sans-serif;
+    background-color: #020D08;
+    color: #F4F7EF;
     font-feature-settings: "rlig" 1, "calt" 1;
-    transition: background-color 0.3s ease, color 0.3s ease;
-  }
-
- 
-  *:focus-visible {
-    outline: 2px solid var(--color-brand);
-    outline-offset: 2px;
-    border-radius: 4px;
   }
 }
 
+/* Micro-animations and utility classes for effects */
 @layer utilities {
   .radial-bg {
     position: fixed;
@@ -113,40 +41,37 @@
     left: 0;
     width: 100vw;
     height: 100vh;
-    background: radial-gradient(circle at 80% 20%, rgba(0, 229, 143, 0.15), transparent 40%),
-                radial-gradient(circle at 20% 80%, rgba(0, 229, 143, 0.05), transparent 40%);
+    background: radial-gradient(circle at 80% 20%, rgba(57, 255, 20, 0.08), transparent 45%),
+                radial-gradient(circle at 20% 80%, rgba(0, 200, 83, 0.05), transparent 45%);
     pointer-events: none;
     z-index: -1;
   }
 
- 
-  @media (max-width: 640px) {
-    .glow-large {
-      transform: scale(0.8);
-    }
+  .glass-card {
+    background: rgba(6, 53, 28, 0.7);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(14, 77, 42, 0.6);
   }
 
-  
-  .contain-layout-style {
-    contain: layout style;
+  .shake {
+    animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
   }
 }
 
-/* Skeleton shimmer animation — used by components/ui/Skeleton.tsx (#871) */
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(200%); }
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+@keyframes spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
-  .animate-spin {
-    animation-duration: 0.3s !important;
-    animation-iteration-count: infinite !important;
+@layer utilities {
+  .animate-spin-slow {
+    animation: spin-slow 3s linear infinite;
   }
 }

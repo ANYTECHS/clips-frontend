@@ -1,259 +1,65 @@
 "use client";
 
-import { Bell, Check, CloudUpload, Menu, Moon, Sun } from "lucide-react";
-import React, { memo, useCallback, useEffect, useRef, useState } from "react";
+import React from "react";
+import { Menu } from "lucide-react";
+import { useAuth } from "@/components/AuthProvider";
+import WalletButton from "@/components/shared/WalletButton";
 
-import { useI18n } from "@/app/lib/i18n/I18nProvider";
-import { sanitize } from "@/app/lib/sanitize";
-import { selectUserName, useUserStore } from "@/app/store";
-import PlanUsage from "@/components/dashboard/PlanUsage";
-import { useTheme } from "@/components/theme-provider";
-import { NetworkSwitcher } from "@/components/wallet/NetworkSwitcher";
-import { useSimpleVirtualizer } from "@/app/hooks/useSimpleVirtualizer";
-import { VIRTUALIZATION_CONFIG } from "@/app/lib/virtualizationConfig";
-
-interface NotificationItem {
-  id: string;
-  type: string;
-  title: string;
-  message: string;
-  readAt: string | null;
-  createdAt: string;
+interface HeaderProps {
+  onMenuClick: () => void;
 }
 
-/**
- * Dashboard header with welcome banner, notification bell, and quick-upload button.
- * Polls notifications every 15 seconds and supports mark-as-read with optimistic updates.
- * Memoized to prevent re-renders from parent layout state changes.
- */
-const DashboardHeader = memo(function DashboardHeader({
-  onMenuClick,
-}: {
-  onMenuClick?: () => void;
-}) {
-  const userName = useUserStore(selectUserName);
-  const { t } = useI18n();
-  const { theme, resolvedTheme, toggleTheme } = useTheme();
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const notificationListRef = useRef<HTMLDivElement>(null);
-  const notificationVirtualizer = useSimpleVirtualizer({
-    count: notifications.length,
-    estimateSize: VIRTUALIZATION_CONFIG.rowHeight.notifications,
-    overscan: VIRTUALIZATION_CONFIG.overscanItems,
-    getScrollElement: () => notificationListRef.current,
-  });
-
-  const fetchNotifications = useCallback(async () => {
-    try {
-      const res = await fetch("/api/notifications");
-      if (res.ok) {
-        const json = await res.json();
-        if (json.success && Array.isArray(json.data)) {
-          setNotifications(json.data);
-        }
-      }
-    } catch {
-      // Ignore network errors in background polling
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
-
-  const handleMarkAsRead = async (id: string) => {
-    // Optimistic update: remove from the list immediately so the UI feels
-    // instant, and restore it if the request turns out to have failed.
-    const previous = notifications;
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-
-    try {
-      const res = await fetch(`/api/notifications/${id}/read`, { method: "PATCH" });
-      if (!res.ok) {
-        setNotifications(previous);
-      }
-    } catch {
-      setNotifications(previous);
-    }
-  };
-
-  const handleMarkAllRead = async () => {
-    const previous = notifications;
-    const ids = notifications.map((n) => n.id);
-    setNotifications([]);
-
-    const results = await Promise.allSettled(
-      ids.map((id) => fetch(`/api/notifications/${id}/read`, { method: "PATCH" }))
-    );
-    const failedIds = ids.filter((_, i) => {
-      const result = results[i];
-      return result.status === "rejected" || !result.value.ok;
-    });
-
-    if (failedIds.length > 0) {
-      // Restore only the notifications that actually failed to mark as read.
-      setNotifications(previous.filter((n) => failedIds.includes(n.id)));
-    }
-  };
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const unreadCount = notifications.length;
+export default function DashboardHeader({ onMenuClick }: HeaderProps) {
+  const { user } = useAuth();
+  const firstName = user?.username || user?.profile?.username || user?.fullName?.split(" ")[0] || "there";
 
   return (
-    // Stacks until `lg`, not `md` (Issue #1070). The sidebar only becomes
-    // static at `lg`, so between 768px and 1023px this row had the full-width
-    // heading and the action cluster competing for a ~720px line and
-    // overlapping. The two breakpoints have to agree.
-    <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 rounded-2xl px-4 sm:px-6 py-5 bg-surface/50 border border-white/5 relative">
-      <div className="flex items-start gap-3 min-w-0">
-        {/* The only way to reach the sidebar below `lg`. `onMenuClick` was
-            accepted as a prop and never rendered, so on every tablet the
-            sidebar sat off-canvas with nothing to open it. */}
-        {onMenuClick && (
+    <header className="w-full border-b border-[#0e4d2a]/50 bg-[#020D08]/40 backdrop-blur-sm">
+      <div className="max-w-[1400px] mx-auto flex justify-between items-center py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-10 gap-2 sm:gap-4">
+        {/* Left: Hamburger menu & Greeting */}
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
-            type="button"
             onClick={onMenuClick}
-            aria-label={t("dashboard.open_menu")}
-            className="lg:hidden -ml-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-surface text-gray-300 transition-colors hover:bg-input hover:text-white"
+            className="lg:hidden p-2 -ml-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors shrink-0"
+            aria-label="Open navigation menu"
           >
-            <Menu className="w-5 h-5" aria-hidden="true" />
+            <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
-        )}
-
-        <div className="min-w-0">
-          <h1 className="text-2xl sm:text-3xl font-bold leading-tight text-white truncate">
-            {t("dashboard.welcome", { name: sanitize(userName) })}
-          </h1>
-          <p className="mt-1 text-zinc-400 text-sm">{t("dashboard.subtitle")}</p>
+          <div className="min-w-0">
+            <h1 className="text-[17px] xs:text-[20px] sm:text-[26px] lg:text-[32px] font-extrabold tracking-tight text-[#F4F7EF] leading-tight truncate">
+              Welcome back, {firstName}
+            </h1>
+          </div>
         </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-3 sm:gap-4">
-        {/* Active Stellar network — mainnet requires typed confirmation */}
-        <NetworkSwitcher />
-
-        {/* Theme Toggle */}
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={`Current theme is ${theme}. Click to switch theme.`}
-          title={`Theme: ${theme} (resolved: ${resolvedTheme})`}
-          className="p-2.5 rounded-xl border border-white/10 bg-surface hover:bg-input text-gray-300 hover:text-white transition-colors"
-        >
-          {resolvedTheme === "dark" ? (
-            <Sun className="w-5 h-5 text-amber-400" aria-hidden="true" />
-          ) : (
-            <Moon className="w-5 h-5 text-blue-400" aria-hidden="true" />
-          )}
-        </button>
-
-        {/* Notification Bell */}
-        <div className="relative" ref={popoverRef} data-tour="notifications">
-          <button
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            aria-expanded={isOpen}
-            aria-label={`${t("notifications.title")} ${unreadCount > 0 ? `(${unreadCount} ${t("notifications.unread_count", { count: unreadCount })})` : ""}`}
-            className="relative p-2.5 rounded-xl border border-white/10 bg-surface hover:bg-input text-gray-300 hover:text-white transition-colors"
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          <WalletButton
+            responsiveCompact
+            className="h-10 sm:h-11 px-3 sm:px-4 rounded-xl bg-[#06351C] border border-[#0e4d2a] text-[#F4F7EF] hover:border-[#39FF14]/40 hover:bg-[#084223] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 shrink-0 shadow-sm"
+          />
+          {/* <button
+            className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#06351C] border border-[#0e4d2a] flex items-center justify-center text-[#90A89C] hover:text-[#F4F7EF] hover:border-[#39FF14]/40 transition-colors relative shrink-0"
+            aria-label="Notifications"
           >
-            <Bell className="w-5 h-5" aria-hidden="true" />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-brand text-[10px] font-extrabold text-black shadow-[0_0_8px_var(--color-brand)]">
-                {unreadCount > 9 ? "9+" : unreadCount}
-              </span>
-            )}
-          </button>
+            <Bell className="w-4 h-4 sm:w-5 sm:h-5" />
+          </button> */}
 
-          {/* Notifications Popover */}
-          {isOpen && (
-            <div className="absolute right-0 mt-3 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-white/10 bg-surface shadow-2xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-150">
-              <div className="flex items-center justify-between px-4 py-3 border-b border-white/5 bg-surface/80">
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
-                  {t("notifications.title")}
-                </span>
-                {unreadCount > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleMarkAllRead}
-                    className="text-[11px] font-semibold text-brand hover:underline"
-                  >
-                    {t("notifications.mark_all_read")}
-                  </button>
-                )}
-              </div>
-
-              {notifications.length === 0 ? (
-                <div className="p-6 text-center text-xs text-zinc-400">
-                  {t("notifications.no_notifications")}
-                </div>
-              ) : (
-                <div ref={notificationListRef} className="h-80 overflow-y-auto divide-y divide-white/5">
-                  <div style={{ height: notificationVirtualizer.getTotalSize(), position: "relative" }} role="list">
-                    {notificationVirtualizer.getVirtualItems().map(({ index, start, size }) => {
-                      const item = notifications[index];
-                      if (!item) return null;
-                      return (
-                        <div
-                          key={item.id}
-                          role="listitem"
-                          style={{ position: "absolute", top: start, left: 0, right: 0, height: size }}
-                          className="p-4 hover:bg-white/5 transition-colors flex items-start justify-between gap-3 overflow-hidden"
-                        >
-                          <div className="min-w-0 space-y-1 text-left">
-                            <p className="truncate text-xs font-bold text-white">{sanitize(item.title)}</p>
-                            <p className="line-clamp-2 text-[11px] text-zinc-400 leading-snug">
-                              {sanitize(item.message)}
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleMarkAsRead(item.id)}
-                            aria-label={t("notifications.mark_as_read")}
-                            className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-brand transition-colors shrink-0"
-                          >
-                            <Check className="w-4 h-4" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
+          <div className="relative group shrink-0">
+            <button
+              disabled
+              aria-disabled="true"
+              className="h-10 sm:h-11 bg-[#B6FF4A]/15 text-[#B6FF4A]/50 px-3 sm:px-5 lg:px-6 rounded-xl font-bold text-[12px] sm:text-[14px] flex items-center justify-center gap-1.5 sm:gap-2 cursor-not-allowed select-none border border-[#B6FF4A]/25 transition-colors whitespace-nowrap"
+              title="Coming soon"
+            >
+              New Clip
+            </button>
+            <div className="absolute bottom-full mb-2.5 right-0 sm:left-1/2 sm:-translate-x-1/2 px-2.5 py-1 bg-[#042413] text-[#B6FF4A] border border-[#0e4d2a] text-[11px] font-bold rounded-lg shadow-xl opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none whitespace-nowrap z-30">
+              Coming soon
             </div>
-          )}
+          </div>
         </div>
-
-        <span data-tour="plan-usage">
-          <PlanUsage compact />
-        </span>
-
-        <button
-          type="button"
-          data-tour="quick-upload"
-          className="inline-flex items-center gap-2 rounded-xl bg-[#00E68A] px-5 py-2.5 text-sm font-semibold text-black shadow-[0_8px_24px_rgba(0,230,138,0.35)] transition hover:brightness-95"
-          aria-label={t("dashboard.quick_upload")}
-        >
-          <CloudUpload className="h-4 w-4" aria-hidden="true" />
-          {t("dashboard.quick_upload")}
-        </button>
       </div>
     </header>
   );
-});
-
-export { DashboardHeader };
-export default DashboardHeader;
+}

@@ -2,7 +2,6 @@
 
 # dependencies
 /node_modules
-/.npm-cache
 /.pnp
 .pnp.*
 .yarn/*
@@ -40,19 +39,3 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
-
-# playwright
-/playwright-report/
-/test-results/
-
-*storybook.log
-storybook-static
-
-# mimocode
-.mimocode/
-.mimo/
-
-# Agent tooling scratch. Holds a full git worktree, so leaving it unignored
-# means a duplicate of every file in the repo — enough to make `git status`
-# unreadable and to trip jest's haste-map collision check on each run.
-.kilo/

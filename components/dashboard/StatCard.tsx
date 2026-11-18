@@ -1,66 +1,35 @@
 "use client";
 
-import React, { memo, useMemo } from "react";
-import type { LucideIcon } from "lucide-react";
-import { TrendingUp, TrendingDown, Minus } from "lucide-react";
-
-type TrendValue = { value: number; label: string } | string;
+import React from "react";
+import { LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
 
 interface StatCardProps {
   label: string;
   value: string;
-  trend?: TrendValue;
-  icon?: LucideIcon;
-  hideTrendIcon?: boolean;
-  /** @deprecated pass trend as { value, label } object instead */
+  trend: string;
   isPositive?: boolean;
+  icon: LucideIcon;
 }
 
-/**
- * Displays a single dashboard statistic with optional trend indicator.
- * Memoized to prevent unnecessary re-renders when parent state changes.
- *
- * @param props.label - The stat label (e.g., "Total Views")
- * @param props.value - The formatted stat value (e.g., "12.5K")
- * @param props.trend - Optional trend data showing direction and label
- * @param props.icon - Optional Lucide icon to display
- */
-function StatCard({ label, value, trend, icon: Icon, hideTrendIcon }: StatCardProps) {
-  let trendContent: React.ReactNode = null;
-  let trendColor = "text-muted-foreground";
-
-  if (typeof trend === "object" && trend !== null && "value" in trend && "label" in trend) {
-    const num = (trend as { value: number }).value;
-    const labelText = (trend as { label: string }).label;
-
-    if (num > 0) {
-      trendColor = "text-green-400";
-      trendContent = <TrendingUp className="w-3 h-3 text-green-400" />;
-    } else if (num < 0) {
-      trendColor = "text-red-400";
-      trendContent = <TrendingDown className="w-3 h-3 text-red-400" />;
-    } else {
-      trendContent = <Minus className="w-3 h-3 text-muted-foreground" />;
-    }
-
-    return null;
-  }, [trend, hideTrendIcon]);
-
+export default function StatCard({ label, value, trend, isPositive = true, icon: Icon }: StatCardProps) {
   return (
-    <div className="bg-surface border border-white/5 rounded-2xl p-6 flex flex-col gap-3">
+    <div className="bg-[#06351C] border border-[#0e4d2a] rounded-[24px] p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-[#39FF14]/40 hover:shadow-[0_0_30px_rgba(57,255,20,0.12)] transition-all duration-300">
       <div className="flex items-center justify-between">
-        <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-widest">{label}</span>
-        {Icon && <Icon className="w-4 h-4 text-muted-foreground" />}
+        <span className="text-[#90A89C] text-[13px] font-bold uppercase tracking-wider">{label}</span>
+        <div className="w-10 h-10 rounded-xl bg-[#031d0f] border border-[#0e4d2a] flex items-center justify-center text-[#90A89C] group-hover:text-[#B6FF4A] group-hover:bg-[#B6FF4A]/10 transition-colors">
+          <Icon className="w-5 h-5" />
+        </div>
       </div>
-      <span className="text-2xl font-extrabold text-white">{value}</span>
-      {trend && <div className="flex items-center gap-1 text-xs text-muted-foreground">{trendContent}</div>}
+      
+      <div className="flex items-end gap-3">
+        <h3 className="text-[32px] font-extrabold text-[#F4F7EF] leading-none font-mono">{value}</h3>
+        <div className={`flex items-center gap-1 text-[13px] font-bold pb-1 ${isPositive ? "text-[#B6FF4A]" : "text-rose-500"}`}>
+          {isPositive ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+          <span>{trend}</span>
+        </div>
+      </div>
+      
+      <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-[#39FF14]/40 to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
     </div>
   );
 }
-
-/**
- * Purely presentational: every prop is a primitive or a module-scope icon
- * component, so a shallow prop comparison is enough to skip re-rendering the
- * card when an unrelated slice of dashboard state changes.
- */
-export default React.memo(StatCard);

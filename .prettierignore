@@ -1,9 +1,0 @@
-.next
-out
-build
-coverage
-node_modules
-package-lock.json
-pnpm-lock.yaml
-.storybook-static
-*.snap

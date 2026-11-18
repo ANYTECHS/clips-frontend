@@ -1,52 +1,37 @@
 "use client";
 
 import React from "react";
-import { Film, TrendingUp, DollarSign } from "lucide-react";
-
-interface StatChipProps {
-  icon: React.ReactNode;
-  label: string;
-  value: string;
-}
-
-function StatChip({ icon, label, value }: StatChipProps) {
-  return (
-    <div className="flex items-center gap-3 px-4 py-3 bg-white/5 border border-white/10 rounded-xl">
-      <div className="w-8 h-8 rounded-lg bg-brand/10 flex items-center justify-center text-brand">
-        {icon}
-      </div>
-      <div className="flex flex-col">
-        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">
-          {label}
-        </span>
-        <span className="text-lg font-bold text-white">{value}</span>
-      </div>
-    </div>
-  );
-}
 
 export default function ClipsStats() {
-  return (
-    <div className="bg-surface border border-white/5 rounded-2xl p-6 sm:p-8">
-      <h2 className="text-xl font-semibold text-white mb-6">Your Stats</h2>
+  const stats = [
+    { label: "Clips Today", value: "4.8k", detail: "Viral potential detected" },
+    { label: "Viral Accuracy", value: "98%", detail: "AI engine confidence" },
+    { label: "Avg Sync Time", value: "2.1s", detail: "Fastest in the industry" },
+  ];
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatChip
-          icon={<Film className="w-4 h-4" />}
-          label="Total Clips"
-          value="24"
-        />
-        <StatChip
-          icon={<TrendingUp className="w-4 h-4" />}
-          label="Avg Virality"
-          value="8.5"
-        />
-        <StatChip
-          icon={<DollarSign className="w-4 h-4" />}
-          label="Total Earnings"
-          value="$1,240"
-        />
-      </div>
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      {stats.map((stat) => (
+        <div 
+          key={stat.label}
+          className="bg-[#06351C] backdrop-blur-md border border-[#0e4d2a] hover:border-[#39FF14]/40 rounded-[24px] p-6 text-center transition-all duration-500 group relative overflow-hidden"
+        >
+          {/* Subtle Glow Background */}
+          <div className="absolute inset-0 bg-[#39FF14]/[0.02] group-hover:bg-[#39FF14]/[0.05] transition-all duration-500" />
+          
+          <div className="relative z-10 space-y-1.5">
+            <p className="text-[28px] sm:text-[32px] font-black text-[#F4F7EF] group-hover:text-[#B6FF4A] transition-colors tracking-tight">
+              {stat.value}
+            </p>
+            <p className="text-[12px] font-bold text-[#90A89C] uppercase tracking-wider group-hover:text-[#F4F7EF] transition-colors">
+              {stat.label}
+            </p>
+            <div className="pt-3 border-t border-[#0e4d2a] mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+               <p className="text-[10px] font-medium text-[#90A89C] uppercase tracking-widest">{stat.detail}</p>
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

@@ -1,203 +1,132 @@
 "use client";
 
+import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import React, { memo, useCallback } from "react";
-import {
-  LayoutDashboard,
-  Video,
-  DollarSign,
-  Layers,
-  Wallet,
-  Activity,
-  Settings,
-  Shield,
+import { useQuery } from "@tanstack/react-query";
+import { 
+  LayoutDashboard, 
+  Video, 
+  Share2, 
+  Settings, 
   X,
-  Zap,
-  Share2,
-  BarChart3,
-  CreditCard,
-  Plug,
-  Tags,
-  LayoutTemplate,
+  LogOut,
   Sparkles,
+  Cpu as CpuAi,
 } from "lucide-react";
-import PlanUsage from "@/components/dashboard/PlanUsage";
-import { useRoutePrefetch } from "@/app/hooks/useRoutePrefetch";
+import { useAuth } from "@/components/AuthProvider";
+import Logo from "@/components/shared/Logo";
+import UserAvatar from "@/components/shared/UserAvatar";
+import { getUserClipCount } from "@/lib/queries";
 
-interface NavItem {
-  label: string;
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const NAV_ITEMS: NavItem[] = [
-  { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { label: "Projects", href: "/projects", icon: Video },
-  { label: "Templates", href: "/templates", icon: LayoutTemplate },
-  { label: "Brand Kit", href: "/brand-kit", icon: Sparkles },
-  { label: "Billing", href: "/billing", icon: CreditCard },
-  { label: "Earnings", href: "/earnings", icon: DollarSign },
-  { label: "Referral", href: "/referral", icon: Share2 },
-  { label: "Analytics", href: "/analytics", icon: BarChart3 },
-  { label: "Integrations", href: "/integrations", icon: Plug },
-  { label: "Categories", href: "/categories", icon: Tags },
-  { label: "Vault", href: "/vault", icon: Layers },
-  { label: "Wallet", href: "/wallet", icon: Wallet },
-  { label: "Activity", href: "/activity", icon: Activity },
-  { label: "Multisig", href: "/multisig", icon: Shield },
+const staticMenuItems = [
+  { id: "dashboard",         label: "Dashboard",        icon: LayoutDashboard, href: "/dashboard" },
+  { id: "ai-projects",       label: "AI Projects",      icon: Sparkles,        href: "/ai-projects" },
+  { id: "agent-marketplace", label: "Agent Marketplace",icon: CpuAi,             href: "/agent-marketplace" },
+  { id: "platforms",         label: "Auto-Posting",     icon: Share2,          href: "/platforms" },
+  { id: "settings",          label: "Settings",         icon: Settings,        href: "/settings" },
 ];
 
-const BOTTOM_NAV_ITEMS: NavItem[] = [
-  { label: "Settings", href: "/settings", icon: Settings },
-];
+const projectsItem = { id: "projects", label: "Projects", icon: Video, href: "/projects" };
 
-interface NavLinkProps {
-  item: NavItem;
-  active: boolean;
-  onNavigate: () => void;
-}
-
-/**
- * A sidebar link that prefetches its route on navigation intent.
- *
- * `prefetch={false}` turns off Next.js's default behaviour of prefetching every
- * link in the viewport: the sidebar holds eleven of them, so the default meant
- * eleven route payloads on every dashboard load for the one the user wanted.
- * `useRoutePrefetch` moves that work to a hover, a focus or a touch.
- */
-function NavLink({ item, active, onNavigate }: NavLinkProps) {
-  const { label, href, icon: Icon } = item;
-  const prefetchHandlers = useRoutePrefetch(href);
-
-  return (
-    <Link
-      href={href}
-      prefetch={false}
-      onClick={onNavigate}
-      aria-current={active ? "page" : undefined}
-      {...prefetchHandlers}
-      className={[
-        "group flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand",
-        active
-          ? "bg-brand/10 text-brand border border-brand/20"
-          : "text-muted hover:text-white hover:bg-surface-hover border border-transparent",
-      ].join(" ")}
-    >
-      <Icon
-        className={[
-          "w-4 h-4 shrink-0 transition-colors",
-          active ? "text-brand" : "text-muted group-hover:text-white",
-        ].join(" ")}
-        aria-hidden="true"
-      />
-      {label}
-      {active && (
-        <span className="ml-auto w-1.5 h-1.5 rounded-full bg-brand shrink-0" aria-hidden="true" />
-      )}
-    </Link>
-  );
-}
-
-interface DashboardSidebarProps {
+interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
-/**
- * DashboardSidebar — main navigation sidebar.
- *
- * Wrapped in React.memo so it only re-renders when `isOpen` or `pathname`
- * actually changes. The `isActive` helper is stabilised with useCallback.
- *
- * Issue #874 – memoization for expensive computations.
- */
-const DashboardSidebar = memo(function DashboardSidebar({ isOpen, onClose }: DashboardSidebarProps) {
+export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
   const pathname = usePathname();
+  const { user, logout } = useAuth();
 
-  const isActive = useCallback(
-    (href: string) => pathname === href || pathname.startsWith(href + "/"),
-    [pathname]
-  );
+  const { data: clipCount = 0 } = useQuery({
+    queryKey: ["userClipCount"],
+    queryFn: getUserClipCount,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
+  });
+
+  const hasClips = clipCount > 0;
+
+  const menuItems = hasClips
+    ? [
+        staticMenuItems[0],
+        staticMenuItems[1],
+        projectsItem,
+        staticMenuItems[2],
+        staticMenuItems[3],
+        staticMenuItems[4],
+      ]
+    : staticMenuItems;
 
   return (
-    <>
-      {/* Sidebar panel */}
-      <aside
-        className={[
-          // Base layout
-          "fixed lg:sticky top-0 left-0 z-50",
-          "flex flex-col h-screen w-64 shrink-0",
-          // Surface
-          "bg-surface border-r border-border",
-          // Mobile: slide in/out
-          "transition-transform duration-300 ease-in-out",
-          isOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-        ].join(" ")}
-        aria-label="Sidebar navigation"
-        data-tour="sidebar-nav"
-      >
-        {/* Logo / branding */}
-        <div className="flex items-center justify-between px-5 py-5 border-b border-border shrink-0">
-          <Link
-            href="/dashboard"
-            className="flex items-center gap-2.5 group"
-            onClick={onClose}
-            aria-label="Go to dashboard home"
-          >
-            <div className="w-8 h-8 rounded-xl bg-brand flex items-center justify-center shadow-[0_4px_12px_rgba(0,229,143,0.4)] group-hover:brightness-110 transition-all">
-              <Zap className="w-4 h-4 text-black" aria-hidden="true" />
-            </div>
-            <span className="text-[15px] font-black text-white tracking-tight">
-              Clips<span className="text-brand">AI</span>
-            </span>
-          </Link>
+    <aside className={`fixed top-0 left-0 h-screen w-[280px] bg-[#031d0f] border-r border-[#0e4d2a] z-50 flex flex-col transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <div className="p-8 flex items-center justify-between">
+        <Logo />
+        <button 
+          onClick={onClose}
+          className="lg:hidden p-2 -mr-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors"
+          aria-label="Close sidebar"
+        >
+          <X className="w-6 h-6" />
+        </button>
+      </div>
 
-          {/* Close button — mobile only */}
-          <button
-            type="button"
-            onClick={onClose}
-            className="lg:hidden flex h-11 w-11 items-center justify-center rounded-lg text-muted hover:text-white hover:bg-surface-hover transition-colors"
-            aria-label="Close sidebar"
+      <nav className="flex-1 px-4 space-y-1.5">
+        {menuItems.map((item) => {
+          const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+                isActive 
+                  ? "bg-[#B6FF4A]/12 text-[#B6FF4A] font-bold border border-[#B6FF4A]/25 shadow-[0_0_15px_rgba(57,255,20,0.08)]" 
+                  : "text-[#90A89C] hover:text-[#F4F7EF] hover:bg-[#06351C]/60"
+              }`}
+            >
+              <item.icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#B6FF4A]" : "text-[#5A7A6B] group-hover:text-[#F4F7EF]"}`} />
+              <span className="text-[14px]">{item.label}</span>
+              {item.id === "projects" && hasClips && (
+                <span className="ml-auto px-1.5 py-0.5 rounded-md bg-[#B6FF4A]/15 text-[#B6FF4A] text-[9px] font-black tracking-wider">
+                  {clipCount > 99 ? "99+" : clipCount}
+                </span>
+              )}
+              {item.id === "platforms" && (
+                <span className="ml-auto px-2 py-0.5 rounded-full bg-[#B6FF4A]/10 border border-[#B6FF4A]/20 text-[#B6FF4A] text-[9px] font-black uppercase tracking-wider">
+                  Coming Soon
+                </span>
+              )}
+              {isActive && item.id !== "projects" && item.id !== "platforms" && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#39FF14] shadow-[0_0_8px_rgba(57,255,20,0.8)]" />
+              )}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="p-6 border-t border-[#0e4d2a] bg-[#020D08]/60">
+        <div className="flex items-center gap-3">
+          <UserAvatar user={user} />
+          <div className="flex-1 min-w-0">
+            <div className="text-[14px] font-bold text-[#F4F7EF] truncate">
+              {user?.username || user?.profile?.username || user?.fullName || ""}
+            </div>
+            <div className="text-[11px] text-[#90A89C] truncate">
+              {user?.email || ""}
+            </div>
+          </div>
+          <button 
+            onClick={() => logout()}
+            className="p-2 text-[#90A89C] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 group/logout relative"
+            title="Logout"
           >
-            <X className="w-5 h-5" aria-hidden="true" />
+            <LogOut className="w-4 h-4" />
+            <span className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-[#042413] text-[#F4F7EF] text-[10px] rounded opacity-0 group-hover/logout:opacity-100 transition-opacity whitespace-nowrap border border-[#0e4d2a] pointer-events-none">
+              Logout
+            </span>
           </button>
         </div>
-
-        {/* Primary nav */}
-        <nav
-          className="flex-1 overflow-y-auto scrollbar-hide px-3 py-4 space-y-0.5"
-          aria-label="Main navigation"
-        >
-          {NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-              onNavigate={onClose}
-            />
-          ))}
-        </nav>
-
-        {/* Live Plan Usage Widget */}
-        <div className="px-3 py-2 shrink-0">
-          <PlanUsage />
-        </div>
-
-        {/* Bottom nav (settings) */}
-        <div className="px-3 pb-5 space-y-0.5 border-t border-border pt-3 shrink-0">
-          {BOTTOM_NAV_ITEMS.map((item) => (
-            <NavLink
-              key={item.href}
-              item={item}
-              active={isActive(item.href)}
-              onNavigate={onClose}
-            />
-          ))}
-        </div>
-      </aside>
-    </>
+      </div>
+    </aside>
   );
-});
-
-export default DashboardSidebar;
+}

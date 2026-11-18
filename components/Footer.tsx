@@ -1,78 +1,50 @@
 import React from "react";
+import Image from "next/image";
 import Link from "next/link";
-import { Zap } from "lucide-react";
 
-const FOOTER_LINKS = [
-  { label: "Privacy", href: "/privacy" },
-  { label: "Terms", href: "/terms" },
-  { label: "Cookies", href: "/cookies" },
-  {
-    label: "GitHub",
-    href: "https://github.com/clipcash-ai",
-    external: true,
-  },
-] as const;
-
-const CURRENT_YEAR = new Date().getFullYear();
-
-/**
- * Public-facing Footer used on /, /login, and other public pages via LandingLayout.
- *
- * - Logo + tagline on the left
- * - Privacy, Terms, Cookies, GitHub links
- * - Copyright notice
- * - Fully responsive (stacks on mobile)
- */
 export default function Footer() {
-  return (
-    <footer className="relative z-10 w-full border-t border-white/5">
-      <div className="w-full max-w-7xl mx-auto px-6 md:px-10 py-8">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-          {/* Logo + tagline */}
-          <div className="flex flex-col items-center sm:items-start gap-1.5">
-            <Link
-              href="/"
-              className="flex items-center gap-2 group"
-              aria-label="ClipCash home"
-            >
-              <div className="w-7 h-7 rounded-xl bg-brand flex items-center justify-center shadow-[0_4px_12px_rgba(0,229,143,0.3)] group-hover:brightness-110 transition-all">
-                <Zap className="w-3.5 h-3.5 text-black" aria-hidden="true" />
-              </div>
-              <span className="text-[14px] font-black text-white tracking-tight">
-                Clips<span className="text-brand">AI</span>
-              </span>
-            </Link>
-            <p className="text-[11px] text-muted">
-              © {CURRENT_YEAR} ClipCash. All rights reserved.
-            </p>
-          </div>
+  const currentYear = new Date().getFullYear();
 
-          {/* Links */}
-          <nav aria-label="Footer navigation">
-            <ul className="flex flex-wrap items-center justify-center gap-x-5 gap-y-2">
-              {FOOTER_LINKS.map(({ label, href, external }) => (
-                <li key={href}>
-                  {external ? (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[13px] text-muted hover:text-white transition-colors"
-                    >
-                      {label}
-                    </a>
-                  ) : (
-                    <Link
-                      href={href}
-                      className="text-[13px] text-muted hover:text-white transition-colors"
-                    >
-                      {label}
-                    </Link>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </nav>
+  return (
+    <footer className="w-full flex justify-center flex-col items-center">
+      <div className="w-full relative h-[120px] sm:h-[160px] flex justify-center flex-col overflow-hidden">
+        <div className="absolute inset-0 bg-[#020D08]/90 backdrop-blur-sm z-10 
+          [mask-image:linear-gradient(to_right,rgba(0,0,0,1)_0%,rgba(0,0,0,0)_15%,rgba(0,0,0,0)_85%,rgba(0,0,0,1)_100%),linear-gradient(to_bottom,rgba(0,0,0,1)_0%,rgba(0,0,0,0)_50%,rgba(0,0,0,1)_100%)] 
+          [-webkit-mask-composite:destination-out] [mask-composite:exclude]" />
+        
+        <div className="w-full max-w-6xl mx-auto px-6 flex justify-around sm:justify-between items-center opacity-40 z-0">
+          <div className="font-[900] text-[16px] sm:text-[22px] md:text-[24px] tracking-wider text-[#90A89C] font-sans">YOUTUBE</div>
+          <div className="font-[900] text-[16px] sm:text-[22px] md:text-[24px] tracking-wider text-[#90A89C] font-sans">TWITCH</div>
+          <div className="font-[900] text-[16px] sm:text-[22px] md:text-[24px] tracking-wider text-[#90A89C] font-sans">TIKTOK</div>
+          <div className="font-[900] text-[16px] sm:text-[22px] md:text-[24px] tracking-wider text-[#90A89C] font-sans">INSTA</div>
+        </div>
+      </div>
+
+      <div className="w-full bg-[#010805] border-t border-[#0e4d2a] py-8 sm:py-10 z-20">
+        <div className="max-w-7xl mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-6 text-center md:text-left">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4">
+            <Link href="/" className="flex items-center gap-2.5 text-[14px] font-bold text-[#B6FF4A] hover:opacity-80 transition-opacity">
+              <div className="relative w-5 h-5 rounded-[4px] overflow-hidden flex-shrink-0">
+                <Image
+                  src="/logo.jpeg"
+                  alt="enclips logo"
+                  width={20}
+                  height={20}
+                  className="object-contain w-full h-full rounded-[4px]"
+                />
+              </div>
+              <span className="font-extrabold tracking-tight text-[#B6FF4A]">enclips</span>
+            </Link>
+            <span className="hidden sm:inline text-[#0e4d2a]">•</span>
+            <div className="text-[12px] text-[#90A89C] font-medium">
+              © {currentYear} enclips. All rights reserved.
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[12px] text-[#90A89C] font-medium">
+            <a href="#" className="hover:text-[#F4F7EF] transition-colors">Privacy Policy</a>
+            <a href="#" className="hover:text-[#F4F7EF] transition-colors">Terms of Service</a>
+            <a href="#" className="hover:text-[#F4F7EF] transition-colors">Cookie Settings</a>
+          </div>
         </div>
       </div>
     </footer>

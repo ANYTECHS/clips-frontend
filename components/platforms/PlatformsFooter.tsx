@@ -1,37 +1,25 @@
+"use client";
+
 import React from "react";
-import Skeleton from "@/components/ui/Skeleton";
+import Link from "next/link";
 
-interface PlatformsFooterProps {
-  isLoading?: boolean;
-}
-
-export default function PlatformsFooter({ isLoading = false }: PlatformsFooterProps) {
-  if (isLoading) {
-    return (
-      <div className="space-y-2 pt-8 border-t border-white/10">
-        <Skeleton className="h-4 w-full" />
-        <Skeleton className="h-4 w-3/4" />
-      </div>
-    );
-  }
-
+export default function PlatformsFooter() {
+  const currentYear = new Date().getFullYear();
+  
   return (
-    <div className="space-y-2 pt-8 border-t border-white/10">
-      <p className="text-xs text-muted-foreground">
-        By connecting your accounts, you authorize Clips to access your account data
-        in accordance with our{" "}
-        <a href="/privacy" className="text-brand hover:underline">
-          Privacy Policy
-        </a>{" "}
-        and{" "}
-        <a href="/terms" className="text-brand hover:underline">
-          Terms of Service
-        </a>
-        . OAuth connections are secure and can be revoked at any time.
-      </p>
-      <p className="text-xs text-muted-foreground">
-        We do not store your passwords or share your data with third parties.
-      </p>
-    </div>
+    <footer className="mt-20 pt-12 pb-16 border-t border-[#0e4d2a]">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-8">
+        <div className="flex flex-wrap justify-center gap-8 text-[13px] font-semibold text-[#90A89C]">
+          <Link href="#" className="hover:text-[#F4F7EF] transition-colors">Privacy Policy</Link>
+          <Link href="#" className="hover:text-[#F4F7EF] transition-colors">Terms of Service</Link>
+          <Link href="#" className="hover:text-[#F4F7EF] transition-colors">API Documentation</Link>
+          <Link href="#" className="hover:text-[#F4F7EF] transition-colors">Pricing</Link>
+        </div>
+        
+        <div className="text-[13px] text-[#90A89C] font-medium tracking-tight">
+          © {currentYear} enclips. All rights reserved.
+        </div>
+      </div>
+    </footer>
   );
 }

@@ -1,40 +1,24 @@
+"use client";
+
 import React from "react";
-import Link from "next/link";
-import { HelpCircle } from "lucide-react";
-import Skeleton from "@/components/ui/Skeleton";
+import { ArrowRight } from "lucide-react";
 
-interface HelpBannerProps {
-  isLoading?: boolean;
-}
-
-export default function HelpBanner({ isLoading = false }: HelpBannerProps) {
-  if (isLoading) {
-    return (
-      <div className="bg-gradient-to-r from-brand/20 to-brand/10 border border-brand/20 rounded-[24px] p-6">
-        <Skeleton className="h-6 w-1/3 mb-2" />
-        <Skeleton className="h-4 w-2/3" />
-      </div>
-    );
-  }
-
+export default function HelpBanner() {
   return (
-    <div className="bg-gradient-to-r from-brand/20 to-brand/10 border border-brand/20 rounded-[24px] p-6">
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-full bg-brand/20 flex items-center justify-center">
-          <HelpCircle className="w-6 h-6 text-brand" />
+    <div className="relative group overflow-hidden rounded-[28px] p-[1px] bg-gradient-to-r from-[#39FF14]/40 via-[#00C853]/20 to-transparent">
+      <div className="bg-[#06351C] rounded-[27px] p-8 sm:p-10 flex flex-col md:flex-row items-center justify-between gap-8 relative overflow-hidden border border-[#0e4d2a]">
+        {/* Background Glow */}
+        <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-[#39FF14]/10 blur-[120px] rounded-full pointer-events-none -translate-x-1/4 -translate-y-1/2" />
+        
+        <div className="space-y-2 relative z-10 text-center md:text-left">
+          <h4 className="text-[22px] font-extrabold text-[#F4F7EF] tracking-tight">Need help connecting? & Report Bugs</h4>
+          <p className="text-[#90A89C] text-[16px] font-medium leading-relaxed max-w-lg">Our support team is available 24/7 to help you set up your automated clipping workflow.</p>
         </div>
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold mb-1">Need help?</h3>
-          <p className="text-sm text-muted-foreground">
-            Check our documentation for guides on connecting platforms and troubleshooting.
-          </p>
-        </div>
-        <Link
-          href="/docs"
-          className="px-5 h-10 rounded-xl bg-brand text-white font-medium text-sm hover:bg-brand/90 transition-colors"
-        >
-          View Docs
-        </Link>
+
+        <button className="flex items-center gap-2.5 text-[18px] font-bold text-[#B6FF4A] hover:text-[#c6ff6b] transition-all group relative z-10 whitespace-nowrap active:scale-[0.98]">
+          <a href="https://t.me/+ACfJdr1FHeg0MmNk" target="_blank" rel="noopener noreferrer">Contact Support</a>
+          <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+        </button>
       </div>
     </div>
   );

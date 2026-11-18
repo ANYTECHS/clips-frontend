@@ -1,256 +1,213 @@
 "use client";
 
 import React, { useState } from "react";
-import { Archive, Download, Share2, Sparkles, Trash2, Undo2, Redo2, Columns } from "lucide-react";
+import { Trash2, MoveRight, Loader2, CheckCircle2, AlertCircle, X, ChevronDown } from "lucide-react";
 
-export interface SelectionFooterProps {
+interface SelectionFooterProps {
   count: number;
   selectedIds: string[];
-  onMint: () => void;
-  isMinting: boolean;
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-  onPost?: (selectedIds: string[], platforms: string[]) => void;
-  isPosting?: boolean;
-  postError?: string | null;
-  onDelete?: (selectedIds: string[]) => void;
-  isDeleting?: boolean;
-  deleteError?: string | null;
-  onArchive?: (selectedIds: string[]) => void;
-  isArchiving?: boolean;
-  archiveError?: string | null;
-  onCompare?: (selectedIds: string[]) => void;
+  onDelete: (ids: string[]) => Promise<void>;
+  onClearSelection: () => void;
 }
 
-const PLATFORMS = ["youtube", "instagram", "tiktok", "twitter"];
+type Toast = { type: "success" | "error"; message: string } | null;
 
-export default function SelectionFooter({
-  count,
-  selectedIds,
-  onMint,
-  isMinting,
-  undo,
-  redo,
-  canUndo,
-  canRedo,
-  onPost,
-  isPosting,
-  postError,
-  onDelete,
-  isDeleting,
-  deleteError,
-  onArchive,
-  isArchiving,
-  archiveError,
-  onCompare,
-}: SelectionFooterProps) {
+const POST_PLATFORMS = [
+  { key: "tiktok", label: "TikTok" },
+  { key: "instagram", label: "Instagram" },
+  { key: "youtube", label: "YouTube" },
+];
+
+export default function SelectionFooter({ count, selectedIds, onDelete, onClearSelection }: SelectionFooterProps) {
+  const [loading, setLoading] = useState(false);
+  const [action, setAction] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [toast, setToast] = useState<Toast>(null);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["tiktok"]);
   const [showPlatformPicker, setShowPlatformPicker] = useState(false);
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>([]);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
-  const handlePostConfirm = () => {
-    if (onPost && selectedPlatforms.length > 0) {
-      onPost(selectedIds, selectedPlatforms);
-      setShowPlatformPicker(false);
-    }
-  };
-
-  const handleDeleteConfirm = () => {
-    onDelete?.(selectedIds);
-    setShowDeleteConfirm(false);
-  };
-
-  const clipNoun = count === 1 ? "clip" : "clips";
 
   if (count === 0) return null;
 
+  const showToast = (type: "success" | "error", message: string) => {
+    setToast({ type, message });
+    setTimeout(() => setToast(null), 5000);
+  };
+
+  const togglePlatform = (key: string) => {
+    setSelectedPlatforms(prev =>
+      prev.includes(key) ? prev.filter(p => p !== key) : [...prev, key]
+    );
+  };
+
+  const handleDelete = async () => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setLoading(true);
+    setAction("delete");
+    setConfirmDelete(false);
+    try {
+      await onDelete(selectedIds);
+      onClearSelection();
+      showToast("success", `${count} clip${count > 1 ? "s" : ""} deleted.`);
+    } catch {
+      showToast("error", "Failed to delete clips. Please try again.");
+    } finally {
+      setLoading(false);
+      setAction(null);
+    }
+  };
+
+  const handlePost = async () => {
+    showToast(
+      "error",
+      "Direct Auto-Posting is coming soon! Use the 'Post Kit' button on individual clips to download HD and publish natively with maximum reach."
+    );
+  };
+
   return (
-    <div className="sticky bottom-6 left-1/2 -translate-x-1/2 z-40 max-w-[800px] w-full px-4 animate-in slide-in-from-bottom-8 fade-in duration-300">
-      <div className="bg-background/80 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl flex flex-wrap items-center justify-between gap-4">
-        
-        {/* Left Side: Count & Undo/Redo */}
-        <div className="flex items-center gap-4 pl-3">
-          <div className="flex items-center gap-2">
-            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand text-black font-bold text-xs">
-              {count}
-            </span>
-            <span className="text-sm font-medium text-white/90">
-              Selected
-            </span>
-          </div>
-
-          <div className="h-6 w-px bg-white/10 hidden sm:block" />
-
-          <div className="hidden sm:flex items-center gap-1">
-            <button
-              onClick={undo}
-              disabled={!canUndo}
-              className={`p-2 rounded-lg transition-colors ${
-                canUndo ? "hover:bg-white/10 text-white" : "text-white/30 cursor-not-allowed"
-              }`}
-              aria-label="Undo selection"
-            >
-              <Undo2 className="w-4 h-4" />
-            </button>
-            <button
-              onClick={redo}
-              disabled={!canRedo}
-              className={`p-2 rounded-lg transition-colors ${
-                canRedo ? "hover:bg-white/10 text-white" : "text-white/30 cursor-not-allowed"
-              }`}
-              aria-label="Redo selection"
-            >
-              <Redo2 className="w-4 h-4" />
-            </button>
-          </div>
+    <>
+      {/* In-app toast */}
+      {toast && (
+        <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl border shadow-xl animate-in slide-in-from-right-5 fade-in duration-300 max-w-md ${
+          toast.type === "success"
+            ? "bg-[#B6FF4A]/10 border-[#B6FF4A]/30 text-[#B6FF4A]"
+            : "bg-red-400/10 border-red-400/30 text-red-400"
+        }`}>
+          {toast.type === "success"
+            ? <CheckCircle2 className="w-4 h-4 shrink-0" />
+            : <AlertCircle className="w-4 h-4 shrink-0" />}
+          <span className="text-[13px] font-medium leading-relaxed">{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 opacity-60 hover:opacity-100 shrink-0">
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
+      )}
 
-        {/* Right Side: Actions */}
-        <div className="flex items-center gap-2 pr-1 w-full sm:w-auto">
-          {onCompare && (
-            <button
-              onClick={() => onCompare(selectedIds)}
-              disabled={count < 2 || count > 4}
-              title={
-                count < 2
-                  ? "Select at least 2 clips to compare"
-                  : count > 4
-                  ? "Maximum 4 clips can be compared at once"
-                  : "Compare clips side-by-side"
-              }
-              className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-semibold text-brand bg-brand/10 hover:bg-brand/20 border border-brand/20 transition-colors flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Columns className="w-4 h-4" />
-              <span>Compare ({count})</span>
-            </button>
-          )}
-          <button className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-white/10 transition-colors flex items-center justify-center gap-2">
-            <Download className="w-4 h-4" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
-          {onArchive && (
-            <button
-              onClick={() => onArchive(selectedIds)}
-              disabled={isArchiving}
-              className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-white/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isArchiving ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Archive className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">
-                {isArchiving ? "Archiving..." : "Archive"}
-              </span>
-            </button>
-          )}
-          {onDelete && (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              disabled={isDeleting}
-              className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium text-error hover:bg-error/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            >
-              {isDeleting ? (
-                <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <Trash2 className="w-4 h-4" />
-              )}
-              <span className="hidden sm:inline">
-                {isDeleting ? "Deleting..." : "Delete"}
-              </span>
-            </button>
-          )}
-          <button
-            onClick={() => setShowPlatformPicker(true)}
-            disabled={isPosting}
-            className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-sm font-medium text-white hover:bg-white/10 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {isPosting ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <Share2 className="w-4 h-4" />}
-            <span className="hidden sm:inline">{isPosting ? "Posting..." : "Post"}</span>
-          </button>
-          <button
-            onClick={onMint}
-            disabled={isMinting}
-            className="flex-1 sm:flex-none px-6 py-2 rounded-xl text-sm font-bold bg-brand text-black hover:bg-brand-hover transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:active:scale-100 disabled:cursor-not-allowed"
-          >
-            {isMinting ? (
-              <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+      <div className="w-full py-6 animate-in slide-in-from-bottom-5 fade-in duration-500 border-t border-[#0e4d2a] bg-[#020D08]/80 backdrop-blur-md">
+        <div className="relative bg-[#06351C] border border-[#0e4d2a] rounded-[32px] px-8 py-4 flex flex-col lg:flex-row items-center justify-between gap-6 w-full shadow-2xl">
+          {/* Left: count */}
+          <div className="flex items-center gap-4">
+            <div className="w-10 h-10 rounded-full bg-[#B6FF4A] flex items-center justify-center text-[#020D08] font-black text-[16px]">
+              {count}
+            </div>
+            <div className="space-y-0.5">
+              <p className="text-[16px] font-extrabold text-[#F4F7EF]">Clips selected</p>
+              <p className="text-[12px] font-medium text-[#90A89C]">Ready for Post Kit download or deletion</p>
+            </div>
+          </div>
+
+          {/* Middle: actions */}
+          <div className="flex flex-wrap items-center justify-center gap-4 text-[#90A89C]">
+            {confirmDelete ? (
+              <div className="flex items-center gap-3">
+                <span className="text-[13px] text-red-400 font-medium">Delete {count} clip{count > 1 ? "s" : ""}?</span>
+                <button
+                  onClick={handleDelete}
+                  disabled={loading}
+                  className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-bold hover:bg-red-500/20 transition-all"
+                >
+                  Confirm
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  className="px-4 py-2 rounded-xl border border-[#0e4d2a] text-[#90A89C] text-[13px] font-bold hover:text-[#F4F7EF] transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
             ) : (
-              <Sparkles className="w-4 h-4" />
+              <button
+                onClick={handleDelete}
+                disabled={loading}
+                className="flex items-center gap-2.5 px-6 py-3 rounded-2xl border border-[#0e4d2a] bg-[#042413] text-[13px] font-bold text-[#90A89C] hover:text-red-400 hover:border-red-400/20 transition-all disabled:opacity-50"
+              >
+                {loading && action === "delete" ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Trash2 className="w-4 h-4" />
+                )}
+                <span>Delete</span>
+              </button>
             )}
-            Mint as NFT
-          </button>
+          </div>
+
+          {/* Right: platform picker + auto-post */}
+          <div className="flex flex-col sm:flex-row items-center gap-4 relative">
+            {/* Auto-posting badge indicator */}
+            {/* <div className="flex items-center gap-2.5 px-5 py-3 rounded-2xl bg-[#042413] border border-[#0e4d2a] text-[#B6FF4A] font-black text-[12px] select-none">
+              <Zap className="w-4 h-4 fill-[#B6FF4A]" />
+              <span>AUTO-POSTING</span>
+              <span className="px-2 py-0.5 rounded-full bg-[#B6FF4A]/15 border border-[#B6FF4A]/30 text-[#B6FF4A] text-[9px] font-black uppercase tracking-wider">
+                Coming Soon
+              </span>
+            </div> */}
+
+            {/* Platform selector */}
+            <div className="relative z-[100]">
+              <button
+                onClick={() => setShowPlatformPicker(v => !v)}
+                className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-[#042413] border border-[#0e4d2a] text-[#F4F7EF] font-bold text-[12px] hover:border-[#39FF14]/40 transition-all"
+              >
+                <span>
+                  {selectedPlatforms.length === 0
+                    ? "Select platforms"
+                    : selectedPlatforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(", ")}
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 text-[#90A89C]" />
+              </button>
+
+              {showPlatformPicker && (
+                <div className="absolute bottom-full mb-2 right-0 z-50 bg-[#042413] border border-[#0e4d2a] rounded-2xl p-4 shadow-2xl min-w-[180px] animate-in slide-in-from-bottom-3 fade-in duration-200">
+                  <p className="text-[10px] font-black text-[#90A89C] uppercase tracking-widest mb-3">Post to</p>
+                  <div className="flex flex-col gap-2">
+                    {POST_PLATFORMS.map(({ key, label }) => (
+                      <button
+                        key={key}
+                        onClick={() => togglePlatform(key)}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] font-bold transition-all ${
+                          selectedPlatforms.includes(key)
+                            ? "bg-[#B6FF4A]/12 border border-[#B6FF4A]/30 text-[#B6FF4A]"
+                            : "border border-[#0e4d2a] text-[#90A89C] hover:text-[#F4F7EF] hover:border-[#39FF14]/40"
+                        }`}
+                      >
+                        <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 border ${
+                          selectedPlatforms.includes(key) ? "bg-[#B6FF4A] border-[#B6FF4A]" : "border-[#0e4d2a]"
+                        }`}>
+                          {selectedPlatforms.includes(key) && (
+                            <CheckCircle2 className="w-3 h-3 text-[#020D08]" />
+                          )}
+                        </div>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    onClick={() => setShowPlatformPicker(false)}
+                    className="mt-3 w-full py-2 rounded-xl bg-[#B6FF4A] text-[#020D08] font-black text-[12px] hover:bg-[#c6ff6b] transition-all"
+                  >
+                    Done
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Auto-Post CTA Button with Coming Soon badge */}
+            <button
+              onClick={handlePost}
+              disabled={loading}
+              className="flex items-center gap-3 px-8 py-4 rounded-3xl bg-[#B6FF4A] text-[#020D08] font-black text-[14px] sm:text-[15px] transition-all hover:bg-[#c6ff6b] hover:scale-[1.02] active:scale-[0.98] shadow-[0_10px_30px_rgba(57,255,20,0.25)]"
+            >
+              <span>Auto-Post Selected</span>
+              <span className="px-2 py-0.5 rounded-full bg-[#020D08]/20 text-[#020D08] text-[9px] font-black uppercase tracking-wider">
+                Coming Soon
+              </span>
+              <MoveRight className="w-4 h-4 ml-0.5" />
+            </button>
+          </div>
         </div>
       </div>
-      {archiveError && (
-        <p className="text-error text-xs mt-2 text-center" role="alert">
-          {archiveError}
-        </p>
-      )}
-
-      {/* Delete confirmation — deletion is not undoable from the UI, so it is
-          always gated behind an explicit confirm. */}
-      {showDeleteConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowDeleteConfirm(false)}
-        >
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div
-            role="alertdialog"
-            aria-modal="true"
-            aria-labelledby="delete-clips-title"
-            className="relative bg-surface border border-white/10 rounded-2xl p-6 w-full max-w-sm"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3 id="delete-clips-title" className="text-lg font-bold text-white mb-2">
-              Delete {count} {clipNoun}?
-            </h3>
-            <p className="text-sm text-muted mb-6">This cannot be undone.</p>
-            {deleteError && <p className="text-error text-xs mb-3">{deleteError}</p>}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="flex-1 px-4 py-2 rounded-xl border border-white/10 text-white text-sm font-medium hover:bg-white/5"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteConfirm}
-                disabled={isDeleting}
-                className="flex-1 px-4 py-2 rounded-xl bg-error text-white text-sm font-bold hover:opacity-90 disabled:opacity-50"
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Platform picker modal */}
-      {showPlatformPicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowPlatformPicker(false)}>
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-          <div className="relative bg-surface border border-white/10 rounded-2xl p-6 w-full max-w-sm" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-white mb-4">Post to platforms</h3>
-            <div className="space-y-2 mb-6">
-              {PLATFORMS.map((p) => (
-                <label key={p} className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer">
-                  <input type="checkbox" checked={selectedPlatforms.includes(p)} onChange={() => setSelectedPlatforms((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p])} className="accent-brand" />
-                  <span className="text-white font-medium text-sm capitalize">{p}</span>
-                </label>
-              ))}
-            </div>
-            {postError && <p className="text-error text-xs mb-3">{postError}</p>}
-            <div className="flex gap-3">
-              <button onClick={() => setShowPlatformPicker(false)} className="flex-1 px-4 py-2 rounded-xl border border-white/10 text-white text-sm font-medium hover:bg-white/5">Cancel</button>
-              <button onClick={handlePostConfirm} disabled={selectedPlatforms.length === 0 || isPosting} className="flex-1 px-4 py-2 rounded-xl bg-brand text-black text-sm font-bold hover:bg-brand-hover disabled:opacity-50">Confirm</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+    </>
   );
 }
