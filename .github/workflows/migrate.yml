@@ -1,0 +1,8 @@
+name: db-migrate
+on: [push]
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx prisma migrate deploy
