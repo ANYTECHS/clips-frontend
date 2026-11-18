@@ -42,9 +42,10 @@ NEXT_PUBLIC_STELLAR_NETWORK=testnet
 npm install
 npm run dev        # http://localhost:3000
 npm run build      # production build
-npm run test       # unit tests (vitest)
-npm run test:e2e   # e2e tests (playwright)
 ```
+
+For a complete guided setup and contribution workflow, see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
