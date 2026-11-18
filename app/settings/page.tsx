@@ -21,6 +21,8 @@ export default function SettingsPage() {
   const [profileLoading, setProfileLoading] = useState(false);
   const [avatarLoading, setAvatarLoading] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [emailDigest, setEmailDigest] = useState(false);
+  const DIGEST_SCHEDULE = "0 8 * * *";
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
