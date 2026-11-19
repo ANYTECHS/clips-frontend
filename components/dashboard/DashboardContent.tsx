@@ -7,7 +7,6 @@ import { getDashboardData, getVideos } from "@/lib/queries";
 import { loadActiveJob, clearActiveJob } from "@/lib/processingStore";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import StatCard from "@/components/dashboard/StatCard";
-import EarningsCard from "@/components/dashboard/EarningsCard";
 import ProjectCard from "@/components/dashboard/ProjectCard";
 import { Video, Globe, ChevronDown, Loader2, Sparkles, X } from "lucide-react";
 
@@ -125,11 +124,6 @@ export default function DashboardContent({ stats: initialStats, projects: initia
             trend="Steady" 
             icon={Globe} 
           />
-        </div>
-
-        {/* Middle Section */}
-        <div>
-          <EarningsCard />
         </div>
 
         {/* Bottom Section: Recent Projects */}

@@ -13,6 +13,7 @@ import {
   LogOut,
   Sparkles,
   Cpu as CpuAi,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import Logo from "@/components/shared/Logo";
@@ -21,6 +22,7 @@ import { getUserClipCount } from "@/lib/queries";
 
 const staticMenuItems = [
   { id: "dashboard",         label: "Dashboard",        icon: LayoutDashboard, href: "/dashboard" },
+  { id: "analytics",         label: "Analytics",        icon: BarChart3,       href: "/analytics" },
   { id: "ai-projects",       label: "AI Projects",      icon: Sparkles,        href: "/ai-projects" },
   { id: "agent-marketplace", label: "Agent Marketplace",icon: CpuAi,             href: "/agent-marketplace" },
   { id: "platforms",         label: "Auto-Posting",     icon: Share2,          href: "/platforms" },
@@ -55,6 +57,7 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
         staticMenuItems[2],
         staticMenuItems[3],
         staticMenuItems[4],
+        staticMenuItems[5],
       ]
     : staticMenuItems;
 
