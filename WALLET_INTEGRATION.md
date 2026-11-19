@@ -143,8 +143,8 @@ Add to `.env.local` (already done) and your production environment (Vercel, etc.
 ### Non-custodial by design
 Your backend never sees the user's private key or secret. The wallet extension holds the keys. ClipCash only ever sees the **public key (G…)**.
 
-### Address persistence
-The address is stored in `localStorage` under the key `clipcash_wallet_address`. On reload, the UI restores immediately without re-prompting. The kit's `STATE_UPDATED` event keeps it in sync if the user switches accounts inside their wallet.
+### Address persistence and network changes
+The address is stored in `localStorage` under the key `clipcash_wallet_address`. On reload, the UI restores immediately without re-prompting. The kit's `STATE_UPDATED` event keeps it in sync if the user switches accounts inside their wallet. While connected, the provider checks the active network periodically and when the page regains focus, then refreshes Horizon balances when the network changes. If the wallet is on a network other than the app's configured `NEXT_PUBLIC_STELLAR_NETWORK`, the address is cleared and a banner asks the user to switch networks and reconnect.
 
 ### No signing yet
 This integration handles **connection only** — reading the public key so you can associate it with a user account, show their balance, route rewards to it, etc. If you later need to sign and submit transactions (e.g. payment, token mint):

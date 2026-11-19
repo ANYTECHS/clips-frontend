@@ -14,6 +14,11 @@ export const STELLAR_NETWORK =
     ? Networks.PUBLIC
     : Networks.TESTNET;
 
+export interface StellarBalance {
+  assetCode: string;
+  amount: string;
+}
+
 let kitInitialised = false;
 
 export function initWalletKit(): void {
@@ -40,6 +45,41 @@ export async function connectWalletModal(): Promise<string> {
 export async function getWalletAddress(): Promise<string> {
   const { address } = await StellarWalletsKit.getAddress();
   return address;
+}
+
+export async function getWalletNetwork(): Promise<string> {
+  const { networkPassphrase } = await StellarWalletsKit.getNetwork();
+  return networkPassphrase;
+}
+
+export async function fetchWalletBalances(
+  address: string,
+  networkPassphrase: string,
+): Promise<StellarBalance[]> {
+  const horizonUrl =
+    networkPassphrase === Networks.PUBLIC
+      ? "https://horizon.stellar.org"
+      : networkPassphrase === Networks.TESTNET
+        ? "https://horizon-testnet.stellar.org"
+        : null;
+
+  if (!horizonUrl) {
+    throw new Error("Cannot fetch balances for an unsupported Stellar network.");
+  }
+
+  const response = await fetch(`${horizonUrl}/accounts/${encodeURIComponent(address)}`);
+  if (response.status === 404) return [];
+  if (!response.ok) {
+    throw new Error(`Failed to fetch Stellar balances (HTTP ${response.status}).`);
+  }
+
+  const account = await response.json();
+  return (account.balances ?? []).map(
+    (balance: { asset_type: string; asset_code?: string; balance: string }) => ({
+      assetCode: balance.asset_type === "native" ? "XLM" : balance.asset_code ?? "Unknown",
+      amount: balance.balance,
+    }),
+  );
 }
 
 export async function openProfileModal(): Promise<void> {
