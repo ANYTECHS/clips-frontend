@@ -59,12 +59,12 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
     : staticMenuItems;
 
   return (
-    <aside className={`fixed top-0 left-0 h-screen w-[280px] bg-[#031d0f] border-r border-[#0e4d2a] z-50 flex flex-col transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+    <aside className={`fixed top-0 start-0 h-screen w-[280px] bg-[#031d0f] border-e border-[#0e4d2a] z-50 flex flex-col transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
       <div className="p-8 flex items-center justify-between">
         <Logo />
         <button 
           onClick={onClose}
-          className="lg:hidden p-2 -mr-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors"
+          className="lg:hidden p-2 -me-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors"
           aria-label="Close sidebar"
         >
           <X className="w-6 h-6" />
@@ -87,17 +87,17 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
               <item.icon className={`w-5 h-5 transition-colors ${isActive ? "text-[#B6FF4A]" : "text-[#5A7A6B] group-hover:text-[#F4F7EF]"}`} />
               <span className="text-[14px]">{item.label}</span>
               {item.id === "projects" && hasClips && (
-                <span className="ml-auto px-1.5 py-0.5 rounded-md bg-[#B6FF4A]/15 text-[#B6FF4A] text-[9px] font-black tracking-wider">
+                <span className="ms-auto px-1.5 py-0.5 rounded-md bg-[#B6FF4A]/15 text-[#B6FF4A] text-[9px] font-black tracking-wider">
                   {clipCount > 99 ? "99+" : clipCount}
                 </span>
               )}
               {item.id === "platforms" && (
-                <span className="ml-auto px-2 py-0.5 rounded-full bg-[#B6FF4A]/10 border border-[#B6FF4A]/20 text-[#B6FF4A] text-[9px] font-black uppercase tracking-wider">
+                <span className="ms-auto px-2 py-0.5 rounded-full bg-[#B6FF4A]/10 border border-[#B6FF4A]/20 text-[#B6FF4A] text-[9px] font-black uppercase tracking-wider">
                   Coming Soon
                 </span>
               )}
               {isActive && item.id !== "projects" && item.id !== "platforms" && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#39FF14] shadow-[0_0_8px_rgba(57,255,20,0.8)]" />
+                <div className="ms-auto w-1.5 h-1.5 rounded-full bg-[#39FF14] shadow-[0_0_8px_rgba(57,255,20,0.8)]" />
               )}
             </Link>
           );

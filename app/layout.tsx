@@ -4,6 +4,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import QueryProvider from "@/components/QueryProvider";
 import { WalletProvider } from "@/components/WalletProvider";
 import { ToastProvider } from "@/components/shared/ToastProvider";
+import arabicLocale from "@/app/locales/ar.json";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://enclips.ai"),
@@ -50,7 +51,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={arabicLocale.locale} dir={arabicLocale.direction} suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
         <div className="radial-bg" />
         <QueryProvider>
