@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useWallet } from "@/components/WalletProvider";
 import WalletButton from "@/components/shared/WalletButton";
+import NetworkToggle from "@/components/shared/NetworkToggle";
 
 type ToastState = { type: "success" | "error"; message: string } | null;
 
@@ -238,6 +239,9 @@ export default function PlatformsContent() {
               )}
             </div>
           </div>
+
+          {/* Network switcher — migrate between Testnet and Mainnet without a new wallet */}
+          <NetworkToggle />
         </section>
 
         {/* Help Banner */}

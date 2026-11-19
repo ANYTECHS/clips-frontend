@@ -8,13 +8,66 @@ import { AlbedoModule } from "@creit-tech/stellar-wallets-kit/modules/albedo";
 import { RabetModule } from "@creit-tech/stellar-wallets-kit/modules/rabet";
 import { Networks } from "@creit-tech/stellar-wallets-kit/types";
 
-const rawNetwork = (process.env.NEXT_PUBLIC_STELLAR_NETWORK || "").trim().toLowerCase();
-export const STELLAR_NETWORK =
-  rawNetwork === "public" || rawNetwork === "mainnet"
-    ? Networks.PUBLIC
-    : Networks.TESTNET;
+/**
+ * The selected Stellar network.
+ *
+ * A Stellar keypair works on BOTH TESTNET and PUBLIC (mainnet) — the secret key
+ * lives in the user's wallet extension (non-custodial), so switching networks
+ * never requires creating a new wallet. We persist the user's choice in
+ * localStorage so it survives reloads; the kit is then re-initialised on the
+ * new network. The connected public key is preserved across the switch.
+ */
+export type NetworkId = "testnet" | "mainnet";
 
+const NETWORK_STORAGE_KEY = "clipcash_stellar_network";
+
+function parseNetworkValue(value: string): NetworkId {
+  const n = (value || "").trim().toLowerCase();
+  return n === "public" || n === "mainnet" ? "mainnet" : "testnet";
+}
+
+function resolveInitialNetwork(): NetworkId {
+  // Client-side: prefer the user's stored choice over the build-time env var.
+  if (typeof window !== "undefined") {
+    const stored = window.localStorage.getItem(NETWORK_STORAGE_KEY);
+    if (stored === "testnet" || stored === "mainnet") return stored;
+  }
+  return parseNetworkValue(process.env.NEXT_PUBLIC_STELLAR_NETWORK || "testnet");
+}
+
+let currentNetworkId: NetworkId = resolveInitialNetwork();
 let kitInitialised = false;
+
+/** Returns the active network as a friendly id ("testnet" | "mainnet"). */
+export function getCurrentNetwork(): NetworkId {
+  return currentNetworkId;
+}
+
+/** True when the active network is Stellar Public / mainnet. */
+export function isMainnet(): boolean {
+  return currentNetworkId === "mainnet";
+}
+
+/** Returns the kit/network-passphrase value for the active network. */
+export function getStellarNetwork(): Networks {
+  return currentNetworkId === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
+}
+
+/**
+ * Persists a network choice so it survives the reload that re-initialises the
+ * kit. The connected public key and the wallet extension's keys are preserved —
+ * the same keypair is reused on the new network.
+ */
+export function setNetwork(network: NetworkId): void {
+  currentNetworkId = network;
+  if (typeof window !== "undefined") {
+    window.localStorage.setItem(NETWORK_STORAGE_KEY, network);
+  }
+  // The kit is bound to a single network per page load. Switching networks
+  // requires a fresh init, so mark the kit as needing re-init. The UI triggers
+  // a reload after switching, which re-runs initWalletKit() on the new network.
+  kitInitialised = false;
+}
 
 export function initWalletKit(): void {
   if (kitInitialised || typeof window === "undefined") return;
@@ -27,7 +80,7 @@ export function initWalletKit(): void {
       new AlbedoModule(),
       new RabetModule(),
     ],
-    network: STELLAR_NETWORK,
+    network: getStellarNetwork(),
   });
 }
 
@@ -64,10 +117,7 @@ export async function signTransaction(xdr: string): Promise<string> {
   initWalletKit();
   const { address } = await StellarWalletsKit.getAddress();
 
-  const networkPassphrase =
-    STELLAR_NETWORK === Networks.PUBLIC
-      ? "Public Global Stellar Network ; September 2015"
-      : "Test SDF Network ; September 2015";
+  const networkPassphrase = getStellarNetwork();
 
   const { signedTxXdr } = await StellarWalletsKit.signTransaction(xdr, {
     address,
@@ -115,15 +165,13 @@ export function ensureHexSignature(signature: string): string {
 
 // Checks if Stellar account has an active USDC trustline
 export async function hasUsdcTrustline(stellarAddress: string): Promise<boolean> {
-  const horizonUrl =
-    STELLAR_NETWORK === Networks.PUBLIC
-      ? "https://horizon.stellar.org"
-      : "https://horizon-testnet.stellar.org";
+  const horizonUrl = isMainnet()
+    ? "https://horizon.stellar.org"
+    : "https://horizon-testnet.stellar.org";
 
-  const usdcIssuer =
-    STELLAR_NETWORK === Networks.PUBLIC
-      ? "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
-      : "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
+  const usdcIssuer = isMainnet()
+    ? "GA5ZSEJYB37JRC5AVCIA5MOP4RHTM335X2KGX3IHOJAPP5RE34K4KZVN"
+    : "GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5";
 
   try {
     const res = await fetch(`${horizonUrl}/accounts/${stellarAddress}`);
@@ -160,10 +208,9 @@ export async function hasUsdcTrustline(stellarAddress: string): Promise<boolean>
 
 // Submits signed Stellar transaction XDR directly to Horizon
 export async function submitToStellar(signedXdr: string): Promise<string> {
-  const horizonUrl =
-    STELLAR_NETWORK === Networks.PUBLIC
-      ? "https://horizon.stellar.org"
-      : "https://horizon-testnet.stellar.org";
+  const horizonUrl = isMainnet()
+    ? "https://horizon.stellar.org"
+    : "https://horizon-testnet.stellar.org";
 
   const body = new URLSearchParams({ tx: signedXdr });
 
@@ -183,7 +230,7 @@ export async function submitToStellar(signedXdr: string): Promise<string> {
     // Always log the raw codes so they're visible in the browser console
     console.error("[submitToStellar] failed — result_codes:", JSON.stringify(codes));
 
-    const isPublic = STELLAR_NETWORK === Networks.PUBLIC;
+    const isPublic = isMainnet();
     const networkLabel = isPublic ? "Public (Mainnet)" : "Testnet";
 
     // ── Transaction-level codes ──────────────────────────────────────────────

@@ -1,0 +1,52 @@
+{
+  "common": {
+    "cancel": "Annuler",
+    "confirm": "Confirmer",
+    "continue": "Continuer",
+    "back": "Retour",
+    "save": "Enregistrer",
+    "loading": "Chargement…"
+  },
+  "wallet": {
+    "connect": "Connecter le portefeuille",
+    "connecting": "Connexion…",
+    "disconnect": "Déconnecter",
+    "connected": "Connecté",
+    "linking": "Liaison du portefeuille…",
+    "linked": "Portefeuille lié à votre compte !",
+    "linkFailed": "Échec de la liaison du portefeuille. Veuillez réessayer."
+  },
+  "network": {
+    "stellarNetwork": "Réseau Stellar",
+    "testnet": "Testnet",
+    "mainnet": "Mainnet",
+    "preserved": "Les clés et le portefeuille sont conservés d'un réseau à l'autre — aucun nouveau portefeuille nécessaire.",
+    "switchToMainnet": "Passer à Mainnet",
+    "switchToTestnet": "Passer à Testnet",
+    "switchMainnetTitle": "Passer à Mainnet",
+    "switchTestnetTitle": "Passer à Testnet",
+    "switchMainnetMessage": "Passer à Mainnet utilise du vrai XLM et de vraies transactions. Vos clés et votre adresse connectée sont conservées — aucun nouveau portefeuille n'est nécessaire. Assurez-vous que votre extension de portefeuille est réglée sur Mainnet/Public et que votre compte est financé sur mainnet, puis confirmez. La page se rechargera pour appliquer le changement.",
+    "switchTestnetMessage": "Vous reviendrez au Testnet Stellar. C'est sûr pour expérimenter — aucun fonds réel n'est impliqué. Vos clés et votre adresse connectée restent les mêmes ; la page se rechargera pour appliquer le changement."
+  },
+  "dashboard": {
+    "title": "Tableau de bord",
+    "totalEarnings": "Gains totaux",
+    "recentTips": "Pourboires récents",
+    "processing": "Traitement…"
+  },
+  "earnings": {
+    "total": "Gains totaux",
+    "xlm": "XLM",
+    "recentTips": "Pourboires récents",
+    "noTips": "Aucun pourboire pour l'instant"
+  },
+  "clips": {
+    "title": "Clips",
+    "upload": "Téléverser la vidéo",
+    "generate": "Générer des clips",
+    "count": {
+      "one": "{{count}} clip",
+      "other": "{{count}} clips"
+    }
+  }
+}
