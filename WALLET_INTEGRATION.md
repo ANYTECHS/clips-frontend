@@ -126,13 +126,66 @@ Add to `.env.local` (already done) and your production environment (Vercel, etc.
 
 ---
 
-## Switching to Mainnet
+## Switching networks — the Testnet → Mainnet migration path
+
+Users can move between Testnet and Mainnet **without creating a new wallet**.
+A Stellar keypair works on both networks: the secret key lives in the user's
+wallet extension (non-custodial), and the same public key (`G…`) is reused on
+either ledger. Only the network passphrase and Horizon endpoint differ.
+
+### Option A — in-app network toggle (recommended for users)
+
+The Platforms page (`/platforms`, *Web3 Wallets* section) renders a
+`<NetworkToggle />` that switches the active network with a confirmation modal.
+
+What happens when a user confirms the switch:
+
+1. The chosen network is written to `localStorage` (`clipcash_stellar_network`).
+2. `clipcash_wallet_address` is **left untouched** — the connected public key
+   is preserved, and the wallet extension still holds the keys. No new wallet,
+   no re-connect, no re-link to the backend account.
+3. The page reloads. On reload `lib/wallet.ts` reads the stored network,
+   re-initialises `StellarWalletsKit` on the new network, and restores the
+   connected address.
+
+> The kit binds to a single network per page load, so a reload is required to
+> re-init on the new network. This mirrors Stellar's own guidance that an
+> existing instance should not switch networks in place — a fresh init is used.
+
+### Option B — environment variable (deploy-time default)
+
+Set the build-time default that the toggle falls back to when no user choice is
+stored:
 
 1. In `.env.local` (or Vercel env):
    ```
    NEXT_PUBLIC_STELLAR_NETWORK=mainnet
    ```
-2. That's it — `lib/wallet.ts` reads this and passes `Networks.PUBLIC` to the kit.
+2. `lib/wallet.ts` reads this as the default network. A user can still override
+   it at runtime with the toggle; their choice is persisted in `localStorage`
+   and takes precedence over the env var.
+
+### Before going to mainnet — checklist for users
+
+A testnet account does **not** exist on mainnet (they are separate ledgers).
+The keypair is the same, but the account must be created on each network:
+
+1. **Switch the wallet extension** (Freighter / Lobstr / Albedo / Rabet) to
+   **Mainnet / Public**. If the extension stays on Testnet while the app is on
+   Mainnet, signing fails with `tx_bad_auth`.
+2. **Fund the mainnet account** with at least 2 XLM (the Stellar minimum
+   reserve). Testnet balances do not carry over.
+3. **Add a USDC trustline** on mainnet if the app uses USDC payments/tips.
+4. Use the in-app toggle to switch the app to Mainnet and confirm.
+
+### Files
+
+| File | What it does |
+|------|-------------|
+| `lib/wallet.ts` | `NetworkId`, `getCurrentNetwork`, `isMainnet`, `getStellarNetwork`, `setNetwork` — runtime-switchable, persisted network selection |
+| `components/shared/NetworkToggle.tsx` | UI toggle + confirmation modal |
+| `components/WalletProvider.tsx` | Exposes `network` and `switchNetwork()` via `useWallet()` |
+| `components/platforms/PlatformsContent.tsx` | Renders `<NetworkToggle />` in the Web3 Wallets section |
 
 > **Always test on testnet first.** You can get test XLM from [Friendbot](https://laboratory.stellar.org/#account-creator).
 
@@ -143,8 +196,8 @@ Add to `.env.local` (already done) and your production environment (Vercel, etc.
 ### Non-custodial by design
 Your backend never sees the user's private key or secret. The wallet extension holds the keys. ClipCash only ever sees the **public key (G…)**.
 
-### Address persistence
-The address is stored in `localStorage` under the key `clipcash_wallet_address`. On reload, the UI restores immediately without re-prompting. The kit's `STATE_UPDATED` event keeps it in sync if the user switches accounts inside their wallet.
+### Address persistence and network changes
+The address is stored in `localStorage` under the key `clipcash_wallet_address`. On reload, the UI restores immediately without re-prompting. The kit's `STATE_UPDATED` event keeps it in sync if the user switches accounts inside their wallet. While connected, the provider checks the active network periodically and when the page regains focus, then refreshes Horizon balances when the network changes. If the wallet is on a network other than the app's configured `NEXT_PUBLIC_STELLAR_NETWORK`, the address is cleared and a banner asks the user to switch networks and reconnect.
 
 ### No signing yet
 This integration handles **connection only** — reading the public key so you can associate it with a user account, show their balance, route rewards to it, etc. If you later need to sign and submit transactions (e.g. payment, token mint):

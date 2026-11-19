@@ -1,0 +1,52 @@
+{
+  "common": {
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "continue": "Continuar",
+    "back": "Voltar",
+    "save": "Salvar",
+    "loading": "Carregando…"
+  },
+  "wallet": {
+    "connect": "Conectar carteira",
+    "connecting": "Conectando…",
+    "disconnect": "Desconectar",
+    "connected": "Conectada",
+    "linking": "Vinculando carteira…",
+    "linked": "Carteira vinculada à sua conta!",
+    "linkFailed": "Falha ao vincular a carteira. Tente novamente."
+  },
+  "network": {
+    "stellarNetwork": "Rede Stellar",
+    "testnet": "Testnet",
+    "mainnet": "Mainnet",
+    "preserved": "As chaves e a carteira são preservadas ao trocar de rede — não é necessária uma nova carteira.",
+    "switchToMainnet": "Mudar para Mainnet",
+    "switchToTestnet": "Mudar para Testnet",
+    "switchMainnetTitle": "Mudar para Mainnet",
+    "switchTestnetTitle": "Mudar para Testnet",
+    "switchMainnetMessage": "Mudar para Mainnet usa XLM reais e transações reais. Suas chaves e o endereço conectado são preservados — não é necessária uma nova carteira. Certifique-se de que a extensão da carteira está definida para Mainnet/Public e de que a sua conta tem fundos na mainnet, depois confirme. A página será recarregada para aplicar a alteração.",
+    "switchTestnetMessage": "Voltará à Testnet da Stellar. É seguro para experimentar — não há fundos reais envolvidos. As suas chaves e o endereço conectado permanecem os mesmos; a página será recarregada para aplicar a alteração."
+  },
+  "dashboard": {
+    "title": "Painel",
+    "totalEarnings": "Ganhos totais",
+    "recentTips": "Gorjetas recentes",
+    "processing": "A processar…"
+  },
+  "earnings": {
+    "total": "Ganhos totais",
+    "xlm": "XLM",
+    "recentTips": "Gorjetas recentes",
+    "noTips": "Ainda sem gorjetas"
+  },
+  "clips": {
+    "title": "Clips",
+    "upload": "Enviar vídeo",
+    "generate": "Gerar clips",
+    "count": {
+      "one": "{{count}} clipe",
+      "other": "{{count}} clips"
+    }
+  }
+}

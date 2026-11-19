@@ -1,0 +1,20 @@
+name: translations
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate-translations:
+    name: Translation key parity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # The validator is dependency-free (Node built-ins only), so no
+      # `npm install` is required. It fails (exit 1) and prints the missing
+      # keys when any locale lacks a key present in en.json.
+      - run: npm run validate:translations

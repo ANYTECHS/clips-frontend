@@ -1,0 +1,52 @@
+{
+  "common": {
+    "cancel": "Cancelar",
+    "confirm": "Confirmar",
+    "continue": "Continuar",
+    "back": "Atrás",
+    "save": "Guardar",
+    "loading": "Cargando…"
+  },
+  "wallet": {
+    "connect": "Conectar billetera",
+    "connecting": "Conectando…",
+    "disconnect": "Desconectar",
+    "connected": "Conectada",
+    "linking": "Vinculando billetera…",
+    "linked": "¡Billetera vinculada a tu cuenta!",
+    "linkFailed": "Error al vincular la billetera. Inténtalo de nuevo."
+  },
+  "network": {
+    "stellarNetwork": "Red Stellar",
+    "testnet": "Testnet",
+    "mainnet": "Mainnet",
+    "preserved": "Las claves y la billetera se conservan al cambiar de red — no necesitas una billetera nueva.",
+    "switchToMainnet": "Cambiar a Mainnet",
+    "switchToTestnet": "Cambiar a Testnet",
+    "switchMainnetTitle": "Cambiar a Mainnet",
+    "switchTestnetTitle": "Cambiar a Testnet",
+    "switchMainnetMessage": "Cambiar a Mainnet usa XLM reales y transacciones reales. Tus claves y la dirección conectada se conservan — no necesitas una billetera nueva. Asegúrate de que tu extensión de billetera esté en Mainnet/Public y de que tu cuenta tenga fondos en mainnet, y luego confirma. La página se recargará para aplicar el cambio.",
+    "switchTestnetMessage": "Volverás a la Testnet de Stellar. Es seguro para experimentar — no hay fondos reales implicados. Tus claves y la dirección conectada permanecen igual; la página se recargará para aplicar el cambio."
+  },
+  "dashboard": {
+    "title": "Panel",
+    "totalEarnings": "Ganancias totales",
+    "recentTips": "Propinas recientes",
+    "processing": "Procesando…"
+  },
+  "earnings": {
+    "total": "Ganancias totales",
+    "xlm": "XLM",
+    "recentTips": "Propinas recientes",
+    "noTips": "Aún no hay propinas"
+  },
+  "clips": {
+    "title": "Clips",
+    "upload": "Subir vídeo",
+    "generate": "Generar clips",
+    "count": {
+      "one": "{{count}} clip",
+      "other": "{{count}} clips"
+    }
+  }
+}

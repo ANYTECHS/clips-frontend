@@ -4,7 +4,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import QueryProvider from "@/components/QueryProvider";
 import { WalletProvider } from "@/components/WalletProvider";
 import { ToastProvider } from "@/components/shared/ToastProvider";
-import arabicLocale from "@/app/locales/ar.json";
+import { I18nProvider } from "@/components/I18nProvider";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://enclips.ai"),
@@ -55,13 +55,15 @@ export default function RootLayout({
       <body className="font-sans antialiased" suppressHydrationWarning>
         <div className="radial-bg" />
         <QueryProvider>
-          <WalletProvider>
-            <AuthProvider>
-              <ToastProvider>
-                {children}
-              </ToastProvider>
-            </AuthProvider>
-          </WalletProvider>
+          <I18nProvider>
+            <WalletProvider>
+              <AuthProvider>
+                <ToastProvider>
+                  {children}
+                </ToastProvider>
+              </AuthProvider>
+            </WalletProvider>
+          </I18nProvider>
         </QueryProvider>
       </body>
     </html>
