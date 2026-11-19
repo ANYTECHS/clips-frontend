@@ -12,7 +12,13 @@ import { useWallet } from "@/components/WalletProvider";
 import { useAuth } from "@/components/AuthProvider";
 import WalletButton from "@/components/shared/WalletButton";
 import { useToast } from "@/components/shared/ToastProvider";
-import { signTransaction, submitToStellar, hasUsdcTrustline } from "@/lib/wallet";
+import {
+  getTransactionHashFromXdr,
+  signTransaction,
+  submitToStellar,
+  hasUsdcTrustline,
+} from "@/lib/wallet";
+import StellarTransactionStatus from "@/components/shared/StellarTransactionStatus";
 import { uploadVideoToStorage, type StorageUploadResult, MAX_VIDEO_FILE_SIZE_BYTES } from "@/lib/uploadToStorage";
 import {
   buildAgentPaymentXdr, hireAgent,
@@ -59,6 +65,8 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
   const [selPlan,        setSelPlan]        = useState<"STARTER" | "CREATOR" | "PRO">("CREATOR");
   const [step,           setStep]           = useState<Step>("config");
   const [errMsg,         setErrMsg]         = useState("");
+  const [txHash,         setTxHash]         = useState("");
+  const [txStatus,       setTxStatus]       = useState<"pending" | "confirmed" | "failed" | null>(null);
 
   const { data: subscription } = useQuery<StellarSubscription | null>({
     queryKey: ["mySubscription"],
@@ -110,6 +118,9 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
 
   const runHireFlow = async (videoUrl: string, uploadedVideoId?: string) => {
     try {
+      setTxHash("");
+      setTxStatus(null);
+
       if (isFirstFreeJob && payMode === "pay-per-job") {
         setStep("submitting");
 
@@ -159,7 +170,17 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
         const signedSubXdr = await signTransaction(subRes.xdr);
 
         setStep("submitting");
-        const _txHash = await submitToStellar(signedSubXdr);
+        const localTxHash = getTransactionHashFromXdr(signedSubXdr);
+        setTxHash(localTxHash);
+        setTxStatus("pending");
+        try {
+          const submittedHash = await submitToStellar(signedSubXdr);
+          setTxHash(submittedHash);
+          setTxStatus("confirmed");
+        } catch (err) {
+          setTxStatus("failed");
+          throw err;
+        }
 
         await activateSubscription({
           senderAddress: address!,
@@ -190,7 +211,17 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
         const signedPaymentXdr = await signTransaction(paymentRes.xdr);
 
         setStep("submitting");
-        txHash = await submitToStellar(signedPaymentXdr);
+        const localTxHash = getTransactionHashFromXdr(signedPaymentXdr);
+        setTxHash(localTxHash);
+        setTxStatus("pending");
+        try {
+          txHash = await submitToStellar(signedPaymentXdr);
+          setTxHash(txHash);
+          setTxStatus("confirmed");
+        } catch (err) {
+          setTxStatus("failed");
+          throw err;
+        }
       }
 
       setStep("submitting");
@@ -638,6 +669,7 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
                     : "Broadcasting your USDC payment to the Stellar network…"
                   : "Preparing your USDC payment on the Stellar network…"}
               </p>
+              {txStatus && <StellarTransactionStatus status={txStatus} hash={txHash || undefined} />}
             </div>
           )}
           {step === "done" && (
@@ -647,6 +679,7 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
               </div>
               <p className="text-[#F4F7EF] font-bold text-[16px]">Job Started!</p>
               <p className="text-[#90A89C] text-[13px]">Your AI agent has begun processing clips.</p>
+              {txStatus && <StellarTransactionStatus status={txStatus} hash={txHash || undefined} />}
             </div>
           )}
           {step === "error" && (
@@ -659,6 +692,7 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
                 <p className="text-[#90A89C] text-[12px] max-w-sm mx-auto leading-relaxed">
                   {errMsg || "An unexpected error occurred. Please try again."}
                 </p>
+                {txStatus && <StellarTransactionStatus status={txStatus} hash={txHash || undefined} />}
               </div>
               <div className="flex gap-2">
                 <button

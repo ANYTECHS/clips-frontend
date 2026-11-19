@@ -14,9 +14,10 @@ import {
   submitTipTransaction,
   type ClipInfo,
 } from "@/lib/queries";
-import { signTransaction } from "@/lib/wallet";
+import { getTransactionHashFromXdr, signTransaction } from "@/lib/wallet";
 import { markUnlocked } from "@/lib/tipUnlockStore";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
+import StellarTransactionStatus from "@/components/shared/StellarTransactionStatus";
 
 interface TipModalProps {
   clipId: string;
@@ -96,6 +97,8 @@ export default function TipModal({
   const [step,       setStep]       = useState<Step>("loading");
   const [info,       setInfo]       = useState<ClipInfo | null>(null);
   const [errorMsg,   setErrorMsg]   = useState("");
+  const [txHash,     setTxHash]     = useState("");
+  const [txStatus,   setTxStatus]   = useState<"pending" | "confirmed" | "failed" | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -138,6 +141,8 @@ export default function TipModal({
     }
 
     try {
+      setTxHash("");
+      setTxStatus(null);
       setStep("building");
       const buildRes = await buildTipTransaction(parseInt(clipId), "1", address);
       const targetXdr = (buildRes as any)?.transactionXdr || (buildRes as any)?.xdr;
@@ -146,12 +151,24 @@ export default function TipModal({
       const signedXdr = await signTransaction(targetXdr);
 
       setStep("submitting");
-      await submitTipTransaction(parseInt(clipId), signedXdr, address);
+      const localTxHash = getTransactionHashFromXdr(signedXdr);
+      setTxHash(localTxHash);
+      setTxStatus("pending");
+      try {
+        const submission = await submitTipTransaction(parseInt(clipId), signedXdr, address);
+        const submittedHash =
+          submission?.txHash || submission?.transactionHash || submission?.hash || localTxHash;
+        setTxHash(submittedHash);
+      } catch (err) {
+        setTxStatus("failed");
+        throw err;
+      }
 
       setStep("confirming");
       const downloadUrl = await waitForDownload(clipId, address);
 
       markUnlocked(clipId, address);
+      setTxStatus("confirmed");
       setStep("success");
       toast("Tip confirmed! Download ready.", "success");
 
@@ -304,6 +321,10 @@ export default function TipModal({
             </div>
           )}
 
+          {txStatus && step !== "success" && (isWorking || step === "error") && (
+            <StellarTransactionStatus status={txStatus} hash={txHash || undefined} />
+          )}
+
           {/* Success state */}
           {step === "success" && (
             <div className="flex flex-col items-center gap-3 py-4">
@@ -317,6 +338,7 @@ export default function TipModal({
               <p className="text-[#90A89C] text-[12px] text-center">
                 Your download is starting…
               </p>
+              <StellarTransactionStatus status="confirmed" hash={txHash || undefined} />
             </div>
           )}
 
