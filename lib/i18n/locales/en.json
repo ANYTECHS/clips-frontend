@@ -1,0 +1,52 @@
+{
+  "common": {
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "continue": "Continue",
+    "back": "Back",
+    "save": "Save",
+    "loading": "Loading…"
+  },
+  "wallet": {
+    "connect": "Connect Wallet",
+    "connecting": "Connecting…",
+    "disconnect": "Disconnect",
+    "connected": "Connected",
+    "linking": "Linking wallet…",
+    "linked": "Wallet linked to your account!",
+    "linkFailed": "Failed to link wallet. Please try again."
+  },
+  "network": {
+    "stellarNetwork": "Stellar Network",
+    "testnet": "Testnet",
+    "mainnet": "Mainnet",
+    "preserved": "Keys & wallet are preserved across networks — no new wallet needed.",
+    "switchToMainnet": "Switch to Mainnet",
+    "switchToTestnet": "Switch to Testnet",
+    "switchMainnetTitle": "Switch to Mainnet",
+    "switchTestnetTitle": "Switch to Testnet",
+    "switchMainnetMessage": "Switching to Mainnet uses real XLM and real transactions. Your wallet keys and connected address are preserved — no new wallet is needed. Make sure your wallet extension is set to Mainnet/Public and that your account is funded on mainnet, then confirm. The page will reload to apply the change.",
+    "switchTestnetMessage": "You'll move back to the Stellar Testnet. This is safe to experiment with — no real funds are involved. Your wallet keys and connected address stay the same; the page will reload to apply the change."
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "totalEarnings": "Total Earnings",
+    "recentTips": "Recent Tips",
+    "processing": "Processing…"
+  },
+  "earnings": {
+    "total": "Total Earnings",
+    "xlm": "XLM",
+    "recentTips": "Recent Tips",
+    "noTips": "No tips yet"
+  },
+  "clips": {
+    "title": "Clips",
+    "upload": "Upload Video",
+    "generate": "Generate Clips",
+    "count": {
+      "one": "{{count}} clip",
+      "other": "{{count}} clips"
+    }
+  }
+}

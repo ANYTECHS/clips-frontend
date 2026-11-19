@@ -30,6 +30,7 @@ import {
   type StellarBalance,
   Networks,
 } from "@/lib/wallet";
+import type { NetworkId } from "@/lib/wallet";
 import { KitEventType } from "@creit-tech/stellar-wallets-kit/types";
 
 const STORAGE_KEY = "clipcash_wallet_address";
@@ -45,6 +46,13 @@ interface WalletContextType {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   openProfile: () => Promise<void>;
+  /**
+   * Switches the active network. The wallet keypair is reused on the new
+   * network (non-custodial — keys never leave the extension) and the connected
+   * public key is preserved in localStorage. The page reloads so the kit
+   * re-initialises on the new network.
+   */
+  switchNetwork: (target: NetworkId) => void;
 }
 
 const WalletContext = createContext<WalletContextType>({
@@ -58,6 +66,7 @@ const WalletContext = createContext<WalletContextType>({
   connect: async () => {},
   disconnect: async () => {},
   openProfile: async () => {},
+  switchNetwork: () => {},
 });
 
 export const useWallet = () => useContext(WalletContext);

@@ -4,6 +4,7 @@ import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Wallet, TrendingUp, ArrowUpRight, Loader2 } from "lucide-react";
 import { getEarningsData } from "@/lib/queries";
+import { useI18n } from "@/components/I18nProvider";
 
 export default function EarningsCard() {
   const { data, isLoading } = useQuery({
@@ -22,11 +23,6 @@ export default function EarningsCard() {
       </div>
     );
   }
-
-  const formatXlm = (value: string | number) => {
-    const num = typeof value === "string" ? parseFloat(value) : value;
-    return num.toFixed(2);
-  };
 
   const formatAddress = (address: string) => {
     if (address.startsWith("G") && address.length === 56) {
@@ -47,7 +43,8 @@ export default function EarningsCard() {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    // Absolute date uses Intl.DateTimeFormat with the active locale.
+    return formatDateLocale(d, { month: "short", day: "numeric" });
   };
 
   return (
