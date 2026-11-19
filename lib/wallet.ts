@@ -7,12 +7,29 @@ import { LobstrModule } from "@creit-tech/stellar-wallets-kit/modules/lobstr";
 import { AlbedoModule } from "@creit-tech/stellar-wallets-kit/modules/albedo";
 import { RabetModule } from "@creit-tech/stellar-wallets-kit/modules/rabet";
 import { Networks } from "@creit-tech/stellar-wallets-kit/types";
+import { TransactionBuilder } from "@stellar/stellar-sdk";
 
 const rawNetwork = (process.env.NEXT_PUBLIC_STELLAR_NETWORK || "").trim().toLowerCase();
 export const STELLAR_NETWORK =
   rawNetwork === "public" || rawNetwork === "mainnet"
     ? Networks.PUBLIC
     : Networks.TESTNET;
+
+export function getTransactionHashFromXdr(xdr: string): string {
+  const networkPassphrase =
+    STELLAR_NETWORK === Networks.PUBLIC
+      ? "Public Global Stellar Network ; September 2015"
+      : "Test SDF Network ; September 2015";
+
+  return Array.from(TransactionBuilder.fromXDR(xdr, networkPassphrase).hash())
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+export function getTransactionExplorerUrl(hash: string): string {
+  const network = STELLAR_NETWORK === Networks.PUBLIC ? "public" : "testnet";
+  return `https://stellar.expert/explorer/${network}/tx/${hash}`;
+}
 
 let kitInitialised = false;
 
