@@ -101,7 +101,7 @@ export default function Navbar({ variant = "landing", sticky = false }: NavbarPr
             <div className="flex items-center gap-4 sm:gap-6">
               
 
-              <div className="relative flex items-center gap-3 pl-4 border-l border-[#0e4d2a]" ref={dropdownRef}>
+              <div className="relative flex items-center gap-3 ps-4 border-s border-[#0e4d2a]" ref={dropdownRef}>
                 <div className="hidden sm:flex flex-col items-end">
                   <span className="text-[13px] font-bold text-[#F4F7EF] leading-none mb-1">
                     {user?.username || user?.profile?.username || user?.fullName || "User"}
@@ -113,7 +113,7 @@ export default function Navbar({ variant = "landing", sticky = false }: NavbarPr
                 </button>
 
                 {dropdownOpen && (
-                  <div className="absolute right-0 top-full mt-4 w-48 bg-[#042413] border border-[#0e4d2a] rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
+                  <div className="absolute end-0 top-full mt-4 w-48 bg-[#042413] border border-[#0e4d2a] rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200 z-50">
                     <button 
                       onClick={() => {
                         logout();
