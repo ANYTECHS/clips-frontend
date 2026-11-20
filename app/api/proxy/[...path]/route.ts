@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createHash } from 'crypto';
+import { logApiRequest, shouldLogBody } from '@/lib/apiLogger';
 
 // Disable Next.js body parsing — we stream the raw body directly to the backend.
 // Without this, Next.js buffers and size-limits request bodies (bad for uploads/SSE).
@@ -31,13 +32,13 @@ async function computeEtag(
 }
 
 async function handler(req: NextRequest) {
+  const startedAt = Date.now();
   const baseUrl = (process.env.API_URL || 'https://clipcash-api.onrender.com').replace(/\/+$/, '');
 
   const path = req.nextUrl.pathname.replace(/^\/api\/proxy/, '');
   const search = req.nextUrl.search;
   const targetUrl = `${baseUrl}${path}${search}`;
-
-  console.log(`[proxy] → ${req.method} ${targetUrl}`);
+  let bodyText: string | null = null;
 
   const headers = new Headers(req.headers);
   headers.delete('host');
@@ -71,9 +72,7 @@ async function handler(req: NextRequest) {
     if (contentType.includes('application/json') && !['GET', 'HEAD'].includes(req.method)) {
       const text = await req.text();
       body = text;
-      if (path.includes('/stellar/')) {
-        console.log(`[proxy] ${req.method} ${path} payload:`, text);
-      }
+      bodyText = text;
     }
 
     // Give the backend up to 45s to respond on non-GET requests. Render's
@@ -115,6 +114,12 @@ async function handler(req: NextRequest) {
     console.error(
       `[proxy] ${req.method} ${path} → ${isWakeUp ? 'backend waking up' : 'connection error'}: ${code || msg}`
     );
+    logApiRequest({
+      method: req.method,
+      path: req.nextUrl.pathname,
+      status: 503,
+      durationMs: Date.now() - startedAt,
+    });
 
     return new NextResponse(
       JSON.stringify({
@@ -130,7 +135,14 @@ async function handler(req: NextRequest) {
     );
   }
 
-  console.log(`[proxy] ← ${req.method} ${targetUrl} → ${backendRes.status}`);
+  logApiRequest({
+    method: req.method,
+    path: req.nextUrl.pathname,
+    status: backendRes.status,
+    durationMs: Date.now() - startedAt,
+    body: bodyText,
+    logBody: shouldLogBody(req.nextUrl.pathname),
+  });
 
   const responseHeaders = new Headers(backendRes.headers);
   // Remove encoding headers — no longer valid after Node's auto-decompression
