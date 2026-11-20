@@ -16,6 +16,7 @@ import apiClient from "@/lib/apiClient";
 import { useAuth } from "@/components/AuthProvider";
 import { useRouter } from "next/navigation";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
+import Button from "@/components/shared/Button";
 
 interface EmailVerificationModalProps {
   isOpen: boolean;
@@ -376,10 +377,9 @@ export default function EmailVerificationModal({
               </div>
 
               {/* Submit CTA */}
-              <button
-                type="submit"
+              <Button size="lg" type="submit"
                 disabled={verifying || !isCodeComplete}
-                className="w-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] py-3.5 rounded-xl font-black text-[14px] flex items-center justify-center gap-2 transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(57,255,20,0.25)] hover:shadow-[0_0_30px_rgba(57,255,20,0.4)] active:scale-[0.99]"
+                className="w-full"
               >
                 {verifying ? (
                   <>
@@ -392,7 +392,7 @@ export default function EmailVerificationModal({
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
-              </button>
+              </Button>
             </form>
 
             {/* Clean Footer Row */}

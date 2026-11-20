@@ -17,6 +17,7 @@ import {
 import { triggerDownload } from "@/lib/download";
 import ReadyToPostModal from "@/components/shared/ReadyToPostModal";
 import { ReadyToPostKit } from "@/lib/queries";
+import Button from "@/components/shared/Button";
 
 
 interface ClipCardProps {
@@ -289,17 +290,16 @@ export default function ClipCard({
           </div>
 
           {/* Action Row 1: Ready-to-Post Kit (Primary Action) */}
-          <button
-            onClick={(e) => {
+          <Button size="sm" onClick={(e) => {
               e.stopPropagation();
               setShowPostKit(true);
             }}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] text-[11px] font-black uppercase tracking-wider transition-all shadow-[0_0_15px_rgba(57,255,20,0.25)] active:scale-[0.98]"
+            className="w-full uppercase tracking-wider"
             title="Open Ready-to-Post Kit with captions, hashtags & one-click sharing"
           >
             <Sparkles className="w-3.5 h-3.5 shrink-0" />
             <span>Ready-to-Post Kit</span>
-          </button>
+          </Button>
 
           {/* Action Row 2: Download HD, Preview & Delete with clear spacing */}
           <div className="flex items-center gap-2 pt-1 border-t border-[#0e4d2a]/60">

@@ -10,6 +10,7 @@ import apiClient from "@/lib/apiClient";
 import { Wallet, Loader2 } from "lucide-react";
 import { signAuthMessage, StellarWalletsKit, ensureHexSignature } from "@/lib/wallet";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
+import Button from "@/components/shared/Button";
 
 function OnboardingInner() {
   const { user, setUser } = useAuth();
@@ -154,13 +155,12 @@ function OnboardingInner() {
                   <p className="text-red-400 text-[13px] text-center">{walletError}</p>
                 )}
 
-                <button
-                  type="submit"
+                <Button type="submit"
                   disabled={loading}
-                  className="w-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] py-[15px] rounded-[12px] font-black text-[15px] flex justify-center items-center gap-2 transition-all disabled:opacity-70 mt-4 cursor-pointer shadow-[0_0_20px_rgba(57,255,20,0.25)]"
+                  className="w-full mt-4 cursor-pointer"
                 >
                   {loading ? <Loader2 className="w-5 h-5 animate-spin text-[#020D08]" /> : "Create Account & Go to Dashboard"}
-                </button>
+                </Button>
 
                 <button
                   type="button"

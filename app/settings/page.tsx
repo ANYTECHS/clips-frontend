@@ -8,6 +8,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/shared/ToastProvider";
 import ConfirmModal from "@/components/shared/ConfirmModal";
 import UserAvatar from "@/components/shared/UserAvatar";
+import Button from "@/components/shared/Button";
 
 export default function SettingsPage() {
   const { user, setUser, logout } = useAuth();
@@ -269,13 +270,11 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <button 
-                type="submit"
+              <Button size="lg" type="submit"
                 disabled={profileLoading}
-                className="bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] px-8 py-4 rounded-2xl font-black text-[15px] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 shadow-[0_0_20px_rgba(57,255,20,0.25)]"
               >
                 {profileLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Save Changes"}
-              </button>
+              </Button>
             </form>
           </div>
         </section>
@@ -332,13 +331,11 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <button 
-                type="submit"
+              <Button size="lg" type="submit"
                 disabled={loading}
-                className="bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] px-8 py-4 rounded-2xl font-black text-[15px] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center gap-2 shadow-[0_0_20px_rgba(57,255,20,0.25)]"
               >
                 {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Update Password"}
-              </button>
+              </Button>
             </form>
           </div>
         </section>

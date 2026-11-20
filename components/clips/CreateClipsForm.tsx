@@ -17,6 +17,8 @@ import { saveActiveJob } from "@/lib/processingStore";
 import { markFreeJobAsClaimed } from "@/lib/freeJobStore";
 import { useYouTubeImport, isYouTubeUrl } from "@/lib/useYouTubeImport";
 import { uploadVideoToStorage, MAX_VIDEO_FILE_SIZE_BYTES } from "@/lib/uploadToStorage";
+import Button from "@/components/shared/Button";
+import FieldError, { fieldErrorProps } from "@/components/shared/FieldError";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
 
 export default function CreateClipsForm() {
@@ -175,7 +177,7 @@ export default function CreateClipsForm() {
 
       <div className="space-y-8">
         <div className="space-y-4">
-          <label className="text-[13px] font-bold text-[#90A89C] uppercase tracking-wider block ml-1">
+          <label htmlFor="clips-url" className="text-[13px] font-bold text-[#90A89C] uppercase tracking-wider block ml-1">
             Import from URL
           </label>
 
@@ -184,7 +186,9 @@ export default function CreateClipsForm() {
               <LinkIcon className="w-5 h-5" />
             </div>
             <input
+              id="clips-url"
               type="text"
+              {...fieldErrorProps("clips-form-error", !!error)}
               value={urlValue}
               onChange={(e) => { setUrlValue(e.target.value); setError(""); resetYouTube(); }}
               onKeyDown={(e) => e.key === "Enter" && handleFetchUrl()}
@@ -192,15 +196,14 @@ export default function CreateClipsForm() {
               placeholder="Paste YouTube, TikTok or Vimeo link here…"
               className="w-full h-14 bg-[#042413] border border-[#0e4d2a] focus:border-[#39FF14]/50 focus:ring-4 focus:ring-[#39FF14]/10 rounded-2xl pl-16 pr-44 text-[14px] font-medium placeholder-[#90A89C] text-[#F4F7EF] transition-all outline-none disabled:opacity-50"
             />
-            <button
+            <Button
               onClick={handleFetchUrl}
-              disabled={anyBusy || !urlValue.trim()}
-              className="absolute right-2 px-6 py-3 bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black rounded-xl text-[14px] transition-all active:scale-[0.98] shadow-[0_4px_20px_rgba(57,255,20,0.25)] disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!urlValue.trim()}
+              loading={anyBusy}
+              className="absolute right-2 px-6 py-3"
             >
-              {anyBusy
-                ? <Loader2 className="w-5 h-5 animate-spin" />
-                : "Fetch Video"}
-            </button>
+              {anyBusy ? null : "Fetch Video"}
+            </Button>
           </div>
           {showYtPanel && (
             <div className={`rounded-2xl border px-5 py-4 space-y-3 transition-all ${
@@ -211,7 +214,7 @@ export default function CreateClipsForm() {
               {ytState.phase === "error" ? (
                 <div className="flex items-start gap-3">
                   <AlertCircle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-[13px] text-red-400 font-medium leading-relaxed">
+                  <p role="alert" aria-live="assertive" className="text-[13px] text-red-400 font-medium leading-relaxed">
                     {ytState.error}
                   </p>
                 </div>
@@ -281,11 +284,11 @@ export default function CreateClipsForm() {
             </div>
           </div>
         </div>
-        {error && (
-          <div className="text-red-400 text-sm text-center bg-red-400/10 py-3 rounded-xl border border-red-400/20">
-            {error}
-          </div>
-        )}
+        <FieldError
+          id="clips-form-error"
+          message={error}
+          className="block text-red-400 text-sm text-center bg-red-400/10 py-3 rounded-xl border border-red-400/20"
+        />
         {loading && uploadProgress > 0 && uploadProgress < 100 && (
           <div className="space-y-2">
             <div className="flex justify-between text-[12px] font-bold text-[#90A89C]">

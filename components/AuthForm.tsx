@@ -10,6 +10,8 @@ import apiClient from "@/lib/apiClient";
 import WalletButton from "@/components/shared/WalletButton";
 import { signAuthMessage, ensureHexSignature } from "@/lib/wallet";
 import EmailVerificationModal from "@/components/auth/EmailVerificationModal";
+import Button from "@/components/shared/Button";
+import FieldError, { fieldErrorProps } from "@/components/shared/FieldError";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
 
 const emailAuthSchema = z.object({
@@ -214,11 +216,13 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
       <form onSubmit={handleEmailSubmit} className="space-y-4">
         {currentMode === "signup" && (
           <div>
-            <label className="block text-[13px] font-bold text-[#90A89C] mb-2 uppercase tracking-wider">
+            <label htmlFor="auth-fullname" className="block text-[13px] font-bold text-[#90A89C] mb-2 uppercase tracking-wider">
               Full Name
             </label>
             <input
+              id="auth-fullname"
               type="text"
+              {...fieldErrorProps("auth-error", !!error)}
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
@@ -228,12 +232,13 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
           </div>
         )}
         <div>
-          <label className="block text-[13px] font-bold text-[#90A89C] mb-2 uppercase tracking-wider">
+          <label htmlFor="auth-email" className="block text-[13px] font-bold text-[#90A89C] mb-2 uppercase tracking-wider">
             Email address
           </label>
           <input
             id="auth-email"
             type="email"
+            {...fieldErrorProps("auth-error", !!error)}
             required
             value={email}
             onChange={(e) => {
@@ -246,13 +251,14 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
           />
         </div>
         <div>
-          <label className="block text-[13px] font-bold text-[#90A89C] mb-2 uppercase tracking-wider">
+          <label htmlFor="auth-password" className="block text-[13px] font-bold text-[#90A89C] mb-2 uppercase tracking-wider">
             Password
           </label>
           <div className="relative">
             <input
               id="auth-password"
               type={showPassword ? "text" : "password"}
+              {...fieldErrorProps("auth-error", !!error)}
               required
               value={password}
               onChange={(e) => {
@@ -263,44 +269,41 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
               placeholder="••••••••"
               className="w-full bg-[#042413] border border-[#0e4d2a] text-[#F4F7EF] focus:border-[#39FF14]/70 rounded-[12px] pl-4 pr-11 py-3.5 text-[14px] focus:outline-none focus:bg-[#06351C] transition-colors placeholder-[#90A89C]/50"
             />
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="icon"
               onClick={() => setShowPassword(!showPassword)}
               aria-label={showPassword ? "Hide password" : "Show password"}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors p-1"
+              className="absolute right-3 top-1/2 -translate-y-1/2 !p-1"
             >
               {showPassword ? (
                 <EyeOff className="w-4 h-4" />
               ) : (
                 <Eye className="w-4 h-4" />
               )}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {error && (
-          <div className="space-y-2 pt-1 text-center">
-            <div className="text-[13px] text-red-400">
-              {error}
+        <div className="space-y-2 pt-1 text-center">
+          <FieldError id="auth-error" message={error} />
+          {error && isUnverified && (
+            <div className="pt-1">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const targetEmail = pendingVerificationEmail || email.trim().toLowerCase();
+                  setPendingVerificationEmail(targetEmail);
+                  setShowVerificationModal(true);
+                }}
+              >
+                <span>Enter verification code or resend OTP</span>
+                <span aria-hidden="true">→</span>
+              </Button>
             </div>
-            {isUnverified && (
-              <div className="pt-1">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const targetEmail = pendingVerificationEmail || email.trim().toLowerCase();
-                    setPendingVerificationEmail(targetEmail);
-                    setShowVerificationModal(true);
-                  }}
-                  className="text-[12.5px] text-[#B6FF4A] hover:underline font-semibold inline-flex items-center gap-1.5 bg-[#B6FF4A]/10 hover:bg-[#B6FF4A]/15 px-3 py-1.5 rounded-lg border border-[#B6FF4A]/25 transition-all"
-                >
-                  <span>Enter verification code or resend OTP</span>
-                  <span>→</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
+          )}
+        </div>
 
         {info && (
           <div className="text-[13px] text-center pt-1 text-[#B6FF4A]">
@@ -308,19 +311,9 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
           </div>
         )}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] py-[15px] rounded-[14px] font-black text-[15px] flex justify-center items-center gap-2 transition-all disabled:opacity-70 mt-[6px] shadow-[0_0_20px_rgba(57,255,20,0.25)] hover:shadow-[0_0_30px_rgba(57,255,20,0.4)]"
-        >
-          {loading ? (
-            <Loader2 className="w-5 h-5 animate-spin text-[#020D08]" />
-          ) : currentMode === "login" ? (
-            "Continue with Email"
-          ) : (
-            "Create Account"
-          )}
-        </button>
+        <Button type="submit" size="lg" fullWidth loading={loading} className="mt-[6px]">
+          {currentMode === "login" ? "Continue with Email" : "Create Account"}
+        </Button>
       </form>
 
       <div className="text-center mt-7 text-[13px] text-[#90A89C]">

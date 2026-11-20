@@ -8,6 +8,7 @@ import apiClient from "@/lib/apiClient";
 import { useAuth } from "@/components/AuthProvider";
 import Link from "next/link";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
+import Button from "@/components/shared/Button";
 
 function VerifyEmailContent() {
   const searchParams = useSearchParams();
@@ -138,13 +139,12 @@ function VerifyEmailContent() {
               Your account has been successfully verified. Welcome to enclips!
             </p>
           </div>
-          <button
-            onClick={() => router.push("/onboarding")}
-            className="w-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] py-3.5 rounded-[12px] font-black text-[14px] flex items-center justify-center gap-2 transition-all mt-4 shadow-[0_0_20px_rgba(57,255,20,0.25)]"
+          <Button size="lg" onClick={() => router.push("/onboarding")}
+            className="w-full mt-4"
           >
             <span>Continue to Onboarding</span>
             <ArrowRight className="w-4 h-4" />
-          </button>
+          </Button>
         </div>
       )}
 
@@ -196,13 +196,12 @@ function VerifyEmailContent() {
               />
             </div>
 
-            <button
-              type="submit"
+            <Button size="lg" type="submit"
               disabled={!tokenInput.trim() || !emailInput.trim()}
-              className="w-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] py-3.5 rounded-[12px] font-black text-[14px] disabled:opacity-40 transition-colors shadow-[0_0_20px_rgba(57,255,20,0.25)]"
+              className="w-full"
             >
               Verify Code
-            </button>
+            </Button>
           </form>
 
           {/* Resend link */}
@@ -290,13 +289,12 @@ function VerifyEmailContent() {
               />
             </div>
 
-            <button
-              type="submit"
+            <Button size="lg" type="submit"
               disabled={!tokenInput.trim() || !emailInput.trim()}
-              className="w-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] py-3.5 rounded-[12px] font-black text-[14px] disabled:opacity-40 transition-colors shadow-[0_0_20px_rgba(57,255,20,0.25)]"
+              className="w-full"
             >
               Verify Code
-            </button>
+            </Button>
           </form>
 
           {/* Resend link */}

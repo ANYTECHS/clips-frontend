@@ -11,6 +11,7 @@ import apiClient from "@/lib/apiClient";
 import { loadActiveJob, saveActiveJob, clearActiveJob } from "@/lib/processingStore";
 import { markFreeJobAsClaimed } from "@/lib/freeJobStore";
 import { Sparkles, Clock, RefreshCw, Zap, CheckCircle2, AlertCircle } from "lucide-react";
+import Button from "@/components/shared/Button";
 
 // ─── Strategy ─────────────────────────────────────────────────────────────────
 // 1. Primary:  SSE via /api/sse/events/processing-progress/:videoId
@@ -123,7 +124,7 @@ function ProcessingContent() {
       }
 
       if (clips.length > 0) {
-        queryClient.setQueryData(["projectsData", vid], clips);
+        queryClient.setQueryData(["projectsData", vid, 1], clips);
       }
       queryClient.invalidateQueries({ queryKey: ["sidebarClipCount"] });
 
@@ -440,21 +441,17 @@ function ProcessingContent() {
       {/* Actions */}
       <div className="mt-12 flex flex-col items-center space-y-4">
         {isDone ? (
-          <button
-            onClick={() => router.push(`/projects?videoId=${videoId}`)}
-            className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-sm transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(57,255,20,0.25)]"
+          <Button size="lg" onClick={() => router.push(`/projects?videoId=${videoId}`)}
           >
             <CheckCircle2 className="w-4 h-4" />
             View My Clips
-          </button>
+          </Button>
         ) : hasError ? (
           <>
-            <button
-              onClick={() => router.push("/clips")}
-              className="flex items-center gap-2.5 px-8 py-3.5 rounded-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-sm transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(57,255,20,0.25)]"
+            <Button size="lg" onClick={() => router.push("/clips")}
             >
               Try Again
-            </button>
+            </Button>
             <button
               onClick={() => router.push("/dashboard")}
               className="flex items-center gap-2.5 px-8 py-3.5 rounded-full border border-[#0e4d2a] bg-[#042413] hover:bg-[#084223] hover:border-[#39FF14]/40 text-[#F4F7EF] font-bold text-sm transition-all active:scale-[0.98]"
