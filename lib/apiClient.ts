@@ -22,6 +22,24 @@ const apiClient = axios.create({
   },
 });
 
+// Issue #1392 — Idempotency keys: retries of the same logical operation must
+// reuse the same key so the backend can return the cached result instead of
+// creating a duplicate. Attach a generated Idempotency-Key to unsafe methods.
+const UNSAFE_METHODS = ['post', 'put', 'patch', 'delete'];
+if (typeof window !== 'undefined') {
+  apiClient.interceptors.request.use((config) => {
+    const method = (config.method || 'get').toLowerCase();
+    const headers = config.headers as any;
+    const existingKey = typeof headers?.get === 'function' ? headers.get('Idempotency-Key') : headers?.['Idempotency-Key'];
+    if (UNSAFE_METHODS.includes(method) && !existingKey) {
+      const key = crypto.randomUUID();
+      if (typeof headers?.set === 'function') headers.set('Idempotency-Key', key);
+      else headers['Idempotency-Key'] = key;
+    }
+    return config;
+  });
+}
+
 // Response interceptor for auto-refreshing tokens (only on client side)
 if (typeof window !== 'undefined') {
   apiClient.interceptors.response.use(

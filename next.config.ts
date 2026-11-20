@@ -56,6 +56,15 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    const apiBase = (process.env.API_URL || 'https://clipcash-api.onrender.com').replace(/\/+$/, '');
+    return [
+      // Issue #1395 — Versioned API namespace: public API routes live under
+      // /api/v1/*; unversioned paths are deprecated in favour of the versioned
+      // namespace going forward.
+      { source: '/api/v1/:path*', destination: `${apiBase}/api/v1/:path*` },
+    ];
+  },
   async headers() {
     return [
       {
