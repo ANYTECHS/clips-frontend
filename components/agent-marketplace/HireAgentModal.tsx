@@ -31,6 +31,7 @@ import apiClient from "@/lib/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { saveActiveJob } from "@/lib/processingStore";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
+import Button from "@/components/shared/Button";
 
 interface HireAgentModalProps {
   agent: Agent;
@@ -603,10 +604,9 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
                   </div>
                 )}
               </div>
-              <button
-                onClick={handleSubmit}
+              <Button size="lg" onClick={handleSubmit}
                 disabled={!canSubmit}
-                className="w-full py-4 rounded-[16px] bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-[15px] transition-all active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(57,255,20,0.25)] hover:shadow-[0_0_30px_rgba(57,255,20,0.4)]"
+                className="w-full"
               >
                 {isFirstFreeJob && payMode === "pay-per-job"
                   ? selectedFile
@@ -625,7 +625,7 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
                   : hasActiveSub
                   ? "Use Subscription & Hire"
                   : `Subscribe (${PLANS.find((p) => p.key === selPlan)?.price}) & Hire`}
-              </button>
+              </Button>
             </>
           )}
           {step === "uploading" && (
@@ -701,12 +701,11 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
                 >
                   Back
                 </button>
-                <button
-                  onClick={handleSubmit}
-                  className="flex-1 py-3 rounded-[14px] bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-[13px] transition-all"
+                <Button onClick={handleSubmit}
+                  className="flex-1"
                 >
                   Try Again
-                </button>
+                </Button>
               </div>
             </div>
           )}

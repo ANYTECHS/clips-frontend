@@ -1,24 +1,43 @@
 "use client";
 
 import React, { Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getProjectsData } from "@/lib/queries";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getProjectsData, CLIPS_PAGE_SIZE } from "@/lib/queries";
 import ProjectsContent from "@/components/projects/ProjectsContent";
 import { Loader2 } from "lucide-react";
 
 function ProjectsInner() {
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const videoId = searchParams.get("videoId") ?? undefined;
+  const parsedPage = parseInt(searchParams.get("page") ?? "1", 10);
+  const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
   const queryClient = useQueryClient();
 
+  const handlePageChange = (next: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (next <= 1) params.delete("page");
+    else params.set("page", String(next));
+    const qs = params.toString();
+    router.push(qs ? `${pathname}?${qs}` : pathname);
+  };
+
   // Check if the processing page already seeded the cache
-  const cachedClips = queryClient.getQueryData<any[]>(["projectsData", videoId]);
+  const cachedClips = queryClient.getQueryData<any[]>(["projectsData", videoId, page]);
   const hasCachedData = Array.isArray(cachedClips) && cachedClips.length > 0;
 
-  const { data: clips = [], isLoading } = useQuery({
-    queryKey: ["projectsData", videoId],
-    queryFn: () => getProjectsData(videoId),
+  const {
+    data: clips = [],
+    isLoading,
+    isFetching,
+    isPlaceholderData,
+  } = useQuery({
+    queryKey: ["projectsData", videoId, page],
+    queryFn: () => getProjectsData(videoId, page, CLIPS_PAGE_SIZE),
+    // Keep the previous page on screen while the next one loads.
+    placeholderData: keepPreviousData,
     // If cache is already seeded, treat it as fresh — no refetch on mount
     staleTime: hasCachedData ? 30_000 : 0,
     // Poll fast (every 1 second) while clips are still being retrieved
@@ -41,7 +60,15 @@ function ProjectsInner() {
     );
   }
 
-  return <ProjectsContent clips={clips} />;
+  return (
+    <ProjectsContent
+      clips={clips}
+      page={page}
+      hasNextPage={clips.length >= CLIPS_PAGE_SIZE}
+      pageLoading={isFetching && isPlaceholderData}
+      onPageChange={handlePageChange}
+    />
+  );
 }
 
 export default function ProjectsPage() {

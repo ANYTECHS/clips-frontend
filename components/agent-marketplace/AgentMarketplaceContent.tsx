@@ -20,6 +20,7 @@ import { markFreeJobAsClaimed, useFreeJobClaimed } from "@/lib/freeJobStore";
 import { loadActiveJob, clearActiveJob } from "@/lib/processingStore";
 import AgentCard from "./AgentCard";
 import HireAgentModal from "./HireAgentModal";
+import Button from "@/components/shared/Button";
 
 type Tab = "agents" | "jobs" | "subscription";
 
@@ -156,12 +157,11 @@ export default function AgentMarketplaceContent() {
           </div>
 
           <div className="flex items-center gap-3 shrink-0">
-            <button
-              onClick={() => router.push(`/dashboard/processing?videoId=${activeJob.videoId}`)}
-              className="px-5 py-2 rounded-xl bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] text-xs font-black tracking-wide transition-all active:scale-[0.97] shadow-[0_0_15px_rgba(57,255,20,0.25)]"
+            <Button size="sm" onClick={() => router.push(`/dashboard/processing?videoId=${activeJob.videoId}`)}
+              className="tracking-wide"
             >
               Watch Progress
-            </button>
+            </Button>
             <button
               onClick={() => {
                 clearActiveJob();
@@ -197,14 +197,13 @@ export default function AgentMarketplaceContent() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={() => {
+            <Button size="sm" onClick={() => {
                 if (agents.length > 0) setHiringAgent(agents[0]);
               }}
-              className="px-5 py-2.5 rounded-xl bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-[13px] transition-all shadow-[0_0_15px_rgba(57,255,20,0.25)] shrink-0 active:scale-[0.98]"
+              className="shrink-0"
             >
               Claim Free Job →
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -343,12 +342,11 @@ function SubscriptionPanel({
           </div>
 
           {isActive && (
-            <button
-              onClick={onHireWithSub}
-              className="px-5 py-2.5 rounded-[14px] bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-[13px] transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(57,255,20,0.25)] shrink-0"
+            <Button size="sm" onClick={onHireWithSub}
+              className="shrink-0"
             >
               Hire Agent (Subscribed)
-            </button>
+            </Button>
           )}
         </div>
       </div>

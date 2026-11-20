@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useWallet } from "@/components/WalletProvider";
 import { useToast } from "@/components/shared/ToastProvider";
+import CopyButton from "@/components/shared/CopyButton";
 import {
   getClipInfo,
   getClipDownloadUrl,
@@ -251,18 +252,20 @@ export default function TipModal({
               </div>
 
               {info.owner.stellarAddress ? (
-                <p
-                  className="text-[11px] font-mono text-[#B6FF4A] break-all leading-relaxed cursor-pointer hover:text-[#F4F7EF] transition-colors"
-                  title={info.owner.stellarAddress}
-                  onClick={() =>
-                    navigator.clipboard
-                      ?.writeText(info.owner.stellarAddress!)
-                      .catch(() => {})
-                  }
-                >
-                  {truncateAddr(info.owner.stellarAddress)}
-                  <span className="ml-1 text-[9px] text-[#90A89C]">(click to copy)</span>
-                </p>
+                <div className="flex items-start gap-2">
+                  <p
+                    className="text-[11px] font-mono text-[#B6FF4A] break-all leading-relaxed"
+                    title={info.owner.stellarAddress}
+                  >
+                    {truncateAddr(info.owner.stellarAddress)}
+                  </p>
+                  <CopyButton
+                    value={info.owner.stellarAddress}
+                    label="Copy wallet address"
+                    successMessage="Wallet address copied"
+                    className="shrink-0 mt-0.5"
+                  />
+                </div>
               ) : (
                 <p className="text-[12px] text-[#90A89C]">
                   No wallet connected — download is free.

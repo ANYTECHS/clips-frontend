@@ -7,6 +7,8 @@ import apiClient from "@/lib/apiClient";
 import { saveActiveJob } from "@/lib/processingStore";
 import { markFreeJobAsClaimed } from "@/lib/freeJobStore";
 import { useYouTubeImport, isYouTubeUrl } from "@/lib/useYouTubeImport";
+import Button from "@/components/shared/Button";
+import FieldError, { fieldErrorProps } from "@/components/shared/FieldError";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
 
 export default function URLForm() {
@@ -81,6 +83,7 @@ export default function URLForm() {
           <input
             id="video-url"
             type="url"
+            {...fieldErrorProps("video-url-error", !!error)}
             placeholder="Paste YouTube, TikTok or Vimeo URL"
             value={url}
             onChange={(e) => { setUrl(e.target.value); setError(""); resetYouTube(); }}
@@ -91,19 +94,17 @@ export default function URLForm() {
           />
         </div>
 
-        <button
+        <Button
           type="submit"
-          disabled={anyBusy || !url.trim()}
-          className="bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] px-8 py-3.5 rounded-[14px] font-black text-sm tracking-wide transition-all disabled:opacity-70 flex items-center justify-center gap-2 min-w-[130px] shadow-[0_0_20px_rgba(57,255,20,0.25)]"
+          size="lg"
+          disabled={!url.trim()}
+          loading={anyBusy}
+          className="min-w-[130px]"
         >
-          {anyBusy
-            ? <><Loader2 className="w-5 h-5 animate-spin" /> Processing</>
-            : "Clip Now"}
-        </button>
+          {anyBusy ? "Processing" : "Clip Now"}
+        </Button>
       </form>
-      {error && (
-        <p className="text-red-500 text-xs ml-1">{error}</p>
-      )}
+      <FieldError id="video-url-error" message={error} className="text-red-500 text-xs ml-1" />
       {showYtPanel && (
         <div className={`rounded-2xl border px-4 py-3 space-y-2 transition-all ${
           ytState.phase === "error"
@@ -113,7 +114,7 @@ export default function URLForm() {
           {ytState.phase === "error" ? (
             <div className="flex items-start gap-2">
               <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-red-400 font-medium leading-relaxed">
+              <p role="alert" aria-live="assertive" className="text-xs text-red-400 font-medium leading-relaxed">
                 {ytState.error}
               </p>
             </div>

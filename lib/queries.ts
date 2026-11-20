@@ -110,7 +110,14 @@ export const getVideos = async (page = 1, limit = 10) => {
   };
 };
 
-export const getProjectsData = async (videoId?: string, page = 1, limit = 20) => {
+/** Clips shown per page on the projects list. */
+export const CLIPS_PAGE_SIZE = 20;
+
+export const getProjectsData = async (
+  videoId?: string,
+  page = 1,
+  limit = CLIPS_PAGE_SIZE
+) => {
   try {
     const extractClips = (resData: any): any[] => {
       if (!resData) return [];

@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteClip, ReadyToPostKit } from "@/lib/queries";
 import DashboardLayout from "@/components/shared/DashboardLayout";
 import ClipGrid from "@/components/projects/ClipGrid";
+import Pagination from "@/components/shared/Pagination";
 import SelectionFooter from "@/components/projects/SelectionFooter";
 import { markFreeJobAsClaimed } from "@/lib/freeJobStore";
 import { useAuth } from "@/components/AuthProvider";
@@ -24,9 +26,20 @@ interface Project {
 
 interface ProjectsContentProps {
   clips: Project[];
+  page?: number;
+  hasNextPage?: boolean;
+  /** True while the next page is being fetched. */
+  pageLoading?: boolean;
+  onPageChange?: (page: number) => void;
 }
 
-export default function ProjectsContent({ clips }: ProjectsContentProps) {
+export default function ProjectsContent({
+  clips,
+  page = 1,
+  hasNextPage = false,
+  pageLoading = false,
+  onPageChange,
+}: ProjectsContentProps) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const { address } = useWallet();
@@ -72,6 +85,11 @@ export default function ProjectsContent({ clips }: ProjectsContentProps) {
     }
   };
 
+  // Selection is per page.
+  useEffect(() => {
+    setSelectedIds([]);
+  }, [page]);
+
   const handleSelect = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
@@ -92,13 +110,36 @@ export default function ProjectsContent({ clips }: ProjectsContentProps) {
         <div className="flex-1 flex flex-col overflow-hidden w-full max-w-[1400px] mx-auto">
           {/* Grid Content - scrollable */}
           <div className="flex-1 overflow-y-auto pr-1 sm:pr-2 scrollbar-hide pb-10">
-            <ClipGrid
-              clips={clips}
-              selectedIds={selectedIds}
-              onSelect={handleSelect}
-              onSelectAll={handleSelectAll}
-              onDelete={handleDeleteClip}
-            />
+            <div
+              aria-busy={pageLoading}
+              className={`relative transition-opacity ${pageLoading ? "opacity-50 pointer-events-none" : ""}`}
+            >
+              <ClipGrid
+                clips={clips}
+                selectedIds={selectedIds}
+                onSelect={handleSelect}
+                onSelectAll={handleSelectAll}
+                onDelete={handleDeleteClip}
+              />
+              {pageLoading && (
+                <div
+                  role="status"
+                  className="absolute inset-0 flex items-start justify-center pt-24"
+                >
+                  <Loader2 className="w-8 h-8 text-[#B6FF4A] animate-spin" aria-hidden="true" />
+                  <span className="sr-only">Loading clips…</span>
+                </div>
+              )}
+            </div>
+            {onPageChange && (
+              <Pagination
+                page={page}
+                hasNextPage={hasNextPage}
+                loading={pageLoading}
+                onPageChange={onPageChange}
+                className="pb-6"
+              />
+            )}
           </div>
 
           {/* Docked Actions Footer */}

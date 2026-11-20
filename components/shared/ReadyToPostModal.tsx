@@ -16,10 +16,13 @@ import {
   FileVideo,
 } from "lucide-react";
 import { triggerDownload } from "@/lib/download";
+import { useToast } from "@/components/shared/ToastProvider";
+import { useCopyToClipboard } from "@/lib/hooks/useCopyToClipboard";
 import {
   ReadyToPostKit,
   getClipReadyToPostKit,
 } from "@/lib/queries";
+import Button from "@/components/shared/Button";
 
 export interface ReadyToPostClip {
   id: string;
@@ -75,7 +78,8 @@ export default function ReadyToPostModal({ clip, onClose }: ReadyToPostModalProp
     clip.readyToPostKit?.copyTemplates?.readyToPost || fallbackCaption
   );
   const [userEdited, setUserEdited] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const { toast } = useToast();
+  const { copied, copy } = useCopyToClipboard();
   const [downloading, setDownloading] = useState(false);
   const [showQr, setShowQr] = useState(false);
 
@@ -127,13 +131,10 @@ export default function ReadyToPostModal({ clip, onClose }: ReadyToPostModalProp
     }
   };
 
-  const handleCopyCaption = (textToCopy?: string) => {
+  const handleCopyCaption = async (textToCopy?: string) => {
     const text = textToCopy || caption;
-    if (typeof navigator !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
-    }
+    if (await copy(text)) toast("Caption copied to clipboard", "success");
+    else toast("Couldn't copy to clipboard", "error");
   };
 
   const platformLinks = [
@@ -300,14 +301,13 @@ export default function ReadyToPostModal({ clip, onClose }: ReadyToPostModalProp
             </div>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleDownload}
+              <Button size="lg" onClick={handleDownload}
                 disabled={!effectiveDownloadUrl || downloading}
-                className="flex-1 py-4 px-6 rounded-2xl bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-[15px] flex items-center justify-center gap-2.5 transition-all shadow-[0_0_30px_rgba(57,255,20,0.25)] hover:shadow-[0_0_45px_rgba(57,255,20,0.4)] active:scale-[0.99] disabled:opacity-50"
+                className="flex-1"
               >
                 <Download className={`w-5 h-5 ${downloading ? "animate-bounce" : ""}`} />
                 {downloading ? "Starting HD Download…" : "⬇️ Download HD Clip"}
-              </button>
+              </Button>
 
               {effectiveDownloadUrl && (
                 <a
@@ -334,6 +334,7 @@ export default function ReadyToPostModal({ clip, onClose }: ReadyToPostModalProp
               </span>
               <button
                 onClick={() => handleCopyCaption()}
+                aria-label="Copy caption and hashtags"
                 className="text-[11px] font-bold text-[#B6FF4A] hover:underline flex items-center gap-1"
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -354,6 +355,7 @@ export default function ReadyToPostModal({ clip, onClose }: ReadyToPostModalProp
               />
               <button
                 onClick={() => handleCopyCaption()}
+                aria-label="Copy caption and hashtags"
                 className={`absolute bottom-3 right-3 px-3.5 py-1.5 rounded-xl text-[12px] font-bold flex items-center gap-1.5 transition-all ${
                   copied
                     ? "bg-[#B6FF4A] text-[#020D08] font-black"
@@ -373,6 +375,10 @@ export default function ReadyToPostModal({ clip, onClose }: ReadyToPostModalProp
               </button>
             </div>
           </div>
+
+          <span role="status" aria-live="polite" className="sr-only">
+            {copied ? "Copied" : ""}
+          </span>
 
           {/* Step 3: Platform links */}
           <div className="space-y-2.5">

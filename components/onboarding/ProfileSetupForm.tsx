@@ -1,5 +1,6 @@
 import React from "react";
 import { User as UserIcon, Loader2, ArrowRight, Sparkles } from "lucide-react";
+import Button from "@/components/shared/Button";
 
 interface ProfileSetupFormProps {
   username: string;
@@ -103,10 +104,9 @@ export default function ProfileSetupForm({
           </p>
         </div>
 
-        <button
-          type="submit"
+        <Button size="lg" type="submit"
           disabled={loading}
-          className="w-full bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] py-4 rounded-[14px] font-black text-[15px] flex justify-center items-center gap-2 mt-4 transition-all shadow-[0_0_25px_rgba(57,255,20,0.25)] hover:shadow-[0_0_35px_rgba(57,255,20,0.35)] active:scale-[0.99] disabled:opacity-70 cursor-pointer"
+          className="w-full mt-4 cursor-pointer"
         >
           {loading ? (
             <Loader2 className="animate-spin w-5 h-5" />
@@ -115,7 +115,7 @@ export default function ProfileSetupForm({
               Complete Setup & Go to Dashboard <ArrowRight className="w-[18px] h-[18px]" />
             </>
           )}
-        </button>
+        </Button>
       </form>
     </div>
   );

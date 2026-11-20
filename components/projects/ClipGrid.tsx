@@ -4,6 +4,7 @@ import React from "react";
 import ClipCard from "./ClipCard";
 import { ListFilter, ChevronDown } from "lucide-react";
 import { ReadyToPostKit } from "@/lib/queries";
+import Button from "@/components/shared/Button";
 
 interface Clip {
   id: string;
@@ -59,17 +60,14 @@ export default function ClipGrid({
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <button
-            onClick={onSelectAll}
-            className="flex items-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl bg-[#06351C] border border-[#0e4d2a] hover:border-[#39FF14]/40 text-[#F4F7EF] font-bold text-[13px] sm:text-[14px] transition-all hover:bg-[#084223] active:scale-[0.98]"
-          >
+          <Button variant="secondary" size="lg" onClick={onSelectAll} className="!rounded-xl !px-4 sm:!px-6">
             {selectedIds.length === clips.length ? "Deselect All" : "Select All"}
-          </button>
-          <button className="hidden sm:flex items-center gap-2 px-4 py-2.5 sm:px-6 sm:py-3 rounded-xl bg-[#06351C] border border-[#0e4d2a] text-[#F4F7EF] font-bold text-[13px] sm:text-[14px] transition-all hover:bg-[#084223] hover:border-[#39FF14]/40 active:scale-[0.98]">
+          </Button>
+          <Button variant="secondary" size="lg" className="hidden sm:flex !rounded-xl !px-4 sm:!px-6">
             <ListFilter className="w-4 h-4 text-[#90A89C]" />
             <span>Newest First</span>
             <ChevronDown className="w-3.5 h-3.5 text-[#90A89C]" />
-          </button>
+          </Button>
         </div>
       </div>
 

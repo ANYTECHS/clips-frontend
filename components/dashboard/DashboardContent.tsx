@@ -9,6 +9,7 @@ import DashboardLayout from "@/components/shared/DashboardLayout";
 import StatCard from "@/components/dashboard/StatCard";
 import ProjectCard from "@/components/dashboard/ProjectCard";
 import { Video, Globe, ChevronDown, Loader2, Sparkles, X } from "lucide-react";
+import Button from "@/components/shared/Button";
 
 interface DashboardContentProps {
   stats: {
@@ -93,12 +94,11 @@ export default function DashboardContent({ stats: initialStats, projects: initia
             </div>
 
             <div className="flex items-center gap-3 shrink-0">
-              <button
-                onClick={() => router.push(`/dashboard/processing?videoId=${activeJob.videoId}`)}
-                className="px-5 py-2 rounded-xl bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] text-xs font-black tracking-wide transition-all active:scale-[0.97] shadow-[0_0_15px_rgba(57,255,20,0.25)]"
+              <Button size="sm" onClick={() => router.push(`/dashboard/processing?videoId=${activeJob.videoId}`)}
+                className="tracking-wide"
               >
                 Resume
-              </button>
+              </Button>
               <button
                 onClick={dismissBanner}
                 aria-label="Dismiss"

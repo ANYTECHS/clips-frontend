@@ -3,6 +3,7 @@
 import React from "react";
 import { Bot, Zap, Wallet, ExternalLink } from "lucide-react";
 import type { Agent } from "@/lib/queries";
+import Button from "@/components/shared/Button";
 
 interface AgentCardProps {
   agent: Agent;
@@ -68,12 +69,11 @@ export default function AgentCard({ agent, onHire, isFirstFreeJob = false }: Age
       </div>
 
       {/* CTA */}
-      <button
-        onClick={() => onHire(agent)}
-        className="w-full py-3 rounded-[14px] bg-[#B6FF4A] hover:bg-[#c6ff6b] text-[#020D08] font-black text-[14px] transition-all active:scale-[0.98] shadow-[0_0_20px_rgba(57,255,20,0.25)] hover:shadow-[0_0_30px_rgba(57,255,20,0.4)]"
+      <Button onClick={() => onHire(agent)}
+        className="w-full"
       >
         {isFirstFreeJob ? "Try Agent Free" : "Hire Agent"}
-      </button>
+      </Button>
     </div>
   );
 }
