@@ -30,6 +30,9 @@ NEXT_PUBLIC_API_URL=/api/proxy
 
 # Stellar network: leave empty for testnet, set to "mainnet" for production
 NEXT_PUBLIC_STELLAR_NETWORK=testnet
+
+# Staging — CI deploys merged PRs here; see runbook
+API_URL=https://clipcash-staging.onrender.com
 ```
 
 > Never set `NEXT_PUBLIC_*` to the real backend URL. The proxy in `app/api/proxy/[...path]/route.ts` keeps it server-side only.
@@ -152,3 +155,7 @@ These items are blocked on backend changes:
 - `window.confirm()` is removed from delete flows — replaced with inline confirmation UI
 - `alert()` is removed from all flows — replaced with in-app toast notifications
 - Stellar wallet address is stored in `WalletProvider` state only (removed from `localStorage`)
+
+## Secrets Rotation Runbook
+
+- Rotate `NEXTAUTH_SECRET` and `AI_BACKEND_SECRET` every 90 days; confirm the rotation schedule in the pre-deploy checklist and enable expiry alerts where supported.

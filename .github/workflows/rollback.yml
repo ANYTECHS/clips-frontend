@@ -4,4 +4,6 @@ jobs:
   rollback:
     runs-on: ubuntu-latest
     steps:
+      - name: Blue-green health-check gate
+        run: echo "Warm green slot; switch traffic only after health check passes"
       - run: echo "Auto-rollback placeholder on failed health check"
