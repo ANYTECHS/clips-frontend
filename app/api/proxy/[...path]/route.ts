@@ -1,9 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
+import { createHash } from 'crypto';
 
 // Disable Next.js body parsing — we stream the raw body directly to the backend.
 // Without this, Next.js buffers and size-limits request bodies (bad for uploads/SSE).
 export const dynamic = 'force-dynamic';
+
+// Issue #1394 — ETag support: compute a strong ETag for cacheable (JSON) GET
+// responses and honour the client's If-None-Match header, answering with
+// 304 Not Modified when the representation is unchanged.
+async function computeEtag(
+  req: NextRequest,
+  backendRes: Response,
+  responseHeaders: Headers,
+  targetUrl: string
+): Promise<string | undefined> {
+  const method = req.method;
+  if (method !== 'GET' && method !== 'HEAD') return undefined;
+  if (backendRes.status !== 200) return undefined;
+  const contentType = responseHeaders.get('content-type') || '';
+  // SSE streams and binary payloads are not cacheable here.
+  if (contentType.includes('text/event-stream')) return undefined;
+  if (!contentType.includes('json') && !contentType.includes('text/')) return undefined;
+
+  const body = await backendRes.clone().text();
+  const hash = createHash('sha256').update(`${targetUrl}:${body}`).digest('hex').slice(0, 32);
+  const etag = `"${hash}"`;
+  responseHeaders.set('etag', etag);
+  return etag;
+}
 
 async function handler(req: NextRequest) {
   const baseUrl = (process.env.API_URL || 'https://clipcash-api.onrender.com').replace(/\/+$/, '');
@@ -157,6 +182,24 @@ async function handler(req: NextRequest) {
     responseHeaders.set('cache-control', 'no-cache');
     responseHeaders.set('x-accel-buffering', 'no');
     responseHeaders.set('connection', 'keep-alive');
+  }
+
+  const etag = await computeEtag(req, backendRes, responseHeaders, targetUrl);
+  const ifNoneMatch = etag ? req.headers.get('if-none-match') : null;
+  const etagMatches = !!etag && !!ifNoneMatch && ifNoneMatch
+    .split(',')
+    .map((v) => v.trim())
+    .some((v) => v === etag || v === `W/${etag}`);
+
+  if (etag && etagMatches) {
+    // Issue #1394 — 304 Not Modified: the client already holds this representation.
+    return new NextResponse(null, {
+      status: 304,
+      headers: {
+        etag,
+        'cache-control': responseHeaders.get('cache-control') || 'no-cache',
+      },
+    });
   }
 
   return new NextResponse(backendRes.body, {

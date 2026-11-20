@@ -1,5 +1,40 @@
 import apiClient from "./apiClient";
 
+// Issue #1393 — Pagination metadata: list endpoints return a paginated
+// envelope of the shape { items, total, cursor } (legacy arrays and older
+// { data, total } shapes are still tolerated).
+export interface ListResponse<T = any> {
+  items: T[];
+  total: number;
+  cursor?: string;
+}
+
+export const extractListResponse = (data: any): ListResponse<any> => {
+  let items: any[] = [];
+  if (Array.isArray(data)) items = data;
+  else if (Array.isArray(data?.items)) items = data.items;
+  else if (Array.isArray(data?.data)) items = data.data;
+  else if (Array.isArray(data?.clips)) items = data.clips;
+
+  const total =
+    typeof data?.total === "number"
+      ? data.total
+      : Array.isArray(data?.data)
+        ? typeof data.data.total === "number"
+          ? data.data.total
+          : data.data.length
+        : items.length;
+
+  const cursor =
+    typeof data?.cursor === "string"
+      ? data.cursor
+      : typeof data?.nextCursor === "string"
+        ? data.nextCursor
+        : undefined;
+
+  return { items, total, cursor };
+};
+
 export const getDashboardData = async () => {
   try {
     const [videosRes, platformsRes] = await Promise.all([
@@ -61,7 +96,7 @@ export const getVideos = async (page = 1, limit = 10) => {
     return 0;
   };
   
-  const rawItems = response.data.data || (Array.isArray(response.data) ? response.data : []);
+  const { items: rawItems, total } = extractListResponse(response.data);
   
   // Process each video to ensure clipsCount is set
   const items = rawItems.map((video: any) => ({
@@ -71,7 +106,7 @@ export const getVideos = async (page = 1, limit = 10) => {
 
   return {
     items,
-    total: response.data.total || 0,
+    total,
   };
 };
 
@@ -288,7 +323,7 @@ export const getClipDownloadUrl = async (id: string, senderAddress?: string) => 
 
 export const getPublicFeed = async (page = 1, limit = 20) => {
   const response = await apiClient.get(`/clips/feed?page=${page}&limit=${limit}`);
-  const clips = response.data.data || (Array.isArray(response.data) ? response.data : []);
+  const { items: clips, total } = extractListResponse(response.data);
   return {
     items: clips.map((clip: any) => ({
       id: String(clip.id),
@@ -301,7 +336,7 @@ export const getPublicFeed = async (page = 1, limit = 20) => {
       createdAt: clip.createdAt || null,
       readyToPostKit: clip.readyToPostKit || null,
     })),
-    total: response.data.total || clips.length,
+    total,
   };
 };
 
