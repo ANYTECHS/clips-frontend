@@ -374,6 +374,10 @@ export default function SettingsPage() {
           </div>
         </section>
 
+        <section aria-label="Notification preferences" data-preferences="notificationPreferences">
+          <h2 className="text-xl font-semibold">Notification Preferences</h2>
+        </section>
+
         <ConfirmModal 
           isOpen={showDeleteModal}
           onClose={() => setShowDeleteModal(false)}
