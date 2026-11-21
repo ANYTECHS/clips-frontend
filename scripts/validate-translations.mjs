@@ -1,20 +1,5 @@
 #!/usr/bin/env node
-/**
- * validate-translations.mjs
- *
- * Fails if any locale is missing a key that is present in the English (en)
- * reference locale, and prints the missing keys to the CI log.
- *
- * A "key" is a dotted path (e.g. `network.switchToMainnet`). Plural nodes —
- * objects whose keys are all CLDR plural categories
- * ({zero, one, two, few, many, other}) — are checked for *existence* only,
- * because locales legitimately use different plural-category sets (e.g. Arabic
- * uses all six; English uses one/other).
- *
- * Run via: `npm run validate:translations`
- * Optional: `--out <file>` also writes the full report to a file.
- * Exits 1 if any locale has missing keys, 0 otherwise.
- */
+
 
 import { readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -32,7 +17,7 @@ const PLURAL_CATEGORIES = new Set([
   "other",
 ]);
 
-// Accumulate the report so it can be echoed AND optionally written to a file.
+
 const report = [];
 function out(line) {
   report.push(line);
@@ -43,11 +28,7 @@ function isPlainObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-/**
- * A plural node is an object whose keys are all CLDR plural categories (and
- * has at least one key). Such nodes are compared by existence, not by which
- * categories they contain — those differ per locale.
- */
+
 function isPluralNode(value) {
   if (!isPlainObject(value)) return false;
   const keys = Object.keys(value);
@@ -55,10 +36,7 @@ function isPluralNode(value) {
   return keys.every((k) => PLURAL_CATEGORIES.has(k));
 }
 
-/**
- * Collects the set of keys present in `en`. Plural nodes contribute a single
- * key (their path); namespaces recurse into their children.
- */
+
 function collectKeys(value, prefix, outArr) {
   if (isPluralNode(value)) {
     outArr.push(prefix);
