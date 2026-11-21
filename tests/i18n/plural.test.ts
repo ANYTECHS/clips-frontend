@@ -9,15 +9,11 @@ import {
 
 const COUNTS = [0, 1, 2, 3, 5, 10, 11, 15, 20, 100, 101, 1000];
 
-/**
- * Pluralisation is driven by the i18n library's plural feature
- * (Intl.PluralRules) — each locale selects the correct CLDR plural category,
- * including Arabic's six forms (zero/one/two/few/many/other).
- */
+
 describe("pluralization — Intl.PluralRules selection", () => {
   for (const locale of SUPPORTED_LOCALES) {
     it(`${locale}: t('clips.count') matches the Intl-selected form`, () => {
-      // The plural node lives at clips.count
+     
       const node = (translations[locale].clips as Record<string, unknown>)
         .count as Record<string, string>;
       for (const count of COUNTS) {
@@ -51,8 +47,7 @@ describe("pluralization — concrete forms per locale", () => {
   });
 
   it("pt: one / other", () => {
-    // count 0 is covered by the Intl-delegation test above (pt 0 maps to "one"
-    // in this ICU), so only assert the unambiguous counts here.
+    
     expect(t("clips.count", { count: 1 }, "pt")).toBe("1 clipe");
     expect(t("clips.count", { count: 2 }, "pt")).toBe("2 clips");
   });
