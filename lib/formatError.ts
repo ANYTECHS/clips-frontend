@@ -1,7 +1,4 @@
-/**
- * Normalizes technical, network, wallet, and backend errors into short, 
- * meaningful, and user-friendly error messages for frontend presentation.
- */
+
 
 export function getFriendlyErrorMessage(
   err: unknown,
@@ -9,7 +6,7 @@ export function getFriendlyErrorMessage(
 ): string {
   if (!err) return fallback;
 
-  // 1. Extract string from different shapes of errors
+  
   let rawMsg = "";
   let status: number | undefined;
 
@@ -33,7 +30,7 @@ export function getFriendlyErrorMessage(
 
   const lower = rawMsg.toLowerCase().trim();
 
-  // 2. HTTP Status Code specific handling
+ 
   if (status === 401) {
     if (lower.includes("credential") || lower.includes("password") || lower.includes("email") || lower.includes("incorrect")) {
       return "Incorrect email or password. Please try again.";
@@ -71,7 +68,7 @@ export function getFriendlyErrorMessage(
     return "Server is temporarily unavailable. Please try again shortly.";
   }
 
-  // 3. Network and Connectivity
+ 
   if (
     lower.includes("network error") ||
     lower.includes("failed to fetch") ||
@@ -88,7 +85,7 @@ export function getFriendlyErrorMessage(
     return "Request timed out. Please try again.";
   }
 
-  // 4. Stellar and Wallet errors
+
   if (lower.includes("user declined") || lower.includes("user rejected") || lower.includes("cancelled") || lower.includes("denied")) {
     return "Transaction was cancelled in your wallet.";
   }
@@ -125,16 +122,15 @@ export function getFriendlyErrorMessage(
     return "Transaction could not be completed. Please try again.";
   }
 
-  // 5. Verification / OTP
+ 
   if (lower.includes("invalid or expired") || lower.includes("invalid otp") || lower.includes("code is invalid")) {
     return "Invalid or expired verification code. Please try again.";
   }
 
-  // 6. Sanitized raw message fallback:
-  // If the raw message is reasonably short, doesn't leak SQL / stack traces / JSON, use it.
+  
   const isCodeOrJson = rawMsg.includes("{") || rawMsg.includes("}") || rawMsg.includes("at ") || rawMsg.includes("SELECT ") || rawMsg.includes("INSERT ") || rawMsg.includes("status code");
   if (rawMsg && rawMsg.length > 3 && rawMsg.length <= 110 && !isCodeOrJson) {
-    // Capitalize first letter and end with period if clean
+    
     const trimmed = rawMsg.trim();
     const formatted = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);
     return formatted.endsWith(".") ? formatted : `${formatted}.`;
