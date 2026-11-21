@@ -11,12 +11,12 @@ const LOCALES = SUPPORTED_LOCALES as readonly string[];
 type Locale = (typeof SUPPORTED_LOCALES)[number];
 const asLocale = (l: string) => l as Locale;
 
-const DATE = new Date(2024, 5, 15); // local time, 15 June 2024 — TZ-stable
+const DATE = new Date(2024, 5, 15); 
 const DATE_OPTS = { month: "short", day: "numeric", year: "numeric" } as const;
 
 describe("formatDate", () => {
   it("uses Intl.DateTimeFormat with the active locale (en)", () => {
-    // en short-month/day/year is stable across ICU versions
+    
     expect(formatDate(DATE, "en")).toBe("Jun 15, 2024");
   });
 
@@ -38,7 +38,7 @@ describe("formatNumber", () => {
   });
 
   it("uses the locale decimal separator", () => {
-    // 1.5 has no thousands group, so only the decimal separator varies here.
+   
     expect(formatNumber(1.5, "en")).toBe("1.5");
     expect(formatNumber(1.5, "es")).toBe("1,5");
   });
@@ -69,8 +69,7 @@ describe("formatXlm", () => {
   });
 
   it("uses a different decimal separator per locale", () => {
-    // en uses '.' as the decimal separator, es uses ',' — proving the locale
-    // actually drives the formatting rather than a single hard-coded format.
+    
     expect(formatXlm(1.5, "en")).toBe("1.50");
     expect(formatXlm(1.5, "es")).toBe("1,50");
     expect(formatXlm(1.5, "en")).not.toBe(formatXlm(1.5, "es"));
