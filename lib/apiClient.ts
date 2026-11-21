@@ -1,8 +1,7 @@
 
 import axios from 'axios';
 
-// On server: use the real backend URL directly
-// On client: use the Next.js proxy route
+
 const getApiBaseUrl = () => {
   if (typeof window === 'undefined') {
     // Server side: call backend directly
@@ -22,9 +21,7 @@ const apiClient = axios.create({
   },
 });
 
-// Issue #1392 — Idempotency keys: retries of the same logical operation must
-// reuse the same key so the backend can return the cached result instead of
-// creating a duplicate. Attach a generated Idempotency-Key to unsafe methods.
+
 const UNSAFE_METHODS = ['post', 'put', 'patch', 'delete'];
 if (typeof window !== 'undefined') {
   apiClient.interceptors.request.use((config) => {
@@ -40,7 +37,7 @@ if (typeof window !== 'undefined') {
   });
 }
 
-// Response interceptor for auto-refreshing tokens (only on client side)
+
 if (typeof window !== 'undefined') {
   apiClient.interceptors.response.use(
     (response) => response,
