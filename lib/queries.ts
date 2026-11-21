@@ -1,8 +1,6 @@
 import apiClient from "./apiClient";
 
-// Issue #1393 — Pagination metadata: list endpoints return a paginated
-// envelope of the shape { items, total, cursor } (legacy arrays and older
-// { data, total } shapes are still tolerated).
+
 export interface ListResponse<T = any> {
   items: T[];
   total: number;
@@ -47,7 +45,7 @@ export const getDashboardData = async () => {
       platforms: platformsRes.data
     });
 
-    // Backend returns { data: [...], total, page, limit }
+   
     const videos = videosRes.data.data || (Array.isArray(videosRes.data) ? videosRes.data : []);
     // Backend returns { success, connected, platforms: string[], accountCount }
     const connectedPlatforms = platformsRes.data.accountCount 
@@ -89,7 +87,7 @@ export const getDashboardData = async () => {
 export const getVideos = async (page = 1, limit = 10) => {
   const response = await apiClient.get(`/videos?page=${page}&limit=${limit}`);
   
-  // Function to get number of clips for a video
+  
   const getClipsCount = (video: any) => {
     if (typeof video.clipsCount === 'number') return video.clipsCount;
     if (Array.isArray(video.clips)) return video.clips.length;
@@ -98,7 +96,7 @@ export const getVideos = async (page = 1, limit = 10) => {
   
   const { items: rawItems, total } = extractListResponse(response.data);
   
-  // Process each video to ensure clipsCount is set
+ 
   const items = rawItems.map((video: any) => ({
     ...video,
     clipsCount: getClipsCount(video)
@@ -110,7 +108,7 @@ export const getVideos = async (page = 1, limit = 10) => {
   };
 };
 
-/** Clips shown per page on the projects list. */
+
 export const CLIPS_PAGE_SIZE = 20;
 
 export const getProjectsData = async (
