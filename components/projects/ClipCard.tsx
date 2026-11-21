@@ -329,15 +329,10 @@ export default function ClipCard({
             <button
               onClick={handleDelete}
               disabled={isDeleting}
-              className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#031d0f] hover:bg-red-500/10 border border-[#0e4d2a] hover:border-red-500/30 text-[#90A89C] hover:text-red-400 transition-all disabled:opacity-40 shrink-0 active:scale-[0.95]"
-              title="Delete this clip"
-              aria-label="Delete clip"
+              className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#031d0f] hover:bg-red-500/10 border border-[#0e4d2a] hover:border-red-500/40 text-[#F4F7EF] hover:text-red-400 transition-all disabled:opacity-30"
+              title="Delete clip"
             >
-              {isDeleting ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-red-400" />
-              ) : (
-                <Trash2 className="w-3.5 h-3.5" />
-              )}
+              {isDeleting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
             </button>
           </div>
         </div>
