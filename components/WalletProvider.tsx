@@ -1,14 +1,5 @@
 "use client";
 
-/**
- * WalletProvider
- *
- * Wraps the app and exposes wallet state (address, loading, error)
- * plus connect / disconnect helpers via the useWallet() hook.
- *
- * Persists the connected address in localStorage so the UI survives
- * a page refresh without forcing the user to reconnect.
- */
 
 import React, {
   createContext,
@@ -46,12 +37,7 @@ interface WalletContextType {
   connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   openProfile: () => Promise<void>;
-  /**
-   * Switches the active network. The wallet keypair is reused on the new
-   * network (non-custodial — keys never leave the extension) and the connected
-   * public key is preserved in localStorage. The page reloads so the kit
-   * re-initialises on the new network.
-   */
+  
   switchNetwork: (target: NetworkId) => void;
 }
 
