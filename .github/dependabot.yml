@@ -1,0 +1,10 @@
+version: 2
+updates:
+  # Issue #1373 — auto-create PRs/issues for dependency advisories.
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    reviewers:
+      - ANYTECHS
