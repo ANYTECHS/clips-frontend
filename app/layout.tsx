@@ -5,6 +5,7 @@ import QueryProvider from "@/components/QueryProvider";
 import { WalletProvider } from "@/components/WalletProvider";
 import { ToastProvider } from "@/components/shared/ToastProvider";
 import { I18nProvider } from "@/components/I18nProvider";
+import KeyboardShortcutsHelp from "@/components/shared/KeyboardShortcutsHelp";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://enclips.ai"),
@@ -60,6 +61,7 @@ export default function RootLayout({
               <AuthProvider>
                 <ToastProvider>
                   {children}
+                  <KeyboardShortcutsHelp />
                 </ToastProvider>
               </AuthProvider>
             </WalletProvider>
