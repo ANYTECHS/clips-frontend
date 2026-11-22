@@ -75,3 +75,12 @@
     animation: spin-slow 3s linear infinite;
   }
 }
+
+/* Issue #1382 — light theme overrides for dashboard surfaces. */
+html.light {
+  color-scheme: light;
+}
+html.light body {
+  background: #f4f7ef;
+  color: #14201a;
+}
