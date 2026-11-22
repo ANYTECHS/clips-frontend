@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createHash } from 'crypto';
 import { logApiRequest, shouldLogBody } from '@/lib/apiLogger';
+import { rejectDisallowedOrigin } from '@/lib/cors';
 
 // Disable Next.js body parsing — we stream the raw body directly to the backend.
 // Without this, Next.js buffers and size-limits request bodies (bad for uploads/SSE).
@@ -32,6 +33,10 @@ async function computeEtag(
 }
 
 async function handler(req: NextRequest) {
+  // Issue #1370 — reject credentialed requests from non-allowlisted origins.
+  const corsBlock = rejectDisallowedOrigin(req);
+  if (corsBlock) return corsBlock;
+
   const startedAt = Date.now();
   const baseUrl = (process.env.API_URL || 'https://clipcash-api.onrender.com').replace(/\/+$/, '');
 
