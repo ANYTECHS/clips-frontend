@@ -10,6 +10,7 @@ import apiClient from "@/lib/apiClient";
 import WalletButton from "@/components/shared/WalletButton";
 import { signAuthMessage, ensureHexSignature } from "@/lib/wallet";
 import EmailVerificationModal from "@/components/auth/EmailVerificationModal";
+import Turnstile from "@/components/auth/Turnstile";
 import Button from "@/components/shared/Button";
 import FieldError, { fieldErrorProps } from "@/components/shared/FieldError";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
@@ -40,6 +41,9 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
   const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
   const [isUnverified, setIsUnverified] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  // Issue #1364 — bot detection token from Cloudflare Turnstile.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const [captchaUnavailable, setCaptchaUnavailable] = useState(false);
 
   const shakeCard = () => {
     const card = document.getElementById("auth-card");
@@ -142,13 +146,19 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
     try {
       if (currentMode === "signup") {
         const trimmedEmail = email.trim().toLowerCase();
-        await apiClient.post("/auths/send-otp", { email: trimmedEmail });
+        await apiClient.post("/auths/send-otp", {
+          email: trimmedEmail,
+          captchaToken: captchaToken ?? undefined,
+          captchaFallback: captchaUnavailable ? "unavailable" : undefined,
+        });
         setPendingVerificationEmail(trimmedEmail);
         setShowVerificationModal(true);
       } else {
         const response = await apiClient.post("/auths/signin", {
           email: email.trim().toLowerCase(),
           password,
+          captchaToken: captchaToken ?? undefined,
+          captchaFallback: captchaUnavailable ? "unavailable" : undefined,
         });
 
         const { user } = response.data;
@@ -284,6 +294,11 @@ export default function AuthForm({ mode = "login", showWallet = true }: AuthForm
             </Button>
           </div>
         </div>
+
+        <Turnstile
+          onToken={setCaptchaToken}
+          onUnavailable={() => setCaptchaUnavailable(true)}
+        />
 
         <div className="space-y-2 pt-1 text-center">
           <FieldError id="auth-error" message={error} />
