@@ -11,6 +11,7 @@ import React, {
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import apiClient from "@/lib/apiClient";
 import { disconnectWallet } from "@/lib/wallet";
+import { watchIdleSession } from "@/lib/sessionTimeout";
 
 export interface User {
   id: string;
@@ -138,6 +139,16 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
       }
     }
   }, [user, isLoading, pathname, searchParams, router]);
+
+  // Issue #1365 — idle session timeout: force re-authentication after the
+  // configured idle window (default 30 min, NEXT_PUBLIC_IDLE_TIMEOUT_MINUTES).
+  useEffect(() => {
+    if (!user || isLoading) return;
+    return watchIdleSession(() => {
+      void logout();
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isLoading]);
 
   /**
    * setUser — called by AuthForm after login or signup.

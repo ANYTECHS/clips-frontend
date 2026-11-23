@@ -17,6 +17,9 @@ import {
 } from "@/lib/queries";
 import { getTransactionHashFromXdr, signTransaction } from "@/lib/wallet";
 import { markUnlocked } from "@/lib/tipUnlockStore";
+import { isStepUpFresh } from "@/lib/stepUpAuth";
+import StepUpModal from "@/components/auth/StepUpModal";
+import { useAuth } from "@/components/AuthProvider";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
 import StellarTransactionStatus from "@/components/shared/StellarTransactionStatus";
 
@@ -94,6 +97,8 @@ export default function TipModal({
 }: TipModalProps) {
   const { address, connect } = useWallet();
   const { toast }            = useToast();
+  const { user }             = useAuth();
+  const [showStepUp, setShowStepUp] = useState(false);
 
   const [step,       setStep]       = useState<Step>("loading");
   const [info,       setInfo]       = useState<ClipInfo | null>(null);
@@ -138,6 +143,12 @@ export default function TipModal({
 
     if (!address) {
       await connect();
+      return;
+    }
+
+    // Issue #1366 — wallet sends require a step-up verification < 5 min old.
+    if (!isStepUpFresh()) {
+      setShowStepUp(true);
       return;
     }
 
@@ -386,6 +397,16 @@ export default function TipModal({
           )}
         </div>
       </div>
+
+      <StepUpModal
+        isOpen={showStepUp}
+        user={user}
+        onClose={() => setShowStepUp(false)}
+        onVerified={() => {
+          setShowStepUp(false);
+          void handleAction();
+        }}
+      />
     </div>
   );
 }

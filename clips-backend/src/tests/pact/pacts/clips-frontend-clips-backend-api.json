@@ -1,0 +1,268 @@
+{
+  "consumer": {
+    "name": "clips-frontend"
+  },
+  "interactions": [
+    {
+      "description": "a Stellar payout request",
+      "providerState": "the user has sufficient balance",
+      "request": {
+        "body": {
+          "amount": 100,
+          "currency": "USD",
+          "method": "stellar"
+        },
+        "headers": {
+          "Authorization": "Bearer test-token",
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/payouts/request"
+      },
+      "response": {
+        "body": {
+          "amount": 100,
+          "createdAt": "2026-01-01T00:00:00.000Z",
+          "currency": "USD",
+          "feeAmount": 2.5,
+          "finalAmount": 97.5,
+          "id": 10,
+          "method": "stellar",
+          "payoutId": "payout_123",
+          "status": "pending"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 201
+      }
+    },
+    {
+      "description": "a clip list request without a bearer token",
+      "request": {
+        "method": "GET",
+        "path": "/clips"
+      },
+      "response": {
+        "body": {
+          "errorCode": "UNAUTHORIZED",
+          "message": "Authentication required",
+          "statusCode": 401
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 401
+      }
+    },
+    {
+      "description": "a request for the earnings total",
+      "providerState": "the user has earnings",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer test-token"
+        },
+        "method": "GET",
+        "path": "/earnings"
+      },
+      "response": {
+        "body": {
+          "currency": "USD",
+          "total": 2500.5
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a request to list clips",
+      "providerState": "the user has clips",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer test-token"
+        },
+        "method": "GET",
+        "path": "/clips",
+        "query": "page=1"
+      },
+      "response": {
+        "body": [
+          {
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "id": 42,
+            "nftStatus": "none",
+            "royaltyBps": 500,
+            "selected": false,
+            "updatedAt": "2026-01-01T00:00:00.000Z",
+            "videoId": 7
+          }
+        ],
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a request to list videos",
+      "providerState": "the user has uploaded videos",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer test-token"
+        },
+        "method": "GET",
+        "path": "/videos"
+      },
+      "response": {
+        "body": {
+          "message": "Videos endpoint"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "a request to list wallets",
+      "providerState": "the user has a connected wallet",
+      "request": {
+        "headers": {
+          "Authorization": "Bearer test-token"
+        },
+        "method": "GET",
+        "path": "/wallets"
+      },
+      "response": {
+        "body": [
+          {
+            "address": "GABF...KJ93XD",
+            "chain": "stellar",
+            "connectedAt": "2026-01-01T00:00:00.000Z",
+            "id": 1,
+            "type": "freighter"
+          }
+        ],
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      }
+    },
+    {
+      "description": "an NFT mint request without a bearer token",
+      "request": {
+        "body": {
+          "clipId": 42,
+          "creatorWallet": "GC6XOTK6L6LGBKIWH3IRUZPVUY4COGEMW4J5YINOSPKO27YKTUUHTZF3"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/nfts/mint"
+      },
+      "response": {
+        "body": {
+          "errorCode": "UNAUTHORIZED",
+          "message": "Authentication required",
+          "statusCode": 401
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 401
+      }
+    },
+    {
+      "description": "an authenticated NFT mint request",
+      "providerState": "the user owns a mintable clip and its collection is available",
+      "request": {
+        "body": {
+          "clipId": 42,
+          "creatorWallet": "GC6XOTK6L6LGBKIWH3IRUZPVUY4COGEMW4J5YINOSPKO27YKTUUHTZF3"
+        },
+        "headers": {
+          "Authorization": "Bearer test-token",
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/nfts/mint"
+      },
+      "response": {
+        "body": {
+          "clipId": "42",
+          "collectionId": "viral-clips",
+          "creatorWallet": "GC6XOTK6L6LGBKIWH3IRUZPVUY4COGEMW4J5YINOSPKO27YKTUUHTZF3",
+          "metadataUri": "ipfs://QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG",
+          "royalties": [
+            {
+              "bps": 1000,
+              "label": "creator",
+              "wallet": "GC6XOTK6L6LGBKIWH3IRUZPVUY4COGEMW4J5YINOSPKO27YKTUUHTZF3"
+            }
+          ],
+          "royaltyBps": 1000,
+          "status": "minted"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 201
+      }
+    },
+    {
+      "description": "valid login credentials",
+      "providerState": "a registered user exists",
+      "request": {
+        "body": {
+          "email": "founder@example.com",
+          "password": "Sup3rSecret!"
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "method": "POST",
+        "path": "/auth/login"
+      },
+      "response": {
+        "body": {
+          "csrfToken": "csrf-token",
+          "tokens": {
+            "accessToken": "access-token",
+            "refreshToken": "refresh-token"
+          },
+          "user": {
+            "email": "founder@example.com",
+            "emailVerified": true,
+            "id": 1,
+            "mfaEnabled": false,
+            "name": "Founder",
+            "picture": null
+          }
+        },
+        "headers": {
+          "Content-Type": "application/json"
+        },
+        "status": 200
+      }
+    }
+  ],
+  "metadata": {
+    "pact-js": {
+      "version": "16.5.0"
+    },
+    "pactRust": {
+      "ffi": "0.5.4",
+      "models": "1.3.11"
+    },
+    "pactSpecification": {
+      "version": "2.0.0"
+    }
+  },
+  "provider": {
+    "name": "clips-backend-api"
+  }
+}
