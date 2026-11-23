@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiError } from "@/lib/apiResponse";
+import { resolveRequestId, withRequestId } from "@/lib/requestId";
 
 export const dynamic = "force-dynamic";
 
@@ -52,19 +54,21 @@ function isAllowedUrl(raw: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const requestId = resolveRequestId(req.headers);
   const { searchParams } = req.nextUrl;
   const rawUrl      = searchParams.get("url")      ?? "";
   const rawFilename = searchParams.get("filename")  ?? "clip.mp4";
 
   // ── Validate ────────────────────────────────────────────────────────────────
   if (!rawUrl) {
-    return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
+    return apiError(400, "Missing url parameter.", { code: "MISSING_URL", requestId });
   }
 
   if (!isAllowedUrl(rawUrl)) {
-    return NextResponse.json(
-      { error: "URL not permitted — only Cloudinary assets may be downloaded via this route." },
-      { status: 400 }
+    return apiError(
+      400,
+      "URL not permitted — only Cloudinary assets may be downloaded via this route.",
+      { code: "URL_NOT_PERMITTED", requestId }
     );
   }
 
@@ -79,17 +83,18 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[download-proxy] fetch error:", err?.message);
-    return NextResponse.json(
-      { error: "Could not reach the file server. Please try again." },
-      { status: 502 }
-    );
+    return apiError(502, "Could not reach the file server. Please try again.", {
+      code: "UPSTREAM_UNREACHABLE",
+      requestId,
+      cause: err,
+    });
   }
 
   if (!upstream.ok) {
-    return NextResponse.json(
-      { error: `File server returned ${upstream.status}` },
-      { status: 502 }
-    );
+    return apiError(502, `File server returned ${upstream.status}.`, {
+      code: "UPSTREAM_ERROR",
+      requestId,
+    });
   }
 
   // ── Validate content type ───────────────────────────────────────────────────
@@ -100,16 +105,16 @@ export async function GET(req: NextRequest) {
     contentType.startsWith("binary/");
 
   if (!allowed) {
-    return NextResponse.json(
-      { error: "Unexpected content type — only video files are allowed." },
-      { status: 415 }
-    );
+    return apiError(415, "Unexpected content type — only video files are allowed.", {
+      code: "UNSUPPORTED_CONTENT_TYPE",
+      requestId,
+    });
   }
 
   // ── Stream to browser ───────────────────────────────────────────────────────
   // ReadableStream.pipeThrough limits memory — the file is never fully buffered.
   if (!upstream.body) {
-    return NextResponse.json({ error: "Empty response from file server." }, { status: 502 });
+    return apiError(502, "Empty response from file server.", { code: "UPSTREAM_EMPTY", requestId });
   }
 
   // Enforce the size cap by counting bytes through a TransformStream
@@ -139,5 +144,5 @@ export async function GET(req: NextRequest) {
     "Cache-Control": "no-store",
   });
 
-  return new Response(stream, { status: 200, headers });
+  return withRequestId(new Response(stream, { status: 200, headers }), requestId);
 }

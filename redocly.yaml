@@ -1,0 +1,12 @@
+# Issue #1389 — OpenAPI lint configuration (used by `.github/workflows/openapi.yml`).
+apis:
+  frontend:
+    root: docs/openapi.yaml
+
+extends:
+  - recommended
+
+rules:
+  # These routes authenticate through forwarded session cookies handled by the
+  # backend (or are public), so no securitySchemes are declared here.
+  security-defined: off

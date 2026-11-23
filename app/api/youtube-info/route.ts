@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiError, apiJson } from "@/lib/apiResponse";
+import { resolveRequestId } from "@/lib/requestId";
 import { Innertube } from "youtubei.js";
 
 export const dynamic = "force-dynamic";
@@ -32,13 +34,14 @@ async function getYT(): Promise<Innertube> {
  *   { videoId, title, durationSeconds, thumbnail, downloadUrl, fileSizeBytes, quality }
  */
 export async function GET(req: NextRequest) {
+  const requestId = resolveRequestId(req.headers);
   const videoId = req.nextUrl.searchParams.get("videoId") ?? "";
 
   if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-    return NextResponse.json(
-      { error: "Missing or invalid videoId parameter." },
-      { status: 400 }
-    );
+    return apiError(400, "Missing or invalid videoId parameter.", {
+      code: "INVALID_VIDEO_ID",
+      requestId,
+    });
   }
 
   try {
@@ -48,16 +51,16 @@ export async function GET(req: NextRequest) {
     // Check availability
     const playStatus = info.playability_status?.status ?? "";
     if (playStatus === "LOGIN_REQUIRED" || playStatus === "AGE_CHECK_REQUIRED") {
-      return NextResponse.json(
-        { error: "This video is private or age-restricted." },
-        { status: 403 }
-      );
+      return apiError(403, "This video is private or age-restricted.", {
+        code: "VIDEO_RESTRICTED",
+        requestId,
+      });
     }
     if (playStatus === "UNPLAYABLE" || playStatus === "ERROR") {
-      return NextResponse.json(
-        { error: "Video is unavailable or unplayable." },
-        { status: 404 }
-      );
+      return apiError(404, "Video is unavailable or unplayable.", {
+        code: "VIDEO_UNAVAILABLE",
+        requestId,
+      });
     }
 
     // Pick best muxed (video+audio) MP4 format — prefer 720p
@@ -73,10 +76,10 @@ export async function GET(req: NextRequest) {
     }
 
     if (!format) {
-      return NextResponse.json(
-        { error: "No downloadable format found for this video." },
-        { status: 404 }
-      );
+      return apiError(404, "No downloadable format found for this video.", {
+        code: "NO_DOWNLOADABLE_FORMAT",
+        requestId,
+      });
     }
 
     // Decipher the signed URL using Node's vm module as the evaluator
@@ -89,9 +92,10 @@ export async function GET(req: NextRequest) {
         downloadUrl = format.url;
       } else {
         console.error("[youtube-info] decipher failed:", decipherErr?.message);
-        return NextResponse.json(
-          { error: "Could not resolve a download URL for this video. Please upload the file directly." },
-          { status: 500 }
+        return apiError(
+          500,
+          "Could not resolve a download URL for this video. Please upload the file directly.",
+          { code: "DECIPHER_FAILED", requestId, cause: decipherErr }
         );
       }
     }
@@ -106,15 +110,18 @@ export async function GET(req: NextRequest) {
       format.content_length != null ? Number(format.content_length) : null;
     const quality: string = format.quality_label ?? "unknown";
 
-    return NextResponse.json({
-      videoId,
-      title,
-      durationSeconds,
-      thumbnail,
-      downloadUrl,
-      fileSizeBytes,
-      quality,
-    });
+    return apiJson(
+      {
+        videoId,
+        title,
+        durationSeconds,
+        thumbnail,
+        downloadUrl,
+        fileSizeBytes,
+        quality,
+      },
+      { requestId }
+    );
   } catch (err: any) {
     const msg: string = err?.message ?? "Unknown error";
     console.error("[youtube-info] error:", msg);
@@ -123,25 +130,26 @@ export async function GET(req: NextRequest) {
       msg.toLowerCase().includes("private") ||
       msg.toLowerCase().includes("sign in")
     ) {
-      return NextResponse.json(
-        { error: "This video is private or requires sign-in." },
-        { status: 403 }
-      );
+      return apiError(403, "This video is private or requires sign-in.", {
+        code: "VIDEO_RESTRICTED",
+        requestId,
+      });
     }
     if (
       msg.toLowerCase().includes("not found") ||
       msg.toLowerCase().includes("unavailable") ||
       msg.toLowerCase().includes("does not exist")
     ) {
-      return NextResponse.json(
-        { error: "Video not found or unavailable." },
-        { status: 404 }
-      );
+      return apiError(404, "Video not found or unavailable.", {
+        code: "VIDEO_UNAVAILABLE",
+        requestId,
+      });
     }
 
-    return NextResponse.json(
-      { error: "Could not resolve video info. Please try again or upload the file directly." },
-      { status: 500 }
+    return apiError(
+      500,
+      "Could not resolve video info. Please try again or upload the file directly.",
+      { code: "VIDEO_INFO_FAILED", requestId, cause: err }
     );
   }
 }

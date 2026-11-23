@@ -5,6 +5,7 @@ import { saveActiveJob } from "@/lib/processingStore";
 import { markFreeJobAsClaimed } from "@/lib/freeJobStore";
 import apiClient from "@/lib/apiClient";
 import { uploadVideoToStorage } from "@/lib/uploadToStorage";
+import { getApiErrorMessage } from "@/lib/apiResponse";
 
 
 export type YouTubeImportPhase =
@@ -91,7 +92,7 @@ async function getYouTubeInfo(videoId: string): Promise<{
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const msg: string = data?.error ?? `HTTP ${res.status}`;
+    const msg: string = getApiErrorMessage(data, `HTTP ${res.status}`);
 
     if (res.status === 403) {
       throw new YouTubeInfoUnavailableError(
@@ -159,7 +160,7 @@ function downloadVideo(
         let msg = `Download failed (${xhr.status}).`;
         try {
           const parsed = JSON.parse(xhr.responseText);
-          if (parsed?.error) msg = parsed.error;
+          msg = getApiErrorMessage(parsed, msg);
         } catch { /* keep default */ }
         reject(new Error(msg));
       }
