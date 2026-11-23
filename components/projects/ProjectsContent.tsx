@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { CardSkeleton } from "@/components/shared/Skeleton";
 import { useQueryClient } from "@tanstack/react-query";
 import { deleteClip, ReadyToPostKit } from "@/lib/queries";
 import DashboardLayout from "@/components/shared/DashboardLayout";
@@ -124,9 +124,16 @@ export default function ProjectsContent({
               {pageLoading && (
                 <div
                   role="status"
-                  className="absolute inset-0 flex items-start justify-center pt-24"
+                  aria-label="Loading clips"
+                  className="absolute inset-0 pt-2"
                 >
-                  <Loader2 className="w-8 h-8 text-[#B6FF4A] animate-spin" aria-hidden="true" />
+                  {/* Issue #1380 — skeleton grid matching ClipGrid dimensions
+                      to prevent layout shift while paging. */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <CardSkeleton key={i} />
+                    ))}
+                  </div>
                   <span className="sr-only">Loading clips…</span>
                 </div>
               )}
