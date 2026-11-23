@@ -5,9 +5,14 @@ import { saveActiveJob } from "@/lib/processingStore";
 import { markFreeJobAsClaimed } from "@/lib/freeJobStore";
 import apiClient from "@/lib/apiClient";
 import { uploadVideoToStorage } from "@/lib/uploadToStorage";
+import {
+  MAX_DOWNLOAD_FILENAME_LENGTH,
+  PROGRESS_COMPLETE,
+  PROGRESS_INDETERMINATE,
+} from "@/lib/constants";
 
 
-export type YouTubeImportPhase =
+type YouTubeImportPhase =
   | "idle"
   | "fetching-info"  // getting video metadata via /api/youtube-info
   | "downloading"    // downloading video in browser
@@ -15,7 +20,7 @@ export type YouTubeImportPhase =
   | "done"
   | "error";
 
-export interface YouTubeImportState {
+interface YouTubeImportState {
   phase:         YouTubeImportPhase;
   /** 0–100 during downloading/uploading; -1 = indeterminate */
   progress:      number;
@@ -27,12 +32,12 @@ export interface YouTubeImportState {
   cloudinaryUrl: string | null;
 }
 
-export type YouTubeImportResult =
+type YouTubeImportResult =
   | { videoId: string; cloudinaryUrl: string; error?: never }
   | { error: string; videoId?: never; cloudinaryUrl?: never };
 
 
-export function extractYouTubeId(url: string): string | null {
+function extractYouTubeId(url: string): string | null {
   try {
     const { hostname, pathname, searchParams } = new URL(url);
     const host = hostname.replace("www.", "");
@@ -67,7 +72,7 @@ export function isYouTubeUrl(url: string): boolean {
 // there is no point falling back to the Render backend — it would hit the same
 // wall and just produce a second confusing error.
 
-export class YouTubeInfoUnavailableError extends Error {
+class YouTubeInfoUnavailableError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "YouTubeInfoUnavailableError";
@@ -91,7 +96,7 @@ async function getYouTubeInfo(videoId: string): Promise<{
   const data = await res.json().catch(() => ({}));
 
   if (!res.ok) {
-    const msg: string = data?.error ?? `HTTP ${res.status}`;
+    const msg: string = data?.message ?? data?.error ?? `HTTP ${res.status}`;
 
     if (res.status === 403) {
       throw new YouTubeInfoUnavailableError(
@@ -146,9 +151,9 @@ function downloadVideo(
 
     xhr.onprogress = (e) => {
       if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
+        onProgress(Math.round((e.loaded / e.total) * PROGRESS_COMPLETE));
       } else {
-        onProgress(-1); // indeterminate
+        onProgress(PROGRESS_INDETERMINATE);
       }
     };
 
@@ -159,7 +164,7 @@ function downloadVideo(
         let msg = `Download failed (${xhr.status}).`;
         try {
           const parsed = JSON.parse(xhr.responseText);
-          if (parsed?.error) msg = parsed.error;
+          if (parsed?.message || parsed?.error) msg = parsed.message ?? parsed.error;
         } catch { /* keep default */ }
         reject(new Error(msg));
       }
@@ -291,7 +296,7 @@ export function useYouTubeImport() {
           videoTitle
             .replace(/[^a-zA-Z0-9\s\-_]/g, "")
             .trim()
-            .substring(0, 100) + ".mp4";
+            .substring(0, MAX_DOWNLOAD_FILENAME_LENGTH) + ".mp4";
 
         const file = await downloadVideo(
           downloadUrl,
@@ -312,8 +317,8 @@ export function useYouTubeImport() {
         markFreeJobAsClaimed();
         set({
           phase:         "done",
-          progress:      100,
-          label:         labelFor("done", 100),
+          progress:      PROGRESS_COMPLETE,
+          label:         labelFor("done", PROGRESS_COMPLETE),
           videoId:       uploadResult.videoId,
           cloudinaryUrl: uploadResult.cloudinaryUrl,
         });
@@ -352,8 +357,8 @@ export function useYouTubeImport() {
           markFreeJobAsClaimed();
           set({
             phase:         "done",
-            progress:      100,
-            label:         labelFor("done", 100),
+            progress:      PROGRESS_COMPLETE,
+            label:         labelFor("done", PROGRESS_COMPLETE),
             videoId:       String(backendVideoId),
             cloudinaryUrl: cloudinaryUrl ?? "",
           });

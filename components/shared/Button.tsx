@@ -13,8 +13,8 @@ export const BUTTON_VARIANTS = [
 ] as const;
 export const BUTTON_SIZES = ["sm", "md", "lg", "icon"] as const;
 
-export type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
-export type ButtonSize = (typeof BUTTON_SIZES)[number];
+type ButtonVariant = (typeof BUTTON_VARIANTS)[number];
+type ButtonSize = (typeof BUTTON_SIZES)[number];
 
 const base =
   "inline-flex items-center justify-center gap-2 font-bold transition-all select-none " +
@@ -43,7 +43,7 @@ const sizeClasses: Record<ButtonSize, string> = {
   icon: "p-2 rounded-lg",
 };
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
   /** Shows a spinner, disables the button and sets aria-busy. */

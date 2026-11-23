@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import { DEFAULT_API_URL, SSE_RECONNECT_RETRY_MS, SSE_SHUTDOWN_FLUSH_MS } from "@/lib/constants";
 
 // Force dynamic so Next.js never caches this route
 export const dynamic = "force-dynamic";
 // No body size limit — SSE streams indefinitely
-export const maxDuration = 300; // 5 min max on Vercel hobby; adjust as needed
+// Route segment config must be a static literal (Next.js reads it at build
+// time), so this cannot reference lib/constants: 300 s = 5 min max on Vercel hobby.
+export const maxDuration = 300;
 
 // Graceful shutdown (issue #1397): track every open SSE stream so a
 // SIGTERM/SIGINT can flush a terminal event to clients before the process
@@ -13,11 +16,12 @@ const activeStreams = new Set<ReadableStreamDefaultController<Uint8Array>>();
 
 function flushTerminalEvents(): void {
   // Terminal event: tells clients the stream is closing and that they should
-  // reconnect to the new instance. The SSE `retry:` field is set to 1000ms.
+  // reconnect to the new instance. The SSE `retry:` field is set to
+  // SSE_RECONNECT_RETRY_MS.
   const terminalEvent =
     `event: closing\n` +
     `data: {"status":"shutting_down","message":"Server is shutting down — reconnect to the new instance."}\n` +
-    `retry: 1000\n\n`;
+    `retry: ${SSE_RECONNECT_RETRY_MS}\n\n`;
   for (const controller of activeStreams) {
     try {
       controller.enqueue(new TextEncoder().encode(terminalEvent));
@@ -29,7 +33,7 @@ function flushTerminalEvents(): void {
   activeStreams.clear();
   // Give the terminal events a brief moment to flush, then exit so the
   // shutdown can proceed.
-  setTimeout(() => process.exit(0), 500);
+  setTimeout(() => process.exit(0), SSE_SHUTDOWN_FLUSH_MS);
 }
 
 process.on("SIGTERM", flushTerminalEvents);
@@ -58,7 +62,7 @@ process.on("SIGINT", flushTerminalEvents);
  * cap of ~10s.
  */
 export async function GET(req: NextRequest) {
-  const baseUrl = (process.env.API_URL || "https://clipcash-api.onrender.com").replace(/\/+$/, "");
+  const baseUrl = (process.env.API_URL || DEFAULT_API_URL).replace(/\/+$/, "");
 
   // Strip /api/sse prefix to get the real backend path
   const path = req.nextUrl.pathname.replace(/^\/api\/sse/, "");

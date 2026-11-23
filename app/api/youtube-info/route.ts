@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { Innertube } from "youtubei.js";
+import { error, serverError, success, validationError } from "../apiResponse";
+import { ERROR_CODES } from "../errorCodes";
 
 export const dynamic = "force-dynamic";
 
@@ -35,10 +37,7 @@ export async function GET(req: NextRequest) {
   const videoId = req.nextUrl.searchParams.get("videoId") ?? "";
 
   if (!videoId || !/^[a-zA-Z0-9_-]{11}$/.test(videoId)) {
-    return NextResponse.json(
-      { error: "Missing or invalid videoId parameter." },
-      { status: 400 }
-    );
+    return validationError({ videoId: "Missing or invalid videoId parameter." });
   }
 
   try {
@@ -48,16 +47,10 @@ export async function GET(req: NextRequest) {
     // Check availability
     const playStatus = info.playability_status?.status ?? "";
     if (playStatus === "LOGIN_REQUIRED" || playStatus === "AGE_CHECK_REQUIRED") {
-      return NextResponse.json(
-        { error: "This video is private or age-restricted." },
-        { status: 403 }
-      );
+      return error("This video is private or age-restricted.", 403, ERROR_CODES.FORBIDDEN);
     }
     if (playStatus === "UNPLAYABLE" || playStatus === "ERROR") {
-      return NextResponse.json(
-        { error: "Video is unavailable or unplayable." },
-        { status: 404 }
-      );
+      return error("Video is unavailable or unplayable.", 404, ERROR_CODES.NOT_FOUND);
     }
 
     // Pick best muxed (video+audio) MP4 format — prefer 720p
@@ -73,25 +66,22 @@ export async function GET(req: NextRequest) {
     }
 
     if (!format) {
-      return NextResponse.json(
-        { error: "No downloadable format found for this video." },
-        { status: 404 }
-      );
+      return error("No downloadable format found for this video.", 404, ERROR_CODES.NOT_FOUND);
     }
 
     // Decipher the signed URL using Node's vm module as the evaluator
     let downloadUrl: string;
     try {
       downloadUrl = format.decipher(yt.session.player);
-    } catch (decipherErr: any) {
+    } catch (decipherErr) {
       // If decipher fails, try the raw url field (some formats have it pre-deciphered)
       if (format.url) {
         downloadUrl = format.url;
       } else {
-        console.error("[youtube-info] decipher failed:", decipherErr?.message);
-        return NextResponse.json(
-          { error: "Could not resolve a download URL for this video. Please upload the file directly." },
-          { status: 500 }
+        return serverError(
+          decipherErr,
+          "[youtube-info] decipher failed",
+          "Could not resolve a download URL for this video. Please upload the file directly."
         );
       }
     }
@@ -106,7 +96,7 @@ export async function GET(req: NextRequest) {
       format.content_length != null ? Number(format.content_length) : null;
     const quality: string = format.quality_label ?? "unknown";
 
-    return NextResponse.json({
+    return success({
       videoId,
       title,
       durationSeconds,
@@ -123,25 +113,20 @@ export async function GET(req: NextRequest) {
       msg.toLowerCase().includes("private") ||
       msg.toLowerCase().includes("sign in")
     ) {
-      return NextResponse.json(
-        { error: "This video is private or requires sign-in." },
-        { status: 403 }
-      );
+      return error("This video is private or requires sign-in.", 403, ERROR_CODES.FORBIDDEN);
     }
     if (
       msg.toLowerCase().includes("not found") ||
       msg.toLowerCase().includes("unavailable") ||
       msg.toLowerCase().includes("does not exist")
     ) {
-      return NextResponse.json(
-        { error: "Video not found or unavailable." },
-        { status: 404 }
-      );
+      return error("Video not found or unavailable.", 404, ERROR_CODES.NOT_FOUND);
     }
 
-    return NextResponse.json(
-      { error: "Could not resolve video info. Please try again or upload the file directly." },
-      { status: 500 }
+    return serverError(
+      err,
+      "[youtube-info]",
+      "Could not resolve video info. Please try again or upload the file directly."
     );
   }
 }

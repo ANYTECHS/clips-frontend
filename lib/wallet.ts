@@ -8,6 +8,11 @@ import { AlbedoModule } from "@creit-tech/stellar-wallets-kit/modules/albedo";
 import { RabetModule } from "@creit-tech/stellar-wallets-kit/modules/rabet";
 import { Networks } from "@creit-tech/stellar-wallets-kit/types";
 import { TransactionBuilder } from "@stellar/stellar-sdk";
+import {
+  ED25519_SIGNATURE_HEX_LENGTH,
+  PREFIXED_SIGNATURE_BYTES,
+  SIGNATURE_PREFIX_BYTES,
+} from "./constants";
 
 /**
  * The selected Stellar network.
@@ -36,6 +41,8 @@ function resolveInitialNetwork(): NetworkId {
   return parseNetworkValue(process.env.NEXT_PUBLIC_STELLAR_NETWORK || "testnet");
 }
 
+const currentNetworkId: NetworkId = resolveInitialNetwork();
+
 export interface StellarBalance {
   assetCode: string;
   amount: string;
@@ -43,7 +50,7 @@ export interface StellarBalance {
 
 export function getTransactionHashFromXdr(xdr: string): string {
   const networkPassphrase =
-    STELLAR_NETWORK === Networks.PUBLIC
+    getStellarNetwork() === Networks.PUBLIC
       ? "Public Global Stellar Network ; September 2015"
       : "Test SDF Network ; September 2015";
 
@@ -53,16 +60,11 @@ export function getTransactionHashFromXdr(xdr: string): string {
 }
 
 export function getTransactionExplorerUrl(hash: string): string {
-  const network = STELLAR_NETWORK === Networks.PUBLIC ? "public" : "testnet";
+  const network = getStellarNetwork() === Networks.PUBLIC ? "public" : "testnet";
   return `https://stellar.expert/explorer/${network}/tx/${hash}`;
 }
 
 let kitInitialised = false;
-
-/** Returns the active network as a friendly id ("testnet" | "mainnet"). */
-export function getCurrentNetwork(): NetworkId {
-  return currentNetworkId;
-}
 
 /** True when the active network is Stellar Public / mainnet. */
 export function isMainnet(): boolean {
@@ -70,24 +72,8 @@ export function isMainnet(): boolean {
 }
 
 /** Returns the kit/network-passphrase value for the active network. */
-export function getStellarNetwork(): Networks {
+function getStellarNetwork(): Networks {
   return currentNetworkId === "mainnet" ? Networks.PUBLIC : Networks.TESTNET;
-}
-
-/**
- * Persists a network choice so it survives the reload that re-initialises the
- * kit. The connected public key and the wallet extension's keys are preserved —
- * the same keypair is reused on the new network.
- */
-export function setNetwork(network: NetworkId): void {
-  currentNetworkId = network;
-  if (typeof window !== "undefined") {
-    window.localStorage.setItem(NETWORK_STORAGE_KEY, network);
-  }
-  // The kit is bound to a single network per page load. Switching networks
-  // requires a fresh init, so mark the kit as needing re-init. The UI triggers
-  // a reload after switching, which re-runs initWalletKit() on the new network.
-  kitInitialised = false;
 }
 
 export function initWalletKit(): void {
@@ -188,7 +174,7 @@ export function ensureHexSignature(signature: string): string {
     signature = signature.slice(8);
   }
 
-  if (/^[0-9a-fA-F]{128}$/.test(signature)) {
+  if (new RegExp(`^[0-9a-fA-F]{${ED25519_SIGNATURE_HEX_LENGTH}}$`).test(signature)) {
     return signature.toLowerCase();
   }
 
@@ -206,12 +192,13 @@ export function ensureHexSignature(signature: string): string {
     }
 
     // Freighter signMessage can prepend 2 bytes (66 bytes total)
-    const sigBytes = bytes.length === 66 ? bytes.slice(2) : bytes;
+    const sigBytes =
+      bytes.length === PREFIXED_SIGNATURE_BYTES ? bytes.slice(SIGNATURE_PREFIX_BYTES) : bytes;
     const sigHex   = Array.from(sigBytes)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
 
-    if (sigHex.length === 128) return sigHex;
+    if (sigHex.length === ED25519_SIGNATURE_HEX_LENGTH) return sigHex;
   } catch (e) {
     console.warn("[ensureHexSignature] decode failed:", e);
   }

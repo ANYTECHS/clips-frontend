@@ -48,6 +48,11 @@ interface I18nContextType {
 
 const I18nContext = createContext<I18nContextType | undefined>(undefined);
 
+/**
+ * Consumer hook for the active locale and bound i18n helpers.
+ * @public — the i18n provider's API for components; kept even when no
+ * component currently consumes it.
+ */
 export function useI18n(): I18nContextType {
   const ctx = useContext(I18nContext);
   if (!ctx) {

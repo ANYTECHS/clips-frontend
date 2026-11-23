@@ -1,0 +1,213 @@
+openapi: 3.1.0
+info:
+  title: ClipCash frontend API routes
+  version: 1.0.0
+  description: >
+    Routes served by the Next.js app under /api. Every error uses the
+    ErrorResponse schema (see docs/API.md).
+paths:
+  /api/youtube-info:
+    get:
+      summary: Resolve YouTube metadata and a download URL
+      parameters:
+        - name: videoId
+          in: query
+          required: true
+          schema: { type: string, pattern: "^[a-zA-Z0-9_-]{11}$" }
+      responses:
+        "200":
+          description: Video info
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [videoId, title, durationSeconds, thumbnail, downloadUrl, quality]
+                properties:
+                  videoId: { type: string }
+                  title: { type: string }
+                  durationSeconds: { type: number }
+                  thumbnail: { type: string }
+                  downloadUrl: { type: string }
+                  fileSizeBytes: { type: [number, "null"] }
+                  quality: { type: string }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+  /api/youtube-dl:
+    get:
+      summary: Stream a YouTube CDN file through our origin
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+      responses:
+        "200":
+          description: Video stream
+          content:
+            video/*: { schema: { type: string, format: binary } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "415": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/download:
+    get:
+      summary: Download a Cloudinary/R2 file as an attachment
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+        - name: filename
+          in: query
+          required: false
+          schema: { type: string }
+      responses:
+        "200":
+          description: File stream
+          content:
+            video/*: { schema: { type: string, format: binary } }
+        "400": { $ref: "#/components/responses/ValidationError" }
+        "415": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/r2-proxy:
+    put:
+      summary: Fallback upload proxy to Cloudflare R2
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+      requestBody:
+        required: true
+        content:
+          video/*: { schema: { type: string, format: binary } }
+      responses:
+        "200": { description: Uploaded }
+        "400": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "500": { $ref: "#/components/responses/Error" }
+        "502": { $ref: "#/components/responses/Error" }
+  /api/health/deep:
+    get:
+      summary: Deep health check
+      responses:
+        "200": { $ref: "#/components/responses/Health" }
+        "503": { $ref: "#/components/responses/Health" }
+  /api/sse/{path}:
+    get:
+      summary: Server-sent events proxy to the backend
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Event stream
+          content:
+            text/event-stream: { schema: { type: string } }
+  /api/proxy/{path}:
+    parameters:
+      - name: path
+        in: path
+        required: true
+        schema: { type: string }
+    get:
+      summary: Forward a request to the backend (all methods supported)
+      responses:
+        "200": { description: Backend response, passed through unchanged }
+        "304": { description: Not modified (ETag matched) }
+        "403": { $ref: "#/components/responses/Error" }
+        "503": { $ref: "#/components/responses/Error" }
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [error, message]
+      properties:
+        error:
+          type: string
+          description: HTTP reason phrase for the status.
+          examples: ["Bad Request"]
+        message:
+          type: string
+          description: Human-readable message, safe to show to users.
+        code:
+          $ref: "#/components/schemas/ErrorCode"
+        details:
+          type: object
+          additionalProperties: true
+          description: Structured extra data. Validation errors use `fields`.
+    ErrorCode:
+      type: string
+      enum:
+        - BAD_REQUEST
+        - VALIDATION_ERROR
+        - AUTH_REQUIRED
+        - FORBIDDEN
+        - ORIGIN_NOT_ALLOWED
+        - NOT_FOUND
+        - PAYLOAD_TOO_LARGE
+        - UNSUPPORTED_MEDIA_TYPE
+        - RATE_LIMITED
+        - INTERNAL_ERROR
+        - UPSTREAM_ERROR
+        - SERVICE_UNAVAILABLE
+    ValidationErrorResponse:
+      allOf:
+        - $ref: "#/components/schemas/ErrorResponse"
+        - type: object
+          required: [code, details]
+          properties:
+            code: { const: VALIDATION_ERROR }
+            details:
+              type: object
+              required: [fields]
+              properties:
+                fields:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: string
+                      - type: array
+                        items: { type: string }
+    Pagination:
+      type: object
+      required: [page, limit, total, totalPages]
+      properties:
+        page: { type: integer }
+        limit: { type: integer }
+        total: { type: integer }
+        totalPages: { type: integer }
+    DependencyStatus:
+      type: object
+      required: [ok, latencyMs]
+      properties:
+        ok: { type: boolean }
+        latencyMs: { type: number }
+        error: { type: string }
+  responses:
+    Error:
+      description: Error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ErrorResponse" }
+    ValidationError:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationErrorResponse" }
+    Health:
+      description: Health status
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              status: { type: string, enum: [healthy, degraded] }
+              checks:
+                type: object
+                properties:
+                  app: { $ref: "#/components/schemas/DependencyStatus" }
+                  backend: { $ref: "#/components/schemas/DependencyStatus" }

@@ -36,16 +36,3 @@ export const TwitterIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-export const PhantomIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="#AB9FF2" fill="#AB9FF2" fillOpacity="0.1"></path>
-    <circle cx="12" cy="12" r="3" stroke="#AB9FF2"></circle>
-  </svg>
-);
-
-export const MetaMaskIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none">
-    <path d="M22 6.5l-2.5-3L12 2 4.5 3.5 2 6.5l3 2 7 5 7-5 3-2z" fill="#E2761B"></path>
-    <path d="M12 22l-7-5 2-7.5 5 3.5 5-3.5 2 7.5-7 5z" fill="#E2761B"></path>
-  </svg>
-);

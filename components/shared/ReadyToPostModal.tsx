@@ -24,7 +24,7 @@ import {
 } from "@/lib/queries";
 import Button from "@/components/shared/Button";
 
-export interface ReadyToPostClip {
+interface ReadyToPostClip {
   id: string;
   title: string;
   thumbnail?: string | null;

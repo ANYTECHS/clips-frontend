@@ -76,7 +76,7 @@ export function markUnlocked(clipId: string, address: string) {
 }
 
 /** Returns true if `address` has already unlocked `clipId`. */
-export function isUnlocked(clipId: string, address?: string | null): boolean {
+function isUnlocked(clipId: string, address?: string | null): boolean {
   if (!address || !cache) return false;
   return cache.has(key(clipId, address));
 }

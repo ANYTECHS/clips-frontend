@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-
-export const COPY_FEEDBACK_MS = 2000;
+import { COPY_FEEDBACK_MS } from "@/lib/constants";
 
 /**
  * Copies text and exposes `copied`, which reverts to false after 2 seconds.

@@ -1,0 +1,22 @@
+name: knip
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  knip:
+    name: Dead code (Knip)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      # Issue #1348 — fail on unused files, exports, types and dependencies.
+      - name: Knip
+        run: npm run knip

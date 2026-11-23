@@ -1,4 +1,4 @@
-
+import { FRIENDLY_MESSAGE_MAX_LENGTH, FRIENDLY_MESSAGE_MIN_LENGTH } from "./constants";
 
 export function getFriendlyErrorMessage(
   err: unknown,
@@ -129,7 +129,7 @@ export function getFriendlyErrorMessage(
 
   
   const isCodeOrJson = rawMsg.includes("{") || rawMsg.includes("}") || rawMsg.includes("at ") || rawMsg.includes("SELECT ") || rawMsg.includes("INSERT ") || rawMsg.includes("status code");
-  if (rawMsg && rawMsg.length > 3 && rawMsg.length <= 110 && !isCodeOrJson) {
+  if (rawMsg && rawMsg.length > FRIENDLY_MESSAGE_MIN_LENGTH && rawMsg.length <= FRIENDLY_MESSAGE_MAX_LENGTH && !isCodeOrJson) {
     
     const trimmed = rawMsg.trim();
     const formatted = trimmed.charAt(0).toUpperCase() + trimmed.slice(1);

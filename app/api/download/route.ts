@@ -1,4 +1,7 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { DOWNLOAD_PROXY_MAX_BYTES } from "@/lib/constants";
+import { error, validationError } from "../apiResponse";
+import { ERROR_CODES } from "../errorCodes";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +25,8 @@ export const dynamic = "force-dynamic";
  *      HTML / JS responses from a spoofed URL are rejected with 415.
  *   4. Filename       — sanitised: only alphanumerics, spaces, hyphens, dots
  *      are kept. Defaults to "clip.mp4" if empty.
- *   5. Size cap       — streams are capped at 500 MB to prevent memory abuse.
+ *   5. Size cap       — streams are capped at DOWNLOAD_PROXY_MAX_BYTES (1 GB)
+ *      to prevent memory abuse.
  */
 
 const ALLOWED_HOSTS = [
@@ -31,8 +35,6 @@ const ALLOWED_HOSTS = [
   "r2.dev",
   "cloudflarestorage.com",
 ];
-
-const MAX_BYTES = 1024 * 1024 * 1024; // 1 GB
 
 function sanitiseFilename(raw: string): string {
   const cleaned = raw.replace(/[^a-zA-Z0-9 ._\-()]/g, "").trim();
@@ -58,14 +60,13 @@ export async function GET(req: NextRequest) {
 
   // ── Validate ────────────────────────────────────────────────────────────────
   if (!rawUrl) {
-    return NextResponse.json({ error: "Missing url parameter" }, { status: 400 });
+    return validationError({ url: "Missing url parameter." });
   }
 
   if (!isAllowedUrl(rawUrl)) {
-    return NextResponse.json(
-      { error: "URL not permitted — only Cloudinary assets may be downloaded via this route." },
-      { status: 400 }
-    );
+    return validationError({
+      url: "URL not permitted — only Cloudinary assets may be downloaded via this route.",
+    });
   }
 
   const filename = sanitiseFilename(rawFilename);
@@ -79,17 +80,11 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[download-proxy] fetch error:", err?.message);
-    return NextResponse.json(
-      { error: "Could not reach the file server. Please try again." },
-      { status: 502 }
-    );
+    return error("Could not reach the file server. Please try again.", 502, ERROR_CODES.UPSTREAM_ERROR);
   }
 
   if (!upstream.ok) {
-    return NextResponse.json(
-      { error: `File server returned ${upstream.status}` },
-      { status: 502 }
-    );
+    return error(`File server returned ${upstream.status}`, 502, ERROR_CODES.UPSTREAM_ERROR);
   }
 
   // ── Validate content type ───────────────────────────────────────────────────
@@ -100,16 +95,17 @@ export async function GET(req: NextRequest) {
     contentType.startsWith("binary/");
 
   if (!allowed) {
-    return NextResponse.json(
-      { error: "Unexpected content type — only video files are allowed." },
-      { status: 415 }
+    return error(
+      "Unexpected content type — only video files are allowed.",
+      415,
+      ERROR_CODES.UNSUPPORTED_MEDIA_TYPE
     );
   }
 
   // ── Stream to browser ───────────────────────────────────────────────────────
   // ReadableStream.pipeThrough limits memory — the file is never fully buffered.
   if (!upstream.body) {
-    return NextResponse.json({ error: "Empty response from file server." }, { status: 502 });
+    return error("Empty response from file server.", 502, ERROR_CODES.UPSTREAM_ERROR);
   }
 
   // Enforce the size cap by counting bytes through a TransformStream
@@ -117,7 +113,7 @@ export async function GET(req: NextRequest) {
   const limiter = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
       bytesReceived += chunk.byteLength;
-      if (bytesReceived > MAX_BYTES) {
+      if (bytesReceived > DOWNLOAD_PROXY_MAX_BYTES) {
         controller.error(new Error("File exceeds the 1 GB size cap."));
         return;
       }

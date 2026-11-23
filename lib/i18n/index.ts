@@ -24,15 +24,7 @@ export type LocaleId = "en" | "es" | "fr" | "pt" | "ar";
 
 export const SUPPORTED_LOCALES: LocaleId[] = ["en", "es", "fr", "pt", "ar"];
 export const DEFAULT_LOCALE: LocaleId = "en";
-export const RTL_LOCALES: LocaleId[] = ["ar"];
-
-export const LOCALE_LABELS: Record<LocaleId, string> = {
-  en: "English",
-  es: "Español",
-  fr: "Français",
-  pt: "Português",
-  ar: "العربية",
-};
+const RTL_LOCALES: LocaleId[] = ["ar"];
 
 /** All locale dictionaries. Typed loosely so plural nodes (objects) fit. */
 export const translations: Record<LocaleId, Record<string, unknown>> = {
