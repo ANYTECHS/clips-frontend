@@ -132,6 +132,8 @@ function AuthProviderInner({ children }: { children: React.ReactNode }) {
         "/onboarding",
         "/settings",
         "/agent-marketplace",
+        "/earnings",
+        "/wallet",
       ];
       const isProtected = protectedPaths.some((p) => pathname.startsWith(p));
       if (isProtected && !isWalletOnboarding) {

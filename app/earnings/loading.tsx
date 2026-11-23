@@ -1,0 +1,15 @@
+import DashboardLayout from "@/components/shared/DashboardLayout";
+import { EarningsPageSkeleton } from "@/components/shared/SkeletonPresets";
+
+/**
+ * Issue #1242 — route-level loading state for /earnings.
+ * Rendered inside the same DashboardLayout as the page so the sidebar and
+ * header stay put and only the content area swaps (no layout shift).
+ */
+export default function EarningsLoading() {
+  return (
+    <DashboardLayout>
+      <EarningsPageSkeleton />
+    </DashboardLayout>
+  );
+}

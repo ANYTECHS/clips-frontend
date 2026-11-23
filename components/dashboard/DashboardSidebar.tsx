@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
@@ -14,6 +14,8 @@ import {
   Sparkles,
   Cpu as CpuAi,
   BarChart3,
+  Wallet,
+  Coins,
 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
 import Logo from "@/components/shared/Logo";
@@ -23,6 +25,8 @@ import { getUserClipCount } from "@/lib/queries";
 const staticMenuItems = [
   { id: "dashboard",         label: "Dashboard",        icon: LayoutDashboard, href: "/dashboard" },
   { id: "analytics",         label: "Analytics",        icon: BarChart3,       href: "/analytics" },
+  { id: "earnings",          label: "Earnings",         icon: Coins,           href: "/earnings" },
+  { id: "wallet",            label: "Wallet",           icon: Wallet,          href: "/wallet" },
   { id: "ai-projects",       label: "AI Projects",      icon: Sparkles,        href: "/ai-projects" },
   { id: "agent-marketplace", label: "Agent Marketplace",icon: CpuAi,             href: "/agent-marketplace" },
   { id: "platforms",         label: "Auto-Posting",     icon: Share2,          href: "/platforms" },
@@ -49,39 +53,52 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
 
   const hasClips = clipCount > 0;
 
+  // Projects is inserted right after Analytics once the user has clips.
   const menuItems = hasClips
-    ? [
-        staticMenuItems[0],
-        staticMenuItems[1],
-        projectsItem,
-        staticMenuItems[2],
-        staticMenuItems[3],
-        staticMenuItems[4],
-        staticMenuItems[5],
-      ]
+    ? [...staticMenuItems.slice(0, 2), projectsItem, ...staticMenuItems.slice(2)]
     : staticMenuItems;
 
+  // Issue #1241 — close the mobile drawer on navigation and on Escape.
+  useEffect(() => {
+    onClose();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isOpen, onClose]);
+
   return (
-    <aside className={`fixed top-0 start-0 h-screen w-[280px] bg-[#031d0f] border-e border-[#0e4d2a] z-50 flex flex-col transition-transform duration-300 lg:translate-x-0 ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-      <div className="p-8 flex items-center justify-between">
+    <aside
+      id="dashboard-sidebar"
+      aria-label="Main navigation"
+      className={`fixed top-0 start-0 h-screen w-[280px] max-w-[85vw] bg-[#031d0f] border-e border-[#0e4d2a] z-50 flex flex-col transition-transform duration-300 lg:translate-x-0! ${isOpen ? 'translate-x-0' : '-translate-x-full rtl:translate-x-full'}`}
+    >
+      <div className="p-6 lg:p-8 flex items-center justify-between">
         <Logo />
         <button 
           onClick={onClose}
-          className="lg:hidden p-2 -me-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors"
+          className="lg:hidden min-w-11 min-h-11 flex items-center justify-center -me-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors"
           aria-label="Close sidebar"
         >
           <X className="w-6 h-6" />
         </button>
       </div>
 
-      <nav className="flex-1 px-4 space-y-1.5">
+      <nav className="flex-1 px-4 space-y-1.5 overflow-y-auto">
         {menuItems.map((item) => {
           const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
           return (
             <Link
               key={item.id}
               href={item.href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${
+              aria-current={isActive ? "page" : undefined}
+              className={`flex items-center gap-3 px-4 py-3 min-h-11 rounded-xl transition-all duration-200 group ${
                 isActive 
                   ? "bg-[#B6FF4A]/12 text-[#B6FF4A] font-bold border border-[#B6FF4A]/25 shadow-[0_0_15px_rgba(57,255,20,0.08)]" 
                   : "text-[#90A89C] hover:text-[#F4F7EF] hover:bg-[#06351C]/60"
@@ -120,7 +137,8 @@ export default function DashboardSidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           <button 
             onClick={() => logout()}
-            className="p-2 text-[#90A89C] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 group/logout relative"
+            aria-label="Logout"
+            className="min-w-11 min-h-11 flex items-center justify-center text-[#90A89C] hover:text-red-400 transition-colors rounded-lg hover:bg-red-400/10 group/logout relative"
             title="Logout"
           >
             <LogOut className="w-4 h-4" />

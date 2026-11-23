@@ -13,7 +13,7 @@ interface StatCardProps {
 
 export default function StatCard({ label, value, trend, isPositive = true, icon: Icon }: StatCardProps) {
   return (
-    <div className="bg-[#06351C] border border-[#0e4d2a] rounded-[24px] p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-[#39FF14]/40 hover:shadow-[0_0_30px_rgba(57,255,20,0.12)] transition-all duration-300">
+    <div className="bg-[#06351C] border border-[#0e4d2a] rounded-[24px] p-5 sm:p-8 flex flex-col gap-6 relative overflow-hidden group hover:border-[#39FF14]/40 hover:shadow-[0_0_30px_rgba(57,255,20,0.12)] transition-all duration-300">
       <div className="flex items-center justify-between">
         <span className="text-[#90A89C] text-[13px] font-bold uppercase tracking-wider">{label}</span>
         <div className="w-10 h-10 rounded-xl bg-[#031d0f] border border-[#0e4d2a] flex items-center justify-center text-[#90A89C] group-hover:text-[#B6FF4A] group-hover:bg-[#B6FF4A]/10 transition-colors">

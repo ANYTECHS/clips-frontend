@@ -2,8 +2,9 @@
 
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Loader2 } from "lucide-react";
 import DashboardContent from "@/components/dashboard/DashboardContent";
+import DashboardLayout from "@/components/shared/DashboardLayout";
+import { DashboardPageSkeleton } from "@/components/shared/SkeletonPresets";
 import apiClient from "@/lib/apiClient";
 
 async function getDashboardData() {
@@ -56,12 +57,9 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-1 items-center justify-center min-h-screen bg-[#020D08]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 text-[#B6FF4A] animate-spin" />
-          <p className="text-[#90A89C] text-sm font-medium">Loading dashboard…</p>
-        </div>
-      </div>
+      <DashboardLayout>
+        <DashboardPageSkeleton />
+      </DashboardLayout>
     );
   }
 
