@@ -5,6 +5,7 @@ import QueryProvider from "@/components/QueryProvider";
 import { WalletProvider } from "@/components/WalletProvider";
 import { ToastProvider } from "@/components/shared/ToastProvider";
 import { I18nProvider } from "@/components/I18nProvider";
+import KeyboardShortcutsHelp from "@/components/shared/KeyboardShortcutsHelp";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://enclips.ai"),
@@ -53,13 +54,21 @@ export default function RootLayout({
   return (
     <html lang={arabicLocale.locale} dir={arabicLocale.direction} suppressHydrationWarning>
       <body className="font-sans antialiased" suppressHydrationWarning>
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-[#B6FF4A] focus:text-[#020D08] focus:rounded-lg focus:font-bold"
+        >
+          Skip to content
+        </a>
         <div className="radial-bg" />
         <QueryProvider>
           <I18nProvider>
             <WalletProvider>
               <AuthProvider>
                 <ToastProvider>
-                  {children}
+                  <div id="main-content" tabIndex={-1} className="outline-none">
+                    {children}
+                  </div>
                 </ToastProvider>
               </AuthProvider>
             </WalletProvider>

@@ -76,11 +76,16 @@
   }
 }
 
-/* Issue #1382 — light theme overrides for dashboard surfaces. */
-html.light {
-  color-scheme: light;
-}
-html.light body {
-  background: #f4f7ef;
-  color: #14201a;
+/* Issue #1378 — honour prefers-reduced-motion: disable animations and
+   transitions globally; components may still opt into instant state changes
+   via useReducedMotion(). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

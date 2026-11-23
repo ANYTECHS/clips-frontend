@@ -5,7 +5,7 @@ import Image from "next/image";
 import { Play, Pause, X, Volume2, VolumeX, Download, Lock, Unlock, Sparkles, Loader2 } from "lucide-react";
 import TipModal from "./TipModal";
 import { useWallet } from "@/components/WalletProvider";
-import { isUnlocked } from "@/lib/tipUnlockStore";
+import { isUnlockedAsync } from "@/lib/tipUnlockStore";
 import { getClipDownloadUrl, ReadyToPostKit } from "@/lib/queries";
 import { triggerDownload } from "@/lib/download";
 import ReadyToPostModal from "@/components/shared/ReadyToPostModal";
@@ -183,10 +183,14 @@ export default function AIClipCard({
   // Check on mount and when wallet address changes
   useEffect(() => {
     if (tippingEnabled) {
-      setUnlocked(isUnlocked(id, address || undefined));
-    } else {
-      setUnlocked(true);
+      let active = true;
+      void isUnlockedAsync(id, address || undefined).then((v) => {
+        if (active) setUnlocked(v);
+      });
+      return () => { active = false; };
     }
+    setUnlocked(true);
+    return undefined;
   }, [id, address, tippingEnabled]);
 
   // Keep thumbnail src in sync if prop changes

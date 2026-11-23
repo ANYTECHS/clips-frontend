@@ -30,6 +30,8 @@ import { markFreeJobAsClaimed, useFreeJobClaimed } from "@/lib/freeJobStore";
 import apiClient from "@/lib/apiClient";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { saveActiveJob } from "@/lib/processingStore";
+import { isStepUpFresh } from "@/lib/stepUpAuth";
+import StepUpModal from "@/components/auth/StepUpModal";
 import { getFriendlyErrorMessage } from "@/lib/formatError";
 import Button from "@/components/shared/Button";
 
@@ -68,6 +70,9 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
   const [errMsg,         setErrMsg]         = useState("");
   const [txHash,         setTxHash]         = useState("");
   const [txStatus,       setTxStatus]       = useState<"pending" | "confirmed" | "failed" | null>(null);
+  // Issue #1366 — step-up re-verification before wallet payments.
+  const [showStepUp,     setShowStepUp]     = useState(false);
+  const pendingHireRef   = useRef<{ videoUrl: string; videoId?: string } | null>(null);
 
   const { data: subscription } = useQuery<StellarSubscription | null>({
     queryKey: ["mySubscription"],
@@ -119,6 +124,17 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
 
   const runHireFlow = async (videoUrl: string, uploadedVideoId?: string) => {
     try {
+      // Issue #1366 — any wallet payment requires a step-up verification
+      // no older than 5 minutes (mirrors UserSession.stepUpVerified on the API).
+      const willPay =
+        !(isFirstFreeJob && payMode === "pay-per-job") &&
+        !(payMode === "subscription" && hasActiveSub);
+      if (willPay && !isStepUpFresh()) {
+        pendingHireRef.current = { videoUrl, videoId: uploadedVideoId };
+        setShowStepUp(true);
+        return;
+      }
+
       setTxHash("");
       setTxStatus(null);
 
@@ -712,6 +728,21 @@ export default function HireAgentModal({ agent, onClose, onJobCreated }: HireAge
 
         </div>
       </div>
+
+      <StepUpModal
+        isOpen={showStepUp}
+        user={user}
+        onClose={() => {
+          setShowStepUp(false);
+          pendingHireRef.current = null;
+        }}
+        onVerified={() => {
+          setShowStepUp(false);
+          const pending = pendingHireRef.current;
+          pendingHireRef.current = null;
+          if (pending) void runHireFlow(pending.videoUrl, pending.videoId);
+        }}
+      />
     </div>
   );
 }

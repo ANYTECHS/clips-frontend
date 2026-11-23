@@ -1,0 +1,138 @@
+import {
+  IsString,
+  IsNotEmpty,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  ValidateIf,
+} from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsStellarTransactionHash } from '../../common/validators/decorators';
+import { IsValidPlan } from '../../common/validators/decorators';
+import { SUBSCRIPTION_PLANS } from '../subscriptions.constants';
+
+export class CreateStellarSubscriptionDto {
+  @ApiProperty({
+    enum: SUBSCRIPTION_PLANS,
+    example: 'pro',
+    description:
+      'Subscription plan identifier. ' +
+      `Supported values: ${SUBSCRIPTION_PLANS.join(', ')}. ` +
+      'Plan pricing and duration are set by backend configuration.',
+  })
+  @IsString()
+  @IsNotEmpty()
+  @IsValidPlan()
+  plan: string;
+
+  @ApiProperty({
+    enum: ['xlm', 'usdc', 'custom'],
+    example: 'xlm',
+    description:
+      'Payment asset. Use xlm for native XLM, usdc for USDC, or custom for other Stellar assets (provide assetCode + assetIssuer).',
+  })
+  @IsString()
+  @IsEnum(['xlm', 'usdc', 'custom'])
+  asset: string;
+
+  @ApiProperty({
+    example: 10,
+    description: 'Payment amount in the selected asset',
+  })
+  @IsNumber()
+  @IsNotEmpty()
+  amount: number;
+
+  @ApiPropertyOptional({
+    description: 'Connected Stellar wallet ID',
+    example: 'wallet_abc123',
+  })
+  @IsString()
+  @IsOptional()
+  walletId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Override destination Stellar address',
+    example: 'GC6XOTK6L6LGBKIWH3IRUZPVUY4COGEMW4J5YINOSPKO27YKTUUHTZF3',
+  })
+  @IsString()
+  @IsOptional()
+  destinationAddress?: string;
+
+  @ApiPropertyOptional({
+    description: 'Payment memo for tracking',
+    example: 'sub-pro-2026-07',
+  })
+  @IsString()
+  @IsOptional()
+  memo?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Required when asset is custom — Stellar asset code (e.g. EURC)',
+    example: 'EURC',
+  })
+  @ValidateIf((o: CreateStellarSubscriptionDto) => o.asset === 'custom')
+  @IsString()
+  @IsNotEmpty()
+  assetCode?: string;
+
+  @ApiPropertyOptional({
+    description: 'Required when asset is custom — issuing account public key',
+    example: 'G...',
+  })
+  @ValidateIf((o: CreateStellarSubscriptionDto) => o.asset === 'custom')
+  @IsString()
+  @IsNotEmpty()
+  assetIssuer?: string;
+}
+
+export class StellarPaymentIntentDto {
+  @ApiProperty({ description: 'Payment intent ID', example: 'pi_01HXYZ' })
+  id: string;
+
+  @ApiProperty({ description: 'Payment amount in the selected asset', example: 10 })
+  amount: number;
+
+  @ApiProperty({ description: 'Payment asset (xlm, usdc, custom)', example: 'xlm', enum: ['xlm', 'usdc', 'custom'] })
+  asset: string;
+
+  @ApiProperty({ description: 'Stellar destination address', example: 'GC6XOTK6L6LGBKIWH3IRUZPVUY4COGEMW4J5YINOSPKO27YKTUUHTZF3' })
+  destination: string;
+
+  @ApiProperty({ description: 'Payment memo for tracking', example: 'sub-pro-2026-07' })
+  memo: string;
+
+  @ApiProperty({ description: 'Expiration date and time', example: '2026-07-26T13:00:00.000Z' })
+  expiresAt: Date;
+
+  @ApiProperty({
+    description: 'Payment intent status',
+    enum: ['pending', 'completed', 'expired'],
+    example: 'pending',
+  })
+  status: 'pending' | 'completed' | 'expired';
+
+  @ApiPropertyOptional({
+    description: 'Asset issuer when using a custom Stellar asset',
+    example: 'GBBD47IF6LWK7P7MDEVSCWR7DPUWV3NY3DTQEVFL4NAT4AQH3ZLLFLA5',
+  })
+  assetIssuer?: string | null;
+}
+
+export class VerifyStellarPaymentQueryDto {
+  @ApiProperty({
+    description: 'Payment intent ID to verify',
+    example: 'pi_01HXYZ',
+  })
+  @IsString()
+  @IsNotEmpty()
+  paymentIntentId: string;
+
+  @ApiProperty({
+    description: 'Stellar transaction hash — 64 lowercase hex characters',
+    example: 'a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
+  })
+  @IsStellarTransactionHash()
+  transactionHash: string;
+}
