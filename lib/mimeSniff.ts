@@ -2,12 +2,12 @@
 // Client-supplied Content-Type can be spoofed; we sniff the first bytes of
 // the payload and compare against the declared type before proxying.
 
-export type SniffedKind =
+type SniffedKind =
   | "mp4" | "webm" | "mov" | "avi" | "mpeg" | "mp3"
   | "jpeg" | "png" | "gif" | "webp" | "pdf" | "zip"
   | "exe" | "elf" | "script" | "unknown";
 
-export interface MimeVerdict {
+interface MimeVerdict {
   ok: boolean;
   sniffed: SniffedKind;
   reason?: string;

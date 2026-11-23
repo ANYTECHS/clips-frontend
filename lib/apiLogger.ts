@@ -6,6 +6,8 @@
 // `body=<redacted>` unless a route has opted in to body logging via the
 // API_LOG_BODY_PATHS env var (comma-separated route prefixes).
 
+import { API_LOG_BODY_PREVIEW_CHARS } from "./constants";
+
 const REDACTED = "<redacted>";
 
 function bodyLogPaths(): string[] {
@@ -32,7 +34,7 @@ export function logApiRequest(args: {
   const { method, path, status, durationMs, body } = args;
   const hasBody =
     args.logBody === true && typeof body === "string" && body.length > 0;
-  const bodyPreview = hasBody ? body!.slice(0, 500) : REDACTED;
+  const bodyPreview = hasBody ? body!.slice(0, API_LOG_BODY_PREVIEW_CHARS) : REDACTED;
   console.log(
     `[api] ${method} ${path} status=${status} durationMs=${durationMs} ` +
       `authorization=${REDACTED} cookies=${REDACTED} body=${bodyPreview}`

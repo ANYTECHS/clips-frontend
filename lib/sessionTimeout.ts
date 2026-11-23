@@ -11,23 +11,32 @@
 // Timeout is configurable via NEXT_PUBLIC_IDLE_TIMEOUT_MINUTES
 // (default 30). Set to 0 to disable.
 
+import {
+  ACTIVITY_WRITE_THROTTLE_MS,
+  DEFAULT_IDLE_TIMEOUT_MINUTES,
+  IDLE_CHECK_INTERVAL_MS,
+  MS_PER_MINUTE,
+} from "./constants";
+
 const ACTIVITY_KEY = "clp_last_activity_at";
 const ACTIVITY_EVENTS = ["mousedown", "keydown", "touchstart", "scroll", "mousemove"] as const;
 
-export function getIdleTimeoutMs(): number {
-  const minutes = Number(process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MINUTES ?? "30");
+function getIdleTimeoutMs(): number {
+  const minutes = Number(
+    process.env.NEXT_PUBLIC_IDLE_TIMEOUT_MINUTES ?? String(DEFAULT_IDLE_TIMEOUT_MINUTES)
+  );
   if (!Number.isFinite(minutes) || minutes <= 0) return 0; // disabled
-  return minutes * 60 * 1000;
+  return minutes * MS_PER_MINUTE;
 }
 
-export function markActivity(): void {
+function markActivity(): void {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.setItem(ACTIVITY_KEY, String(Date.now()));
   } catch {}
 }
 
-export function getLastActivityAt(): number {
+function getLastActivityAt(): number {
   if (typeof window === "undefined") return Date.now();
   try {
     const raw = sessionStorage.getItem(ACTIVITY_KEY);
@@ -39,7 +48,7 @@ export function getLastActivityAt(): number {
 }
 
 /** True when the user has been idle longer than the configured window. */
-export function isSessionIdle(): boolean {
+function isSessionIdle(): boolean {
   const timeout = getIdleTimeoutMs();
   if (timeout === 0) return false;
   return Date.now() - getLastActivityAt() >= timeout;
@@ -68,7 +77,7 @@ export function watchIdleSession(onIdle: () => void): () => void {
   let lastWrite = 0;
   const onActivity = () => {
     const now = Date.now();
-    if (now - lastWrite > 1000) {
+    if (now - lastWrite > ACTIVITY_WRITE_THROTTLE_MS) {
       lastWrite = now;
       markActivity();
     }
@@ -78,7 +87,7 @@ export function watchIdleSession(onIdle: () => void): () => void {
     window.addEventListener(evt, onActivity, { passive: true });
   }
 
-  const interval = window.setInterval(check, 15_000);
+  const interval = window.setInterval(check, IDLE_CHECK_INTERVAL_MS);
   window.addEventListener("focus", onActivity);
 
   return () => {

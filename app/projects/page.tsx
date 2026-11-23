@@ -3,7 +3,8 @@
 import React, { Suspense } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { keepPreviousData, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getProjectsData, CLIPS_PAGE_SIZE } from "@/lib/queries";
+import { getProjectsData } from "@/lib/queries";
+import { CLIPS_PAGE_SIZE } from "@/lib/constants";
 import ProjectsContent from "@/components/projects/ProjectsContent";
 import { Loader2 } from "lucide-react";
 

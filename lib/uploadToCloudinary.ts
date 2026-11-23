@@ -1,5 +1,7 @@
 "use client";
 
+import { PROGRESS_COMPLETE, PROGRESS_INDETERMINATE } from "./constants";
+
 export interface CloudinaryUploadResult {
   secureUrl: string;
   publicId: string;
@@ -38,9 +40,9 @@ export function uploadToCloudinary(
 
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
+        onProgress(Math.round((e.loaded / e.total) * PROGRESS_COMPLETE));
       } else {
-        onProgress(-1);
+        onProgress(PROGRESS_INDETERMINATE);
       }
     };
 

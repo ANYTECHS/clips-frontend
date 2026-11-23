@@ -1,10 +1,7 @@
 // Persists the active video-processing job in localStorage for page reloads / resume
 const KEY = "clp_active_job";
-const SSE_STALL_MS = 15000;
-const EVENT_TRANSPORTS = ["sse", "websocket", "polling"] as const;
-export type ProgressTransport = (typeof EVENT_TRANSPORTS)[number];
 
-export interface ActiveJob {
+interface ActiveJob {
   videoId: string;
   startedAt: number;
 }

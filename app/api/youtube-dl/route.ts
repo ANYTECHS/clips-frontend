@@ -1,4 +1,7 @@
- import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { YOUTUBE_PROXY_MAX_BYTES } from "@/lib/constants";
+import { error, validationError } from "../apiResponse";
+import { ERROR_CODES } from "../errorCodes";
 
 export const dynamic = "force-dynamic";
 
@@ -34,8 +37,6 @@ const ALLOWED_HOSTS = [
   "yt3.ggpht.com",
 ];
 
-const MAX_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
-
 function isAllowedYouTubeUrl(raw: string): boolean {
   try {
     const { hostname, protocol } = new URL(raw);
@@ -53,14 +54,11 @@ export async function GET(req: NextRequest) {
   const rawUrl = req.nextUrl.searchParams.get("url") ?? "";
 
   if (!rawUrl) {
-    return NextResponse.json({ error: "Missing url parameter." }, { status: 400 });
+    return validationError({ url: "Missing url parameter." });
   }
 
   if (!isAllowedYouTubeUrl(rawUrl)) {
-    return NextResponse.json(
-      { error: "URL not permitted — only YouTube CDN URLs are accepted." },
-      { status: 400 }
-    );
+    return validationError({ url: "URL not permitted — only YouTube CDN URLs are accepted." });
   }
 
   let upstream: Response;
@@ -78,29 +76,20 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[youtube-dl] fetch error:", err?.message);
-    return NextResponse.json(
-      { error: "Could not reach YouTube CDN. Please try again." },
-      { status: 502 }
-    );
+    return error("Could not reach YouTube CDN. Please try again.", 502, ERROR_CODES.UPSTREAM_ERROR);
   }
 
   if (!upstream.ok) {
-    return NextResponse.json(
-      { error: `YouTube CDN returned ${upstream.status}.` },
-      { status: 502 }
-    );
+    return error(`YouTube CDN returned ${upstream.status}.`, 502, ERROR_CODES.UPSTREAM_ERROR);
   }
 
   const contentType = upstream.headers.get("content-type") ?? "";
   if (!contentType.startsWith("video/") && !contentType.startsWith("application/octet-stream")) {
-    return NextResponse.json(
-      { error: "Unexpected content type from YouTube CDN." },
-      { status: 415 }
-    );
+    return error("Unexpected content type from YouTube CDN.", 415, ERROR_CODES.UNSUPPORTED_MEDIA_TYPE);
   }
 
   if (!upstream.body) {
-    return NextResponse.json({ error: "Empty response from YouTube CDN." }, { status: 502 });
+    return error("Empty response from YouTube CDN.", 502, ERROR_CODES.UPSTREAM_ERROR);
   }
 
   // Stream through a byte counter that enforces the size cap
@@ -108,7 +97,7 @@ export async function GET(req: NextRequest) {
   const limiter = new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
       received += chunk.byteLength;
-      if (received > MAX_BYTES) {
+      if (received > YOUTUBE_PROXY_MAX_BYTES) {
         controller.error(new Error("File exceeds the 2 GB size cap."));
         return;
       }

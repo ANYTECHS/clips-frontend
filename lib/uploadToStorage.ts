@@ -2,10 +2,15 @@
 
 import apiClient from "./apiClient";
 import { uploadToCloudinary, type CloudinaryUploadResult } from "./uploadToCloudinary";
+import {
+  BYTES_PER_MB,
+  HYBRID_UPLOAD_THRESHOLD_BYTES,
+  MAX_VIDEO_FILE_SIZE_BYTES,
+  PROGRESS_COMPLETE,
+  PROGRESS_INDETERMINATE,
+} from "./constants";
 
 // Files <95MB upload to Cloudinary; >=95MB stream directly to Cloudflare R2
-export const HYBRID_UPLOAD_THRESHOLD_BYTES = 95 * 1024 * 1024;
-export const MAX_VIDEO_FILE_SIZE_BYTES = 1024 * 1024 * 1024; // 1 GB limit
 
 export interface StorageUploadResult {
   url: string;
@@ -31,7 +36,11 @@ function sendPutWithProgress(
     }
 
     xhr.upload.onprogress = (e) => {
-      onProgress(e.lengthComputable ? Math.round((e.loaded / e.total) * 100) : -1);
+      onProgress(
+        e.lengthComputable
+          ? Math.round((e.loaded / e.total) * PROGRESS_COMPLETE)
+          : PROGRESS_INDETERMINATE
+      );
     };
 
     xhr.onload = () => {
@@ -56,7 +65,7 @@ export async function uploadVideoToStorage(
 ): Promise<StorageUploadResult> {
   if (file.size > MAX_VIDEO_FILE_SIZE_BYTES) {
     throw new Error(
-      `File size ${(file.size / (1024 * 1024)).toFixed(1)} MB exceeds the maximum 1 GB upload limit.`
+      `File size ${(file.size / BYTES_PER_MB).toFixed(1)} MB exceeds the maximum 1 GB upload limit.`
     );
   }
 

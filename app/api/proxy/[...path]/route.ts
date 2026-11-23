@@ -2,7 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createHash } from 'crypto';
 import { logApiRequest, shouldLogBody } from '@/lib/apiLogger';
-import { rejectDisallowedOrigin } from '@/lib/cors';
+import { isOriginAllowed } from '@/lib/cors';
+import {
+  DEFAULT_API_URL,
+  ERROR_LOG_PREVIEW_CHARS,
+  ETAG_HASH_LENGTH,
+  PROXY_BACKEND_TIMEOUT_MS,
+} from '@/lib/constants';
+import { empty, error } from '../../apiResponse';
+import { ERROR_CODES } from '../../errorCodes';
 
 // Disable Next.js body parsing — we stream the raw body directly to the backend.
 // Without this, Next.js buffers and size-limits request bodies (bad for uploads/SSE).
@@ -26,7 +34,7 @@ async function computeEtag(
   if (!contentType.includes('json') && !contentType.includes('text/')) return undefined;
 
   const body = await backendRes.clone().text();
-  const hash = createHash('sha256').update(`${targetUrl}:${body}`).digest('hex').slice(0, 32);
+  const hash = createHash('sha256').update(`${targetUrl}:${body}`).digest('hex').slice(0, ETAG_HASH_LENGTH);
   const etag = `"${hash}"`;
   responseHeaders.set('etag', etag);
   return etag;
@@ -34,11 +42,12 @@ async function computeEtag(
 
 async function handler(req: NextRequest) {
   // Issue #1370 — reject credentialed requests from non-allowlisted origins.
-  const corsBlock = rejectDisallowedOrigin(req);
-  if (corsBlock) return corsBlock;
+  if (!isOriginAllowed(req.headers.get('origin'))) {
+    return error('Origin not allowed.', 403, ERROR_CODES.ORIGIN_NOT_ALLOWED);
+  }
 
   const startedAt = Date.now();
-  const baseUrl = (process.env.API_URL || 'https://clipcash-api.onrender.com').replace(/\/+$/, '');
+  const baseUrl = (process.env.API_URL || DEFAULT_API_URL).replace(/\/+$/, '');
 
   const path = req.nextUrl.pathname.replace(/^\/api\/proxy/, '');
   const search = req.nextUrl.search;
@@ -80,13 +89,13 @@ async function handler(req: NextRequest) {
       bodyText = text;
     }
 
-    // Give the backend up to 45s to respond on non-GET requests. Render's
+    // Give the backend up to PROXY_BACKEND_TIMEOUT_MS to respond on non-GET requests. Render's
     // free tier can take 30+s to cold-start (the default undici connect
     // timeout is 10s which is too short for POSTs like /auth/stellar/connect).
     // GET requests (including SSE streams) keep the default timeout.
     const fetchTimeout = ['GET', 'HEAD'].includes(req.method)
       ? undefined
-      : AbortSignal.timeout(45_000);
+      : AbortSignal.timeout(PROXY_BACKEND_TIMEOUT_MS);
 
     backendRes = await fetch(targetUrl, {
       method: req.method,
@@ -126,17 +135,12 @@ async function handler(req: NextRequest) {
       durationMs: Date.now() - startedAt,
     });
 
-    return new NextResponse(
-      JSON.stringify({
-        statusCode: 503,
-        message: isWakeUp
-          ? 'Server is starting up — please wait a moment and try again.'
-          : 'Could not reach the server.',
-      }),
-      {
-        status: 503,
-        headers: { 'content-type': 'application/json' },
-      }
+    return error(
+      isWakeUp
+        ? 'Server is starting up — please wait a moment and try again.'
+        : 'Could not reach the server.',
+      503,
+      ERROR_CODES.SERVICE_UNAVAILABLE
     );
   }
 
@@ -187,7 +191,7 @@ async function handler(req: NextRequest) {
     backendRes.clone().text().then(body => {
       console.error(`[proxy] ${req.method} ${path} → ${backendRes.status}`);
       if (typeof body === 'string') {
-        console.error('[proxy] backend error response:', body.slice(0, 500));
+        console.error('[proxy] backend error response:', body.slice(0, ERROR_LOG_PREVIEW_CHARS));
       }
     }).catch(() => {});
   }
@@ -210,8 +214,7 @@ async function handler(req: NextRequest) {
 
   if (etag && etagMatches) {
     // Issue #1394 — 304 Not Modified: the client already holds this representation.
-    return new NextResponse(null, {
-      status: 304,
+    return empty(304, {
       headers: {
         etag,
         'cache-control': responseHeaders.get('cache-control') || 'no-cache',

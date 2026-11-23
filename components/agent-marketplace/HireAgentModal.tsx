@@ -19,7 +19,8 @@ import {
   hasUsdcTrustline,
 } from "@/lib/wallet";
 import StellarTransactionStatus from "@/components/shared/StellarTransactionStatus";
-import { uploadVideoToStorage, type StorageUploadResult, MAX_VIDEO_FILE_SIZE_BYTES } from "@/lib/uploadToStorage";
+import { uploadVideoToStorage, type StorageUploadResult } from "@/lib/uploadToStorage";
+import { MAX_VIDEO_FILE_SIZE_BYTES } from "@/lib/constants";
 import {
   buildAgentPaymentXdr, hireAgent,
   buildSubscriptionPaymentXdr, activateSubscription,

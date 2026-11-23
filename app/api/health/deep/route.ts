@@ -1,4 +1,5 @@
-import { NextResponse } from "next/server";
+import { DEFAULT_API_URL, HEALTH_CHECK_TIMEOUT_MS } from "@/lib/constants";
+import { success } from "../../apiResponse";
 
 // Deep health check endpoint (issue #1396).
 //
@@ -13,8 +14,6 @@ import { NextResponse } from "next/server";
 //
 // The frontend proxies all data access to the backend, so backend health is
 // the frontier for DB/Redis/S3-style degradations (the backend fronts them).
-
-const DEP_TIMEOUT_MS = 2000;
 
 interface DependencyStatus {
   ok: boolean;
@@ -39,7 +38,7 @@ async function checkDependency(
 }
 
 export async function GET() {
-  const baseUrl = (process.env.API_URL || "https://clipcash-api.onrender.com").replace(
+  const baseUrl = (process.env.API_URL || DEFAULT_API_URL).replace(
     /\/+$/,
     ""
   );
@@ -50,7 +49,7 @@ export async function GET() {
     }),
     checkDependency(async () => {
       const res = await fetch(`${baseUrl}/health`, {
-        signal: AbortSignal.timeout(DEP_TIMEOUT_MS),
+        signal: AbortSignal.timeout(HEALTH_CHECK_TIMEOUT_MS),
       });
       if (!res.ok) throw new Error(`backend returned HTTP ${res.status}`);
     }),
@@ -59,11 +58,11 @@ export async function GET() {
   const status =
     checks.every((c) => c.ok) ? "healthy" : "degraded";
 
-  return NextResponse.json(
+  return success(
     {
       status,
       checks: { app: checks[0], backend: checks[1] },
     },
-    { status: status === "healthy" ? 200 : 503 }
+    status === "healthy" ? 200 : 503
   );
 }

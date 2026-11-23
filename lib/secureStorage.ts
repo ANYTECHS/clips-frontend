@@ -17,9 +17,16 @@
 // key derivation, 100k iterations). Decryption returns null for legacy
 // plaintext values so callers can migrate + re-encrypt on next write.
 
+import {
+  AES_GCM_IV_BYTES,
+  AES_KEY_BYTES,
+  AES_KEY_LENGTH_BITS,
+  PBKDF2_ITERATIONS,
+  PBKDF2_SALT_BYTES,
+} from "./constants";
+
 const ENV_KEY = process.env.NEXT_PUBLIC_PII_ENCRYPTION_KEY || "";
 const KEY_WRAP_STORAGE = "clp_pii_key_wrap";
-const PBKDF2_ITERATIONS = 100_000;
 const ENC_PREFIX = "v1";
 
 function bytesToB64(bytes: Uint8Array): string {
@@ -42,7 +49,7 @@ async function deriveKey(material: Uint8Array, salt: Uint8Array): Promise<Crypto
   return crypto.subtle.deriveKey(
     { name: "PBKDF2", salt: salt as BufferSource, iterations: PBKDF2_ITERATIONS, hash: "SHA-256" },
     baseKey,
-    { name: "AES-GCM", length: 256 },
+    { name: "AES-GCM", length: AES_KEY_LENGTH_BITS },
     false,
     ["encrypt", "decrypt"],
   );
@@ -52,9 +59,9 @@ function decodeEnvKey(): Uint8Array | null {
   const k = ENV_KEY.trim();
   if (!k) return null;
   try {
-    if (/^[0-9a-fA-F]{64}$/.test(k)) {
-      const out = new Uint8Array(32);
-      for (let i = 0; i < 32; i++) out[i] = parseInt(k.slice(i * 2, i * 2 + 2), 16);
+    if (new RegExp(`^[0-9a-fA-F]{${AES_KEY_BYTES * 2}}$`).test(k)) {
+      const out = new Uint8Array(AES_KEY_BYTES);
+      for (let i = 0; i < AES_KEY_BYTES; i++) out[i] = parseInt(k.slice(i * 2, i * 2 + 2), 16);
       return out;
     }
     return b64ToBytes(k);
@@ -75,25 +82,25 @@ export async function encryptPII(plaintext: string): Promise<string> {
 
   if (envKey) {
     keyMaterial = envKey;
-    salt = new Uint8Array(16);
+    salt = new Uint8Array(PBKDF2_SALT_BYTES);
     crypto.getRandomValues(salt);
   } else {
     // Fallback: stable per-installation material so values remain decryptable
     // across reloads. Stored base64 in localStorage (documented above).
     let stored = localStorage.getItem(KEY_WRAP_STORAGE);
     if (!stored) {
-      const raw = new Uint8Array(32);
+      const raw = new Uint8Array(AES_KEY_BYTES);
       crypto.getRandomValues(raw);
       stored = bytesToB64(raw);
       localStorage.setItem(KEY_WRAP_STORAGE, stored);
     }
     keyMaterial = b64ToBytes(stored);
-    salt = new Uint8Array(16);
+    salt = new Uint8Array(PBKDF2_SALT_BYTES);
     crypto.getRandomValues(salt);
   }
 
   const key = await deriveKey(keyMaterial, salt);
-  const iv = new Uint8Array(12);
+  const iv = new Uint8Array(AES_GCM_IV_BYTES);
   crypto.getRandomValues(iv);
   const ct = await crypto.subtle.encrypt(
     { name: "AES-GCM", iv: iv as BufferSource },
@@ -130,22 +137,4 @@ export async function decryptPII(blob: string): Promise<string | null> {
   } catch {
     return null;
   }
-}
-
-/** Reads a localStorage value that may be encrypted; returns plaintext. */
-export async function secureGet(key: string): Promise<string | null> {
-  const raw = localStorage.getItem(key);
-  if (!raw) return null;
-  const dec = await decryptPII(raw);
-  return dec ?? raw; // legacy plaintext fallback
-}
-
-/** Writes a value encrypted at rest. */
-export async function secureSet(key: string, value: string): Promise<void> {
-  localStorage.setItem(key, await encryptPII(value));
-}
-
-/** Removes an encrypted or plaintext value. */
-export function secureRemove(key: string): void {
-  localStorage.removeItem(key);
 }

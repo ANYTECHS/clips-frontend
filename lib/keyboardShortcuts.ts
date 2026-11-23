@@ -4,12 +4,12 @@
  * the "?" help overlay (components/shared/KeyboardShortcutsHelp.tsx).
  */
 
-export interface ShortcutDef {
+interface ShortcutDef {
   keys: string;
   description: string;
 }
 
-export interface ShortcutCategory {
+interface ShortcutCategory {
   category: string;
   shortcuts: ShortcutDef[];
 }

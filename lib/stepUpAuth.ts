@@ -5,11 +5,11 @@
 // STEP_UP_WINDOW_MS. The verified timestamp is kept in sessionStorage so it
 // survives reloads within the tab but not across sessions.
 
-export const STEP_UP_WINDOW_MS = 5 * 60 * 1000; // 5 minutes
+import { STEP_UP_WINDOW_MS } from "./constants";
 
 const STORAGE_KEY = "clp_stepup_verified_at";
 
-export function getStepUpVerifiedAt(): number | null {
+function getStepUpVerifiedAt(): number | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);

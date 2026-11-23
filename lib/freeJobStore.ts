@@ -35,7 +35,7 @@ function resolveAllIdentifiers(
 }
 
 // Checks if the user or device has already used or claimed their free welcome job
-export function hasClaimedFreeJob(
+function hasClaimedFreeJob(
   userIdentifiers?: (string | null | undefined)[] | string | null
 ): boolean {
   if (typeof window === "undefined") return false;

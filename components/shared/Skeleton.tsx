@@ -41,17 +41,3 @@ export function CardSkeleton() {
     </div>
   );
 }
-
-/** Row-shaped skeleton for list views. */
-export function RowSkeleton() {
-  return (
-    <div className="flex items-center gap-4 p-4 border-b border-[#0e4d2a]/50">
-      <Skeleton w="w-10" h="h-10" rounded="rounded-full" />
-      <div className="flex-1 space-y-2">
-        <Skeleton w="w-1/2" h="h-4" />
-        <Skeleton w="w-1/3" h="h-3" />
-      </div>
-      <Skeleton w="w-20" h="h-8" rounded="rounded-lg" />
-    </div>
-  );
-}
