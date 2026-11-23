@@ -28,7 +28,9 @@ const variantClasses: Record<ButtonVariant, string> = {
     "bg-[#06351C] hover:bg-[#084223] text-[#F4F7EF] border border-[#0e4d2a] hover:border-[#39FF14]/40",
   outline:
     "bg-transparent hover:bg-[#B6FF4A]/10 text-[#B6FF4A] border border-[#B6FF4A]/40 hover:border-[#B6FF4A]",
-  ghost: "bg-transparent hover:bg-white/5 text-[#90A89C] hover:text-[#F4F7EF]",
+  // Issue #1376 — ghost text bumped to #DCE8E0 (~7:1 on #020D08/#042413)
+  // to meet WCAG AA 4.5:1; #90A89C measured ~3.8:1 and failed.
+  ghost: "bg-transparent hover:bg-white/5 text-[#DCE8E0] hover:text-[#F4F7EF]",
   danger:
     "bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 hover:border-red-500/60",
   link: "bg-transparent text-[#B6FF4A] hover:underline px-0 py-0 h-auto active:scale-100",
