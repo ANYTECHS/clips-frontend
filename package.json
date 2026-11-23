@@ -22,7 +22,7 @@
     "next": "^15.3.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "youtubei.js": "^18.1.0",
+    "youtubei.js": "^18.3.0",
     "zod": "^4.5.4"
   },
   "overrides": {
