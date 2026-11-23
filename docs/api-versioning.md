@@ -26,7 +26,7 @@ Issue: #1395 — Enforce API versioning on all routes
 
 ## Related API guidelines
 
-- Pagination metadata: list endpoints return `{ items, total, cursor }`.
+- Pagination metadata: list endpoints return `{ data, pagination: { nextCursor, hasMore, total? } }` — see [`API.md`](./API.md#pagination).
 - Idempotency: unsafe methods accept an `Idempotency-Key`; keys are scoped per
   operation and expire after 24h.
 - Caching: safe GET responses may carry an `ETag`; clients should send

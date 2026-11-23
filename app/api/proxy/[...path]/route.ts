@@ -3,6 +3,12 @@ import { cookies } from 'next/headers';
 import { createHash } from 'crypto';
 import { logApiRequest, shouldLogBody } from '@/lib/apiLogger';
 import { rejectDisallowedOrigin } from '@/lib/cors';
+import {
+  InvalidCursorError,
+  invalidCursorBody,
+  isPaginatedListPath,
+  normalizeListSearchParams,
+} from '@/app/api/pagination';
 
 // Disable Next.js body parsing — we stream the raw body directly to the backend.
 // Without this, Next.js buffers and size-limits request bodies (bad for uploads/SSE).
@@ -41,7 +47,22 @@ async function handler(req: NextRequest) {
   const baseUrl = (process.env.API_URL || 'https://clipcash-api.onrender.com').replace(/\/+$/, '');
 
   const path = req.nextUrl.pathname.replace(/^\/api\/proxy/, '');
-  const search = req.nextUrl.search;
+  let search = req.nextUrl.search;
+
+  // Issue #1248 — list endpoints share one pagination contract: validate the
+  // opaque cursor (400 on garbage) and apply the default / max `limit`.
+  if (req.method === 'GET' && isPaginatedListPath(path)) {
+    try {
+      const normalized = normalizeListSearchParams(req.nextUrl.searchParams).toString();
+      search = normalized ? `?${normalized}` : '';
+    } catch (err) {
+      if (err instanceof InvalidCursorError) {
+        return NextResponse.json(invalidCursorBody(err), { status: 400 });
+      }
+      throw err;
+    }
+  }
+
   const targetUrl = `${baseUrl}${path}${search}`;
   let bodyText: string | null = null;
 

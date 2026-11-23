@@ -5,6 +5,7 @@ export interface ListResponse<T = any> {
   items: T[];
   total: number;
   cursor?: string;
+  hasMore?: boolean;
 }
 
 export const extractListResponse = (data: any): ListResponse<any> => {
@@ -14,23 +15,33 @@ export const extractListResponse = (data: any): ListResponse<any> => {
   else if (Array.isArray(data?.data)) items = data.data;
   else if (Array.isArray(data?.clips)) items = data.clips;
 
+  // Issue #1248 — standard envelope: { data, pagination: { nextCursor, hasMore, total? } }
+  const pagination = data?.pagination;
+
   const total =
-    typeof data?.total === "number"
-      ? data.total
-      : Array.isArray(data?.data)
-        ? typeof data.data.total === "number"
-          ? data.data.total
-          : data.data.length
-        : items.length;
+    typeof pagination?.total === "number"
+      ? pagination.total
+      : typeof data?.total === "number"
+        ? data.total
+        : Array.isArray(data?.data)
+          ? typeof data.data.total === "number"
+            ? data.data.total
+            : data.data.length
+          : items.length;
 
   const cursor =
-    typeof data?.cursor === "string"
-      ? data.cursor
-      : typeof data?.nextCursor === "string"
-        ? data.nextCursor
-        : undefined;
+    typeof pagination?.nextCursor === "string"
+      ? pagination.nextCursor
+      : typeof data?.cursor === "string"
+        ? data.cursor
+        : typeof data?.nextCursor === "string"
+          ? data.nextCursor
+          : undefined;
 
-  return { items, total, cursor };
+  const hasMore =
+    typeof pagination?.hasMore === "boolean" ? pagination.hasMore : cursor !== undefined;
+
+  return { items, total, cursor, hasMore };
 };
 
 export const getDashboardData = async () => {
@@ -349,6 +360,41 @@ export const getPublicFeed = async (page = 1, limit = 20) => {
 export const getEarningsData = async () => {
   const response = await apiClient.get('/dashboard/earnings');
   return response.data;
+};
+
+export interface WalletTransaction {
+  id: string;
+  type: string;
+  amount: string;
+  assetCode: string;
+  createdAt: string | null;
+  txHash: string | null;
+}
+
+/**
+ * Issue #1248 — cursor-paginated wallet transactions.
+ * `GET /wallet/transactions?cursor=&limit=` → `{ data, pagination }`.
+ */
+export const getWalletTransactions = async (
+  cursor?: string | null,
+  limit = 20
+): Promise<{ items: WalletTransaction[]; cursor?: string; hasMore: boolean }> => {
+  const params = new URLSearchParams({ limit: String(limit) });
+  if (cursor) params.set('cursor', cursor);
+  const response = await apiClient.get(`/wallet/transactions?${params.toString()}`);
+  const { items, cursor: nextCursor, hasMore } = extractListResponse(response.data);
+  return {
+    items: items.map((tx: any) => ({
+      id: String(tx.id),
+      type: tx.type || 'tip',
+      amount: String(tx.amount ?? '0'),
+      assetCode: tx.assetCode || tx.asset || 'XLM',
+      createdAt: tx.createdAt || null,
+      txHash: tx.txHash || tx.hash || null,
+    })),
+    cursor: nextCursor,
+    hasMore: hasMore ?? false,
+  };
 };
 
 

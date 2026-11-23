@@ -20,6 +20,7 @@ const LABELS: Record<string, string> = {
   platforms: "Platforms",
   analytics: "Analytics",
   earnings: "Earnings",
+  wallet: "Wallet",
   processing: "Processing",
 };
 

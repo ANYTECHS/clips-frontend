@@ -102,7 +102,7 @@ export default function DashboardContent({ stats: initialStats, projects: initia
               <button
                 onClick={dismissBanner}
                 aria-label="Dismiss"
-                className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-white/5 text-[#90A89C] hover:text-[#F4F7EF] transition-colors"
+                className="w-11 h-11 flex items-center justify-center rounded-full hover:bg-white/5 text-[#90A89C] hover:text-[#F4F7EF] transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -110,8 +110,8 @@ export default function DashboardContent({ stats: initialStats, projects: initia
           </div>
         )}
 
-        {/* Stats Row */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Stats Row — stacks vertically below 768px */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <StatCard 
             label="Total Clips Generated" 
             value={stats.clips} 

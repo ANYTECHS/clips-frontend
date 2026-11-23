@@ -7,21 +7,26 @@ import WalletButton from "@/components/shared/WalletButton";
 
 interface HeaderProps {
   onMenuClick: () => void;
+  /** Whether the mobile navigation drawer is currently open. */
+  menuOpen?: boolean;
 }
 
-export default function DashboardHeader({ onMenuClick }: HeaderProps) {
+export default function DashboardHeader({ onMenuClick, menuOpen = false }: HeaderProps) {
   const { user } = useAuth();
   const firstName = user?.username || user?.profile?.username || user?.fullName?.split(" ")[0] || "there";
 
+  // Issue #1241 — sticky header; compact (py-3) on phones, roomier on larger screens.
   return (
-    <header className="w-full border-b border-[#0e4d2a]/50 bg-[#020D08]/40 backdrop-blur-sm">
-      <div className="max-w-[1400px] mx-auto flex justify-between items-center py-4 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-10 gap-2 sm:gap-4">
+    <header className="sticky top-0 z-30 w-full border-b border-[#0e4d2a]/50 bg-[#020D08]/80 backdrop-blur-md">
+      <div className="max-w-[1400px] mx-auto flex justify-between items-center py-3 sm:py-6 lg:py-8 px-4 sm:px-6 lg:px-10 gap-2 sm:gap-4">
         {/* Left: Hamburger menu & Greeting */}
         <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <button
             onClick={onMenuClick}
-            className="lg:hidden p-2 -ml-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors shrink-0"
+            className="lg:hidden min-w-11 min-h-11 flex items-center justify-center -ms-2 text-[#90A89C] hover:text-[#F4F7EF] transition-colors shrink-0"
             aria-label="Open navigation menu"
+            aria-controls="dashboard-sidebar"
+            aria-expanded={menuOpen}
           >
             <Menu className="w-5 h-5 sm:w-6 sm:h-6" />
           </button>
@@ -36,7 +41,7 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <WalletButton
             responsiveCompact
-            className="h-10 sm:h-11 px-3 sm:px-4 rounded-xl bg-[#06351C] border border-[#0e4d2a] text-[#F4F7EF] hover:border-[#39FF14]/40 hover:bg-[#084223] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 shrink-0 shadow-sm"
+            className="h-11 px-3 sm:px-4 rounded-xl bg-[#06351C] border border-[#0e4d2a] text-[#F4F7EF] hover:border-[#39FF14]/40 hover:bg-[#084223] transition-all text-xs sm:text-sm flex items-center justify-center gap-2 shrink-0 shadow-sm"
           />
           {/* <button
             className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-[#06351C] border border-[#0e4d2a] flex items-center justify-center text-[#90A89C] hover:text-[#F4F7EF] hover:border-[#39FF14]/40 transition-colors relative shrink-0"
@@ -49,7 +54,7 @@ export default function DashboardHeader({ onMenuClick }: HeaderProps) {
             <button
               disabled
               aria-disabled="true"
-              className="h-10 sm:h-11 bg-[#B6FF4A]/15 text-[#B6FF4A]/50 px-3 sm:px-5 lg:px-6 rounded-xl font-bold text-[12px] sm:text-[14px] flex items-center justify-center gap-1.5 sm:gap-2 cursor-not-allowed select-none border border-[#B6FF4A]/25 transition-colors whitespace-nowrap"
+              className="h-11 bg-[#B6FF4A]/15 text-[#B6FF4A]/50 px-3 sm:px-5 lg:px-6 rounded-xl font-bold text-[12px] sm:text-[14px] flex items-center justify-center gap-1.5 sm:gap-2 cursor-not-allowed select-none border border-[#B6FF4A]/25 transition-colors whitespace-nowrap"
               title="Coming soon"
             >
               New Clip

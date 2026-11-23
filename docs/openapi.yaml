@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  title: ClipCash API
+  version: 1.0.0
+  description: |
+    List endpoints share a cursor-based pagination contract. See docs/API.md.
+paths:
+  /api/jobs:
+    get:
+      summary: List jobs
+      tags: [Jobs]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of jobs
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '400':
+          $ref: '#/components/responses/InvalidCursor'
+  /api/clips:
+    get:
+      summary: List clips
+      tags: [Clips]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of clips
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '400':
+          $ref: '#/components/responses/InvalidCursor'
+  /api/wallet/transactions:
+    get:
+      summary: List wallet transactions
+      tags: [Wallet]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of wallet transactions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '400':
+          $ref: '#/components/responses/InvalidCursor'
+  /api/notifications:
+    get:
+      summary: List notifications
+      tags: [Notifications]
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/Limit'
+      responses:
+        '200':
+          description: A page of notifications
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedResponse'
+        '400':
+          $ref: '#/components/responses/InvalidCursor'
+components:
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: >-
+        Opaque base64url cursor taken from `pagination.nextCursor` of the
+        previous page. Omit to fetch the first page.
+      schema:
+        type: string
+        pattern: '^[A-Za-z0-9_-]+$'
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: Page size. Values outside 1–100 are clamped.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+  schemas:
+    PaginationMeta:
+      type: object
+      required: [nextCursor, hasMore]
+      properties:
+        nextCursor:
+          type: string
+          nullable: true
+          description: Cursor for the next page; null on the last page.
+        hasMore:
+          type: boolean
+        total:
+          type: integer
+          description: Total item count, when available.
+    PaginatedResponse:
+      type: object
+      required: [data, pagination]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+        pagination:
+          $ref: '#/components/schemas/PaginationMeta'
+    Error:
+      type: object
+      required: [error, message, statusCode]
+      properties:
+        error:
+          type: string
+          example: Invalid cursor
+        message:
+          type: string
+        statusCode:
+          type: integer
+          example: 400
+  responses:
+    InvalidCursor:
+      description: The cursor is malformed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
