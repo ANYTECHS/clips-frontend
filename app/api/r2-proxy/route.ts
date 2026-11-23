@@ -1,4 +1,6 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiError } from "@/lib/apiResponse";
+import { resolveRequestId, withRequestId } from "@/lib/requestId";
 import { validateMime } from "@/lib/mimeSniff";
 
 export const dynamic = "force-dynamic";
@@ -11,36 +13,31 @@ export const dynamic = "force-dynamic";
  * server-side so the upload succeeds without CORS errors.
  */
 export async function PUT(req: NextRequest) {
+  const requestId = resolveRequestId(req.headers);
   const uploadUrl = req.nextUrl.searchParams.get("url");
 
   if (!uploadUrl) {
-    return NextResponse.json(
-      { error: "Missing upload URL parameter." },
-      { status: 400 }
-    );
+    return apiError(400, "Missing upload URL parameter.", { code: "MISSING_URL", requestId });
   }
 
   // Security check: ensure target host is an HTTPS R2 cloudflarestorage or r2.dev domain
   try {
     const parsed = new URL(uploadUrl);
     if (parsed.protocol !== "https:") {
-      return NextResponse.json(
-        { error: "HTTPS is required for upload URL." },
-        { status: 400 }
-      );
+      return apiError(400, "HTTPS is required for upload URL.", {
+        code: "HTTPS_REQUIRED",
+        requestId,
+      });
     }
     const host = parsed.hostname.toLowerCase();
     if (!host.endsWith(".r2.cloudflarestorage.com") && !host.endsWith(".r2.dev")) {
-      return NextResponse.json(
-        { error: "Target URL host is not an allowed R2 storage endpoint." },
-        { status: 403 }
-      );
+      return apiError(403, "Target URL host is not an allowed R2 storage endpoint.", {
+        code: "URL_NOT_PERMITTED",
+        requestId,
+      });
     }
   } catch {
-    return NextResponse.json(
-      { error: "Invalid upload URL provided." },
-      { status: 400 }
-    );
+    return apiError(400, "Invalid upload URL provided.", { code: "INVALID_URL", requestId });
   }
 
   try {
@@ -73,9 +70,10 @@ export async function PUT(req: NextRequest) {
       const verdict = validateMime(contentType, head.subarray(0, 64));
       if (!verdict.ok) {
         await reader.cancel().catch(() => {});
-        return NextResponse.json(
-          { error: verdict.reason || "Uploaded file content does not match its declared type." },
-          { status: 400 }
+        return apiError(
+          400,
+          verdict.reason || "Uploaded file content does not match its declared type.",
+          { code: "CONTENT_TYPE_MISMATCH", requestId }
         );
       }
       // Rebuild the stream: peeked chunks first, then the remainder.
@@ -111,19 +109,21 @@ export async function PUT(req: NextRequest) {
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
       console.error(`[r2-proxy] R2 returned ${res.status}:`, errText.slice(0, 200));
-      return NextResponse.json(
-        { error: `Cloudflare R2 rejected upload (${res.status}): ${errText.slice(0, 100)}` },
-        { status: res.status }
+      return apiError(
+        res.status,
+        `Cloudflare R2 rejected upload (${res.status}): ${errText.slice(0, 100)}`,
+        { code: "UPSTREAM_REJECTED", requestId }
       );
     }
 
-    return new NextResponse(null, { status: 200 });
+    return withRequestId(new Response(null, { status: 200 }), requestId);
   } catch (err: any) {
     console.error("[r2-proxy] streaming error:", err);
-    return NextResponse.json(
-      { error: err?.message || "Failed to stream upload to Cloudflare R2." },
-      { status: 500 }
-    );
+    return apiError(500, err?.message || "Failed to stream upload to Cloudflare R2.", {
+      code: "UPLOAD_FAILED",
+      requestId,
+      cause: err,
+    });
   }
 }
 

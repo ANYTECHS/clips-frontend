@@ -1,5 +1,7 @@
 
 import axios from 'axios';
+import { reportError } from './errorReporting';
+import { REQUEST_ID_HEADER } from './requestId';
 
 
 const getApiBaseUrl = () => {
@@ -58,6 +60,13 @@ if (typeof window !== 'undefined') {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+
+      // Issue #1391 — tag server errors with the request ID returned by the
+      // API so the Sentry event can be correlated with server/backend logs.
+      const requestId: string | undefined = error.response?.headers?.[REQUEST_ID_HEADER];
+      if (requestId && error.response.status >= 500) {
+        reportError(error, { requestId });
+      }
 
       // If error doesn't have config (e.g. network error), just reject
       if (!originalRequest) {
