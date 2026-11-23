@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import DashboardSidebar from "@/components/dashboard/DashboardSidebar";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import BackgroundGlow from "@/components/shared/BackgroundGlow";
+import Breadcrumbs from "@/components/shared/Breadcrumbs";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -40,6 +41,9 @@ export default function DashboardLayout({
       {/* Main Content Area */}
       <main className={`flex-1 flex flex-col h-screen overflow-y-auto scrollbar-hide relative z-10 ${showSidebar ? "lg:ps-[280px]" : ""}`}>
         {showHeader && <DashboardHeader onMenuClick={handleMenuClick} />}
+        <div className="px-4 sm:px-6 lg:px-8 pt-2 w-full max-w-[1400px] mx-auto">
+          <Breadcrumbs />
+        </div>
         {children}
       </main>
     </div>
