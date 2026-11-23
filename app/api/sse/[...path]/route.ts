@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import { REQUEST_ID_HEADER, resolveRequestId } from "@/lib/requestId";
+import { reportError } from "@/lib/errorReporting";
 
 // Force dynamic so Next.js never caches this route
 export const dynamic = "force-dynamic";
@@ -58,6 +60,7 @@ process.on("SIGINT", flushTerminalEvents);
  * cap of ~10s.
  */
 export async function GET(req: NextRequest) {
+  const requestId = resolveRequestId(req.headers);
   const baseUrl = (process.env.API_URL || "https://clipcash-api.onrender.com").replace(/\/+$/, "");
 
   // Strip /api/sse prefix to get the real backend path
@@ -82,19 +85,22 @@ export async function GET(req: NextRequest) {
         "Cache-Control": "no-cache",
         ...(cookieHeader ? { cookie: cookieHeader } : {}),
         ...(authHeader ? { authorization: authHeader } : {}),
+        [REQUEST_ID_HEADER]: requestId,
       },
       // Critical: tell fetch not to buffer the body
       cache: "no-store",
     });
   } catch (err: any) {
     console.error("[sse-proxy] connection error:", err?.message);
+    reportError(err, { requestId });
     return new Response(
-      `data: ${JSON.stringify({ status: "error", message: "Could not reach the processing server." })}\n\n`,
+      `data: ${JSON.stringify({ status: "error", error: "Service Unavailable", message: "Could not reach the processing server.", code: "BACKEND_UNREACHABLE" })}\n\n`,
       {
         status: 200,
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
+          [REQUEST_ID_HEADER]: requestId,
         },
       }
     );
@@ -106,12 +112,13 @@ export async function GET(req: NextRequest) {
     const errorText = await backendRes.text().catch(() => "");
     console.error("[sse-proxy] backend error:", backendRes.status, errorText);
     return new Response(
-      `data: ${JSON.stringify({ status: "error", message: `Backend error ${backendRes.status}` })}\n\n`,
+      `data: ${JSON.stringify({ status: "error", error: "Bad Gateway", message: `Backend error ${backendRes.status}`, code: "UPSTREAM_ERROR" })}\n\n`,
       {
         status: 200,
         headers: {
           "Content-Type": "text/event-stream",
           "Cache-Control": "no-cache",
+          [REQUEST_ID_HEADER]: requestId,
         },
       }
     );
@@ -159,6 +166,7 @@ export async function GET(req: NextRequest) {
       "Cache-Control": "no-cache, no-transform",
       "X-Accel-Buffering": "no", // disable nginx buffering
       Connection: "keep-alive",
+      [REQUEST_ID_HEADER]: requestId,
       // Allow EventSource from the browser (same origin — no CORS needed)
     },
   });

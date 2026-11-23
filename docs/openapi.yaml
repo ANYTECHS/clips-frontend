@@ -1,136 +1,448 @@
 openapi: 3.0.3
 info:
-  title: ClipCash API
+  title: ClipCash frontend API routes
   version: 1.0.0
-  description: |
-    List endpoints share a cursor-based pagination contract. See docs/API.md.
+  description: >
+    Next.js route handlers under `app/api/**` served by the ClipCash frontend.
+    The spec is linted in CI and checked against the real handlers by the
+    contract tests in `tests/api/openapi-contract.test.ts` (see
+    `.github/workflows/openapi.yml`). Every error response uses the standard
+    `ApiError` envelope and every response carries an `x-request-id` header.
+  license:
+    name: Proprietary
+    url: https://enclips.ai
+servers:
+  - url: https://enclips.ai
+tags:
+  - name: media
+    description: Server-side streaming proxies for media files.
+  - name: youtube
+    description: YouTube import helpers.
+  - name: proxy
+    description: Pass-through proxies to the ClipCash backend.
+  - name: health
+    description: Health checks.
+
 paths:
-  /api/jobs:
+  /api/download:
     get:
-      summary: List jobs
-      tags: [Jobs]
+      operationId: downloadFile
+      tags: [media]
+      summary: Stream a Cloudinary/R2 file back with a Save-dialog disposition.
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - name: url
+          in: query
+          required: true
+          description: HTTPS URL of the file. Only Cloudinary and R2 hosts are allowed.
+          schema:
+            type: string
+        - name: filename
+          in: query
+          required: false
+          schema:
+            type: string
+            default: clip.mp4
       responses:
-        '200':
-          description: A page of jobs
+        "200":
+          description: File stream.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            video/*:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /api/youtube-dl:
+    get:
+      operationId: downloadYouTubeVideo
+      tags: [youtube]
+      summary: Stream a YouTube CDN video through our origin.
+      parameters:
+        - name: url
+          in: query
+          required: true
+          description: HTTPS YouTube / Google Video CDN URL.
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Video stream.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+          content:
+            video/*:
+              schema:
+                type: string
+                format: binary
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "415":
+          $ref: "#/components/responses/UnsupportedMediaType"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /api/youtube-info:
+    get:
+      operationId: getYouTubeInfo
+      tags: [youtube]
+      summary: Resolve YouTube metadata and a direct download URL.
+      parameters:
+        - name: videoId
+          in: query
+          required: true
+          schema:
+            type: string
+            pattern: "^[a-zA-Z0-9_-]{11}$"
+      responses:
+        "200":
+          description: Video metadata.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedResponse'
-        '400':
-          $ref: '#/components/responses/InvalidCursor'
-  /api/clips:
-    get:
-      summary: List clips
-      tags: [Clips]
+                $ref: "#/components/schemas/YouTubeInfo"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+
+  /api/r2-proxy:
+    put:
+      operationId: proxyR2Upload
+      tags: [media]
+      summary: Proxy a presigned Cloudflare R2 upload when the browser hits CORS.
       parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+        - name: url
+          in: query
+          required: true
+          description: Presigned HTTPS R2 upload URL.
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          video/*:
+            schema:
+              type: string
+              format: binary
       responses:
-        '200':
-          description: A page of clips
+        "200":
+          description: Upload accepted by R2.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "500":
+          $ref: "#/components/responses/InternalServerError"
+        "502":
+          $ref: "#/components/responses/BadGateway"
+
+  /api/health/deep:
+    get:
+      operationId: getDeepHealth
+      tags: [health]
+      summary: Deep health check of the app and the backend it proxies to.
+      responses:
+        "200":
+          description: All dependencies healthy.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedResponse'
-        '400':
-          $ref: '#/components/responses/InvalidCursor'
-  /api/wallet/transactions:
-    get:
-      summary: List wallet transactions
-      tags: [Wallet]
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
-      responses:
-        '200':
-          description: A page of wallet transactions
+                $ref: "#/components/schemas/HealthResponse"
+        "503":
+          description: At least one dependency is degraded.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PaginatedResponse'
-        '400':
-          $ref: '#/components/responses/InvalidCursor'
-  /api/notifications:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /api/proxy/{path}:
+    parameters:
+      - $ref: "#/components/parameters/BackendPath"
     get:
-      summary: List notifications
-      tags: [Notifications]
-      parameters:
-        - $ref: '#/components/parameters/Cursor'
-        - $ref: '#/components/parameters/Limit'
+      operationId: proxyGet
+      tags: [proxy]
+      summary: Forward a GET to the backend.
       responses:
-        '200':
-          description: A page of notifications
+        "200":
+          $ref: "#/components/responses/BackendPassthrough"
+        "304":
+          description: Not Modified — the client's If-None-Match matched the ETag.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        default:
+          $ref: "#/components/responses/BackendPassthrough"
+    post:
+      operationId: proxyPost
+      tags: [proxy]
+      summary: Forward a POST to the backend.
+      responses:
+        "200":
+          $ref: "#/components/responses/BackendPassthrough"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        default:
+          $ref: "#/components/responses/BackendPassthrough"
+    put:
+      operationId: proxyPut
+      tags: [proxy]
+      summary: Forward a PUT to the backend.
+      responses:
+        "200":
+          $ref: "#/components/responses/BackendPassthrough"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        default:
+          $ref: "#/components/responses/BackendPassthrough"
+    patch:
+      operationId: proxyPatch
+      tags: [proxy]
+      summary: Forward a PATCH to the backend.
+      responses:
+        "200":
+          $ref: "#/components/responses/BackendPassthrough"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        default:
+          $ref: "#/components/responses/BackendPassthrough"
+    delete:
+      operationId: proxyDelete
+      tags: [proxy]
+      summary: Forward a DELETE to the backend.
+      responses:
+        "200":
+          $ref: "#/components/responses/BackendPassthrough"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        default:
+          $ref: "#/components/responses/BackendPassthrough"
+    options:
+      operationId: proxyOptions
+      tags: [proxy]
+      summary: Forward an OPTIONS request to the backend.
+      responses:
+        "200":
+          $ref: "#/components/responses/BackendPassthrough"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+        default:
+          $ref: "#/components/responses/BackendPassthrough"
+
+  /api/sse/{path}:
+    parameters:
+      - $ref: "#/components/parameters/BackendPath"
+    get:
+      operationId: proxySse
+      tags: [proxy]
+      summary: Unbuffered Server-Sent Events proxy to the backend.
+      description: >
+        Always answers 200 with an event stream. Connection failures are sent
+        as a single `data:` event whose payload follows the `ApiError`
+        envelope plus `status: "error"`.
+      responses:
+        "200":
+          description: Event stream.
+          headers:
+            x-request-id:
+              $ref: "#/components/headers/RequestId"
           content:
-            application/json:
+            text/event-stream:
               schema:
-                $ref: '#/components/schemas/PaginatedResponse'
-        '400':
-          $ref: '#/components/responses/InvalidCursor'
+                type: string
+
 components:
-  parameters:
-    Cursor:
-      name: cursor
-      in: query
-      required: false
-      description: >-
-        Opaque base64url cursor taken from `pagination.nextCursor` of the
-        previous page. Omit to fetch the first page.
+  headers:
+    RequestId:
+      description: Correlation ID for this request (also used as the Sentry `request_id` tag).
+      required: true
       schema:
         type: string
-        pattern: '^[A-Za-z0-9_-]+$'
-    Limit:
-      name: limit
-      in: query
-      required: false
-      description: Page size. Values outside 1–100 are clamped.
+
+  parameters:
+    BackendPath:
+      name: path
+      in: path
+      required: true
+      description: Backend path forwarded verbatim (may contain slashes).
       schema:
-        type: integer
-        minimum: 1
-        maximum: 100
-        default: 20
+        type: string
+
   schemas:
-    PaginationMeta:
+    ApiError:
       type: object
-      required: [nextCursor, hasMore]
-      properties:
-        nextCursor:
-          type: string
-          nullable: true
-          description: Cursor for the next page; null on the last page.
-        hasMore:
-          type: boolean
-        total:
-          type: integer
-          description: Total item count, when available.
-    PaginatedResponse:
-      type: object
-      required: [data, pagination]
-      properties:
-        data:
-          type: array
-          items:
-            type: object
-        pagination:
-          $ref: '#/components/schemas/PaginationMeta'
-    Error:
-      type: object
-      required: [error, message, statusCode]
+      required: [error, message]
+      additionalProperties: false
       properties:
         error:
           type: string
-          example: Invalid cursor
+          description: Short label for the HTTP status, e.g. "Bad Request".
         message:
           type: string
-        statusCode:
-          type: integer
-          example: 400
+          description: Human-readable explanation, safe to show to users.
+        code:
+          type: string
+          description: Optional machine-readable reason, e.g. "MISSING_URL".
+
+    YouTubeInfo:
+      type: object
+      required: [videoId, title, durationSeconds, thumbnail, downloadUrl, fileSizeBytes, quality]
+      properties:
+        videoId:
+          type: string
+        title:
+          type: string
+        durationSeconds:
+          type: number
+        thumbnail:
+          type: string
+        downloadUrl:
+          type: string
+        fileSizeBytes:
+          type: number
+          nullable: true
+        quality:
+          type: string
+
+    DependencyStatus:
+      type: object
+      required: [ok, latencyMs]
+      properties:
+        ok:
+          type: boolean
+        latencyMs:
+          type: number
+        error:
+          type: string
+
+    HealthResponse:
+      type: object
+      required: [status, checks]
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded]
+        checks:
+          type: object
+          required: [app, backend]
+          properties:
+            app:
+              $ref: "#/components/schemas/DependencyStatus"
+            backend:
+              $ref: "#/components/schemas/DependencyStatus"
+
   responses:
-    InvalidCursor:
-      description: The cursor is malformed.
+    BadRequest:
+      description: Invalid or missing parameters.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/Error'
+            $ref: "#/components/schemas/ApiError"
+    Forbidden:
+      description: The request is not allowed.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    NotFound:
+      description: The resource was not found.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    UnsupportedMediaType:
+      description: The upstream content type is not allowed.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    InternalServerError:
+      description: Unexpected server error.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    BadGateway:
+      description: The upstream server failed or could not be reached.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    ServiceUnavailable:
+      description: The backend is starting up or unreachable.
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ApiError"
+    BackendPassthrough:
+      description: Backend response forwarded as-is (status, headers and body).
+      headers:
+        x-request-id:
+          $ref: "#/components/headers/RequestId"

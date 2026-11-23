@@ -1,6 +1,7 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
+import { jwtSecretOrKeyProvider } from '../jwt-keys';
 
 export type JwtPayload = {
   sub: number;
@@ -15,7 +16,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET || 'dev_jwt_secret',
+      // Accepts JWT_SECRET and, during rotation, JWT_SECRET_PREVIOUS.
+      secretOrKeyProvider: jwtSecretOrKeyProvider,
     });
   }
 
@@ -37,6 +39,7 @@ import { Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { jwtSecretOrKeyProvider } from '../jwt-keys';
 
 /**
  * JWT payload structure.
@@ -62,7 +65,8 @@ export interface JwtPayload {
  * Used by JwtAuthGuard to verify tokens from the Authorization header.
  *
  * Configuration:
- * - Secret: process.env.JWT_SECRET or 'dev_jwt_secret'
+ * - Secret: process.env.JWT_SECRET or 'dev_jwt_secret'; JWT_SECRET_PREVIOUS
+ *   is also accepted during a key rotation (see docs/SESSION_SECURITY.md)
  * - Extraction: Bearer token from Authorization header
  * - Validation: Signature verification and expiration check (done by Passport)
  */
@@ -72,8 +76,8 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey:
-        configService.get<string>('JWT_SECRET') || 'dev_jwt_secret',
+      // Accepts JWT_SECRET and, during rotation, JWT_SECRET_PREVIOUS.
+      secretOrKeyProvider: jwtSecretOrKeyProvider,
     });
   }
 

@@ -1,0 +1,39 @@
+name: openapi
+
+# Issue #1389 — keep docs/openapi.yaml in sync with the app/api route handlers.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-spec:
+    name: Lint OpenAPI spec
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Rules are configured in redocly.yaml (recommended ruleset). Any
+      # structural or rule error fails the job.
+      - name: Redocly lint
+        run: npx --yes @redocly/cli@1.34.0 lint docs/openapi.yaml --format=github-actions
+
+  contract-tests:
+    name: Spec / route contract tests
+    runs-on: ubuntu-latest
+    needs: lint-spec
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      # Fails when a route is undocumented, a documented path/method has no
+      # handler, or a real response (status, headers, content type, body)
+      # doesn't match the spec. Also enforces the standard error envelope.
+      - name: Contract tests
+        run: npx vitest --run tests/api

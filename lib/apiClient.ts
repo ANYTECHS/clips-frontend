@@ -1,5 +1,7 @@
 
 import axios from 'axios';
+import { reportError } from './errorReporting';
+import { REQUEST_ID_HEADER } from './requestId';
 
 
 const getApiBaseUrl = () => {
@@ -23,6 +25,13 @@ const apiClient = axios.create({
 
 
 const UNSAFE_METHODS = ['post', 'put', 'patch', 'delete'];
+
+function readCookie(name: string): string | null {
+  const match = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith(`${name}=`));
+  return match ? decodeURIComponent(match.slice(name.length + 1)) : null;
+}
 if (typeof window !== 'undefined') {
   apiClient.interceptors.request.use((config) => {
     const method = (config.method || 'get').toLowerCase();
@@ -32,6 +41,14 @@ if (typeof window !== 'undefined') {
       const key = crypto.randomUUID();
       if (typeof headers?.set === 'function') headers.set('Idempotency-Key', key);
       else headers['Idempotency-Key'] = key;
+    }
+    // Double-submit CSRF: echo the `_csrf` cookie issued by the backend.
+    if (UNSAFE_METHODS.includes(method)) {
+      const csrfToken = readCookie('_csrf');
+      if (csrfToken) {
+        if (typeof headers?.set === 'function') headers.set('X-CSRF-Token', csrfToken);
+        else headers['X-CSRF-Token'] = csrfToken;
+      }
     }
     return config;
   });
@@ -43,6 +60,13 @@ if (typeof window !== 'undefined') {
     (response) => response,
     async (error) => {
       const originalRequest = error.config;
+
+      // Issue #1391 — tag server errors with the request ID returned by the
+      // API so the Sentry event can be correlated with server/backend logs.
+      const requestId: string | undefined = error.response?.headers?.[REQUEST_ID_HEADER];
+      if (requestId && error.response.status >= 500) {
+        reportError(error, { requestId });
+      }
 
       // If error doesn't have config (e.g. network error), just reject
       if (!originalRequest) {

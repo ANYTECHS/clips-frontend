@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { Trash2, MoveRight, Loader2, CheckCircle2, AlertCircle, X, ChevronDown } from "lucide-react";
+import ConfirmModal from "@/components/shared/ConfirmModal";
 
 interface SelectionFooterProps {
   count: number;
@@ -39,14 +40,11 @@ export default function SelectionFooter({ count, selectedIds, onDelete, onClearS
     );
   };
 
+  // Destructive action: deletion only runs after explicit confirmation in the
+  // dialog (issue #1388). Esc / Cancel closes the dialog without deleting.
   const handleDelete = async () => {
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
     setLoading(true);
     setAction("delete");
-    setConfirmDelete(false);
     try {
       await onDelete(selectedIds);
       onClearSelection();
@@ -54,6 +52,7 @@ export default function SelectionFooter({ count, selectedIds, onDelete, onClearS
     } catch {
       showToast("error", "Failed to delete clips. Please try again.");
     } finally {
+      setConfirmDelete(false);
       setLoading(false);
       setAction(null);
     }
@@ -68,6 +67,17 @@ export default function SelectionFooter({ count, selectedIds, onDelete, onClearS
 
   return (
     <>
+      <ConfirmModal
+        isOpen={confirmDelete}
+        onClose={() => { if (!loading) setConfirmDelete(false); }}
+        onConfirm={handleDelete}
+        title={`Delete ${count} clip${count > 1 ? "s" : ""}`}
+        message={`${count} selected clip${count > 1 ? "s" : ""} will be permanently deleted, including ${count > 1 ? "their" : "its"} video file${count > 1 ? "s" : ""} and Ready-to-Post Kit${count > 1 ? "s" : ""}. This action cannot be undone.`}
+        confirmText={`Delete ${count > 1 ? "clips" : "clip"}`}
+        variant="danger"
+        loading={loading && action === "delete"}
+      />
+
       {/* In-app toast */}
       {toast && (
         <div className={`fixed top-6 right-6 z-50 flex items-center gap-3 px-5 py-3.5 rounded-2xl border shadow-xl animate-in slide-in-from-right-5 fade-in duration-300 max-w-md ${
@@ -100,37 +110,18 @@ export default function SelectionFooter({ count, selectedIds, onDelete, onClearS
 
           {/* Middle: actions */}
           <div className="flex flex-wrap items-center justify-center gap-4 text-[#90A89C]">
-            {confirmDelete ? (
-              <div className="flex items-center gap-3">
-                <span className="text-[13px] text-red-400 font-medium">Delete {count} clip{count > 1 ? "s" : ""}?</span>
-                <button
-                  onClick={handleDelete}
-                  disabled={loading}
-                  className="px-4 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[13px] font-bold hover:bg-red-500/20 transition-all"
-                >
-                  Confirm
-                </button>
-                <button
-                  onClick={() => setConfirmDelete(false)}
-                  className="px-4 py-2 rounded-xl border border-[#0e4d2a] text-[#90A89C] text-[13px] font-bold hover:text-[#F4F7EF] transition-all"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="flex items-center gap-2.5 px-6 py-3 rounded-2xl border border-[#0e4d2a] bg-[#042413] text-[13px] font-bold text-[#90A89C] hover:text-red-400 hover:border-red-400/20 transition-all disabled:opacity-50"
-              >
-                {loading && action === "delete" ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Trash2 className="w-4 h-4" />
-                )}
-                <span>Delete</span>
-              </button>
-            )}
+            <button
+              onClick={() => setConfirmDelete(true)}
+              disabled={loading}
+              className="flex items-center gap-2.5 px-6 py-3 rounded-2xl border border-[#0e4d2a] bg-[#042413] text-[13px] font-bold text-[#90A89C] hover:text-red-400 hover:border-red-400/20 transition-all disabled:opacity-50"
+            >
+              {loading && action === "delete" ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              <span>Delete</span>
+            </button>
           </div>
 
           {/* Right: platform picker + auto-post */}

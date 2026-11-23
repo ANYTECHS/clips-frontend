@@ -51,6 +51,7 @@ export default function ConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-modal-title"
+        aria-describedby="confirm-modal-message"
         className="relative w-full max-w-md bg-[#06351C] border border-[#0e4d2a] rounded-[32px] p-8 shadow-[0_0_80px_rgba(0,0,0,0.6)] animate-in zoom-in-95 duration-300 overflow-hidden">
         {/* subtle glow */}
         <div className={`absolute -top-24 -right-24 w-48 h-48 rounded-full blur-[60px] pointer-events-none ${variant === 'danger' ? 'bg-red-500/10' : 'bg-[#39FF14]/10'}`} />
@@ -62,7 +63,7 @@ export default function ConfirmModal({
 
           <div className="space-y-2">
             <h3 id="confirm-modal-title" className="text-2xl font-bold text-[#F4F7EF] tracking-tight">{title}</h3>
-            <p className="text-[#90A89C] leading-relaxed">{message}</p>
+            <p id="confirm-modal-message" className="text-[#90A89C] leading-relaxed">{message}</p>
           </div>
 
           <div className="flex gap-3 w-full pt-2">

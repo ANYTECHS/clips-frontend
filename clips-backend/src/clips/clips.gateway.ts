@@ -6,6 +6,7 @@ import {
   OnGatewayDisconnect,
 } from '@nestjs/websockets';
 import { JwtService } from '@nestjs/jwt';
+import { verifyJwtWithRotation } from '../auth/jwt-keys';
 import { Server, Socket } from 'socket.io';
 import type {
   ClipProgressPayload,
@@ -109,7 +110,8 @@ export class ClipsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       if (!token) return null;
 
-      const payload = this.jwtService.verify<{ sub?: number | string }>(token);
+      // Accepts the current and, during rotation, the previous signing key.
+      const payload = verifyJwtWithRotation<{ sub?: number | string }>(token);
       const userId = String(payload?.sub ?? '');
       if (!userId) return null;
 

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { triggerDownload } from "@/lib/download";
 import ReadyToPostModal from "@/components/shared/ReadyToPostModal";
+import ConfirmModal from "@/components/shared/ConfirmModal";
 import { ReadyToPostKit } from "@/lib/queries";
 import Button from "@/components/shared/Button";
 
@@ -176,19 +177,28 @@ export default function ClipCard({
   const [imgSrc, setImgSrc] = useState(thumbnail || FALLBACK_IMG);
   const [showPreview, setShowPreview] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
     setImgSrc(thumbnail || FALLBACK_IMG);
   }, [thumbnail]);
 
-  const handleDelete = async (e: React.MouseEvent) => {
+  // Destructive action: open a confirmation dialog first (issue #1388).
+  const requestDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (!onDelete || isDeleting) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDelete = async () => {
     if (!onDelete || isDeleting) return;
     setIsDeleting(true);
     try {
       await onDelete(id);
+      setShowDeleteConfirm(false);
     } catch {
       setIsDeleting(false);
+      setShowDeleteConfirm(false);
     }
   };
 
@@ -211,6 +221,17 @@ export default function ClipCard({
       {showPreview && clipUrl && (
         <VideoModal clipUrl={clipUrl} title={initialTitle} onClose={() => setShowPreview(false)} />
       )}
+
+      <ConfirmModal
+        isOpen={showDeleteConfirm}
+        onClose={() => { if (!isDeleting) setShowDeleteConfirm(false); }}
+        onConfirm={handleDelete}
+        title="Delete clip"
+        message={`"${initialTitle}" will be permanently deleted, including its video file and Ready-to-Post Kit. This action cannot be undone.`}
+        confirmText="Delete clip"
+        variant="danger"
+        loading={isDeleting}
+      />
 
       {showPostKit && (
         <ReadyToPostModal
@@ -327,7 +348,7 @@ export default function ClipCard({
 
             {/* Delete button */}
             <button
-              onClick={handleDelete}
+              onClick={requestDelete}
               disabled={isDeleting}
               className="w-9 h-9 rounded-xl flex items-center justify-center bg-[#031d0f] hover:bg-red-500/10 border border-[#0e4d2a] hover:border-red-500/30 text-[#90A89C] hover:text-red-400 transition-all disabled:opacity-40 shrink-0 active:scale-[0.95]"
               title="Delete this clip"

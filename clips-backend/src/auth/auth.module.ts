@@ -11,6 +11,7 @@ import { MailService } from './mail.service';
 import { CookieService } from './cookie.service';
 import { DeviceFingerprintService } from './device-fingerprint.service';
 import { BruteForceProtectionService } from './brute-force-protection.service';
+import { PasswordResetRateLimiterService } from './password-reset-rate-limiter.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { CsrfModule } from '../csrf/csrf.module';
 import { BullModule } from '@nestjs/bullmq';
@@ -60,6 +61,7 @@ import { QueueOverflowService } from '../common/queue/queue-overflow.service';
     CookieService,
     DeviceFingerprintService,
     BruteForceProtectionService,
+    PasswordResetRateLimiterService,
     EmailDeliveryService,
     EmailDeliveryProcessor,
     AdminGuard,

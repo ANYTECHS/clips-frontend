@@ -1,4 +1,6 @@
- import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiError } from "@/lib/apiResponse";
+import { resolveRequestId, withRequestId } from "@/lib/requestId";
 
 export const dynamic = "force-dynamic";
 
@@ -50,17 +52,18 @@ function isAllowedYouTubeUrl(raw: string): boolean {
 }
 
 export async function GET(req: NextRequest) {
+  const requestId = resolveRequestId(req.headers);
   const rawUrl = req.nextUrl.searchParams.get("url") ?? "";
 
   if (!rawUrl) {
-    return NextResponse.json({ error: "Missing url parameter." }, { status: 400 });
+    return apiError(400, "Missing url parameter.", { code: "MISSING_URL", requestId });
   }
 
   if (!isAllowedYouTubeUrl(rawUrl)) {
-    return NextResponse.json(
-      { error: "URL not permitted — only YouTube CDN URLs are accepted." },
-      { status: 400 }
-    );
+    return apiError(400, "URL not permitted — only YouTube CDN URLs are accepted.", {
+      code: "URL_NOT_PERMITTED",
+      requestId,
+    });
   }
 
   let upstream: Response;
@@ -78,29 +81,30 @@ export async function GET(req: NextRequest) {
     });
   } catch (err: any) {
     console.error("[youtube-dl] fetch error:", err?.message);
-    return NextResponse.json(
-      { error: "Could not reach YouTube CDN. Please try again." },
-      { status: 502 }
-    );
+    return apiError(502, "Could not reach YouTube CDN. Please try again.", {
+      code: "UPSTREAM_UNREACHABLE",
+      requestId,
+      cause: err,
+    });
   }
 
   if (!upstream.ok) {
-    return NextResponse.json(
-      { error: `YouTube CDN returned ${upstream.status}.` },
-      { status: 502 }
-    );
+    return apiError(502, `YouTube CDN returned ${upstream.status}.`, {
+      code: "UPSTREAM_ERROR",
+      requestId,
+    });
   }
 
   const contentType = upstream.headers.get("content-type") ?? "";
   if (!contentType.startsWith("video/") && !contentType.startsWith("application/octet-stream")) {
-    return NextResponse.json(
-      { error: "Unexpected content type from YouTube CDN." },
-      { status: 415 }
-    );
+    return apiError(415, "Unexpected content type from YouTube CDN.", {
+      code: "UNSUPPORTED_CONTENT_TYPE",
+      requestId,
+    });
   }
 
   if (!upstream.body) {
-    return NextResponse.json({ error: "Empty response from YouTube CDN." }, { status: 502 });
+    return apiError(502, "Empty response from YouTube CDN.", { code: "UPSTREAM_EMPTY", requestId });
   }
 
   // Stream through a byte counter that enforces the size cap
@@ -125,8 +129,11 @@ export async function GET(req: NextRequest) {
       : {}),
   });
 
-  return new Response(upstream.body.pipeThrough(limiter), {
-    status: 200,
-    headers: responseHeaders,
-  });
+  return withRequestId(
+    new Response(upstream.body.pipeThrough(limiter), {
+      status: 200,
+      headers: responseHeaders,
+    }),
+    requestId
+  );
 }

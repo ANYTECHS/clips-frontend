@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest } from "next/server";
+import { apiJson } from "@/lib/apiResponse";
+import { resolveRequestId } from "@/lib/requestId";
 
 // Deep health check endpoint (issue #1396).
 //
@@ -38,7 +40,8 @@ async function checkDependency(
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const requestId = resolveRequestId(req.headers);
   const baseUrl = (process.env.API_URL || "https://clipcash-api.onrender.com").replace(
     /\/+$/,
     ""
@@ -59,11 +62,11 @@ export async function GET() {
   const status =
     checks.every((c) => c.ok) ? "healthy" : "degraded";
 
-  return NextResponse.json(
+  return apiJson(
     {
       status,
       checks: { app: checks[0], backend: checks[1] },
     },
-    { status: status === "healthy" ? 200 : 503 }
+    { status: status === "healthy" ? 200 : 503, requestId }
   );
 }
