@@ -11,6 +11,9 @@ import {
   BadRequestException,
   HttpCode,
   HttpStatus,
+  HttpException,
+  UnauthorizedException,
+  Logger,
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
@@ -35,16 +38,51 @@ import { LoginResponseDto } from './dto/login-response.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { CsrfService } from '../csrf/csrf.service';
+import { PasswordResetRateLimiterService } from './password-reset-rate-limiter.service';
+import { verifyJwtWithRotation } from './jwt-keys';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly cookieService: CookieService,
     private readonly deviceFingerprintService: DeviceFingerprintService,
     private readonly csrfService: CsrfService,
+    private readonly passwordResetRateLimiter: PasswordResetRateLimiterService,
   ) {}
+
+  @Get('csrf')
+  @ApiOperation({
+    summary: 'Issue a CSRF token',
+    description:
+      'Issues a fresh CSRF token to an authenticated session. The token is set in the `_csrf` cookie and returned in the body; send it back in the `X-CSRF-Token` header on every POST/PUT/PATCH/DELETE request.',
+  })
+  @ApiResponse({ status: 200, description: 'CSRF token issued' })
+  @ApiResponse({ status: 401, description: 'No valid session' })
+  getCsrfToken(
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const authHeader: string | undefined = req.headers?.authorization;
+    const accessToken = authHeader?.startsWith('Bearer ')
+      ? authHeader.slice('Bearer '.length)
+      : req.cookies?.['access_token'];
+    if (!accessToken) {
+      throw new UnauthorizedException();
+    }
+    try {
+      verifyJwtWithRotation(accessToken);
+    } catch {
+      throw new UnauthorizedException();
+    }
+
+    const csrfToken = this.csrfService.generateToken();
+    this.csrfService.setCsrfCookie(res, csrfToken);
+    return { csrfToken };
+  }
 
   @Post('signup')
   @ApiOperation({ summary: 'Register a new user account' })
@@ -437,11 +475,14 @@ export class AuthController {
       throw new BadRequestException('Refresh token is required');
     }
     const result = await this.authService.refreshTokens(rawToken, fingerprint);
+    // Re-issue the CSRF token so it never outlives the refreshed session.
+    const csrfToken = this.csrfService.generateToken();
+    this.csrfService.setCsrfCookie(res, csrfToken);
     if (useCookies === 'true') {
       this.cookieService.setTokenCookies(res, result);
-      return {};
+      return { csrfToken };
     }
-    return result;
+    return { ...result, csrfToken };
   }
 
   @Post('logout')
@@ -464,13 +505,39 @@ export class AuthController {
   @ApiOperation({ summary: 'Request password reset', description: 'Sends password reset link to email' })
   @ApiResponse({ status: 200, description: 'Reset link sent if email exists' })
   @ApiResponse({ status: 400, description: 'Invalid email format' })
-  @ApiResponse({ status: 429, description: 'Too many requests' })
+  @ApiResponse({
+    status: 429,
+    description:
+      'Too many requests — limited to 3 per hour per email and per IP',
+  })
   @HttpCode(HttpStatus.OK)
   @Throttle({ sensitive: { limit: 3, ttl: 900000 } })
   async forgotPassword(
     @Body(new ValidationPipe({ transform: true })) dto: ForgotPasswordDto,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
-    await this.authService.forgotPassword(dto.email);
+    // Counted before any user lookup, so the limit is identical for
+    // existing and non-existing emails.
+    const limit = await this.passwordResetRateLimiter.consume(
+      dto.email,
+      req.ip ?? req.socket?.remoteAddress ?? '',
+    );
+    if (!limit.allowed) {
+      res.setHeader('Retry-After', String(limit.retryAfterSeconds));
+      throw new HttpException(
+        'Too many password reset requests. Please try again later.',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    // Not awaited: the response (body and timing) must not depend on
+    // whether the email belongs to an account.
+    void Promise.resolve()
+      .then(() => this.authService.forgotPassword(dto.email))
+      .catch((err: Error) => {
+        this.logger.error(`Password reset request failed: ${err?.message}`);
+      });
     return { message: 'If that email exists, a reset link has been sent.' };
   }
 

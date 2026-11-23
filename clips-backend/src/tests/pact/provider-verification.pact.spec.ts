@@ -20,6 +20,7 @@ import { EarningsExportService } from '../../earnings/earnings-export.service';
 import { DailyEarningsAggregationService } from '../../earnings/daily-earnings-aggregation.service';
 import { LeaderboardService } from '../../earnings/leaderboard.service';
 import { CsrfService } from '../../csrf/csrf.service';
+import { PasswordResetRateLimiterService } from '../../auth/password-reset-rate-limiter.service';
 import { VideosController } from '../../videos/videos.controller';
 import { WalletsController } from '../../wallets/wallets.controller';
 import { WalletsService } from '../../wallets/wallets.service';
@@ -435,6 +436,14 @@ async function createProviderApp(
         useValue: {
           generateToken: jest.fn().mockReturnValue('csrf-token'),
           setCsrfCookie: jest.fn(),
+        },
+      },
+      {
+        provide: PasswordResetRateLimiterService,
+        useValue: {
+          consume: jest
+            .fn()
+            .mockResolvedValue({ allowed: true, retryAfterSeconds: 0 }),
         },
       },
       { provide: ClipsService, useValue: services.clips },
