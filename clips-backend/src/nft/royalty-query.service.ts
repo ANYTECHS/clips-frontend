@@ -1,0 +1,257 @@
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  InternalServerErrorException,
+  NotFoundException,
+} from '@nestjs/common';
+import { StellarService } from '../stellar/stellar.service';
+import { RedisService } from '../redis/redis.service';
+import StellarSdk from '@stellar/stellar-sdk';
+import { CacheKeyBuilder } from './cache-key.util';
+import {
+  CircuitBreakerService,
+  CircuitBreakerConfig,
+} from '../common/circuit-breaker/circuit-breaker.service';
+
+/** Redis cache TTL for on-chain royalty responses (5 minutes). */
+const CACHE_TTL_SECONDS = 300;
+
+export interface RoyaltyInfo {
+  royaltyBps: number;
+  recipient: string;
+}
+
+@Injectable()
+export class RoyaltyQueryService {
+  private readonly logger = new Logger(RoyaltyQueryService.name);
+
+  private readonly CONTRACT_ID =
+    process.env.SOROBAN_NFT_CONTRACT_ID ||
+    'CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEU4';
+
+  private readonly sorobanCircuitBreakerConfig: CircuitBreakerConfig = {
+    name: 'soroban-royalty-query',
+    failureThreshold: 5,
+    recoveryTimeout: 30000,
+    samplingDuration: 60000,
+  };
+
+  constructor(
+    private readonly stellarService: StellarService,
+    private readonly redisService: RedisService,
+    private readonly circuitBreakerService: CircuitBreakerService,
+  ) {}
+
+  /**
+   * Returns royalty info for a given NFT mint address (token ID).
+   * Result is cached in Redis for 5 minutes.
+   */
+  async getRoyaltyInfo(mintAddress: string): Promise<RoyaltyInfo> {
+    const cacheKey = CacheKeyBuilder.royalty(mintAddress);
+
+    const cached = await this.redisService.get(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for royalty:${mintAddress}`);
+      return JSON.parse(cached) as RoyaltyInfo;
+    }
+
+    const result = await this.queryOnChainRoyalty(mintAddress);
+
+    await this.redisService.setex(
+      cacheKey,
+      CACHE_TTL_SECONDS,
+      JSON.stringify(result),
+    );
+
+    return result;
+  }
+
+  private async queryOnChainRoyalty(mintAddress: string): Promise<RoyaltyInfo> {
+    // mintAddress is the numeric token ID assigned during minting (= clip.id)
+    const tokenIdNum = parseInt(mintAddress, 10);
+    if (isNaN(tokenIdNum) || tokenIdNum <= 0) {
+      throw new BadRequestException(
+        `Invalid mint address: "${mintAddress}". Expected a numeric token ID.`,
+      );
+    }
+
+    const server = new StellarSdk.rpc.Server(this.stellarService.rpcUrl);
+    const contract = new StellarSdk.Contract(this.CONTRACT_ID);
+
+    const op = contract.call(
+      'get_royalties',
+      StellarSdk.nativeToScVal(BigInt(tokenIdNum), { type: 'u128' }),
+    );
+
+    // Use a well-known funded testnet/mainnet account only for read-only simulation.
+    // The sequence number "0" is acceptable because simulateTransaction ignores it.
+    const dummyAccount = new StellarSdk.Account(
+      'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN',
+      '0',
+    );
+
+    const tx = new StellarSdk.TransactionBuilder(dummyAccount, {
+      fee: '100',
+      networkPassphrase: this.stellarService.networkPassphrase,
+    })
+      .addOperation(op)
+      .setTimeout(StellarSdk.TimeoutInfinite)
+      .build();
+
+    let simulation: Awaited<ReturnType<typeof server.simulateTransaction>>;
+    try {
+      simulation = await this.circuitBreakerService.execute(
+        this.sorobanCircuitBreakerConfig,
+        async () => server.simulateTransaction(tx),
+      );
+    } catch (err) {
+      if (err.name === 'ServiceUnavailableException') {
+        this.logger.error(
+          `Soroban service unavailable during royalty query for ${mintAddress}`,
+        );
+        throw new InternalServerErrorException(
+          'Soroban service temporarily unavailable. Please try again later.',
+        );
+      }
+
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Soroban simulation failed for token ${mintAddress}: ${msg}`,
+      );
+      throw new InternalServerErrorException(
+        `Failed to query royalty from contract: ${msg}`,
+      );
+    }
+
+    if ((simulation as { error?: string }).error) {
+      throw new BadRequestException(
+        `Contract returned error: ${(simulation as { error: string }).error}`,
+      );
+    }
+
+    const results = (simulation as { results?: Array<{ xdr: string }> })
+      .results;
+
+    if (!results?.[0]?.xdr) {
+      throw new InternalServerErrorException(
+        'No return value from get_royalties contract call',
+      );
+    }
+
+    const returnValue = StellarSdk.xdr.ScVal.fromXDR(results[0].xdr, 'base64');
+    const royaltyMap = StellarSdk.scValToNative(returnValue) as
+      | Map<string, bigint>
+      | Record<string, bigint>;
+
+    const entries: [string, bigint][] =
+      royaltyMap instanceof Map
+        ? Array.from(royaltyMap.entries())
+        : Object.entries(royaltyMap);
+
+    if (entries.length === 0) {
+      throw new NotFoundException(
+        `Royalty data not found for mint address ${mintAddress}`,
+      );
+    }
+
+    const [recipient, bps] = entries[0];
+    return {
+      royaltyBps: Number(bps),
+      recipient,
+    };
+  }
+
+  /**
+   * Returns the full multi-recipient royalty split for a token by calling
+   * the Soroban `get_royalties` method, which returns a `Map<Address, u32>`.
+   * Unlike `getRoyaltyInfo` (single recipient, legacy), this surfaces every
+   * configured recipient. Not cached — callers needing the split for a
+   * one-off read (e.g. the `/nfts/:id/royalties` endpoint) can add caching
+   * if this becomes a hot path.
+   */
+  async getRoyaltySplits(tokenId: number): Promise<RoyaltyInfo[]> {
+    if (!Number.isInteger(tokenId) || tokenId <= 0) {
+      throw new BadRequestException(
+        `Invalid token ID: "${tokenId}". Expected a positive integer.`,
+      );
+    }
+
+    const server = new StellarSdk.rpc.Server(this.stellarService.rpcUrl);
+    const contract = new StellarSdk.Contract(this.CONTRACT_ID);
+
+    const op = contract.call(
+      'get_royalties',
+      StellarSdk.nativeToScVal(BigInt(tokenId), { type: 'u64' }),
+    );
+
+    const dummyAccount = new StellarSdk.Account(
+      'GAAZI4TCR3TY5OJHCTJC2A4QSY6CJWJH5IAJTGKIN2ER7LBNVKOCCWN',
+      '0',
+    );
+
+    const tx = new StellarSdk.TransactionBuilder(dummyAccount, {
+      fee: '100',
+      networkPassphrase: this.stellarService.networkPassphrase,
+    })
+      .addOperation(op)
+      .setTimeout(StellarSdk.TimeoutInfinite)
+      .build();
+
+    let simulation: Awaited<ReturnType<typeof server.simulateTransaction>>;
+    try {
+      simulation = await this.circuitBreakerService.execute(
+        this.sorobanCircuitBreakerConfig,
+        async () => server.simulateTransaction(tx),
+      );
+    } catch (err) {
+      if (err.name === 'ServiceUnavailableException') {
+        throw new InternalServerErrorException(
+          'Soroban service temporarily unavailable. Please try again later.',
+        );
+      }
+      const msg = err instanceof Error ? err.message : String(err);
+      this.logger.error(
+        `Soroban simulation failed for get_royalties(${tokenId}): ${msg}`,
+      );
+      throw new InternalServerErrorException(
+        `Failed to query royalties from contract: ${msg}`,
+      );
+    }
+
+    if ((simulation as { error?: string }).error) {
+      throw new BadRequestException(
+        `Contract returned error: ${(simulation as { error: string }).error}`,
+      );
+    }
+
+    const results = (simulation as { results?: Array<{ xdr: string }> })
+      .results;
+    if (!results?.[0]?.xdr) {
+      throw new InternalServerErrorException(
+        'No return value from get_royalties contract call',
+      );
+    }
+
+    const returnValue = StellarSdk.xdr.ScVal.fromXDR(results[0].xdr, 'base64');
+    const royaltyMap = StellarSdk.scValToNative(returnValue) as
+      | Map<string, bigint>
+      | Record<string, bigint>;
+
+    const entries: [string, bigint][] =
+      royaltyMap instanceof Map
+        ? Array.from(royaltyMap.entries())
+        : Object.entries(royaltyMap);
+
+    if (entries.length === 0) {
+      throw new NotFoundException(
+        `No royalty split configured for token ${tokenId}`,
+      );
+    }
+
+    return entries.map(([recipient, bps]) => ({
+      recipient,
+      royaltyBps: Number(bps),
+    }));
+  }
+}

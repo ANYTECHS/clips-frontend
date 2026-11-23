@@ -1,0 +1,60 @@
+import { Controller, Post, Param, UseGuards, Get, Req } from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiParam,
+  ApiBadRequestResponse,
+  ApiUnauthorizedResponse,
+  ApiNotFoundResponse,
+  ApiInternalServerErrorResponse,
+} from '@nestjs/swagger';
+import { ClipsService } from '../clips/clips.service';
+import { Auth } from '../auth/decorators/auth.decorator';
+import { ParsePositiveIntPipe } from '../common/pipes';
+
+@ApiTags('Videos')
+@ApiBadRequestResponse({ description: 'Invalid request parameters' })
+@ApiUnauthorizedResponse({ description: 'JWT token required' })
+@ApiNotFoundResponse({ description: 'Video not found' })
+@ApiInternalServerErrorResponse({ description: 'Internal server error' })
+@Auth()
+@Controller('videos')
+export class VideosController {
+  constructor(private readonly clipsService: ClipsService) {}
+
+  @Get()
+  @ApiOperation({ summary: 'List user videos' })
+  @ApiResponse({
+    status: 200,
+    description: 'List of videos returned',
+    schema: { example: { message: 'Videos endpoint' } },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  getVideos() {
+    return { message: 'Videos endpoint' };
+  }
+
+  @Post(':id/cancel')
+  @ApiOperation({
+    summary: 'Cancel video processing',
+    description: 'Cancels ongoing clip generation for a video',
+  })
+  @ApiParam({ name: 'id', description: 'Positive integer video ID', type: Number, example: 42 })
+  @ApiResponse({
+    status: 200,
+    description: 'Video processing cancelled',
+    schema: { example: { message: 'Video 42 processing has been cancelled' } },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Invalid video ID, not owned by user, or not cancellable',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 404, description: 'Video not found' })
+  async cancel(@Param('id', ParsePositiveIntPipe) id: number, @Req() req: any) {
+    const userId = Number(req.user?.id ?? 0);
+    return this.clipsService.cancelVideo(String(id), userId);
+  }
+}
