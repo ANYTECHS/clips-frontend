@@ -94,7 +94,7 @@ export class NftMintService {
   ): Promise<UploadMetadataResult> {
     const collection = await this.requireCollection(collectionId);
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       include: {
         video: { select: { userId: true } },
         clipPosts: { select: { platform: true } },
@@ -181,7 +181,9 @@ export class NftMintService {
     }
     await this.assertMintCooldown(walletAddress);
 
-    const clip = await this.prisma.clip.findUnique({ where: { id: clipId } });
+    const clip = await this.prisma.clip.findUnique({
+      where: { id: clipId, deletedAt: null },
+    });
     if (!clip) throw new NotFoundException(`Clip ${clipId} not found`);
     if (clip.mintAddress || clip.nftStatus === 'minted')
       throw new ConflictException(`Clip ${clipId} is already minted`);
@@ -287,7 +289,7 @@ export class NftMintService {
 
   async validateClipOwner(clipId: number, userId: number): Promise<void> {
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       include: { video: { select: { userId: true } } },
     });
     if (!clip) throw new NotFoundException(`Clip ${clipId} not found`);
@@ -338,7 +340,9 @@ export class NftMintService {
     mintAddress: string,
     onChainOwnerAddress: string,
   ): Promise<{ clipId: number; mintAddress: string; mintedAt: Date; nftStatus: string }> {
-    const clip = await this.prisma.clip.findUnique({ where: { id: clipId } });
+    const clip = await this.prisma.clip.findUnique({
+      where: { id: clipId, deletedAt: null },
+    });
     if (!clip) throw new NotFoundException(`Clip ${clipId} not found`);
     if (clip.mintAddress || clip.nftStatus === 'minted')
       throw new BadRequestException(`Clip ${clipId} already minted`);
@@ -488,6 +492,7 @@ export class NftMintService {
         collectionId,
         mintAddress: { not: null },
         nftStatus: { not: 'burned' },
+        deletedAt: null,
       },
     });
   }

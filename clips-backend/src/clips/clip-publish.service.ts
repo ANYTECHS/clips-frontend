@@ -49,7 +49,9 @@ export class ClipPublishService {
     userId: number,
     targetPlatforms: string[],
   ): Promise<{ jobId: string; platforms: string[] }> {
-    const clip = await this.prisma.clip.findUnique({ where: { id: clipId } });
+    const clip = await this.prisma.clip.findUnique({
+      where: { id: clipId, deletedAt: null },
+    });
     if (!clip) throw new NotFoundException(`Clip ${clipId} not found`);
     if (!clip.clipUrl) {
       throw new BadRequestException(

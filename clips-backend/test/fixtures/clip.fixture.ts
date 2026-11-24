@@ -126,6 +126,7 @@ export function buildClipRecord(overrides: Record<string, unknown> = {}) {
     error: null,
     createdAt: baseDate,
     updatedAt: baseDate,
+    deletedAt: null,
     ...overrides,
   };
 }

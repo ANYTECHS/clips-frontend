@@ -67,7 +67,7 @@ export class ClipRoyaltyService {
 
     // Verify clip exists
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
     });
 
     if (!clip) {

@@ -37,7 +37,7 @@ export class NftMintGuard implements CanActivate {
     }
 
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       select: {
         nftStatus: true,
         mintAddress: true,

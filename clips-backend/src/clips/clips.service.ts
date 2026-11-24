@@ -71,6 +71,7 @@ export interface ClipRecord {
   error: string | null;
   createdAt: Date;
   updatedAt: Date;
+  deletedAt: Date | null;
   video?: { userId: number }; // For tests
 }
 
@@ -130,7 +131,7 @@ export class ClipsService {
 
     // Fetch clip and verify ownership.
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       select: { id: true, video: { select: { userId: true } } },
     });
 
@@ -159,7 +160,7 @@ export class ClipsService {
    */
   async getRoyaltyBps(clipId: number): Promise<{ clipId: number; royaltyBps: number }> {
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       select: { id: true, royaltyBps: true },
     });
 
@@ -178,9 +179,11 @@ export class ClipsService {
   async findById(id: number): Promise<ClipRecord | null> {
     // Use test data if available (for testing)
     if (this.testData) {
-      return this.testData.find((clip) => clip.id === id) || null;
+      return this.testData.find((clip) => clip.id === id && !clip.deletedAt) || null;
     }
-    return this.prisma.clip.findUnique({ where: { id } }) as Promise<ClipRecord | null>;
+    return this.prisma.clip.findUnique({
+      where: { id, deletedAt: null },
+    }) as Promise<ClipRecord | null>;
   }
 
   /** Find a clip by ID or throw NotFoundException. */
@@ -236,7 +239,7 @@ export class ClipsService {
    */
   async preventPostedMint(clipId: number): Promise<void> {
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       select: {
         postStatus: true,
         postedAt: true,
@@ -317,7 +320,7 @@ export class ClipsService {
   /** Verify the requesting user owns a clip via its parent video. */
   async validateClipOwnership(clipId: number, userId: number): Promise<void> {
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       select: { video: { select: { userId: true } } },
     });
 
@@ -427,7 +430,7 @@ export class ClipsService {
   ): Promise<{ deleted: number; skipped: number; skippedIds: number[] }> {
     // Fetch all candidate clips including ownership info in one query
     const clips = await this.prisma.clip.findMany({
-      where: { id: { in: clipIds } },
+      where: { id: { in: clipIds }, deletedAt: null },
       select: {
         id: true,
         clipUrl: true,
@@ -462,8 +465,9 @@ export class ClipsService {
       }
     }
 
-    const { count } = await this.prisma.clip.deleteMany({
-      where: { id: { in: ownedIds } },
+    const { count } = await this.prisma.clip.updateMany({
+      where: { id: { in: ownedIds }, deletedAt: null },
+      data: { deletedAt: new Date() },
     });
 
     this.logger.log(
@@ -484,7 +488,7 @@ export class ClipsService {
     userId: number,
   ): Promise<ClipRecord> {
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       select: {
         id: true,
         startTime: true,
@@ -584,7 +588,10 @@ export class ClipsService {
     // Handle test mode
     if (this.testData) {
       const ownedClips = this.testData.filter(
-        (clip) => clipIds.includes(clip.id) && clip.video?.userId === userId,
+        (clip) =>
+          clipIds.includes(clip.id) &&
+          clip.video?.userId === userId &&
+          !clip.deletedAt,
       );
       const foundClipIds = ownedClips.map((c) => c.id);
       const notFoundIds = clipIds.filter((id) => !foundClipIds.includes(id));
@@ -608,7 +615,9 @@ export class ClipsService {
       if (updates.postStatus === 'posted') {
         const videoIds = [...new Set(ownedClips.map((c) => c.videoId))];
         for (const videoId of videoIds) {
-          const allClipsInVideo = this.testData.filter((c) => c.videoId === videoId);
+          const allClipsInVideo = this.testData.filter(
+            (c) => c.videoId === videoId && !c.deletedAt,
+          );
           const allPosted = allClipsInVideo.every(
             (clip) =>
               clip.postStatus === 'posted' ||
@@ -639,6 +648,7 @@ export class ClipsService {
       where: {
         id: { in: clipIds },
         video: { userId },
+        deletedAt: null,
       },
       select: {
         id: true,
@@ -685,7 +695,7 @@ export class ClipsService {
 
         for (const videoId of videoIds) {
           const allClipsInVideo = await prisma.clip.findMany({
-            where: { videoId },
+            where: { videoId, deletedAt: null },
             select: { id: true, postStatus: true },
           });
 
@@ -830,7 +840,7 @@ export class ClipsService {
       throw new BadRequestException('page must be a positive integer');
     }
 
-    const where: any = {};
+    const where: any = { deletedAt: null };
     if (options.videoId !== undefined) {
       where.videoId = parseInt(String(options.videoId), 10);
     }

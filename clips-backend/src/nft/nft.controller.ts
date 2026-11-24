@@ -629,6 +629,7 @@ export class NftController {
           collectionId,
           mintAddress: { not: null },
           nftStatus: { not: 'burned' },
+          deletedAt: null,
         },
       });
       if (supply >= collection.maxSupply) {
@@ -2863,7 +2864,7 @@ export class NftController {
     await this.nftMintService.validateClipOwner(clipId, userId);
 
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       include: { clipPosts: { select: { platform: true } } },
     });
     if (!clip) {
