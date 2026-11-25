@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { ClipsController } from './clips.controller';
 import { ClipsService } from './clips.service';
 import { BulkClipActionService } from './bulk-clip-action.service';
+import { ClipPurgeService } from './clip-purge.service';
 import { CloudinaryService } from './cloudinary.service';
 import { ClipPublishService } from './clip-publish.service';
 import { NftMintService } from './nft-mint.service';
@@ -32,6 +33,7 @@ import { QueueOverflowService } from '../common/queue/queue-overflow.service';
   providers: [
     ClipsService,
     BulkClipActionService,
+    ClipPurgeService,
     CloudinaryService,
     ClipPublishService,
     NftConfig,

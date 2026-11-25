@@ -94,7 +94,7 @@ export class BulkClipActionService {
     clipId: number,
   ): Promise<BulkItemResult> {
     const clip = await this.prisma.clip.findUnique({
-      where: { id: clipId },
+      where: { id: clipId, deletedAt: null },
       select: {
         id: true,
         clipUrl: true,
@@ -121,7 +121,10 @@ export class BulkClipActionService {
         }
       }
 
-      await this.prisma.clip.delete({ where: { id: clipId } });
+      await this.prisma.clip.update({
+        where: { id: clipId },
+        data: { deletedAt: new Date() },
+      });
       return { clipId, status: 'success' };
     } catch (error) {
       return this.failure(clipId, error);

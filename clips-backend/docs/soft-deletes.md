@@ -14,6 +14,7 @@ Models that use soft delete today:
 | `PayoutMethod` | `deletedAt DateTime?` | `PayoutMethodService.remove` / `SoftDeleteService` |
 | `Wallet` | `deletedAt DateTime?` | `WalletManagementService.disconnect` |
 | `Earning` | `deletedAt DateTime?` | `EarningsAggregationService.softDelete` (`DELETE /earnings/:earningId`) |
+| `Clip` | `deletedAt DateTime?` | `ClipsService.bulkDeleteClips`, `BulkClipActionService` delete action |
 
 Indexes on `deletedAt` (from `prisma/schema.prisma`):
 
@@ -21,6 +22,7 @@ Indexes on `deletedAt` (from `prisma/schema.prisma`):
 |-------|---------|
 | `Payout` | `@@index([deletedAt])`, `@@index([userId, deletedAt])` |
 | `Earning` | `@@index([deletedAt])` |
+| `Clip` | `@@index([deletedAt])` — supports the default `deletedAt: null` filter and the purge job |
 | `PayoutMethod` | none on `deletedAt` (queried via `userId` index) |
 | `Wallet` | none on `deletedAt` (queried via `userId` index; `@@unique([address, chain])`) |
 
@@ -82,6 +84,18 @@ await prisma.earning.findMany({
     clip: { video: { userId } },
     deletedAt: null,
   },
+});
+```
+
+```typescript
+// Clips — soft-deleted clips are treated as missing
+await prisma.clip.findMany({
+  where: { videoId, deletedAt: null },
+});
+
+// findUnique also accepts deletedAt alongside the unique key
+await prisma.clip.findUnique({
+  where: { id: clipId, deletedAt: null },
 });
 ```
 
@@ -164,8 +178,13 @@ await prisma.wallet.upsert({
 | Payout method | Yes | `SoftDeleteService.restorePayoutMethod` |
 | Wallet | Yes (reconnect) | Connecting the same address/chain upserts and sets `deletedAt: null` |
 | Earning | Yes (admin) | `POST /admin/earnings/:earningId/restore` via `EarningsAggregationService.restore` |
+| Clip | No (purge only) | Rows are hard-deleted by `ClipPurgeService` 90 days after `deletedAt`; there is no restore endpoint |
 
 Permanent delete methods on `SoftDeleteService` bypass restore permanently — use only under retention policy.
+
+### Clip purge job
+
+`ClipPurgeService` (`src/clips/clip-purge.service.ts`) runs daily at 03:00 UTC and hard-deletes clips with `deletedAt` older than 90 days (`CLIP_PURGE_RETENTION_DAYS`), in batches of 500. Hard deletion cascades to `Earning`, `ClipPost`, `ClipRoyalty`, and `NftMintStatus` rows per the Prisma schema, so the retention window is the last point at which clip earnings history can be audited.
 
 ## API / Swagger behavior
 
@@ -180,6 +199,7 @@ Permanent delete methods on `SoftDeleteService` bypass restore permanently — u
 | `POST /wallets/connect` | User | Upsert on `address + chain` clears `deletedAt` | `200` |
 | `DELETE /earnings/:earningId` | User | Sets `deletedAt` on an owned, active earning; invalidates earnings cache | `200 { message }`, `404` if missing / not owned / already deleted |
 | `POST /admin/earnings/:earningId/restore` | Admin (`@Auth()` + `@Admin()`) | Clears `deletedAt`; invalidates owner's cache | `200 { message, id, deletedAt: null }`, `403` non-admin, `404` missing or not soft-deleted |
+| `POST /clips/bulk-delete`, `POST /clips/bulk` (`action: "delete"`) | User | Sets `deletedAt` on owned clips; Cloudinary assets removed | `200` summary / per-item results; already-deleted clips are skipped as not found |
 
 ### How deleted resources appear
 

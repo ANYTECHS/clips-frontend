@@ -95,7 +95,7 @@ describe('ClipsService.listClips query optimisation', () => {
     await service.listClips({ videoId: '42' });
 
     const call = prisma.clip.findMany.mock.calls[0][0];
-    expect(call.where).toEqual({ videoId: 42 });
+    expect(call.where).toEqual({ deletedAt: null, videoId: 42 });
   });
 
   it('sorts by viralityScore with nulls last and createdAt tie-breaker', async () => {

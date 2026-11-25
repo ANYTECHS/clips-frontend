@@ -8,7 +8,7 @@ describe('BulkClipActionService (Issue #1401)', () => {
   const prisma = {
     clip: {
       findUnique: jest.fn(),
-      delete: jest.fn(),
+      update: jest.fn(),
     },
   };
   const cloudinary = { deleteClip: jest.fn() };
@@ -53,7 +53,7 @@ describe('BulkClipActionService (Issue #1401)', () => {
       prisma.clip.findUnique
         .mockResolvedValueOnce(ownedClip(1))
         .mockResolvedValueOnce(null); // clip 2 missing
-      prisma.clip.delete.mockResolvedValue({});
+      prisma.clip.update.mockResolvedValue({});
 
       const res = await service.execute(userId, dto());
 
@@ -68,7 +68,11 @@ describe('BulkClipActionService (Issue #1401)', () => {
         failed: 0,
         skipped: 1,
       });
-      expect(prisma.clip.delete).toHaveBeenCalledTimes(1);
+      expect(prisma.clip.update).toHaveBeenCalledTimes(1);
+      expect(prisma.clip.update).toHaveBeenCalledWith({
+        where: { id: 1 },
+        data: { deletedAt: expect.any(Date) },
+      });
       expect(cloudinary.deleteClip).toHaveBeenCalledWith(`clip-1`);
     });
 
@@ -81,14 +85,14 @@ describe('BulkClipActionService (Issue #1401)', () => {
       const res = await service.execute(userId, dto({ clipIds: [1] }));
 
       expect(res.results[0].status).toBe('skipped');
-      expect(prisma.clip.delete).not.toHaveBeenCalled();
+      expect(prisma.clip.update).not.toHaveBeenCalled();
     });
 
     it('records a per-item failure without aborting the batch', async () => {
       prisma.clip.findUnique
         .mockResolvedValueOnce(ownedClip(1))
         .mockResolvedValueOnce(ownedClip(2));
-      prisma.clip.delete
+      prisma.clip.update
         .mockRejectedValueOnce(new Error('db exploded'))
         .mockResolvedValueOnce({});
 

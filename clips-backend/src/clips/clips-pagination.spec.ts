@@ -11,10 +11,9 @@ function makeService(clips: any[] = [], total?: number) {
     },
   };
   const service = new ClipsService(
-    null as any,
-    new EventEmitter2(),
     prisma as any,
     null as any,
+    new EventEmitter2(),
     null as any,
   );
   return { service, prisma };
@@ -50,7 +49,7 @@ describe('ClipsService.listClips pagination', () => {
 
     expect(prisma.clip.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { videoId: 42 },
+        where: { deletedAt: null, videoId: 42 },
         orderBy: [
           { viralityScore: { sort: 'desc', nulls: 'last' } },
           { createdAt: 'desc' },

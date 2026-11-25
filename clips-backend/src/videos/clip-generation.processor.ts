@@ -106,7 +106,7 @@ export class ClipGenerationProcessor extends WorkerHost implements OnModuleInit 
 
       // Fetch the clips created for this video to report the final count
       const clipsGenerated = await this.prisma.clip.count({
-        where: { videoId },
+        where: { videoId, deletedAt: null },
       });
 
       // ── 100% — done ──────────────────────────────────────────────────────

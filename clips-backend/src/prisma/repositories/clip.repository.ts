@@ -17,7 +17,7 @@ export class ClipRepository {
 
   async findById(id: number): Promise<ClipPayload | null> {
     return this.prisma.clip.findMany({
-      where: { id },
+      where: { id, deletedAt: null },
       select: clipListSelect,
       take: 1,
     }).then((rows) => (rows[0] as ClipPayload | undefined) ?? null);
@@ -27,7 +27,7 @@ export class ClipRepository {
     id: number,
   ): Promise<(ClipPayload & { video: { userId: number } }) | null> {
     return this.prisma.clip.findUnique({
-      where: { id },
+      where: { id, deletedAt: null },
       select: {
         ...clipListSelect,
         video: { select: { userId: true } },
@@ -37,7 +37,7 @@ export class ClipRepository {
 
   async findManyByIds(ids: number[]): Promise<ClipPayload[]> {
     return this.prisma.clip.findMany({
-      where: { id: { in: ids } },
+      where: { id: { in: ids }, deletedAt: null },
       select: {
         ...clipListSelect,
         video: { select: { userId: true } },
@@ -56,13 +56,13 @@ export class ClipRepository {
     return paginateQuery<ClipPayload>(
       ({ skip, take }) =>
         this.prisma.clip.findMany({
-          where,
+          where: { deletedAt: null, ...where },
           orderBy,
           skip,
           take,
           select: clipListSelect,
         }) as Promise<ClipPayload[]>,
-      () => this.prisma.clip.count({ where }),
+      () => this.prisma.clip.count({ where: { deletedAt: null, ...where } }),
       page,
       limit,
     );

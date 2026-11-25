@@ -147,6 +147,7 @@ model Clip {
   error         String?
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
+  deletedAt     DateTime?
   video         Video      @relation(fields: [videoId], references: [id], onDelete: Cascade)
   collection    NftCollection @relation(fields: [collectionId], references: [collectionId], onDelete: Restrict)
   earnings      Earning[]
@@ -157,6 +158,7 @@ model Clip {
   @@index([videoId])
   @@index([selected])
   @@index([collectionId, mintAddress])
+  @@index([deletedAt])
 }
 
 model NftCollection {

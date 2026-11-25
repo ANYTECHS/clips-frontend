@@ -43,7 +43,9 @@ export class NftMintStatusService {
    */
   async getOrCreate(clipId: number): Promise<MintStatusResult> {
     // Verify clip exists first
-    const clip = await this.prisma.clip.findUnique({ where: { id: clipId } });
+    const clip = await this.prisma.clip.findUnique({
+      where: { id: clipId, deletedAt: null },
+    });
     if (!clip) throw new NotFoundException(`Clip ${clipId} not found`);
 
     const existing = await this.prisma.nftMintStatus.findUnique({

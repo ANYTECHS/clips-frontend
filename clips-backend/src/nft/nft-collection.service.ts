@@ -63,6 +63,7 @@ export class NftCollectionService {
       where: {
         mintAddress: { not: null },
         nftStatus: { not: 'burned' },
+        deletedAt: null,
         ...(query.collectionId ? { collectionId: query.collectionId } : {}),
       },
       select: {
@@ -89,6 +90,7 @@ export class NftCollectionService {
         collectionId,
         mintAddress: { not: null },
         nftStatus: { not: 'burned' },
+        deletedAt: null,
       },
     });
   }

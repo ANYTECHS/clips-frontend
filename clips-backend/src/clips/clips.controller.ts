@@ -281,8 +281,10 @@ export class ClipsController {
   /**
    * POST /clips/bulk-delete
    *
-   * Permanently deletes the specified clips (and their Cloudinary assets)
-   * after verifying ownership. Clips not owned by the caller are skipped.
+   * Soft-deletes the specified clips (sets deletedAt; Cloudinary assets are
+   * removed) after verifying ownership. Clips not owned by the caller are
+   * skipped. Soft-deleted clips are excluded from all default reads and are
+   * permanently purged after 90 days.
    *
    * Closes #739
    */
@@ -292,8 +294,9 @@ export class ClipsController {
   @ApiOperation({
     summary: 'Bulk delete rejected/unwanted clips',
     description:
-      'Permanently deletes the specified clips (and their Cloudinary assets) ' +
-      'after verifying ownership. Clips not owned by the caller are silently skipped.',
+      'Soft-deletes the specified clips (sets deletedAt; Cloudinary assets are removed) ' +
+      'after verifying ownership. Clips not owned by the caller are silently skipped. ' +
+      'Soft-deleted clips are excluded from default reads and purged after 90 days.',
   })
   @ApiResponse({
     status: 200,
